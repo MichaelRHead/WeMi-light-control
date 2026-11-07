@@ -97,9 +97,55 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     private val _useWeMiWordmark = MutableStateFlow(true)
     val useWeMiWordmark: StateFlow<Boolean> = _useWeMiWordmark.asStateFlow()
 
+    private val _isTvMode = MutableStateFlow(false)
+    val isTvMode: StateFlow<Boolean> = _isTvMode.asStateFlow()
+
     init {
         viewModelScope.launch {
             repository.ensureSeeded()
+        }
+    }
+
+    fun setTvMode(enabled: Boolean) {
+        _isTvMode.value = enabled
+    }
+
+    fun toggleTvMode() {
+        _isTvMode.value = !_isTvMode.value
+    }
+
+    fun stepDeviceBrightness(device: WeMoDeviceEntity, deltaPercent: Int) {
+        if (!device.isReachable || device.parsedType != WeMoDeviceType.LIGHTBULB_DIMMER) return
+        val next = (device.brightness + deltaPercent).coerceIn(10, 100)
+        updateBrightness(device, next)
+        showTransientStatus("${device.name}: Brightness ${next}% via TV Remote")
+    }
+
+    fun applyTvScene(sceneKey: String) {
+        viewModelScope.launch {
+            when (sceneKey) {
+                "MOVIE_MODE" -> {
+                    // Dim all reachable bulbs to 20% for Movie Mode
+                    val bulbs = devices.value.filter {
+                        it.isReachable && it.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER
+                    }
+                    bulbs.forEach { repository.updateDeviceBrightness(it, 20) }
+                    showTransientStatus("TV Movie Mode: Dimmed ${bulbs.size} smart bulb(s) to 20%")
+                }
+                "HOLIDAY_ON" -> {
+                    val holidaySwitches = devices.value.filter {
+                        it.isReachable &&
+                            it.parsedType == WeMoDeviceType.SWITCH_PLUG &&
+                            !it.isOn
+                    }
+                    holidaySwitches.forEach { repository.toggleDevicePower(it) }
+                    showTransientStatus("Holiday Scene: All smart plugs turned ON")
+                }
+                "BEDTIME_OFF" -> {
+                    turnAllSwitches(false)
+                    showTransientStatus("Bedtime Scene: Turned OFF all switches across all rooms")
+                }
+            }
         }
     }
 

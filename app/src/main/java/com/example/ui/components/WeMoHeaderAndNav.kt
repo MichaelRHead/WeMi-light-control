@@ -29,6 +29,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,6 +76,7 @@ fun WeMoTopHeader(
     onEditClick: () -> Unit,
     onAddClick: () -> Unit,
     onWordmarkClick: () -> Unit,
+    onOpenTvModeClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "refreshSpin")
@@ -118,7 +120,7 @@ fun WeMoTopHeader(
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        // Top Row: Refresh button on left, Edit pill on right
+        // Top Row: Refresh button on left, TV Remote Mode + Edit pills on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -142,26 +144,61 @@ fun WeMoTopHeader(
                 )
             }
 
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = if (isEditMode) Color.White else Color.White.copy(alpha = 0.16f),
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable(onClick = onEditClick)
-                    .testTag("edit_devices_button")
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = Color.White.copy(alpha = 0.16f),
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable(onClick = onOpenTvModeClick)
+                        .testTag("header_tv_mode_button")
                 ) {
-                    Text(
-                        text = if (isEditMode) stringResource(R.string.action_done) else stringResource(R.string.action_edit),
-                        color = if (isEditMode) WemoGreenBottom else Color.White,
-                        fontFamily = WorkSansFontFamily,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 16.sp
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tv,
+                            contentDescription = "Launch Android TV Remote Mode",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "TV Remote",
+                            color = Color.White,
+                            fontFamily = WorkSansFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isEditMode) Color.White else Color.White.copy(alpha = 0.16f),
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable(onClick = onEditClick)
+                        .testTag("edit_devices_button")
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (isEditMode) stringResource(R.string.action_done) else stringResource(R.string.action_edit),
+                            color = if (isEditMode) WemoGreenBottom else Color.White,
+                            fontFamily = WorkSansFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 16.sp
+                        )
+                    }
                 }
             }
         }

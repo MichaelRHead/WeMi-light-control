@@ -131,5 +131,18 @@ class ExampleRobolectricTest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Master Switch Control").assertIsDisplayed()
         composeTestRule.onNodeWithText("Offline Local UPnP / SOAP Engine").assertIsDisplayed()
+
+        // Launch 10-foot Android TV Remote Mode and verify D-Pad controller and TV scenes
+        composeTestRule.onNodeWithTag("header_tv_mode_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("tv_dashboard_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tv_remote_dpad_ok").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tv_scene_movie").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tv_remote_dpad_ok").performClick()
+        composeTestRule.waitForIdle()
+
+        // Return to Phone View from Android TV Mode
+        composeTestRule.onNodeWithTag("tv_exit_button").performClick()
+        composeTestRule.waitForIdle()
     }
 }

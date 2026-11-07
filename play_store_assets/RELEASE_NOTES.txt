@@ -1,6 +1,6 @@
 <en-US>
-What's new in WeMi Switch Control v2.0 (versionCode 2):
-• Room Grouping System: Organize switches by room (Living Room, Bedroom, Kitchen, Hallway, Ensuite) with quick room filter chips.
-• Master Room Power & Dimmer Controls: Toggle all switches or adjust brightness for every bulb in a room simultaneously with one tap.
-• Pull-to-Refresh SSDP Scan: Swipe down on the Devices list to trigger a live UDP multicast (239.255.255.250:1900) discovery scan.
+What's new in WeMi Switch Control v2.0 (Phone, Tablet & Android TV):
+• Android TV Support: Control your switches from the couch with your TV remote (D-Pad navigation, OK toggle, Left/Right dimmer, and Movie Mode scene).
+• Room Grouping System: Organize switches by room with Master Room Power & Brightness controls to toggle multiple lights at once.
+• Pull-to-Refresh SSDP Scan: Swipe down to broadcast a live UDP multicast (239.255.255.250:1900) discovery scan.
 </en-US>

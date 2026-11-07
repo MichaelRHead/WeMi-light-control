@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.res.Configuration
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -37,12 +38,14 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -60,6 +63,7 @@ import com.example.ui.components.WeMoRoomGroupHeaderCard
 import com.example.ui.components.WeMoSsdpDiscoveryBanner
 import com.example.ui.components.WeMoSsdpScannerModal
 import com.example.ui.components.WeMoTopHeader
+import com.example.ui.components.WeMoTvDashboardScreen
 import com.example.ui.screens.WeMoMoreScreen
 import com.example.ui.screens.WeMoRulesScreen
 import com.example.ui.theme.WeMiTheme
@@ -94,6 +98,17 @@ class MainActivity : ComponentActivity() {
 fun WeMiSwitchApp(
     viewModel: WeMoViewModel = viewModel()
 ) {
+    val configuration = LocalConfiguration.current
+    val isHardwareTelevision = remember(configuration) {
+        (configuration.uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
+    }
+
+    LaunchedEffect(isHardwareTelevision) {
+        if (isHardwareTelevision) {
+            viewModel.setTvMode(true)
+        }
+    }
+
     val devices by viewModel.devices.collectAsStateWithLifecycle()
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val soapLogs by viewModel.soapLogs.collectAsStateWithLifecycle()
@@ -114,6 +129,7 @@ fun WeMiSwitchApp(
     val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
+    val isTvMode by viewModel.isTvMode.collectAsStateWithLifecycle()
 
     val availableRooms by remember(devices) {
         derivedStateOf {
@@ -139,12 +155,14 @@ fun WeMiSwitchApp(
 
     BackHandler(
         enabled = showSsdpScannerSheet ||
+            (isTvMode && !isHardwareTelevision) ||
             isEditMode ||
             selectedRoomFilter != null ||
             selectedTab != WeMoBottomTab.DEVICES
     ) {
         when {
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
+            isTvMode && !isHardwareTelevision -> viewModel.setTvMode(false)
             isEditMode -> viewModel.setEditMode(false)
             selectedRoomFilter != null -> viewModel.selectRoomFilter(null)
             else -> viewModel.selectTab(WeMoBottomTab.DEVICES)
@@ -154,32 +172,37 @@ fun WeMiSwitchApp(
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
-            WeMoTopHeader(
-                isRefreshing = isRefreshing,
-                isEditMode = isEditMode,
-                useWeMiWordmark = useWeMiWordmark,
-                onRefreshClick = { viewModel.openSsdpScannerAndScan() },
-                onEditClick = {
-                    if (selectedTab != WeMoBottomTab.DEVICES) {
-                        viewModel.selectTab(WeMoBottomTab.DEVICES)
-                    }
-                    viewModel.toggleEditMode()
-                },
-                onAddClick = {
-                    if (selectedTab == WeMoBottomTab.RULES) {
-                        viewModel.openAddRuleDialog()
-                    } else {
-                        viewModel.openAddDeviceDialog()
-                    }
-                },
-                onWordmarkClick = { viewModel.toggleBrandWordmark() }
-            )
+            if (!isTvMode) {
+                WeMoTopHeader(
+                    isRefreshing = isRefreshing,
+                    isEditMode = isEditMode,
+                    useWeMiWordmark = useWeMiWordmark,
+                    onRefreshClick = { viewModel.openSsdpScannerAndScan() },
+                    onEditClick = {
+                        if (selectedTab != WeMoBottomTab.DEVICES) {
+                            viewModel.selectTab(WeMoBottomTab.DEVICES)
+                        }
+                        viewModel.toggleEditMode()
+                    },
+                    onAddClick = {
+                        if (selectedTab == WeMoBottomTab.RULES) {
+                            viewModel.openAddRuleDialog()
+                        } else {
+                            viewModel.openAddDeviceDialog()
+                        }
+                    },
+                    onWordmarkClick = { viewModel.toggleBrandWordmark() },
+                    onOpenTvModeClick = { viewModel.setTvMode(true) }
+                )
+            }
         },
         bottomBar = {
-            WeMoBottomNavigationBar(
-                selectedTab = selectedTab,
-                onSelectTab = { viewModel.selectTab(it) }
-            )
+            if (!isTvMode) {
+                WeMoBottomNavigationBar(
+                    selectedTab = selectedTab,
+                    onSelectTab = { viewModel.selectTab(it) }
+                )
+            }
         },
         containerColor = WemoBackgroundGray
     ) { innerPadding ->
@@ -190,13 +213,33 @@ fun WeMiSwitchApp(
                 .background(WemoBackgroundGray),
             contentAlignment = Alignment.TopCenter
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .widthIn(max = 680.dp)
-            ) {
-                when (selectedTab) {
-                    WeMoBottomTab.DEVICES -> {
+            if (isTvMode) {
+                WeMoTvDashboardScreen(
+                    devices = devices,
+                    rooms = availableRooms,
+                    selectedRoomFilter = selectedRoomFilter,
+                    isRefreshing = isRefreshing,
+                    togglingDeviceIds = togglingDeviceIds,
+                    togglingRooms = togglingRooms,
+                    latestSoapLog = soapLogs.firstOrNull(),
+                    onSelectRoomFilter = { viewModel.selectRoomFilter(it) },
+                    onToggleDevicePower = { viewModel.toggleDevicePower(it) },
+                    onStepDeviceBrightness = { dev, delta -> viewModel.stepDeviceBrightness(dev, delta) },
+                    onTriggerMotion = { viewModel.simulateOrRefreshMotion(it) },
+                    onReconnectDevice = { viewModel.reconnectDevice(it) },
+                    onToggleRoomPower = { viewModel.toggleRoomPower(it) },
+                    onApplyTvScene = { viewModel.applyTvScene(it) },
+                    onScanSsdpClick = { viewModel.openSsdpScannerAndScan() },
+                    onExitTvMode = { viewModel.setTvMode(false) }
+                )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .widthIn(max = 680.dp)
+                ) {
+                    when (selectedTab) {
+                        WeMoBottomTab.DEVICES -> {
                         val pullToRefreshState = rememberPullToRefreshState()
                         PullToRefreshBox(
                             isRefreshing = isRefreshing,
@@ -371,6 +414,7 @@ fun WeMiSwitchApp(
                             onClearLogs = { viewModel.clearSoapLogs() }
                         )
                     }
+                }
                 }
             }
 
