@@ -8,6 +8,8 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeDown
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.WeMoDeviceType
 import com.example.network.WeMoNetworkClient
@@ -80,10 +82,11 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `verify SSDP discovery banner and classic screenshot devices work`() {
+    fun `verify SSDP discovery banner, pull to refresh, and classic screenshot devices work`() {
         composeTestRule.waitForIdle()
 
-        // Verify SSDP discovery banner and top header buttons exist
+        // Verify pull-to-refresh container, SSDP discovery banner, and top header buttons exist
+        composeTestRule.onNodeWithTag("devices_pull_to_refresh").assertIsDisplayed()
         composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
         composeTestRule.onNodeWithTag("open_ssdp_scanner_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("brand_wordmark_text").assertIsDisplayed()
@@ -92,6 +95,11 @@ class ExampleRobolectricTest {
         // Verify screenshot devices appear in the list
         composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()
         composeTestRule.onNodeWithText("Christmas Candle").assertIsDisplayed()
+
+        // Trigger pull-to-refresh swipeDown gesture on the devices list
+        composeTestRule.onNodeWithTag("devices_pull_to_refresh")
+            .performTouchInput { swipeDown() }
+        composeTestRule.waitForIdle()
 
         // Toggle power on Christmas Tree Living
         composeTestRule.onNodeWithTag("power_button_1").performClick()

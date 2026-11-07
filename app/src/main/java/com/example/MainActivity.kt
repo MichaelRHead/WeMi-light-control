@@ -29,9 +29,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -58,6 +62,7 @@ import com.example.ui.theme.WeMiTheme
 import com.example.ui.theme.WemoBackgroundGray
 import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
+import com.example.ui.theme.WemoRowSurface
 import com.example.ui.theme.WemoTextPrimary
 import com.example.ui.theme.WemoTextSecondary
 import com.example.ui.theme.WorkSansFontFamily
@@ -80,6 +85,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeMiSwitchApp(
     viewModel: WeMoViewModel = viewModel()
@@ -155,59 +161,78 @@ fun WeMiSwitchApp(
             ) {
                 when (selectedTab) {
                     WeMoBottomTab.DEVICES -> {
-                        if (devices.isEmpty()) {
-                            EmptyDevicesState(
-                                onAddClick = { viewModel.openAddDeviceDialog() },
-                                onScanSsdpClick = { viewModel.openSsdpScannerAndScan() },
-                                onRestoreClassicClick = { viewModel.resetToClassicScreenshotDevices() }
-                            )
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(WemoBackgroundGray)
-                                    .testTag("devices_list"),
-                                contentPadding = PaddingValues(top = 6.dp, bottom = 36.dp)
-                            ) {
-                                item(key = "ssdp_discovery_banner_header") {
-                                    WeMoSsdpDiscoveryBanner(
-                                        isScanning = isRefreshing,
-                                        latestReport = latestSsdpReport,
-                                        savedDeviceCount = devices.count { it.isReachable },
-                                        onOpenScannerClick = { viewModel.openSsdpScannerAndScan() }
-                                    )
-                                }
+                        val pullToRefreshState = rememberPullToRefreshState()
+                        PullToRefreshBox(
+                            isRefreshing = isRefreshing,
+                            onRefresh = { viewModel.refreshDevicesFromNetwork() },
+                            state = pullToRefreshState,
+                            indicator = {
+                                PullToRefreshDefaults.Indicator(
+                                    state = pullToRefreshState,
+                                    isRefreshing = isRefreshing,
+                                    containerColor = WemoRowSurface,
+                                    color = WemoGreenPrimary,
+                                    modifier = Modifier.align(Alignment.TopCenter)
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .testTag("devices_pull_to_refresh")
+                        ) {
+                            if (devices.isEmpty()) {
+                                EmptyDevicesState(
+                                    onAddClick = { viewModel.openAddDeviceDialog() },
+                                    onScanSsdpClick = { viewModel.openSsdpScannerAndScan() },
+                                    onRestoreClassicClick = { viewModel.resetToClassicScreenshotDevices() }
+                                )
+                            } else {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(WemoBackgroundGray)
+                                        .testTag("devices_list"),
+                                    contentPadding = PaddingValues(top = 6.dp, bottom = 36.dp)
+                                ) {
+                                    item(key = "ssdp_discovery_banner_header") {
+                                        WeMoSsdpDiscoveryBanner(
+                                            isScanning = isRefreshing,
+                                            latestReport = latestSsdpReport,
+                                            savedDeviceCount = devices.count { it.isReachable },
+                                            onOpenScannerClick = { viewModel.openSsdpScannerAndScan() }
+                                        )
+                                    }
 
-                                items(devices, key = { it.id }) { device ->
-                                    WeMoDeviceRow(
-                                        device = device,
-                                        isExpanded = device.id in expandedDeviceIds,
-                                        isEditMode = isEditMode,
-                                        isToggling = device.id in togglingDeviceIds,
-                                        onTogglePower = { viewModel.toggleDevicePower(device) },
-                                        onToggleExpand = { viewModel.toggleExpandDevice(device.id) },
-                                        onBrightnessChange = { level ->
-                                            viewModel.updateBrightness(device, level)
-                                        },
-                                        onTriggerMotion = {
-                                            viewModel.simulateOrRefreshMotion(device)
-                                        },
-                                        onReconnect = {
-                                            viewModel.reconnectDevice(device)
-                                        },
-                                        onEditDevice = {
-                                            viewModel.openEditDeviceDialog(device)
-                                        },
-                                        onDeleteDevice = {
-                                            viewModel.deleteDevice(device)
-                                        },
-                                        onMoveUp = {
-                                            viewModel.moveDevice(device, moveUp = true)
-                                        },
-                                        onMoveDown = {
-                                            viewModel.moveDevice(device, moveUp = false)
-                                        }
-                                    )
+                                    items(devices, key = { it.id }) { device ->
+                                        WeMoDeviceRow(
+                                            device = device,
+                                            isExpanded = device.id in expandedDeviceIds,
+                                            isEditMode = isEditMode,
+                                            isToggling = device.id in togglingDeviceIds,
+                                            onTogglePower = { viewModel.toggleDevicePower(device) },
+                                            onToggleExpand = { viewModel.toggleExpandDevice(device.id) },
+                                            onBrightnessChange = { level ->
+                                                viewModel.updateBrightness(device, level)
+                                            },
+                                            onTriggerMotion = {
+                                                viewModel.simulateOrRefreshMotion(device)
+                                            },
+                                            onReconnect = {
+                                                viewModel.reconnectDevice(device)
+                                            },
+                                            onEditDevice = {
+                                                viewModel.openEditDeviceDialog(device)
+                                            },
+                                            onDeleteDevice = {
+                                                viewModel.deleteDevice(device)
+                                            },
+                                            onMoveUp = {
+                                                viewModel.moveDevice(device, moveUp = true)
+                                            },
+                                            onMoveDown = {
+                                                viewModel.moveDevice(device, moveUp = false)
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
