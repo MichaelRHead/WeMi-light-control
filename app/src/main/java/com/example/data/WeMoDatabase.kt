@@ -6,8 +6,12 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [WeMoDeviceEntity::class, WeMoRuleEntity::class],
-    version = 3,
+    entities = [
+        WeMoDeviceEntity::class,
+        WeMoRuleEntity::class,
+        WeMoHomeNetworkEntity::class
+    ],
+    version = 4,
     exportSchema = false
 )
 abstract class WeMoDatabase : RoomDatabase() {

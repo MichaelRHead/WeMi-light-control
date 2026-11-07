@@ -33,6 +33,30 @@ interface WeMoDao {
     @Query("DELETE FROM wemo_devices")
     suspend fun deleteAllDevices()
 
+    @Query("SELECT * FROM wemo_home_networks ORDER BY sortOrder ASC, homeName ASC")
+    fun getAllHomeNetworks(): Flow<List<WeMoHomeNetworkEntity>>
+
+    @Query("SELECT COUNT(*) FROM wemo_home_networks")
+    suspend fun getHomeNetworkCount(): Int
+
+    @Query("SELECT * FROM wemo_home_networks WHERE networkKey = :networkKey LIMIT 1")
+    suspend fun getHomeNetworkByKey(networkKey: String): WeMoHomeNetworkEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHomeNetwork(network: WeMoHomeNetworkEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertHomeNetworks(networks: List<WeMoHomeNetworkEntity>)
+
+    @Update
+    suspend fun updateHomeNetwork(network: WeMoHomeNetworkEntity)
+
+    @Query("DELETE FROM wemo_home_networks WHERE networkKey = :networkKey")
+    suspend fun deleteHomeNetworkByKey(networkKey: String)
+
+    @Query("DELETE FROM wemo_home_networks")
+    suspend fun deleteAllHomeNetworks()
+
     @Query("SELECT * FROM wemo_rules ORDER BY id ASC")
     fun getAllRules(): Flow<List<WeMoRuleEntity>>
 

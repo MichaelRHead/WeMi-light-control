@@ -3,11 +3,13 @@ package com.example.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.DEFAULT_MAIN_HOME_KEY
 import com.example.data.SoapLogEntry
 import com.example.data.SsdpDiscoveredDevice
 import com.example.data.WeMoDatabase
 import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
+import com.example.data.WeMoHomeNetworkEntity
 import com.example.data.WeMoRepository
 import com.example.data.WeMoRuleEntity
 import com.example.data.inferRoomFromName
@@ -39,6 +41,13 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = WeMoRepository.defaultClassicDevices()
         )
 
+    val homeNetworks: StateFlow<List<WeMoHomeNetworkEntity>> = repository.allHomeNetworks
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = WeMoRepository.defaultHomeNetworks()
+        )
+
     val rules: StateFlow<List<WeMoRuleEntity>> = repository.allRules
         .stateIn(
             scope = viewModelScope,
@@ -48,6 +57,15 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     val soapLogs: StateFlow<List<SoapLogEntry>> = repository.soapLogs
     val latestSsdpReport: StateFlow<SsdpScanReport?> = repository.latestSsdpReport
+
+    private val _activeNetworkKey = MutableStateFlow(DEFAULT_MAIN_HOME_KEY)
+    val activeNetworkKey: StateFlow<String> = _activeNetworkKey.asStateFlow()
+
+    private val _isReconnectingHome = MutableStateFlow(false)
+    val isReconnectingHome: StateFlow<Boolean> = _isReconnectingHome.asStateFlow()
+
+    private val _showAddHomeDialog = MutableStateFlow(false)
+    val showAddHomeDialog: StateFlow<Boolean> = _showAddHomeDialog.asStateFlow()
 
     private val _selectedTab = MutableStateFlow(WeMoBottomTab.DEVICES)
     val selectedTab: StateFlow<WeMoBottomTab> = _selectedTab.asStateFlow()
@@ -106,6 +124,65 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun currentWifiSsid(): String {
+        val currentKey = _activeNetworkKey.value
+        return homeNetworks.value.find { it.networkKey == currentKey }?.ssidLabel ?: "WeMi-Home-5G"
+    }
+
+    /**
+     * Switches the active Wi-Fi Home network and automatically reconnects/rediscovers
+     * all remembered WeMi/WeMo switches on that Wi-Fi network.
+     */
+    fun selectHomeNetwork(networkKey: String) {
+        _activeNetworkKey.value = networkKey
+        _selectedRoomFilter.value = null
+        reconnectCurrentHomeNetwork()
+    }
+
+    /**
+     * Reconnects and rediscovers all remembered switches saved under the active Wi-Fi Home.
+     */
+    fun reconnectCurrentHomeNetwork() {
+        val targetKey = _activeNetworkKey.value
+        viewModelScope.launch {
+            _isReconnectingHome.value = true
+            val summary = repository.reconnectAndRediscoverHome(targetKey)
+            _isReconnectingHome.value = false
+            showTransientStatus(
+                "Welcome back to ${summary.homeName} (${summary.ssidLabel}): Reconnected ${summary.reconnectedCount}/${summary.totalRememberedCount} remembered switches (Avg ${summary.averageLatencyMs}ms)"
+            )
+        }
+    }
+
+    fun openAddHomeDialog() {
+        _showAddHomeDialog.value = true
+    }
+
+    fun closeAddHomeDialog() {
+        _showAddHomeDialog.value = false
+    }
+
+    fun addWifiHomeNetwork(homeName: String, ssidLabel: String, subnetPrefix: String) {
+        viewModelScope.launch {
+            val created = repository.saveOrUpdateHomeNetwork(
+                existingKey = null,
+                homeName = homeName,
+                ssidLabel = ssidLabel,
+                subnetPrefix = subnetPrefix
+            )
+            _activeNetworkKey.value = created.networkKey
+            _selectedRoomFilter.value = null
+            _showAddHomeDialog.value = false
+            showTransientStatus(
+                "Remembered Wi-Fi Home '${created.homeName}' (${created.ssidLabel} • ${created.subnetPrefix}.0/24)"
+            )
+        }
+    }
+
+    fun detectCurrentLanIp(): String {
+        return repository.detectCurrentLanIp()
+    }
+
     fun setTvMode(enabled: Boolean) {
         _isTvMode.value = enabled
     }
@@ -123,17 +200,18 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun applyTvScene(sceneKey: String) {
         viewModelScope.launch {
+            val activeKey = _activeNetworkKey.value
+            val currentHomeDevices = devices.value.filter { it.networkKey == activeKey }
             when (sceneKey) {
                 "MOVIE_MODE" -> {
-                    // Dim all reachable bulbs to 20% for Movie Mode
-                    val bulbs = devices.value.filter {
+                    val bulbs = currentHomeDevices.filter {
                         it.isReachable && it.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER
                     }
                     bulbs.forEach { repository.updateDeviceBrightness(it, 20) }
                     showTransientStatus("TV Movie Mode: Dimmed ${bulbs.size} smart bulb(s) to 20%")
                 }
                 "HOLIDAY_ON" -> {
-                    val holidaySwitches = devices.value.filter {
+                    val holidaySwitches = currentHomeDevices.filter {
                         it.isReachable &&
                             it.parsedType == WeMoDeviceType.SWITCH_PLUG &&
                             !it.isOn
@@ -174,14 +252,14 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Toggles all reachable switches/bulbs in [roomName] ON or OFF at once.
-     * If any switch in the room is currently ON, turns all switches in the room OFF;
-     * otherwise turns all switches in the room ON.
+     * Toggles all reachable switches/bulbs in [roomName] ON or OFF at once on the active Wi-Fi Home.
      */
     fun toggleRoomPower(roomName: String) {
         viewModelScope.launch {
+            val activeKey = _activeNetworkKey.value
             val roomSwitches = devices.value.filter {
-                it.roomName.equals(roomName, ignoreCase = true) &&
+                it.networkKey == activeKey &&
+                    it.roomName.equals(roomName, ignoreCase = true) &&
                     it.isReachable &&
                     it.parsedType != WeMoDeviceType.MOTION_SENSOR
             }
@@ -190,7 +268,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             val targetOn = !anyOn
 
             _togglingRooms.value = _togglingRooms.value + roomName
-            val count = repository.toggleRoomPower(roomName, targetOn)
+            val count = repository.toggleRoomPower(roomName, targetOn, activeKey)
             _togglingRooms.value = _togglingRooms.value - roomName
             showTransientStatus(
                 "$roomName: Turned ${if (targetOn) "ON" else "OFF"} $count light switch(es)"
@@ -200,7 +278,8 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateRoomBrightness(roomName: String, brightness: Int) {
         viewModelScope.launch {
-            val count = repository.updateRoomBrightness(roomName, brightness)
+            val activeKey = _activeNetworkKey.value
+            val count = repository.updateRoomBrightness(roomName, brightness, activeKey)
             showTransientStatus("$roomName: Set $count dimmable light(s) to $brightness%")
         }
     }
@@ -291,32 +370,44 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         if (_isRefreshing.value) return
         viewModelScope.launch {
             _isRefreshing.value = true
+            val activeKey = _activeNetworkKey.value
+            val activeSsid = currentWifiSsid()
             val report = repository.executeSsdpScan(
                 searchTarget = searchTarget,
-                autoAdoptNew = autoAdoptNew
+                autoAdoptNew = autoAdoptNew,
+                activeNetworkKey = activeKey,
+                activeWifiSsid = activeSsid
             )
             delay(250)
             _isRefreshing.value = false
             showTransientStatus(
-                "SSDP Scan (${report.scanDurationMs}ms): Found ${report.discoveredDevices.size} UPnP WeMi/WeMo devices"
+                "SSDP Scan on $activeSsid (${report.scanDurationMs}ms): Found ${report.discoveredDevices.size} UPnP WeMi/WeMo devices"
             )
         }
     }
 
     fun adoptSsdpDevice(discovered: SsdpDiscoveredDevice) {
         viewModelScope.launch {
-            val saved = repository.adoptDiscoveredDevice(discovered)
-            showTransientStatus("Synced ${saved.name} to ${saved.roomName} (${saved.ipAddress}:${saved.port})")
+            val saved = repository.adoptDiscoveredDevice(
+                discovered = discovered,
+                activeNetworkKey = _activeNetworkKey.value,
+                activeWifiSsid = currentWifiSsid()
+            )
+            showTransientStatus("Remembered ${saved.name} in ${saved.roomName} on ${saved.wifiSsid}")
         }
     }
 
     fun adoptAllSsdpDevices() {
         viewModelScope.launch {
             val list = latestSsdpReport.value?.discoveredDevices.orEmpty()
-            val added = repository.adoptDiscoveredDevices(list)
+            val added = repository.adoptDiscoveredDevices(
+                discoveredList = list,
+                activeNetworkKey = _activeNetworkKey.value,
+                activeWifiSsid = currentWifiSsid()
+            )
             showTransientStatus(
-                if (added > 0) "Added $added newly discovered SSDP switch(es) to Rooms"
-                else "All ${list.size} SSDP-discovered devices are synced"
+                if (added > 0) "Remembered $added newly discovered SSDP switch(es) on ${currentWifiSsid()}"
+                else "All ${list.size} SSDP-discovered devices are remembered on ${currentWifiSsid()}"
             )
         }
     }
@@ -353,16 +444,22 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             val existing = devices.value.find { it.id == id }
             val resolvedName = name.trim().ifEmpty { "WeMi Light Switch" }
             val resolvedRoom = roomName.trim().ifEmpty { inferRoomFromName(resolvedName) }
+            val activeKey = existing?.networkKey ?: _activeNetworkKey.value
+            val activeSsid = existing?.wifiSsid ?: currentWifiSsid()
             val entity = WeMoDeviceEntity(
                 id = id,
                 name = resolvedName,
                 roomName = resolvedRoom,
+                networkKey = activeKey,
+                wifiSsid = activeSsid,
                 deviceType = deviceType.name,
                 ipAddress = ipAddress.trim().ifEmpty { "192.168.1.115" },
                 port = port.coerceIn(1, 65535),
                 isOn = isOn,
                 isReachable = isReachable,
                 brightness = brightness.coerceIn(1, 100),
+                latencyMs = existing?.latencyMs ?: 14,
+                lastCheckedTime = existing?.lastCheckedTime ?: "Connected now",
                 lastMotionTime = existing?.lastMotionTime ?: "4:15:15 PM",
                 serialNumber = existing?.serialNumber ?: "221517K01018NEW",
                 sortOrder = existing?.sortOrder ?: devices.value.size,
@@ -371,7 +468,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             repository.saveDevice(entity)
             _showAddDeviceDialog.value = false
             _editingDevice.value = null
-            showTransientStatus("Saved ${entity.name} in ${entity.roomName}")
+            showTransientStatus("Remembered ${entity.name} in ${entity.roomName} (${entity.wifiSsid})")
         }
     }
 
@@ -391,14 +488,19 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun turnAllSwitches(turnOn: Boolean) {
         viewModelScope.launch {
+            val activeKey = _activeNetworkKey.value
             val targets = devices.value.filter {
-                it.isReachable && it.parsedType != WeMoDeviceType.MOTION_SENSOR && it.isOn != turnOn
+                it.networkKey == activeKey &&
+                    it.isReachable &&
+                    it.parsedType != WeMoDeviceType.MOTION_SENSOR &&
+                    it.isOn != turnOn
             }
             targets.forEach { dev ->
                 repository.toggleDevicePower(dev)
             }
             showTransientStatus(
-                if (turnOn) "All reachable switches turned ON" else "All reachable switches turned OFF"
+                if (turnOn) "All reachable switches on ${currentWifiSsid()} turned ON"
+                else "All reachable switches on ${currentWifiSsid()} turned OFF"
             )
         }
     }
@@ -468,7 +570,9 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     fun resetToClassicScreenshotDevices() {
         viewModelScope.launch {
             repository.resetToClassicScreenshotPreset()
-            showTransientStatus("Restored classic 8 devices organized into Rooms")
+            _activeNetworkKey.value = DEFAULT_MAIN_HOME_KEY
+            _selectedRoomFilter.value = null
+            showTransientStatus("Restored remembered Wi-Fi Homes and classic devices")
         }
     }
 

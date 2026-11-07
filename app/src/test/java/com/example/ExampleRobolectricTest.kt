@@ -2,6 +2,7 @@ package com.example
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -88,16 +89,39 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `verify Room grouping system, master room toggle, pull to refresh, and SSDP scanner`() {
+    fun `verify Wi-Fi Home network memory, auto-reconnect, Room grouping, and SSDP scanner`() {
         composeTestRule.waitForIdle()
 
-        // Verify pull-to-refresh container, SSDP discovery banner, and Room filter bar exist
+        // Verify Wi-Fi Home selector bar, pull-to-refresh container, and SSDP discovery banner at top
+        composeTestRule.onNodeWithTag("wifi_home_selector_bar").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("reconnect_home_wifi_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("devices_pull_to_refresh").assertIsDisplayed()
         composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
+
+        // Switch to the remembered Lake Cabin Wi-Fi network ("PineLake-Cabin-WiFi") and verify remembered switches load & reconnect
+        composeTestRule.onNodeWithTag("home_chip_wifi_cabin_192_168_50").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasText("Cabin Porch Floodlight"))
+        composeTestRule.onNodeWithText("Cabin Porch Floodlight").assertIsDisplayed()
+
+        // Switch back to Main Home Wi-Fi network ("WeMi-Home-5G") and trigger one-tap Reconnect
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("wifi_home_selector_bar"))
+        composeTestRule.onNodeWithTag("home_chip_wifi_home_192_168_1").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("reconnect_home_wifi_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Scroll to Room filter bar and verify Room grouping controls
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("room_filter_bar"))
         composeTestRule.onNodeWithTag("room_filter_bar").assertIsDisplayed()
         composeTestRule.onNodeWithTag("toggle_group_by_room_chip").assertIsDisplayed()
 
-        // Verify Living Room group header and its master power toggle ring are displayed
+        // Scroll to Living Room group header and verify its master power toggle ring is displayed
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("room_header_Living Room"))
         composeTestRule.onNodeWithTag("room_header_Living Room").assertIsDisplayed()
         composeTestRule.onNodeWithTag("room_power_toggle_Living Room").assertIsDisplayed()
 

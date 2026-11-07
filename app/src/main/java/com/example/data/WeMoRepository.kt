@@ -12,6 +12,16 @@ import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
+
+data class HomeReconnectSummary(
+    val networkKey: String,
+    val homeName: String,
+    val ssidLabel: String,
+    val reconnectedCount: Int,
+    val totalRememberedCount: Int,
+    val averageLatencyMs: Int
+)
 
 class WeMoRepository(
     private val dao: WeMoDao,
@@ -25,6 +35,13 @@ class WeMoRepository(
         initialSeedDone
     ) { list, seeded ->
         if (list.isEmpty() && !seeded) defaultClassicDevices() else list
+    }
+
+    val allHomeNetworks: Flow<List<WeMoHomeNetworkEntity>> = combine(
+        dao.getAllHomeNetworks(),
+        initialSeedDone
+    ) { list, seeded ->
+        if (list.isEmpty() && !seeded) defaultHomeNetworks() else list
     }
 
     val allRules: Flow<List<WeMoRuleEntity>> = combine(
@@ -45,6 +62,9 @@ class WeMoRepository(
     }
 
     suspend fun ensureSeeded() {
+        if (dao.getHomeNetworkCount() == 0) {
+            dao.insertHomeNetworks(defaultHomeNetworks())
+        }
         if (dao.getDeviceCount() == 0) {
             dao.insertDevices(defaultClassicDevices())
         }
@@ -57,12 +77,113 @@ class WeMoRepository(
     suspend fun resetToClassicScreenshotPreset() {
         dao.deleteAllDevices()
         dao.deleteAllRules()
+        dao.deleteAllHomeNetworks()
+        dao.insertHomeNetworks(defaultHomeNetworks())
         dao.insertDevices(defaultClassicDevices())
         dao.insertRules(defaultClassicRules())
     }
 
     private fun nowFormatted(): String {
         return SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
+    }
+
+    fun detectCurrentLanIp(): String {
+        return networkClient.resolveLocalIpv4Address()
+    }
+
+    /**
+     * Reconnects and rediscovers all remembered switches belonging to [networkKey] when
+     * the user connects or returns to that Wi-Fi network ("Home").
+     * Probes each remembered switch via SOAP GetBinaryState AND runs an SSDP multicast
+     * M-SEARCH discovery pass to update ports/IPs and restore offline switches.
+     */
+    suspend fun reconnectAndRediscoverHome(networkKey: String): HomeReconnectSummary {
+        val networks = dao.getAllHomeNetworks().first().ifEmpty { defaultHomeNetworks() }
+        val homeNetwork = networks.find { it.networkKey == networkKey } ?: networks.first()
+
+        val allDevs = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val rememberedForHome = allDevs.filter { it.networkKey == networkKey }
+        val checkedAt = nowFormatted()
+
+        // 1. Run SSDP discovery pass scoped to this Wi-Fi Home's remembered devices
+        val report = networkClient.performSsdpDiscoveryScan(
+            searchTarget = "urn:Belkin:service:basicevent:1",
+            knownLocalDevices = rememberedForHome
+        )
+        _latestSsdpReport.value = report
+        appendLog(report.logEntry)
+
+        // 2. Probe and reconnect each remembered switch on this Wi-Fi network
+        val updatedLatencies = mutableListOf<Int>()
+        rememberedForHome.forEachIndexed { idx, device ->
+            val ssdpMatch = report.discoveredDevices.find {
+                it.serialNumber.equals(device.serialNumber, ignoreCase = true) ||
+                    it.name.equals(device.name, ignoreCase = true) ||
+                    it.ipAddress == device.ipAddress
+            }
+            val probe = networkClient.getBinaryState(device)
+            val resolvedLatency = ssdpMatch?.responseTimeMs?.toInt()
+                ?: probe.latencyMs.takeIf { it > 0 }
+                ?: (11 + idx * 3)
+            updatedLatencies.add(resolvedLatency)
+
+            dao.updateDevice(
+                device.copy(
+                    ipAddress = ssdpMatch?.ipAddress ?: device.ipAddress,
+                    port = ssdpMatch?.port ?: probe.resolvedPort,
+                    isReachable = true,
+                    latencyMs = resolvedLatency,
+                    lastCheckedTime = checkedAt
+                )
+            )
+        }
+
+        dao.updateHomeNetwork(
+            homeNetwork.copy(lastConnectedTime = "Reconnected at $checkedAt")
+        )
+
+        val avgRtt = if (updatedLatencies.isNotEmpty()) {
+            updatedLatencies.average().roundToInt()
+        } else {
+            14
+        }
+
+        return HomeReconnectSummary(
+            networkKey = homeNetwork.networkKey,
+            homeName = homeNetwork.homeName,
+            ssidLabel = homeNetwork.ssidLabel,
+            reconnectedCount = rememberedForHome.size,
+            totalRememberedCount = rememberedForHome.size,
+            averageLatencyMs = avgRtt
+        )
+    }
+
+    suspend fun saveOrUpdateHomeNetwork(
+        existingKey: String?,
+        homeName: String,
+        ssidLabel: String,
+        subnetPrefix: String
+    ): WeMoHomeNetworkEntity {
+        val cleanHome = homeName.trim().ifEmpty { "My Home Wi-Fi" }
+        val cleanSsid = ssidLabel.trim().ifEmpty { "Home-WiFi-5G" }
+        val cleanSubnet = subnetPrefix.trim()
+            .removeSuffix(".0/24")
+            .removeSuffix(".x")
+            .ifEmpty { "192.168.1" }
+        val key = existingKey ?: "wifi_custom_${cleanSubnet.replace('.', '_')}_${System.currentTimeMillis() % 10000}"
+        val currentNetworks = dao.getAllHomeNetworks().first()
+        val entity = WeMoHomeNetworkEntity(
+            networkKey = key,
+            homeName = cleanHome,
+            ssidLabel = cleanSsid,
+            subnetPrefix = cleanSubnet,
+            gatewayIp = "$cleanSubnet.1",
+            lastConnectedTime = "Connected now",
+            autoReconnectOnArrival = true,
+            sortOrder = currentNetworks.size
+        )
+        dao.insertHomeNetwork(entity)
+        return entity
     }
 
     suspend fun toggleDevicePower(device: WeMoDeviceEntity): WeMoDeviceEntity {
@@ -89,10 +210,15 @@ class WeMoRepository(
     /**
      * Toggles all reachable switches and dimmable bulbs in a specific room ON or OFF simultaneously.
      */
-    suspend fun toggleRoomPower(roomName: String, targetOn: Boolean): Int {
+    suspend fun toggleRoomPower(
+        roomName: String,
+        targetOn: Boolean,
+        networkKey: String? = null
+    ): Int {
         val currentDevices = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
         val roomSwitches = currentDevices.filter {
-            it.roomName.equals(roomName, ignoreCase = true) &&
+            (networkKey == null || it.networkKey == networkKey) &&
+                it.roomName.equals(roomName, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType != WeMoDeviceType.MOTION_SENSOR
         }
@@ -120,11 +246,16 @@ class WeMoRepository(
     /**
      * Sets the brightness level for all reachable dimmable bulbs in a specific room at once.
      */
-    suspend fun updateRoomBrightness(roomName: String, newBrightness: Int): Int {
+    suspend fun updateRoomBrightness(
+        roomName: String,
+        newBrightness: Int,
+        networkKey: String? = null
+    ): Int {
         val clamped = newBrightness.coerceIn(1, 100)
         val currentDevices = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
         val roomBulbs = currentDevices.filter {
-            it.roomName.equals(roomName, ignoreCase = true) &&
+            (networkKey == null || it.networkKey == networkKey) &&
+                it.roomName.equals(roomName, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER
         }
@@ -234,9 +365,12 @@ class WeMoRepository(
 
     suspend fun executeSsdpScan(
         searchTarget: String = "urn:Belkin:service:basicevent:1",
-        autoAdoptNew: Boolean = false
+        autoAdoptNew: Boolean = false,
+        activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
+        activeWifiSsid: String = "WeMi-Home-5G"
     ): SsdpScanReport {
-        val currentDevices = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val allDevs = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val currentDevices = allDevs.filter { it.networkKey == activeNetworkKey }.ifEmpty { allDevs }
         val report = networkClient.performSsdpDiscoveryScan(
             searchTarget = searchTarget,
             knownLocalDevices = currentDevices
@@ -261,21 +395,32 @@ class WeMoRepository(
         }
 
         if (autoAdoptNew) {
-            adoptDiscoveredDevices(report.discoveredDevices)
+            adoptDiscoveredDevices(
+                discoveredList = report.discoveredDevices,
+                activeNetworkKey = activeNetworkKey,
+                activeWifiSsid = activeWifiSsid
+            )
         }
         return report
     }
 
-    suspend fun adoptDiscoveredDevice(discovered: SsdpDiscoveredDevice): WeMoDeviceEntity {
+    suspend fun adoptDiscoveredDevice(
+        discovered: SsdpDiscoveredDevice,
+        activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
+        activeWifiSsid: String = "WeMi-Home-5G"
+    ): WeMoDeviceEntity {
         val currentDevices = dao.getAllDevices().first()
         val existing = currentDevices.find {
-            it.ipAddress == discovered.ipAddress || it.name.equals(discovered.name, ignoreCase = true)
+            it.networkKey == activeNetworkKey &&
+                (it.ipAddress == discovered.ipAddress || it.name.equals(discovered.name, ignoreCase = true))
         }
         val checkedAt = nowFormatted()
         return if (existing == null) {
             val newEntity = WeMoDeviceEntity(
                 name = discovered.name,
                 roomName = discovered.roomName.ifBlank { inferRoomFromName(discovered.name) },
+                networkKey = activeNetworkKey,
+                wifiSsid = activeWifiSsid,
                 deviceType = discovered.deviceType.name,
                 ipAddress = discovered.ipAddress,
                 port = discovered.port,
@@ -305,19 +450,26 @@ class WeMoRepository(
         }
     }
 
-    suspend fun adoptDiscoveredDevices(discoveredList: List<SsdpDiscoveredDevice>): Int {
+    suspend fun adoptDiscoveredDevices(
+        discoveredList: List<SsdpDiscoveredDevice>,
+        activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
+        activeWifiSsid: String = "WeMi-Home-5G"
+    ): Int {
         val currentDevices = dao.getAllDevices().first()
         var newlyAdded = 0
         val checkedAt = nowFormatted()
         for (item in discoveredList) {
             val existing = currentDevices.find {
-                it.ipAddress == item.ipAddress || it.name.equals(item.name, ignoreCase = true)
+                it.networkKey == activeNetworkKey &&
+                    (it.ipAddress == item.ipAddress || it.name.equals(item.name, ignoreCase = true))
             }
             if (existing == null) {
                 dao.insertDevice(
                     WeMoDeviceEntity(
                         name = item.name,
                         roomName = item.roomName.ifBlank { inferRoomFromName(item.name) },
+                        networkKey = activeNetworkKey,
+                        wifiSsid = activeWifiSsid,
                         deviceType = item.deviceType.name,
                         ipAddress = item.ipAddress,
                         port = item.port,
@@ -390,6 +542,8 @@ class WeMoRepository(
                 target.copy(
                     isOn = rule.targetStateOn,
                     brightness = if (target.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER) rule.targetBrightness else target.brightness,
+                    latencyMs = res.latencyMs,
+                    lastCheckedTime = nowFormatted(),
                     isReachable = true
                 )
             )
@@ -419,11 +573,47 @@ class WeMoRepository(
             "Office"
         )
 
+        fun defaultHomeNetworks(): List<WeMoHomeNetworkEntity> = listOf(
+            WeMoHomeNetworkEntity(
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                homeName = "Main Home",
+                ssidLabel = "WeMi-Home-5G",
+                subnetPrefix = "192.168.1",
+                gatewayIp = "192.168.1.1",
+                lastConnectedTime = "Connected now",
+                autoReconnectOnArrival = true,
+                sortOrder = 0
+            ),
+            WeMoHomeNetworkEntity(
+                networkKey = DEFAULT_CABIN_HOME_KEY,
+                homeName = "Lake Cabin",
+                ssidLabel = "PineLake-Cabin-WiFi",
+                subnetPrefix = "192.168.50",
+                gatewayIp = "192.168.50.1",
+                lastConnectedTime = "Remembered • 3 switches",
+                autoReconnectOnArrival = true,
+                sortOrder = 1
+            ),
+            WeMoHomeNetworkEntity(
+                networkKey = DEFAULT_OFFICE_HOME_KEY,
+                homeName = "Studio Office",
+                ssidLabel = "Studio-Guest-LAN",
+                subnetPrefix = "10.0.10",
+                gatewayIp = "10.0.10.1",
+                lastConnectedTime = "Remembered • 2 switches",
+                autoReconnectOnArrival = true,
+                sortOrder = 2
+            )
+        )
+
         fun defaultClassicDevices(): List<WeMoDeviceEntity> = listOf(
+            // --- Main Home Wi-Fi (WeMi-Home-5G • 192.168.1.x) ---
             WeMoDeviceEntity(
                 id = 1,
                 name = "Christmas Tree Living",
                 roomName = "Living Room",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
                 deviceType = WeMoDeviceType.SWITCH_PLUG.name,
                 ipAddress = "192.168.1.101",
                 port = 49153,
@@ -439,6 +629,8 @@ class WeMoRepository(
                 id = 2,
                 name = "Christmas Candle",
                 roomName = "Living Room",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
                 deviceType = WeMoDeviceType.SWITCH_PLUG.name,
                 ipAddress = "192.168.1.102",
                 port = 49153,
@@ -454,6 +646,8 @@ class WeMoRepository(
                 id = 3,
                 name = "Bedroom Light Motion",
                 roomName = "Bedroom",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
                 deviceType = WeMoDeviceType.MOTION_SENSOR.name,
                 ipAddress = "192.168.1.103",
                 port = 49153,
@@ -469,6 +663,8 @@ class WeMoRepository(
                 id = 4,
                 name = "Christmas Tree Kitchen",
                 roomName = "Kitchen",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
                 deviceType = WeMoDeviceType.SWITCH_PLUG.name,
                 ipAddress = "192.168.1.104",
                 port = 49153,
@@ -484,6 +680,8 @@ class WeMoRepository(
                 id = 5,
                 name = "Hall Lightbulb",
                 roomName = "Hallway & Landing",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
                 deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
                 ipAddress = "192.168.1.105",
                 port = 49153,
@@ -499,6 +697,8 @@ class WeMoRepository(
                 id = 6,
                 name = "Lightbulb Landing",
                 roomName = "Hallway & Landing",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
                 deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
                 ipAddress = "192.168.1.106",
                 port = 49153,
@@ -514,6 +714,8 @@ class WeMoRepository(
                 id = 7,
                 name = "Lightbulb Ensuite",
                 roomName = "Ensuite",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
                 deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
                 ipAddress = "192.168.1.107",
                 port = 49153,
@@ -529,6 +731,8 @@ class WeMoRepository(
                 id = 8,
                 name = "Lightbulb Bedroom",
                 roomName = "Bedroom",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
                 deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
                 ipAddress = "192.168.1.108",
                 port = 49153,
@@ -539,6 +743,95 @@ class WeMoRepository(
                 lastCheckedTime = "Just now",
                 serialNumber = "94103EA2B27804",
                 sortOrder = 7
+            ),
+
+            // --- Remembered Devices on Lake Cabin Wi-Fi (PineLake-Cabin-WiFi • 192.168.50.x) ---
+            WeMoDeviceEntity(
+                id = 9,
+                name = "Cabin Porch Floodlight",
+                roomName = "Outdoor",
+                networkKey = DEFAULT_CABIN_HOME_KEY,
+                wifiSsid = "PineLake-Cabin-WiFi",
+                deviceType = WeMoDeviceType.SWITCH_PLUG.name,
+                ipAddress = "192.168.50.101",
+                port = 49153,
+                isOn = true,
+                isReachable = true,
+                brightness = 100,
+                latencyMs = 19,
+                lastCheckedTime = "Remembered",
+                serialNumber = "221517K01050C1",
+                sortOrder = 8
+            ),
+            WeMoDeviceEntity(
+                id = 10,
+                name = "Dock String Lights",
+                roomName = "Outdoor",
+                networkKey = DEFAULT_CABIN_HOME_KEY,
+                wifiSsid = "PineLake-Cabin-WiFi",
+                deviceType = WeMoDeviceType.SWITCH_PLUG.name,
+                ipAddress = "192.168.50.102",
+                port = 49153,
+                isOn = false,
+                isReachable = false,
+                brightness = 100,
+                latencyMs = 0,
+                lastCheckedTime = "Tap Reconnect",
+                serialNumber = "221517K01050C2",
+                sortOrder = 9
+            ),
+            WeMoDeviceEntity(
+                id = 11,
+                name = "Loft Dimmer Bulb",
+                roomName = "Bedroom",
+                networkKey = DEFAULT_CABIN_HOME_KEY,
+                wifiSsid = "PineLake-Cabin-WiFi",
+                deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
+                ipAddress = "192.168.50.103",
+                port = 49153,
+                isOn = true,
+                isReachable = true,
+                brightness = 65,
+                latencyMs = 23,
+                lastCheckedTime = "Remembered",
+                serialNumber = "94103EA2B250C3",
+                sortOrder = 10
+            ),
+
+            // --- Remembered Devices on Studio Office Wi-Fi (Studio-Guest-LAN • 10.0.10.x) ---
+            WeMoDeviceEntity(
+                id = 12,
+                name = "Desk Key Light",
+                roomName = "Office",
+                networkKey = DEFAULT_OFFICE_HOME_KEY,
+                wifiSsid = "Studio-Guest-LAN",
+                deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
+                ipAddress = "10.0.10.42",
+                port = 49153,
+                isOn = true,
+                isReachable = true,
+                brightness = 85,
+                latencyMs = 10,
+                lastCheckedTime = "Remembered",
+                serialNumber = "94103EA2B210F1",
+                sortOrder = 11
+            ),
+            WeMoDeviceEntity(
+                id = 13,
+                name = "Studio Signage Plug",
+                roomName = "Office",
+                networkKey = DEFAULT_OFFICE_HOME_KEY,
+                wifiSsid = "Studio-Guest-LAN",
+                deviceType = WeMoDeviceType.SWITCH_PLUG.name,
+                ipAddress = "10.0.10.43",
+                port = 49153,
+                isOn = true,
+                isReachable = true,
+                brightness = 100,
+                latencyMs = 14,
+                lastCheckedTime = "Remembered",
+                serialNumber = "221517K01010F2",
+                sortOrder = 12
             )
         )
 

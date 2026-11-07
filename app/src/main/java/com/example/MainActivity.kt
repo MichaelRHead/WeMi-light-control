@@ -56,6 +56,7 @@ import com.example.ui.WeMoBottomTab
 import com.example.ui.WeMoViewModel
 import com.example.ui.components.AddOrEditWeMoDeviceDialog
 import com.example.ui.components.AddWeMoRuleDialog
+import com.example.ui.components.AddWifiHomeNetworkDialog
 import com.example.ui.components.WeMoBottomNavigationBar
 import com.example.ui.components.WeMoDeviceRow
 import com.example.ui.components.WeMoRoomFilterBar
@@ -64,6 +65,7 @@ import com.example.ui.components.WeMoSsdpDiscoveryBanner
 import com.example.ui.components.WeMoSsdpScannerModal
 import com.example.ui.components.WeMoTopHeader
 import com.example.ui.components.WeMoTvDashboardScreen
+import com.example.ui.components.WeMoWifiHomeBar
 import com.example.ui.screens.WeMoMoreScreen
 import com.example.ui.screens.WeMoRulesScreen
 import com.example.ui.theme.WeMiTheme
@@ -110,6 +112,10 @@ fun WeMiSwitchApp(
     }
 
     val devices by viewModel.devices.collectAsStateWithLifecycle()
+    val homeNetworks by viewModel.homeNetworks.collectAsStateWithLifecycle()
+    val activeNetworkKey by viewModel.activeNetworkKey.collectAsStateWithLifecycle()
+    val isReconnectingHome by viewModel.isReconnectingHome.collectAsStateWithLifecycle()
+    val showAddHomeDialog by viewModel.showAddHomeDialog.collectAsStateWithLifecycle()
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val soapLogs by viewModel.soapLogs.collectAsStateWithLifecycle()
     val latestSsdpReport by viewModel.latestSsdpReport.collectAsStateWithLifecycle()
@@ -131,18 +137,24 @@ fun WeMiSwitchApp(
     val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
     val isTvMode by viewModel.isTvMode.collectAsStateWithLifecycle()
 
-    val availableRooms by remember(devices) {
+    val homeDevices by remember(devices, activeNetworkKey) {
         derivedStateOf {
-            devices.map { it.roomName }.distinct()
+            devices.filter { it.networkKey == activeNetworkKey }
         }
     }
 
-    val filteredDevices by remember(devices, selectedRoomFilter) {
+    val availableRooms by remember(homeDevices) {
+        derivedStateOf {
+            homeDevices.map { it.roomName }.distinct()
+        }
+    }
+
+    val filteredDevices by remember(homeDevices, selectedRoomFilter) {
         derivedStateOf {
             if (selectedRoomFilter == null) {
-                devices
+                homeDevices
             } else {
-                devices.filter { it.roomName.equals(selectedRoomFilter, ignoreCase = true) }
+                homeDevices.filter { it.roomName.equals(selectedRoomFilter, ignoreCase = true) }
             }
         }
     }
@@ -155,6 +167,7 @@ fun WeMiSwitchApp(
 
     BackHandler(
         enabled = showSsdpScannerSheet ||
+            showAddHomeDialog ||
             (isTvMode && !isHardwareTelevision) ||
             isEditMode ||
             selectedRoomFilter != null ||
@@ -162,6 +175,7 @@ fun WeMiSwitchApp(
     ) {
         when {
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
+            showAddHomeDialog -> viewModel.closeAddHomeDialog()
             isTvMode && !isHardwareTelevision -> viewModel.setTvMode(false)
             isEditMode -> viewModel.setEditMode(false)
             selectedRoomFilter != null -> viewModel.selectRoomFilter(null)
@@ -215,7 +229,7 @@ fun WeMiSwitchApp(
         ) {
             if (isTvMode) {
                 WeMoTvDashboardScreen(
-                    devices = devices,
+                    devices = homeDevices,
                     rooms = availableRooms,
                     selectedRoomFilter = selectedRoomFilter,
                     isRefreshing = isRefreshing,
@@ -240,31 +254,24 @@ fun WeMiSwitchApp(
                 ) {
                     when (selectedTab) {
                         WeMoBottomTab.DEVICES -> {
-                        val pullToRefreshState = rememberPullToRefreshState()
-                        PullToRefreshBox(
-                            isRefreshing = isRefreshing,
-                            onRefresh = { viewModel.refreshDevicesFromNetwork() },
-                            state = pullToRefreshState,
-                            indicator = {
-                                PullToRefreshDefaults.Indicator(
-                                    state = pullToRefreshState,
-                                    isRefreshing = isRefreshing,
-                                    containerColor = WemoRowSurface,
-                                    color = WemoGreenPrimary,
-                                    modifier = Modifier.align(Alignment.TopCenter)
-                                )
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .testTag("devices_pull_to_refresh")
-                        ) {
-                            if (devices.isEmpty()) {
-                                EmptyDevicesState(
-                                    onAddClick = { viewModel.openAddDeviceDialog() },
-                                    onScanSsdpClick = { viewModel.openSsdpScannerAndScan() },
-                                    onRestoreClassicClick = { viewModel.resetToClassicScreenshotDevices() }
-                                )
-                            } else {
+                            val pullToRefreshState = rememberPullToRefreshState()
+                            PullToRefreshBox(
+                                isRefreshing = isRefreshing,
+                                onRefresh = { viewModel.refreshDevicesFromNetwork() },
+                                state = pullToRefreshState,
+                                indicator = {
+                                    PullToRefreshDefaults.Indicator(
+                                        state = pullToRefreshState,
+                                        isRefreshing = isRefreshing,
+                                        containerColor = WemoRowSurface,
+                                        color = WemoGreenPrimary,
+                                        modifier = Modifier.align(Alignment.TopCenter)
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .testTag("devices_pull_to_refresh")
+                            ) {
                                 LazyColumn(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -272,11 +279,23 @@ fun WeMiSwitchApp(
                                         .testTag("devices_list"),
                                     contentPadding = PaddingValues(top = 6.dp, bottom = 36.dp)
                                 ) {
+                                    item(key = "wifi_home_selector_header") {
+                                        WeMoWifiHomeBar(
+                                            homeNetworks = homeNetworks,
+                                            activeNetworkKey = activeNetworkKey,
+                                            allDevices = devices,
+                                            isReconnectingHome = isReconnectingHome,
+                                            onSelectHomeNetwork = { viewModel.selectHomeNetwork(it) },
+                                            onReconnectCurrentHome = { viewModel.reconnectCurrentHomeNetwork() },
+                                            onOpenAddHomeDialog = { viewModel.openAddHomeDialog() }
+                                        )
+                                    }
+
                                     item(key = "ssdp_discovery_banner_header") {
                                         WeMoSsdpDiscoveryBanner(
                                             isScanning = isRefreshing,
                                             latestReport = latestSsdpReport,
-                                            savedDeviceCount = devices.count { it.isReachable },
+                                            savedDeviceCount = homeDevices.count { it.isReachable },
                                             onOpenScannerClick = { viewModel.openSsdpScannerAndScan() }
                                         )
                                     }
@@ -291,7 +310,15 @@ fun WeMiSwitchApp(
                                         )
                                     }
 
-                                    if (isGroupedByRoom) {
+                                    if (homeDevices.isEmpty()) {
+                                        item(key = "empty_home_devices_state") {
+                                            EmptyDevicesState(
+                                                onAddClick = { viewModel.openAddDeviceDialog() },
+                                                onScanSsdpClick = { viewModel.openSsdpScannerAndScan() },
+                                                onRestoreClassicClick = { viewModel.resetToClassicScreenshotDevices() }
+                                            )
+                                        }
+                                    } else if (isGroupedByRoom) {
                                         groupedDevicesByRoom.forEach { (roomName, roomDevices) ->
                                             val isCollapsed = roomName in collapsedRooms
                                             item(key = "room_header_item_$roomName") {
@@ -395,32 +422,31 @@ fun WeMiSwitchApp(
                                 }
                             }
                         }
-                    }
 
-                    WeMoBottomTab.RULES -> {
-                        WeMoRulesScreen(
-                            rules = rules,
-                            onToggleRule = { viewModel.toggleRule(it) },
-                            onRunRuleNow = { viewModel.runRuleNow(it) },
-                            onDeleteRule = { viewModel.deleteRule(it) },
-                            onAddRuleClick = { viewModel.openAddRuleDialog() }
-                        )
-                    }
+                        WeMoBottomTab.RULES -> {
+                            WeMoRulesScreen(
+                                rules = rules,
+                                onToggleRule = { viewModel.toggleRule(it) },
+                                onRunRuleNow = { viewModel.runRuleNow(it) },
+                                onDeleteRule = { viewModel.deleteRule(it) },
+                                onAddRuleClick = { viewModel.openAddRuleDialog() }
+                            )
+                        }
 
-                    WeMoBottomTab.MORE -> {
-                        WeMoMoreScreen(
-                            devices = devices,
-                            soapLogs = soapLogs,
-                            useWeMiWordmark = useWeMiWordmark,
-                            onTurnAllOn = { viewModel.turnAllSwitches(true) },
-                            onTurnAllOff = { viewModel.turnAllSwitches(false) },
-                            onScanNetwork = { viewModel.openSsdpScannerAndScan() },
-                            onResetClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
-                            onToggleBrandWordmark = { viewModel.toggleBrandWordmark() },
-                            onClearLogs = { viewModel.clearSoapLogs() }
-                        )
+                        WeMoBottomTab.MORE -> {
+                            WeMoMoreScreen(
+                                devices = homeDevices,
+                                soapLogs = soapLogs,
+                                useWeMiWordmark = useWeMiWordmark,
+                                onTurnAllOn = { viewModel.turnAllSwitches(true) },
+                                onTurnAllOff = { viewModel.turnAllSwitches(false) },
+                                onScanNetwork = { viewModel.openSsdpScannerAndScan() },
+                                onResetClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
+                                onToggleBrandWordmark = { viewModel.toggleBrandWordmark() },
+                                onClearLogs = { viewModel.clearSoapLogs() }
+                            )
+                        }
                     }
-                }
                 }
             }
 
@@ -454,12 +480,22 @@ fun WeMiSwitchApp(
         }
     }
 
+    if (showAddHomeDialog) {
+        AddWifiHomeNetworkDialog(
+            detectedLocalIp = viewModel.detectCurrentLanIp(),
+            onDismiss = { viewModel.closeAddHomeDialog() },
+            onSaveHome = { homeName, ssidLabel, subnetPrefix ->
+                viewModel.addWifiHomeNetwork(homeName, ssidLabel, subnetPrefix)
+            }
+        )
+    }
+
     if (showSsdpScannerSheet) {
         WeMoSsdpScannerModal(
             isScanning = isRefreshing,
             selectedSearchTarget = selectedSearchTarget,
             scanReport = latestSsdpReport,
-            existingDevices = devices,
+            existingDevices = homeDevices,
             onSelectSearchTarget = { st -> viewModel.selectSearchTargetAndScan(st) },
             onRescan = { viewModel.openSsdpScannerAndScan(selectedSearchTarget) },
             onAdoptDevice = { item -> viewModel.adoptSsdpDevice(item) },
@@ -500,7 +536,7 @@ fun WeMiSwitchApp(
 
     if (showAddRuleDialog) {
         AddWeMoRuleDialog(
-            devices = devices,
+            devices = homeDevices,
             onDismiss = { viewModel.closeAddRuleDialog() },
             onCreateRule = { name, ruleType, targetDevice, triggerSummary, targetStateOn, brightness ->
                 viewModel.addRule(
@@ -530,7 +566,7 @@ private fun EmptyDevicesState(
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = "No WeMi / WeMo Switches",
+            text = "No WeMi / WeMo Switches on This Wi-Fi Home",
             fontFamily = WorkSansFontFamily,
             fontWeight = FontWeight.Medium,
             fontSize = 20.sp,
@@ -538,7 +574,7 @@ private fun EmptyDevicesState(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Scan your local Wi-Fi network via SSDP (239.255.255.250:1900), add a switch by IP, or restore the classic 8-device preset.",
+            text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, add a switch by IP, or restore the default preset.",
             fontFamily = WorkSansFontFamily,
             fontSize = 14.sp,
             color = WemoTextSecondary

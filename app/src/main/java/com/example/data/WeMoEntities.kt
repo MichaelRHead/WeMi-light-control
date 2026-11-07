@@ -3,6 +3,10 @@ package com.example.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
+const val DEFAULT_MAIN_HOME_KEY = "wifi_home_192_168_1"
+const val DEFAULT_CABIN_HOME_KEY = "wifi_cabin_192_168_50"
+const val DEFAULT_OFFICE_HOME_KEY = "wifi_office_10_0_10"
+
 enum class WeMoDeviceType {
     SWITCH_PLUG,
     MOTION_SENSOR,
@@ -19,11 +23,29 @@ enum class WeMoConnectionQuality(
     OFFLINE(statusTitle = "Offline", signalBars = 0)
 }
 
+/**
+ * Represents a remembered Wi-Fi Network ("Home") so the app remembers all switches discovered
+ * on each Wi-Fi network and automatically reconnects/rediscovers them when returning home.
+ */
+@Entity(tableName = "wemo_home_networks")
+data class WeMoHomeNetworkEntity(
+    @PrimaryKey val networkKey: String,
+    val homeName: String,
+    val ssidLabel: String,
+    val subnetPrefix: String,
+    val gatewayIp: String = "${subnetPrefix}.1",
+    val lastConnectedTime: String = "Connected now",
+    val autoReconnectOnArrival: Boolean = true,
+    val sortOrder: Int = 0
+)
+
 @Entity(tableName = "wemo_devices")
 data class WeMoDeviceEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
     val roomName: String = "Living Room",
+    val networkKey: String = DEFAULT_MAIN_HOME_KEY,
+    val wifiSsid: String = "WeMi-Home-5G",
     val deviceType: String = WeMoDeviceType.SWITCH_PLUG.name,
     val ipAddress: String = "192.168.1.100",
     val port: Int = 49153,
@@ -106,11 +128,11 @@ fun inferRoomFromName(deviceName: String): String {
     val lower = deviceName.lowercase()
     return when {
         "kitchen" in lower -> "Kitchen"
-        "bedroom" in lower -> "Bedroom"
+        "bedroom" in lower || "loft" in lower -> "Bedroom"
         "ensuite" in lower || "bath" in lower -> "Ensuite"
         "hall" in lower || "landing" in lower || "stairs" in lower -> "Hallway & Landing"
-        "patio" in lower || "porch" in lower || "outdoor" in lower || "garden" in lower -> "Outdoor"
-        "office" in lower || "study" in lower || "desk" in lower -> "Office"
+        "patio" in lower || "porch" in lower || "outdoor" in lower || "garden" in lower || "dock" in lower -> "Outdoor"
+        "office" in lower || "study" in lower || "desk" in lower || "studio" in lower -> "Office"
         else -> "Living Room"
     }
 }
