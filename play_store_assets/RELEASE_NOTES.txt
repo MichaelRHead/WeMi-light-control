@@ -1,0 +1,7 @@
+<en-US>
+Initial 1.0 release of WeMi Switch Control:
+• Direct local Wi-Fi control for WeMi & Belkin WeMo smart switches, plugs, dimmers, bulbs, and motion sensors.
+• Interactive SSDP (Simple Service Discovery Protocol) multicast scanner on 239.255.255.250:1900 with setup.xml parsing.
+• One-tap glowing cyan power rings and inline 1%–100% brightness dimmer sliders.
+• Local LAN schedules, motion triggers, auto-off timers, and live UPnP/SOAP packet inspector.
+</en-US>
