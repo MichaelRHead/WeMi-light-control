@@ -32,14 +32,14 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
+            initialValue = WeMoRepository.defaultClassicDevices()
         )
 
     val rules: StateFlow<List<WeMoRuleEntity>> = repository.allRules
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
+            initialValue = WeMoRepository.defaultClassicRules()
         )
 
     val soapLogs: StateFlow<List<SoapLogEntry>> = repository.soapLogs

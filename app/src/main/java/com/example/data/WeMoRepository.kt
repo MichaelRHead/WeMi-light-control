@@ -14,8 +14,21 @@ class WeMoRepository(
     private val dao: WeMoDao,
     private val networkClient: WeMoNetworkClient = WeMoNetworkClient()
 ) {
-    val allDevices: Flow<List<WeMoDeviceEntity>> = dao.getAllDevices()
-    val allRules: Flow<List<WeMoRuleEntity>> = dao.getAllRules()
+    private val initialSeedDone = MutableStateFlow(false)
+
+    val allDevices: Flow<List<WeMoDeviceEntity>> = kotlinx.coroutines.flow.combine(
+        dao.getAllDevices(),
+        initialSeedDone
+    ) { list, seeded ->
+        if (list.isEmpty() && !seeded) defaultClassicDevices() else list
+    }
+
+    val allRules: Flow<List<WeMoRuleEntity>> = kotlinx.coroutines.flow.combine(
+        dao.getAllRules(),
+        initialSeedDone
+    ) { list, seeded ->
+        if (list.isEmpty() && !seeded) defaultClassicRules() else list
+    }
 
     private val _soapLogs = MutableStateFlow<List<SoapLogEntry>>(emptyList())
     val soapLogs: StateFlow<List<SoapLogEntry>> = _soapLogs.asStateFlow()
@@ -34,6 +47,7 @@ class WeMoRepository(
         if (dao.getRuleCount() == 0) {
             dao.insertRules(defaultClassicRules())
         }
+        initialSeedDone.value = true
     }
 
     suspend fun resetToClassicScreenshotPreset() {
