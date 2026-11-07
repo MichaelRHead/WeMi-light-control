@@ -1,7 +1,6 @@
 <en-US>
-Initial 1.0 release of WeMi Switch Control:
-• Direct local Wi-Fi control for WeMi & Belkin WeMo smart switches, plugs, dimmers, bulbs, and motion sensors.
-• Interactive SSDP (Simple Service Discovery Protocol) multicast scanner on 239.255.255.250:1900 with setup.xml parsing.
-• One-tap glowing cyan power rings and inline 1%–100% brightness dimmer sliders.
-• Local LAN schedules, motion triggers, auto-off timers, and live UPnP/SOAP packet inspector.
+What's new in WeMi Switch Control v2.0 (versionCode 2):
+• Room Grouping System: Organize switches by room (Living Room, Bedroom, Kitchen, Hallway, Ensuite) with quick room filter chips.
+• Master Room Power & Dimmer Controls: Toggle all switches or adjust brightness for every bulb in a room simultaneously with one tap.
+• Pull-to-Refresh SSDP Scan: Swipe down on the Devices list to trigger a live UDP multicast (239.255.255.250:1900) discovery scan.
 </en-US>
