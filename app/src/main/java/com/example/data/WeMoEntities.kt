@@ -54,3 +54,20 @@ data class SoapLogEntry(
     val xmlSnippet: String,
     val isLiveLanSuccess: Boolean
 )
+
+data class SsdpDiscoveredDevice(
+    val name: String,
+    val ipAddress: String,
+    val port: Int,
+    val deviceType: WeMoDeviceType,
+    val modelName: String,
+    val serialNumber: String,
+    val firmwareVersion: String,
+    val usn: String,
+    val searchTarget: String,
+    val locationUrl: String,
+    val responseTimeMs: Long,
+    val isOn: Boolean = true,
+    val brightness: Int = 100,
+    val isLiveUdpResponse: Boolean = false
+)

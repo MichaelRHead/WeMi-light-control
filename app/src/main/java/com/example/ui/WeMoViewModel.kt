@@ -4,11 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.SoapLogEntry
+import com.example.data.SsdpDiscoveredDevice
 import com.example.data.WeMoDatabase
 import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
 import com.example.data.WeMoRepository
 import com.example.data.WeMoRuleEntity
+import com.example.network.SsdpScanReport
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -25,7 +27,8 @@ enum class WeMoBottomTab {
 
 class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     private val repository: WeMoRepository = WeMoRepository(
-        WeMoDatabase.getDatabase(application).wemoDao()
+        dao = WeMoDatabase.getDatabase(application).wemoDao(),
+        context = application.applicationContext
     )
 
     val devices: StateFlow<List<WeMoDeviceEntity>> = repository.allDevices
@@ -43,6 +46,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         )
 
     val soapLogs: StateFlow<List<SoapLogEntry>> = repository.soapLogs
+    val latestSsdpReport: StateFlow<SsdpScanReport?> = repository.latestSsdpReport
 
     private val _selectedTab = MutableStateFlow(WeMoBottomTab.DEVICES)
     val selectedTab: StateFlow<WeMoBottomTab> = _selectedTab.asStateFlow()
@@ -52,6 +56,12 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+
+    private val _showSsdpScannerSheet = MutableStateFlow(false)
+    val showSsdpScannerSheet: StateFlow<Boolean> = _showSsdpScannerSheet.asStateFlow()
+
+    private val _selectedSearchTarget = MutableStateFlow("urn:Belkin:service:basicevent:1")
+    val selectedSearchTarget: StateFlow<String> = _selectedSearchTarget.asStateFlow()
 
     private val _expandedDeviceIds = MutableStateFlow<Set<Int>>(emptySet())
     val expandedDeviceIds: StateFlow<Set<Int>> = _expandedDeviceIds.asStateFlow()
@@ -137,29 +147,56 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun markDeviceOffline(device: WeMoDeviceEntity, offline: Boolean) {
+    fun openSsdpScannerAndScan(searchTarget: String = _selectedSearchTarget.value) {
+        _selectedSearchTarget.value = searchTarget
+        _showSsdpScannerSheet.value = true
+        runSsdpScan(searchTarget = searchTarget, autoAdoptNew = false)
+    }
+
+    fun closeSsdpScanner() {
+        _showSsdpScannerSheet.value = false
+    }
+
+    fun selectSearchTargetAndScan(searchTarget: String) {
+        _selectedSearchTarget.value = searchTarget
+        runSsdpScan(searchTarget = searchTarget, autoAdoptNew = false)
+    }
+
+    fun refreshDevicesFromNetwork() {
+        runSsdpScan(searchTarget = _selectedSearchTarget.value, autoAdoptNew = true)
+    }
+
+    private fun runSsdpScan(searchTarget: String, autoAdoptNew: Boolean) {
+        if (_isRefreshing.value) return
         viewModelScope.launch {
-            repository.setDeviceReachableState(device, !offline)
+            _isRefreshing.value = true
+            val report = repository.executeSsdpScan(
+                searchTarget = searchTarget,
+                autoAdoptNew = autoAdoptNew
+            )
+            delay(250)
+            _isRefreshing.value = false
             showTransientStatus(
-                if (offline) "${device.name} marked as Not Detected"
-                else "${device.name} marked as Online"
+                "SSDP Scan (${report.scanDurationMs}ms): Found ${report.discoveredDevices.size} UPnP WeMi/WeMo devices"
             )
         }
     }
 
-    fun refreshDevicesFromNetwork() {
-        if (_isRefreshing.value) return
+    fun adoptSsdpDevice(discovered: SsdpDiscoveredDevice) {
         viewModelScope.launch {
-            _isRefreshing.value = true
-            val addedCount = repository.refreshAndDiscoverAll()
-            delay(350)
-            _isRefreshing.value = false
-            val msg = if (addedCount > 0) {
-                "SSDP Scan complete: Discovered $addedCount new switch(es) on Wi-Fi"
-            } else {
-                "SSDP Scan & SOAP Poll complete (${devices.value.count { it.isReachable }} active)"
-            }
-            showTransientStatus(msg)
+            val saved = repository.adoptDiscoveredDevice(discovered)
+            showTransientStatus("Synced ${saved.name} (${saved.ipAddress}:${saved.port})")
+        }
+    }
+
+    fun adoptAllSsdpDevices() {
+        viewModelScope.launch {
+            val list = latestSsdpReport.value?.discoveredDevices.orEmpty()
+            val added = repository.adoptDiscoveredDevices(list)
+            showTransientStatus(
+                if (added > 0) "Added $added newly discovered SSDP switch(es) to Devices"
+                else "All ${list.size} SSDP-discovered devices are synced"
+            )
         }
     }
 

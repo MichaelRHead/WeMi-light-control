@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
@@ -50,6 +49,8 @@ import com.example.ui.components.AddOrEditWeMoDeviceDialog
 import com.example.ui.components.AddWeMoRuleDialog
 import com.example.ui.components.WeMoBottomNavigationBar
 import com.example.ui.components.WeMoDeviceRow
+import com.example.ui.components.WeMoSsdpDiscoveryBanner
+import com.example.ui.components.WeMoSsdpScannerModal
 import com.example.ui.components.WeMoTopHeader
 import com.example.ui.screens.WeMoMoreScreen
 import com.example.ui.screens.WeMoRulesScreen
@@ -86,9 +87,12 @@ fun WeMiSwitchApp(
     val devices by viewModel.devices.collectAsStateWithLifecycle()
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val soapLogs by viewModel.soapLogs.collectAsStateWithLifecycle()
+    val latestSsdpReport by viewModel.latestSsdpReport.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val isEditMode by viewModel.isEditMode.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
+    val showSsdpScannerSheet by viewModel.showSsdpScannerSheet.collectAsStateWithLifecycle()
+    val selectedSearchTarget by viewModel.selectedSearchTarget.collectAsStateWithLifecycle()
     val expandedDeviceIds by viewModel.expandedDeviceIds.collectAsStateWithLifecycle()
     val togglingDeviceIds by viewModel.togglingDeviceIds.collectAsStateWithLifecycle()
     val editingDevice by viewModel.editingDevice.collectAsStateWithLifecycle()
@@ -97,12 +101,11 @@ fun WeMiSwitchApp(
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
 
-    // Handle back button when in Edit mode or on Rules / More tabs
-    BackHandler(enabled = isEditMode || selectedTab != WeMoBottomTab.DEVICES) {
-        if (isEditMode) {
-            viewModel.setEditMode(false)
-        } else {
-            viewModel.selectTab(WeMoBottomTab.DEVICES)
+    BackHandler(enabled = showSsdpScannerSheet || isEditMode || selectedTab != WeMoBottomTab.DEVICES) {
+        when {
+            showSsdpScannerSheet -> viewModel.closeSsdpScanner()
+            isEditMode -> viewModel.setEditMode(false)
+            else -> viewModel.selectTab(WeMoBottomTab.DEVICES)
         }
     }
 
@@ -113,7 +116,7 @@ fun WeMiSwitchApp(
                 isRefreshing = isRefreshing,
                 isEditMode = isEditMode,
                 useWeMiWordmark = useWeMiWordmark,
-                onRefreshClick = { viewModel.refreshDevicesFromNetwork() },
+                onRefreshClick = { viewModel.openSsdpScannerAndScan() },
                 onEditClick = {
                     if (selectedTab != WeMoBottomTab.DEVICES) {
                         viewModel.selectTab(WeMoBottomTab.DEVICES)
@@ -155,6 +158,7 @@ fun WeMiSwitchApp(
                         if (devices.isEmpty()) {
                             EmptyDevicesState(
                                 onAddClick = { viewModel.openAddDeviceDialog() },
+                                onScanSsdpClick = { viewModel.openSsdpScannerAndScan() },
                                 onRestoreClassicClick = { viewModel.resetToClassicScreenshotDevices() }
                             )
                         } else {
@@ -163,8 +167,17 @@ fun WeMiSwitchApp(
                                     .fillMaxSize()
                                     .background(WemoBackgroundGray)
                                     .testTag("devices_list"),
-                                contentPadding = PaddingValues(bottom = 36.dp)
+                                contentPadding = PaddingValues(top = 6.dp, bottom = 36.dp)
                             ) {
+                                item(key = "ssdp_discovery_banner_header") {
+                                    WeMoSsdpDiscoveryBanner(
+                                        isScanning = isRefreshing,
+                                        latestReport = latestSsdpReport,
+                                        savedDeviceCount = devices.count { it.isReachable },
+                                        onOpenScannerClick = { viewModel.openSsdpScannerAndScan() }
+                                    )
+                                }
+
                                 items(devices, key = { it.id }) { device ->
                                     WeMoDeviceRow(
                                         device = device,
@@ -217,7 +230,7 @@ fun WeMiSwitchApp(
                             useWeMiWordmark = useWeMiWordmark,
                             onTurnAllOn = { viewModel.turnAllSwitches(true) },
                             onTurnAllOff = { viewModel.turnAllSwitches(false) },
-                            onScanNetwork = { viewModel.refreshDevicesFromNetwork() },
+                            onScanNetwork = { viewModel.openSsdpScannerAndScan() },
                             onResetClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
                             onToggleBrandWordmark = { viewModel.toggleBrandWordmark() },
                             onClearLogs = { viewModel.clearSoapLogs() }
@@ -226,7 +239,7 @@ fun WeMiSwitchApp(
                 }
             }
 
-            // Floating status toast pill at bottom of content area for instant SOAP feedback
+            // Floating status toast pill at bottom of content area for instant SOAP / SSDP feedback
             AnimatedVisibility(
                 visible = statusBannerMessage != null,
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -256,6 +269,20 @@ fun WeMiSwitchApp(
         }
     }
 
+    if (showSsdpScannerSheet) {
+        WeMoSsdpScannerModal(
+            isScanning = isRefreshing,
+            selectedSearchTarget = selectedSearchTarget,
+            scanReport = latestSsdpReport,
+            existingDevices = devices,
+            onSelectSearchTarget = { st -> viewModel.selectSearchTargetAndScan(st) },
+            onRescan = { viewModel.openSsdpScannerAndScan(selectedSearchTarget) },
+            onAdoptDevice = { item -> viewModel.adoptSsdpDevice(item) },
+            onAdoptAll = { viewModel.adoptAllSsdpDevices() },
+            onDismiss = { viewModel.closeSsdpScanner() }
+        )
+    }
+
     if (showAddDeviceDialog || editingDevice != null) {
         AddOrEditWeMoDeviceDialog(
             initialDevice = editingDevice,
@@ -281,7 +308,7 @@ fun WeMiSwitchApp(
             } else {
                 null
             },
-            onScanNetwork = { viewModel.refreshDevicesFromNetwork() }
+            onScanNetwork = { viewModel.openSsdpScannerAndScan() }
         )
     }
 
@@ -306,6 +333,7 @@ fun WeMiSwitchApp(
 @Composable
 private fun EmptyDevicesState(
     onAddClick: () -> Unit,
+    onScanSsdpClick: () -> Unit,
     onRestoreClassicClick: () -> Unit
 ) {
     Column(
@@ -324,17 +352,24 @@ private fun EmptyDevicesState(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Add a switch by IP address, scan your local Wi-Fi via UPnP SSDP, or restore the classic 8-device preset.",
+            text = "Scan your local Wi-Fi network via SSDP (239.255.255.250:1900), add a switch by IP, or restore the classic 8-device preset.",
             fontFamily = WorkSansFontFamily,
             fontSize = 14.sp,
             color = WemoTextSecondary
         )
         Spacer(modifier = Modifier.height(16.dp))
         Button(
-            onClick = onAddClick,
+            onClick = onScanSsdpClick,
             colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary)
         ) {
-            Text("Add Switch")
+            Text("Scan Local Network (SSDP)")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            onClick = onAddClick,
+            colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark)
+        ) {
+            Text("Add Switch Manually")
         }
         Spacer(modifier = Modifier.height(8.dp))
         Button(

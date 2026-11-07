@@ -35,13 +35,16 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.ui.theme.WemoGreenBottom
+import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
+import com.example.ui.theme.WemoGreenTop
 import com.example.ui.theme.WemoMotionCyan
 import com.example.ui.theme.WemoRingInactive
 
 /**
- * High-detail Canvas illustration of the classic Belkin WeMo Smart Plug / Light Switch
- * seen on "Christmas Tree Living", "Christmas Candle", and "Christmas Tree Kitchen".
+ * Redesigned WeMi Smart Wall Switch / Module illustration featuring a sleek ocean-teal anodized
+ * outer bezel, pearl glass touch rocker face, glowing electric-cyan LED bar, and smart socket detail.
  */
 @Composable
 fun WeMoSmartPlugIllustration(
@@ -49,7 +52,7 @@ fun WeMoSmartPlugIllustration(
     isOn: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val alphaVal = if (isReachable) 1f else 0.35f
+    val alphaVal = if (isReachable) 1f else 0.38f
     Canvas(
         modifier = modifier
             .size(width = 58.dp, height = 74.dp)
@@ -58,130 +61,125 @@ fun WeMoSmartPlugIllustration(
         val w = size.width
         val h = size.height
 
-        // Drop shadow at bottom
+        // Soft ambient cyan/slate shadow beneath switch
         drawOval(
-            color = Color(0x28000000),
-            topLeft = Offset(w * 0.14f, h * 0.88f),
-            size = Size(w * 0.72f, h * 0.09f)
+            color = if (isOn && isReachable) Color(0x330891B2) else Color(0x220F172A),
+            topLeft = Offset(w * 0.12f, h * 0.87f),
+            size = Size(w * 0.76f, h * 0.09f)
         )
 
-        // Outer rounded switch body
-        val bodyLeft = w * 0.12f
-        val bodyTop = h * 0.06f
-        val bodyW = w * 0.76f
-        val bodyH = h * 0.86f
+        // Outer architectural switch frame with teal-slate metallic edge
+        val frameLeft = w * 0.10f
+        val frameTop = h * 0.07f
+        val frameW = w * 0.80f
+        val frameH = h * 0.83f
         drawRoundRect(
-            brush = Brush.horizontalGradient(
-                colors = listOf(
-                    Color(0xFFE7EAEE),
-                    Color(0xFFF9FAFB),
-                    Color(0xFFD5D9DF)
-                ),
-                startX = bodyLeft,
-                endX = bodyLeft + bodyW
+            brush = Brush.linearGradient(
+                colors = if (isOn && isReachable) {
+                    listOf(Color(0xFF0E7490), Color(0xFF155E75), Color(0xFF0F4C81))
+                } else {
+                    listOf(Color(0xFFCBD5E1), Color(0xFFE2E8F0), Color(0xFF94A3B8))
+                },
+                start = Offset(frameLeft, frameTop),
+                end = Offset(frameLeft + frameW, frameTop + frameH)
             ),
-            topLeft = Offset(bodyLeft, bodyTop),
-            size = Size(bodyW, bodyH),
-            cornerRadius = CornerRadius(w * 0.24f, w * 0.24f)
+            topLeft = Offset(frameLeft, frameTop),
+            size = Size(frameW, frameH),
+            cornerRadius = CornerRadius(w * 0.18f, w * 0.18f)
         )
 
-        // Subtle inner face highlight
-        val faceInset = w * 0.045f
+        // Inner frosted pearl touch rocker plate
+        val inset = w * 0.06f
         drawRoundRect(
             brush = Brush.verticalGradient(
-                colors = listOf(Color(0xFFFFFFFF), Color(0xFFECEFF3)),
-                startY = bodyTop + faceInset,
-                endY = bodyTop + bodyH - faceInset
+                colors = listOf(Color(0xFFFFFFFF), Color(0xFFF1F5F9)),
+                startY = frameTop + inset,
+                endY = frameTop + frameH - inset
             ),
-            topLeft = Offset(bodyLeft + faceInset, bodyTop + faceInset),
-            size = Size(bodyW - faceInset * 2, bodyH - faceInset * 2),
-            cornerRadius = CornerRadius(w * 0.20f, w * 0.20f)
+            topLeft = Offset(frameLeft + inset, frameTop + inset),
+            size = Size(frameW - inset * 2, frameH - inset * 2),
+            cornerRadius = CornerRadius(w * 0.13f, w * 0.13f)
         )
 
-        // Top small power/Wi-Fi button circle & status dot
-        val topCenter = Offset(w * 0.5f, h * 0.23f)
-        drawCircle(
-            color = Color(0xFFD8DCE2),
-            radius = w * 0.085f,
-            center = topCenter,
-            style = Stroke(width = w * 0.022f)
-        )
-        drawCircle(
-            color = if (isOn && isReachable) WemoGreenPrimary else Color(0xFFA0A7B0),
-            radius = w * 0.032f,
-            center = Offset(w * 0.5f, h * 0.125f)
-        )
-
-        // 7 vertical vent slots across the middle
-        val slotCount = 7
-        val slotTotalW = bodyW * 0.52f
-        val slotStartX = (w - slotTotalW) / 2f
-        val slotStep = slotTotalW / (slotCount - 1)
-        for (i in 0 until slotCount) {
-            val sx = slotStartX + i * slotStep
-            drawLine(
-                color = Color(0xFF7B828B),
-                start = Offset(sx, h * 0.42f),
-                end = Offset(sx, h * 0.47f),
-                strokeWidth = w * 0.026f,
-                cap = StrokeCap.Round
+        // Horizontal glowing cyan status LED bar across upper rocker
+        val ledColor = if (isOn && isReachable) Color(0xFF06B6D4) else Color(0xFF94A3B8)
+        if (isOn && isReachable) {
+            drawRoundRect(
+                color = Color(0x4022D3EE),
+                topLeft = Offset(w * 0.28f, h * 0.20f),
+                size = Size(w * 0.44f, h * 0.08f),
+                cornerRadius = CornerRadius(w * 0.04f, w * 0.04f)
             )
         }
-
-        // Recessed NEMA 5-15 outlet face at bottom
-        val outletLeft = w * 0.25f
-        val outletTop = h * 0.55f
-        val outletW = w * 0.50f
-        val outletH = h * 0.29f
-        drawRoundRect(
-            color = Color(0xFFE3E7EC),
-            topLeft = Offset(outletLeft, outletTop),
-            size = Size(outletW, outletH),
-            cornerRadius = CornerRadius(w * 0.12f, w * 0.12f)
-        )
-        drawRoundRect(
-            color = Color(0xFFB8BFC7),
-            topLeft = Offset(outletLeft, outletTop),
-            size = Size(outletW, outletH),
-            cornerRadius = CornerRadius(w * 0.12f, w * 0.12f),
-            style = Stroke(width = w * 0.02f)
+        drawLine(
+            color = ledColor,
+            start = Offset(w * 0.33f, h * 0.24f),
+            end = Offset(w * 0.67f, h * 0.24f),
+            strokeWidth = w * 0.045f,
+            cap = StrokeCap.Round
         )
 
-        // Left neutral blade slot (slightly taller)
-        drawLine(
-            color = Color(0xFF42474D),
-            start = Offset(w * 0.38f, h * 0.61f),
-            end = Offset(w * 0.38f, h * 0.70f),
-            strokeWidth = w * 0.042f,
-            cap = StrokeCap.Square
-        )
-        // Right hot blade slot
-        drawLine(
-            color = Color(0xFF42474D),
-            start = Offset(w * 0.62f, h * 0.62f),
-            end = Offset(w * 0.62f, h * 0.695f),
-            strokeWidth = w * 0.042f,
-            cap = StrokeCap.Square
-        )
-        // Bottom U-shaped ground hole
+        // Center touch ring emblem on the switch face
+        val touchCenter = Offset(w * 0.50f, h * 0.46f)
         drawCircle(
-            color = Color(0xFF42474D),
-            radius = w * 0.042f,
-            center = Offset(w * 0.50f, h * 0.77f)
+            color = if (isOn && isReachable) Color(0x2606B6D4) else Color(0x1464748B),
+            radius = w * 0.16f,
+            center = touchCenter
+        )
+        drawCircle(
+            color = ledColor,
+            radius = w * 0.12f,
+            center = touchCenter,
+            style = Stroke(width = w * 0.032f)
+        )
+        drawLine(
+            color = ledColor,
+            start = Offset(touchCenter.x, touchCenter.y - w * 0.06f),
+            end = Offset(touchCenter.x, touchCenter.y + w * 0.02f),
+            strokeWidth = w * 0.032f,
+            cap = StrokeCap.Round
+        )
+
+        // Lower smart outlet / receptacle detail
+        val socketTop = h * 0.64f
+        drawRoundRect(
+            color = Color(0xFFE2E8F0),
+            topLeft = Offset(w * 0.28f, socketTop),
+            size = Size(w * 0.44f, h * 0.18f),
+            cornerRadius = CornerRadius(w * 0.07f, w * 0.07f)
+        )
+        drawLine(
+            color = Color(0xFF334155),
+            start = Offset(w * 0.40f, socketTop + h * 0.04f),
+            end = Offset(w * 0.40f, socketTop + h * 0.10f),
+            strokeWidth = w * 0.036f,
+            cap = StrokeCap.Round
+        )
+        drawLine(
+            color = Color(0xFF334155),
+            start = Offset(w * 0.60f, socketTop + h * 0.04f),
+            end = Offset(w * 0.60f, socketTop + h * 0.10f),
+            strokeWidth = w * 0.036f,
+            cap = StrokeCap.Round
+        )
+        drawCircle(
+            color = Color(0xFF0E7490),
+            radius = w * 0.032f,
+            center = Offset(w * 0.50f, socketTop + h * 0.135f)
         )
     }
 }
 
 /**
- * High-detail Canvas illustration of the Belkin WeMo Motion Sensor pedestal
- * seen on "Bedroom Light Motion".
+ * Redesigned WeMi Motion Radar Sensor illustration with deep sapphire/teal lens aperture
+ * and glowing electric cyan radar rings.
  */
 @Composable
 fun WeMoMotionSensorIllustration(
     isReachable: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val alphaVal = if (isReachable) 1f else 0.35f
+    val alphaVal = if (isReachable) 1f else 0.38f
     Canvas(
         modifier = modifier
             .size(width = 58.dp, height = 74.dp)
@@ -192,67 +190,66 @@ fun WeMoMotionSensorIllustration(
 
         // Base shadow
         drawOval(
-            color = Color(0x33000000),
-            topLeft = Offset(w * 0.10f, h * 0.85f),
-            size = Size(w * 0.80f, h * 0.08f)
+            color = Color(0x2E0E7490),
+            topLeft = Offset(w * 0.12f, h * 0.85f),
+            size = Size(w * 0.76f, h * 0.08f)
         )
 
-        // Tapered cylinder body path
-        val bodyPath = Path().apply {
-            moveTo(w * 0.20f, h * 0.22f)
-            lineTo(w * 0.80f, h * 0.22f)
-            lineTo(w * 0.86f, h * 0.84f)
-            quadraticTo(w * 0.50f, h * 0.90f, w * 0.14f, h * 0.84f)
-            close()
-        }
-        drawPath(
-            path = bodyPath,
-            brush = Brush.horizontalGradient(
-                colors = listOf(
-                    Color(0xFFE0E4E9),
-                    Color(0xFFFDFEFF),
-                    Color(0xFFCFD5DC)
-                ),
-                startX = w * 0.14f,
-                endX = w * 0.86f
-            )
-        )
-
-        // Concave top dish ellipse
-        drawOval(
+        // Sleek rounded sensor pod housing
+        drawRoundRect(
             brush = Brush.verticalGradient(
-                colors = listOf(Color(0xFFC5CCD4), Color(0xFFF4F6F8)),
-                startY = h * 0.13f,
-                endY = h * 0.30f
+                colors = listOf(Color(0xFFFFFFFF), Color(0xFFE2E8F0), Color(0xFFCBD5E1)),
+                startY = h * 0.14f,
+                endY = h * 0.86f
             ),
-            topLeft = Offset(w * 0.20f, h * 0.14f),
-            size = Size(w * 0.60f, h * 0.16f)
-        )
-        drawOval(
-            color = Color(0xFFE8ECF0),
-            topLeft = Offset(w * 0.20f, h * 0.14f),
-            size = Size(w * 0.60f, h * 0.16f),
-            style = Stroke(width = w * 0.025f)
+            topLeft = Offset(w * 0.14f, h * 0.14f),
+            size = Size(w * 0.72f, h * 0.72f),
+            cornerRadius = CornerRadius(w * 0.28f, w * 0.28f)
         )
 
-        // Glowing cyan motion indicator dot in lower half
-        val ledCenter = Offset(w * 0.50f, h * 0.63f)
+        // Outer teal trim ring
+        drawRoundRect(
+            color = Color(0xFF0891B2).copy(alpha = 0.45f),
+            topLeft = Offset(w * 0.14f, h * 0.14f),
+            size = Size(w * 0.72f, h * 0.72f),
+            cornerRadius = CornerRadius(w * 0.28f, w * 0.28f),
+            style = Stroke(width = w * 0.028f)
+        )
+
+        // Deep sapphire/teal infrared Fresnel dome lens in center
+        val lensCenter = Offset(w * 0.50f, h * 0.46f)
         drawCircle(
-            color = WemoMotionCyan.copy(alpha = 0.28f),
-            radius = w * 0.085f,
-            center = ledCenter
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFF22D3EE),
+                    Color(0xFF0891B2),
+                    Color(0xFF0F4C81)
+                ),
+                center = Offset(lensCenter.x - w * 0.04f, lensCenter.y - h * 0.03f),
+                radius = w * 0.22f
+            ),
+            radius = w * 0.20f,
+            center = lensCenter
+        )
+
+        // Concentric radar wave arcs inside lens
+        drawCircle(
+            color = Color.White.copy(alpha = 0.45f),
+            radius = w * 0.12f,
+            center = lensCenter,
+            style = Stroke(width = w * 0.02f)
         )
         drawCircle(
             color = WemoMotionCyan,
-            radius = w * 0.036f,
-            center = ledCenter
+            radius = w * 0.045f,
+            center = lensCenter
         )
 
-        // Dark base foot strip
+        // Bottom cyan status pill
         drawLine(
-            color = Color(0xFF6B727B),
-            start = Offset(w * 0.16f, h * 0.86f),
-            end = Offset(w * 0.84f, h * 0.86f),
+            color = Color(0xFF0891B2),
+            start = Offset(w * 0.36f, h * 0.74f),
+            end = Offset(w * 0.64f, h * 0.74f),
             strokeWidth = w * 0.04f,
             cap = StrokeCap.Round
         )
@@ -260,8 +257,8 @@ fun WeMoMotionSensorIllustration(
 }
 
 /**
- * High-detail Canvas illustration of the WeMo Smart LED Lightbulb (A19 profile)
- * seen on "Hall Lightbulb", "Lightbulb Landing", "Lightbulb Ensuite", and "Lightbulb Bedroom".
+ * Redesigned WeMi Smart Dimmable Bulb illustration with an anodized ocean-teal collar
+ * and luminous cyan-tinted frosted glass globe when active.
  */
 @Composable
 fun WeMoLightbulbIllustration(
@@ -270,7 +267,7 @@ fun WeMoLightbulbIllustration(
     brightness: Int,
     modifier: Modifier = Modifier
 ) {
-    val alphaVal = if (isReachable) 1f else 0.32f
+    val alphaVal = if (isReachable) 1f else 0.34f
     Canvas(
         modifier = modifier
             .size(width = 58.dp, height = 74.dp)
@@ -278,15 +275,32 @@ fun WeMoLightbulbIllustration(
     ) {
         val w = size.width
         val h = size.height
+        val glowFactor = if (isReachable && isOn) (brightness / 100f).coerceIn(0.2f, 1f) else 0f
 
-        // Screw base (E26 threads at bottom)
+        // Ambient cyan halo behind the bulb when ON
+        if (glowFactor > 0f) {
+            drawCircle(
+                brush = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF22D3EE).copy(alpha = 0.32f * glowFactor),
+                        Color.Transparent
+                    ),
+                    center = Offset(w * 0.50f, h * 0.32f),
+                    radius = w * 0.48f
+                ),
+                radius = w * 0.48f,
+                center = Offset(w * 0.50f, h * 0.32f)
+            )
+        }
+
+        // Brushed titanium E26 screw base
         val baseLeft = w * 0.36f
         val baseTop = h * 0.72f
         val baseW = w * 0.28f
         val baseH = h * 0.16f
         drawRoundRect(
             brush = Brush.horizontalGradient(
-                colors = listOf(Color(0xFF8C939B), Color(0xFFDADEE4), Color(0xFF727880)),
+                colors = listOf(Color(0xFF64748B), Color(0xFFCBD5E1), Color(0xFF475569)),
                 startX = baseLeft,
                 endX = baseLeft + baseW
             ),
@@ -294,27 +308,25 @@ fun WeMoLightbulbIllustration(
             size = Size(baseW, baseH),
             cornerRadius = CornerRadius(w * 0.04f, w * 0.04f)
         )
-        // Thread ridges
         for (i in 1..3) {
             val ty = baseTop + (baseH * i / 4f)
             drawLine(
-                color = Color(0xFF595F66),
+                color = Color(0xFF334155),
                 start = Offset(baseLeft, ty),
                 end = Offset(baseLeft + baseW, ty),
                 strokeWidth = w * 0.022f
             )
         }
-        // Bottom metallic contact point
         drawOval(
-            color = Color(0xFF2B2E33),
+            color = Color(0xFF0F172A),
             topLeft = Offset(w * 0.41f, h * 0.86f),
             size = Size(w * 0.18f, h * 0.05f)
         )
 
-        // Lower tapered ceramic heat-sink neck
+        // Tapered heat-sink neck with signature WeMi Ocean Teal accent band
         val neckPath = Path().apply {
-            moveTo(w * 0.25f, h * 0.45f)
-            lineTo(w * 0.75f, h * 0.45f)
+            moveTo(w * 0.24f, h * 0.45f)
+            lineTo(w * 0.76f, h * 0.45f)
             lineTo(w * 0.65f, h * 0.73f)
             lineTo(w * 0.35f, h * 0.73f)
             close()
@@ -322,55 +334,61 @@ fun WeMoLightbulbIllustration(
         drawPath(
             path = neckPath,
             brush = Brush.horizontalGradient(
-                colors = listOf(Color(0xFFDCE0E6), Color(0xFFFAFBFD), Color(0xFFC8CED6)),
-                startX = w * 0.25f,
-                endX = w * 0.75f
+                colors = listOf(Color(0xFFCBD5E1), Color(0xFFF8FAFC), Color(0xFF94A3B8)),
+                startX = w * 0.24f,
+                endX = w * 0.76f
             )
         )
 
-        // Upper frosted glass bulb dome
-        val domeRect = Rect(
-            left = w * 0.19f,
-            top = h * 0.08f,
-            right = w * 0.81f,
-            bottom = h * 0.60f
+        // Ocean-Teal / Electric-Cyan collar stripe on the bulb neck
+        drawLine(
+            color = if (glowFactor > 0f) Color(0xFF06B6D4) else Color(0xFF0E7490),
+            start = Offset(w * 0.27f, h * 0.52f),
+            end = Offset(w * 0.73f, h * 0.52f),
+            strokeWidth = w * 0.048f,
+            cap = StrokeCap.Round
         )
-        val glowFactor = if (isReachable && isOn) (brightness / 100f).coerceIn(0.15f, 1f) else 0f
+
+        // Frosted glass bulb dome with cyan-white luminescence when ON
+        val domeRect = Rect(
+            left = w * 0.18f,
+            top = h * 0.08f,
+            right = w * 0.82f,
+            bottom = h * 0.59f
+        )
         drawOval(
             brush = Brush.radialGradient(
                 colors = if (glowFactor > 0f) {
                     listOf(
                         Color(0xFFFFFFFF),
-                        Color(0xFFF6F9F4),
-                        Color(0xFFDDE3E9)
+                        Color(0xFFE0F7FA),
+                        Color(0xFF67E8F9)
                     )
                 } else {
                     listOf(
-                        Color(0xFFF7F9FA),
-                        Color(0xFFE7EBEF),
-                        Color(0xFFD2D8DF)
+                        Color(0xFFF8FAFC),
+                        Color(0xFFE2E8F0),
+                        Color(0xFFCBD5E1)
                     )
                 },
                 center = Offset(w * 0.45f, h * 0.28f),
-                radius = w * 0.36f
+                radius = w * 0.38f
             ),
             topLeft = domeRect.topLeft,
             size = domeRect.size
         )
-
-        // Subtle equator seam between glass dome and ceramic neck
-        drawLine(
-            color = Color(0xFFCFD5DC),
-            start = Offset(w * 0.24f, h * 0.45f),
-            end = Offset(w * 0.76f, h * 0.45f),
-            strokeWidth = w * 0.02f
+        drawOval(
+            color = if (glowFactor > 0f) Color(0xFF06B6D4).copy(alpha = 0.55f) else Color(0xFFCBD5E1),
+            topLeft = domeRect.topLeft,
+            size = domeRect.size,
+            style = Stroke(width = w * 0.022f)
         )
     }
 }
 
 /**
- * The signature circular power button on the right side of every switch/lightbulb row in the screenshot.
- * Features the outer ring and classic IEC power glyph inside.
+ * Redesigned WeMi Power Ring Toggle Button with an Electric Cyan -> Deep Sapphire gradient ring
+ * and soft radial luminescence when ON.
  */
 @Composable
 fun WeMoPowerRingButton(
@@ -414,46 +432,61 @@ fun WeMoPowerRingButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.size(60.dp)) {
-            val strokeW = 3.2.dp.toPx()
+        Canvas(modifier = Modifier.size(58.dp)) {
+            val strokeW = 3.4.dp.toPx()
             val radius = (size.minDimension - strokeW) / 2f
             val center = Offset(size.width / 2f, size.height / 2f)
 
-            // Subtle soft tint inside when ON
             if (isOn) {
+                // Soft cyan-teal radial inner glow when ON
                 drawCircle(
-                    color = WemoGreenPrimary.copy(alpha = 0.06f),
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            WemoGreenTop.copy(alpha = 0.18f),
+                            WemoGreenPrimary.copy(alpha = 0.05f)
+                        ),
+                        center = center,
+                        radius = radius
+                    ),
                     radius = radius,
                     center = center
                 )
+                // Gradient outer ring
+                drawCircle(
+                    brush = Brush.linearGradient(
+                        colors = listOf(WemoGreenTop, WemoGreenPrimary, WemoGreenBottom)
+                    ),
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = strokeW)
+                )
+            } else {
+                drawCircle(
+                    color = ringColor,
+                    radius = radius,
+                    center = center,
+                    style = Stroke(width = strokeW)
+                )
             }
 
-            // Outer circle ring
-            drawCircle(
-                color = ringColor,
-                radius = radius,
-                center = center,
-                style = Stroke(width = strokeW)
-            )
-
             if (isToggling) {
-                // Animated arc overlay while SOAP request is in flight
                 drawArc(
-                    color = WemoGreenPrimary,
+                    color = WemoGreenTop,
                     startAngle = spinAngle,
                     sweepAngle = 100f,
                     useCenter = false,
                     topLeft = Offset(strokeW / 2f, strokeW / 2f),
                     size = Size(size.width - strokeW, size.height - strokeW),
-                    style = Stroke(width = strokeW * 1.25f, cap = StrokeCap.Round)
+                    style = Stroke(width = strokeW * 1.3f, cap = StrokeCap.Round)
                 )
             }
 
             // Inner IEC power icon: broken circle arc + top vertical stem
             val innerRadius = radius * 0.42f
             val innerStroke = 3.0.dp.toPx()
+            val glyphColor = if (isOn) WemoGreenDark else ringColor
             drawArc(
-                color = ringColor,
+                color = glyphColor,
                 startAngle = -52f,
                 sweepAngle = 284f,
                 useCenter = false,
@@ -462,9 +495,8 @@ fun WeMoPowerRingButton(
                 style = Stroke(width = innerStroke, cap = StrokeCap.Round)
             )
 
-            // Vertical power stem at top
             drawLine(
-                color = ringColor,
+                color = glyphColor,
                 start = Offset(center.x, center.y - innerRadius - 2.5.dp.toPx()),
                 end = Offset(center.x, center.y + 1.dp.toPx()),
                 strokeWidth = innerStroke,
@@ -474,10 +506,6 @@ fun WeMoPowerRingButton(
     }
 }
 
-/**
- * Custom Canvas icon for the "Devices" bottom tab (horizontal 2-prong electrical plug silhouette
- * matching the screenshot).
- */
 @Composable
 fun WeMoPlugTabIcon(
     tint: Color,
@@ -487,7 +515,6 @@ fun WeMoPlugTabIcon(
         val w = size.width
         val h = size.height
 
-        // Left cord stub
         drawLine(
             color = tint,
             start = Offset(w * 0.08f, h * 0.50f),
@@ -496,7 +523,6 @@ fun WeMoPlugTabIcon(
             cap = StrokeCap.Round
         )
 
-        // D-shaped plug body
         val plugPath = Path().apply {
             addRoundRect(
                 RoundRect(
@@ -510,7 +536,6 @@ fun WeMoPlugTabIcon(
         }
         drawPath(path = plugPath, color = tint)
 
-        // Two horizontal metal prongs extending right
         drawLine(
             color = tint,
             start = Offset(w * 0.66f, h * 0.37f),

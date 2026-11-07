@@ -1,10 +1,13 @@
 package com.example.data
 
+import android.content.Context
+import com.example.network.SsdpScanReport
 import com.example.network.WeMoNetworkClient
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -12,18 +15,19 @@ import java.util.Locale
 
 class WeMoRepository(
     private val dao: WeMoDao,
-    private val networkClient: WeMoNetworkClient = WeMoNetworkClient()
+    context: Context? = null,
+    private val networkClient: WeMoNetworkClient = WeMoNetworkClient(context)
 ) {
     private val initialSeedDone = MutableStateFlow(false)
 
-    val allDevices: Flow<List<WeMoDeviceEntity>> = kotlinx.coroutines.flow.combine(
+    val allDevices: Flow<List<WeMoDeviceEntity>> = combine(
         dao.getAllDevices(),
         initialSeedDone
     ) { list, seeded ->
         if (list.isEmpty() && !seeded) defaultClassicDevices() else list
     }
 
-    val allRules: Flow<List<WeMoRuleEntity>> = kotlinx.coroutines.flow.combine(
+    val allRules: Flow<List<WeMoRuleEntity>> = combine(
         dao.getAllRules(),
         initialSeedDone
     ) { list, seeded ->
@@ -33,13 +37,13 @@ class WeMoRepository(
     private val _soapLogs = MutableStateFlow<List<SoapLogEntry>>(emptyList())
     val soapLogs: StateFlow<List<SoapLogEntry>> = _soapLogs.asStateFlow()
 
+    private val _latestSsdpReport = MutableStateFlow<SsdpScanReport?>(null)
+    val latestSsdpReport: StateFlow<SsdpScanReport?> = _latestSsdpReport.asStateFlow()
+
     private fun appendLog(entry: SoapLogEntry) {
         _soapLogs.value = (listOf(entry) + _soapLogs.value).take(40)
     }
 
-    /**
-     * Seeds the exact 8 devices from the user's classic WeMo screenshot if the database is empty.
-     */
     suspend fun ensureSeeded() {
         if (dao.getDeviceCount() == 0) {
             dao.insertDevices(defaultClassicDevices())
@@ -102,7 +106,6 @@ class WeMoRepository(
         )
         dao.updateDevice(updated)
 
-        // Also execute any enabled MOTION_TRIGGER rules
         val rules = dao.getAllRules().first()
         rules.filter { it.isEnabled && it.ruleType == "MOTION_TRIGGER" }.forEach { rule ->
             val target = dao.getDeviceById(rule.targetDeviceId)
@@ -134,59 +137,92 @@ class WeMoRepository(
         dao.updateDevice(device.copy(isReachable = reachable))
     }
 
-    suspend fun refreshAndDiscoverAll(): Int {
-        val (discoveredLan, discoveryLog) = networkClient.discoverDevicesOnLan()
-        appendLog(discoveryLog)
+    /**
+     * Runs an SSDP M-SEARCH discovery scan over UDP 239.255.255.250:1900 and updates the
+     * latest SsdpScanReport with all discovered UPnP WeMi/WeMo devices on the network.
+     */
+    suspend fun executeSsdpScan(
+        searchTarget: String = "urn:Belkin:service:basicevent:1",
+        autoAdoptNew: Boolean = false
+    ): SsdpScanReport {
+        val currentDevices = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val report = networkClient.performSsdpDiscoveryScan(
+            searchTarget = searchTarget,
+            knownLocalDevices = currentDevices
+        )
+        _latestSsdpReport.value = report
+        appendLog(report.logEntry)
 
+        if (autoAdoptNew) {
+            adoptDiscoveredDevices(report.discoveredDevices)
+        }
+        return report
+    }
+
+    /**
+     * Adds or updates a single SSDP-discovered device in the Room database.
+     */
+    suspend fun adoptDiscoveredDevice(discovered: SsdpDiscoveredDevice): WeMoDeviceEntity {
+        val currentDevices = dao.getAllDevices().first()
+        val existing = currentDevices.find {
+            it.ipAddress == discovered.ipAddress || it.name.equals(discovered.name, ignoreCase = true)
+        }
+        return if (existing == null) {
+            val newEntity = WeMoDeviceEntity(
+                name = discovered.name,
+                deviceType = discovered.deviceType.name,
+                ipAddress = discovered.ipAddress,
+                port = discovered.port,
+                isOn = discovered.isOn,
+                isReachable = true,
+                brightness = discovered.brightness,
+                serialNumber = discovered.serialNumber,
+                firmwareVersion = discovered.firmwareVersion,
+                sortOrder = currentDevices.size
+            )
+            val newId = dao.insertDevice(newEntity).toInt()
+            newEntity.copy(id = newId)
+        } else {
+            val updated = existing.copy(
+                ipAddress = discovered.ipAddress,
+                port = discovered.port,
+                isReachable = true,
+                serialNumber = discovered.serialNumber,
+                firmwareVersion = discovered.firmwareVersion
+            )
+            dao.updateDevice(updated)
+            updated
+        }
+    }
+
+    /**
+     * Syncs all SSDP-discovered devices into the persistent Room database list.
+     */
+    suspend fun adoptDiscoveredDevices(discoveredList: List<SsdpDiscoveredDevice>): Int {
         val currentDevices = dao.getAllDevices().first()
         var newlyAdded = 0
-        for (lanDev in discoveredLan) {
+        for (item in discoveredList) {
             val existing = currentDevices.find {
-                it.ipAddress == lanDev.ipAddress || it.name.equals(lanDev.name, ignoreCase = true)
+                it.ipAddress == item.ipAddress || it.name.equals(item.name, ignoreCase = true)
             }
             if (existing == null) {
                 dao.insertDevice(
                     WeMoDeviceEntity(
-                        name = lanDev.name,
-                        deviceType = lanDev.deviceType.name,
-                        ipAddress = lanDev.ipAddress,
-                        port = lanDev.port,
-                        isOn = true,
+                        name = item.name,
+                        deviceType = item.deviceType.name,
+                        ipAddress = item.ipAddress,
+                        port = item.port,
+                        isOn = item.isOn,
                         isReachable = true,
-                        brightness = 100,
-                        serialNumber = lanDev.serialNumber,
+                        brightness = item.brightness,
+                        serialNumber = item.serialNumber,
+                        firmwareVersion = item.firmwareVersion,
                         sortOrder = currentDevices.size + newlyAdded
                     )
                 )
                 newlyAdded++
-            } else {
-                val stateRes = networkClient.getBinaryState(existing)
-                appendLog(stateRes.logEntry)
-                if (stateRes.reachableOnLan) {
-                    dao.updateDevice(
-                        existing.copy(
-                            isOn = stateRes.binaryStateOn ?: existing.isOn,
-                            brightness = stateRes.brightness ?: existing.brightness,
-                            port = stateRes.resolvedPort,
-                            isReachable = true
-                        )
-                    )
-                }
-            }
-        }
-
-        // Also probe the first active switch so the user sees a real GetBinaryState SOAP check in the log
-        currentDevices.firstOrNull()?.let { firstDevice ->
-            val res = networkClient.getBinaryState(firstDevice)
-            appendLog(res.logEntry)
-            if (res.reachableOnLan) {
-                dao.updateDevice(
-                    firstDevice.copy(
-                        isOn = res.binaryStateOn ?: firstDevice.isOn,
-                        port = res.resolvedPort,
-                        isReachable = true
-                    )
-                )
+            } else if (!existing.isReachable) {
+                dao.updateDevice(existing.copy(isReachable = true, port = item.port))
             }
         }
         return newlyAdded
@@ -311,7 +347,7 @@ class WeMoRepository(
                 ipAddress = "192.168.1.105",
                 port = 49153,
                 isOn = false,
-                isReachable = false, // Matches "Not Detected" in screenshot
+                isReachable = false,
                 brightness = 100,
                 serialNumber = "94103EA2B27801",
                 sortOrder = 4
@@ -324,7 +360,7 @@ class WeMoRepository(
                 port = 49153,
                 isOn = true,
                 isReachable = true,
-                brightness = 21, // Matches "21%" in screenshot
+                brightness = 21,
                 serialNumber = "94103EA2B27802",
                 sortOrder = 5
             ),
@@ -336,7 +372,7 @@ class WeMoRepository(
                 port = 49153,
                 isOn = true,
                 isReachable = true,
-                brightness = 100, // Matches "100%" in screenshot
+                brightness = 100,
                 serialNumber = "94103EA2B27803",
                 sortOrder = 6
             ),
@@ -348,7 +384,7 @@ class WeMoRepository(
                 port = 49153,
                 isOn = true,
                 isReachable = true,
-                brightness = 100, // Matches "100%" in screenshot
+                brightness = 100,
                 serialNumber = "94103EA2B27804",
                 sortOrder = 7
             )
