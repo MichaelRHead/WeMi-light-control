@@ -105,8 +105,11 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("room_power_toggle_Living Room").performClick()
         composeTestRule.waitForIdle()
 
-        // Verify Living Room devices are displayed under the group
+        // Verify Living Room devices and their real-time connection/latency indicators are displayed
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasText("Christmas Tree Living"))
         composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("connection_status_badge_1", useUnmergedTree = true).assertIsDisplayed()
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasText("Christmas Candle"))
         composeTestRule.onNodeWithText("Christmas Candle").assertIsDisplayed()

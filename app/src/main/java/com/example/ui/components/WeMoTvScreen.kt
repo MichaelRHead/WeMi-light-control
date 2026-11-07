@@ -819,11 +819,11 @@ private fun WeMoTvDeviceCard(
 
             val statusLabel = when {
                 isToggling -> "Sending SOAP SetBinaryState..."
-                !device.isReachable -> "Not Detected • Press OK to Reconnect"
-                type == WeMoDeviceType.MOTION_SENSOR -> "Motion sensed: ${device.lastMotionTime ?: "Active"}"
+                !device.isReachable -> "Offline • Timeout (Press OK to Retry)"
+                type == WeMoDeviceType.MOTION_SENSOR -> "${device.connectionBadgeText} • Motion: ${device.lastMotionTime ?: "Active"}"
                 type == WeMoDeviceType.LIGHTBULB_DIMMER ->
-                    if (device.isOn) "ON • ${device.brightness}% Brightness" else "OFF • Dimmable LED"
-                else -> if (device.isOn) "ON • Active Relay (${device.ipAddress})" else "OFF • Standby (${device.ipAddress})"
+                    if (device.isOn) "${device.connectionBadgeText} • ON (${device.brightness}%)" else "${device.connectionBadgeText} • OFF"
+                else -> if (device.isOn) "${device.connectionBadgeText} • ON (${device.ipAddress})" else "${device.connectionBadgeText} • Standby (${device.ipAddress})"
             }
 
             Text(

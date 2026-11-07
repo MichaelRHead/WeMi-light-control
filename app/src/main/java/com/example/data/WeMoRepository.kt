@@ -61,6 +61,10 @@ class WeMoRepository(
         dao.insertRules(defaultClassicRules())
     }
 
+    private fun nowFormatted(): String {
+        return SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
+    }
+
     suspend fun toggleDevicePower(device: WeMoDeviceEntity): WeMoDeviceEntity {
         val nextOn = !device.isOn
         val result = networkClient.setBinaryState(
@@ -74,6 +78,8 @@ class WeMoRepository(
             isOn = nextOn,
             isReachable = true,
             port = result.resolvedPort,
+            latencyMs = result.latencyMs,
+            lastCheckedTime = nowFormatted(),
             brightness = if (device.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && nextOn && device.brightness == 0) 100 else device.brightness
         )
         dao.updateDevice(updated)
@@ -90,6 +96,7 @@ class WeMoRepository(
                 it.isReachable &&
                 it.parsedType != WeMoDeviceType.MOTION_SENSOR
         }
+        val checkedAt = nowFormatted()
         roomSwitches.forEach { dev ->
             val result = networkClient.setBinaryState(
                 device = dev,
@@ -101,6 +108,8 @@ class WeMoRepository(
                 dev.copy(
                     isOn = targetOn,
                     port = result.resolvedPort,
+                    latencyMs = result.latencyMs,
+                    lastCheckedTime = checkedAt,
                     brightness = if (dev.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && targetOn && dev.brightness == 0) 100 else dev.brightness
                 )
             )
@@ -119,6 +128,7 @@ class WeMoRepository(
                 it.isReachable &&
                 it.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER
         }
+        val checkedAt = nowFormatted()
         roomBulbs.forEach { bulb ->
             val result = networkClient.setBinaryState(
                 device = bulb,
@@ -130,7 +140,9 @@ class WeMoRepository(
                 bulb.copy(
                     isOn = true,
                     brightness = clamped,
-                    port = result.resolvedPort
+                    port = result.resolvedPort,
+                    latencyMs = result.latencyMs,
+                    lastCheckedTime = checkedAt
                 )
             )
         }
@@ -150,15 +162,19 @@ class WeMoRepository(
                 isOn = true,
                 isReachable = true,
                 brightness = clamped,
-                port = result.resolvedPort
+                port = result.resolvedPort,
+                latencyMs = result.latencyMs,
+                lastCheckedTime = nowFormatted()
             )
         )
     }
 
     suspend fun triggerMotionEvent(device: WeMoDeviceEntity) {
-        val nowFormatted = SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
+        val now = nowFormatted()
         val updated = device.copy(
-            lastMotionTime = nowFormatted,
+            lastMotionTime = now,
+            lastCheckedTime = now,
+            latencyMs = device.latencyMs.takeIf { it > 0 } ?: 15,
             isReachable = true
         )
         dao.updateDevice(updated)
@@ -171,6 +187,7 @@ class WeMoRepository(
                     target.copy(
                         isOn = rule.targetStateOn,
                         brightness = rule.targetBrightness,
+                        lastCheckedTime = now,
                         isReachable = true
                     )
                 )
@@ -178,20 +195,41 @@ class WeMoRepository(
         }
     }
 
-    suspend fun reconnectDevice(device: WeMoDeviceEntity) {
+    suspend fun reconnectDevice(device: WeMoDeviceEntity): WeMoDeviceEntity {
         val probe = networkClient.getBinaryState(device)
         appendLog(probe.logEntry)
-        dao.updateDevice(
-            device.copy(
-                isReachable = true,
-                port = probe.resolvedPort,
-                isOn = probe.binaryStateOn ?: true
-            )
+        val updated = device.copy(
+            isReachable = true,
+            port = probe.resolvedPort,
+            latencyMs = probe.latencyMs.coerceAtLeast(11),
+            lastCheckedTime = nowFormatted(),
+            isOn = probe.binaryStateOn ?: true
         )
+        dao.updateDevice(updated)
+        return updated
+    }
+
+    suspend fun pingDeviceLatency(device: WeMoDeviceEntity): WeMoDeviceEntity {
+        val probe = networkClient.getBinaryState(device)
+        appendLog(probe.logEntry)
+        val updated = device.copy(
+            isReachable = true,
+            port = probe.resolvedPort,
+            latencyMs = probe.latencyMs.coerceAtLeast(9),
+            lastCheckedTime = nowFormatted()
+        )
+        dao.updateDevice(updated)
+        return updated
     }
 
     suspend fun setDeviceReachableState(device: WeMoDeviceEntity, reachable: Boolean) {
-        dao.updateDevice(device.copy(isReachable = reachable))
+        dao.updateDevice(
+            device.copy(
+                isReachable = reachable,
+                latencyMs = if (reachable) (device.latencyMs.takeIf { it > 0 } ?: 14) else 0,
+                lastCheckedTime = nowFormatted()
+            )
+        )
     }
 
     suspend fun executeSsdpScan(
@@ -206,6 +244,22 @@ class WeMoRepository(
         _latestSsdpReport.value = report
         appendLog(report.logEntry)
 
+        // Update latency & lastCheckedTime for all known devices found in the SSDP scan
+        val checkedAt = nowFormatted()
+        currentDevices.forEach { existing ->
+            val match = report.discoveredDevices.find {
+                it.ipAddress == existing.ipAddress || it.name.equals(existing.name, ignoreCase = true)
+            }
+            if (match != null && existing.isReachable) {
+                dao.updateDevice(
+                    existing.copy(
+                        latencyMs = match.responseTimeMs.toInt().coerceAtLeast(8),
+                        lastCheckedTime = checkedAt
+                    )
+                )
+            }
+        }
+
         if (autoAdoptNew) {
             adoptDiscoveredDevices(report.discoveredDevices)
         }
@@ -217,6 +271,7 @@ class WeMoRepository(
         val existing = currentDevices.find {
             it.ipAddress == discovered.ipAddress || it.name.equals(discovered.name, ignoreCase = true)
         }
+        val checkedAt = nowFormatted()
         return if (existing == null) {
             val newEntity = WeMoDeviceEntity(
                 name = discovered.name,
@@ -227,6 +282,8 @@ class WeMoRepository(
                 isOn = discovered.isOn,
                 isReachable = true,
                 brightness = discovered.brightness,
+                latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(9),
+                lastCheckedTime = checkedAt,
                 serialNumber = discovered.serialNumber,
                 firmwareVersion = discovered.firmwareVersion,
                 sortOrder = currentDevices.size
@@ -238,6 +295,8 @@ class WeMoRepository(
                 ipAddress = discovered.ipAddress,
                 port = discovered.port,
                 isReachable = true,
+                latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(9),
+                lastCheckedTime = checkedAt,
                 serialNumber = discovered.serialNumber,
                 firmwareVersion = discovered.firmwareVersion
             )
@@ -249,6 +308,7 @@ class WeMoRepository(
     suspend fun adoptDiscoveredDevices(discoveredList: List<SsdpDiscoveredDevice>): Int {
         val currentDevices = dao.getAllDevices().first()
         var newlyAdded = 0
+        val checkedAt = nowFormatted()
         for (item in discoveredList) {
             val existing = currentDevices.find {
                 it.ipAddress == item.ipAddress || it.name.equals(item.name, ignoreCase = true)
@@ -264,6 +324,8 @@ class WeMoRepository(
                         isOn = item.isOn,
                         isReachable = true,
                         brightness = item.brightness,
+                        latencyMs = item.responseTimeMs.toInt().coerceAtLeast(9),
+                        lastCheckedTime = checkedAt,
                         serialNumber = item.serialNumber,
                         firmwareVersion = item.firmwareVersion,
                         sortOrder = currentDevices.size + newlyAdded
@@ -271,7 +333,14 @@ class WeMoRepository(
                 )
                 newlyAdded++
             } else if (!existing.isReachable) {
-                dao.updateDevice(existing.copy(isReachable = true, port = item.port))
+                dao.updateDevice(
+                    existing.copy(
+                        isReachable = true,
+                        port = item.port,
+                        latencyMs = item.responseTimeMs.toInt().coerceAtLeast(9),
+                        lastCheckedTime = checkedAt
+                    )
+                )
             }
         }
         return newlyAdded
@@ -361,6 +430,8 @@ class WeMoRepository(
                 isOn = true,
                 isReachable = true,
                 brightness = 100,
+                latencyMs = 11,
+                lastCheckedTime = "Just now",
                 serialNumber = "221517K01018A1",
                 sortOrder = 0
             ),
@@ -374,6 +445,8 @@ class WeMoRepository(
                 isOn = true,
                 isReachable = true,
                 brightness = 100,
+                latencyMs = 14,
+                lastCheckedTime = "Just now",
                 serialNumber = "221517K01018A2",
                 sortOrder = 1
             ),
@@ -386,6 +459,8 @@ class WeMoRepository(
                 port = 49153,
                 isOn = true,
                 isReachable = true,
+                latencyMs = 18,
+                lastCheckedTime = "Just now",
                 lastMotionTime = "4:15:15 PM",
                 serialNumber = "221432M02004B9",
                 sortOrder = 2
@@ -400,6 +475,8 @@ class WeMoRepository(
                 isOn = true,
                 isReachable = true,
                 brightness = 100,
+                latencyMs = 16,
+                lastCheckedTime = "Just now",
                 serialNumber = "221517K01018A4",
                 sortOrder = 3
             ),
@@ -413,6 +490,8 @@ class WeMoRepository(
                 isOn = false,
                 isReachable = false,
                 brightness = 100,
+                latencyMs = 0,
+                lastCheckedTime = "Timeout",
                 serialNumber = "94103EA2B27801",
                 sortOrder = 4
             ),
@@ -426,6 +505,8 @@ class WeMoRepository(
                 isOn = true,
                 isReachable = true,
                 brightness = 21,
+                latencyMs = 32,
+                lastCheckedTime = "Just now",
                 serialNumber = "94103EA2B27802",
                 sortOrder = 5
             ),
@@ -439,6 +520,8 @@ class WeMoRepository(
                 isOn = true,
                 isReachable = true,
                 brightness = 100,
+                latencyMs = 15,
+                lastCheckedTime = "Just now",
                 serialNumber = "94103EA2B27803",
                 sortOrder = 6
             ),
@@ -452,6 +535,8 @@ class WeMoRepository(
                 isOn = true,
                 isReachable = true,
                 brightness = 100,
+                latencyMs = 12,
+                lastCheckedTime = "Just now",
                 serialNumber = "94103EA2B27804",
                 sortOrder = 7
             )

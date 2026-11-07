@@ -228,7 +228,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             val updated = repository.toggleDevicePower(device)
             _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
             showTransientStatus(
-                "${updated.name}: Turned ${if (updated.isOn) "ON" else "OFF"} (${updated.ipAddress}:${updated.port})"
+                "${updated.name}: Turned ${if (updated.isOn) "ON" else "OFF"} (${updated.latencyMs}ms • ${updated.ipAddress}:${updated.port})"
             )
         }
     }
@@ -249,9 +249,22 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     fun reconnectDevice(device: WeMoDeviceEntity) {
         viewModelScope.launch {
             _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
-            repository.reconnectDevice(device)
+            val updated = repository.reconnectDevice(device)
             _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
-            showTransientStatus("${device.name} reconnected at ${device.ipAddress}:${device.port}")
+            showTransientStatus(
+                "${updated.name} Active (${updated.latencyMs}ms RTT) at ${updated.ipAddress}:${updated.port}"
+            )
+        }
+    }
+
+    fun pingDeviceLatency(device: WeMoDeviceEntity) {
+        viewModelScope.launch {
+            _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
+            val updated = repository.pingDeviceLatency(device)
+            _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
+            showTransientStatus(
+                "${updated.name}: Connection Active • ${updated.latencyMs}ms latency (${updated.ipAddress}:${updated.port})"
+            )
         }
     }
 

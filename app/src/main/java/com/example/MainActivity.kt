@@ -345,6 +345,9 @@ fun WeMiSwitchApp(
                                                         onMoveDown = {
                                                             viewModel.moveDevice(device, moveUp = false)
                                                         },
+                                                        onPingLatency = {
+                                                            viewModel.pingDeviceLatency(device)
+                                                        },
                                                         modifier = Modifier.padding(start = 10.dp)
                                                     )
                                                 }
@@ -382,6 +385,9 @@ fun WeMiSwitchApp(
                                                 },
                                                 onMoveDown = {
                                                     viewModel.moveDevice(device, moveUp = false)
+                                                },
+                                                onPingLatency = {
+                                                    viewModel.pingDeviceLatency(device)
                                                 }
                                             )
                                         }

@@ -9,6 +9,16 @@ enum class WeMoDeviceType {
     LIGHTBULB_DIMMER
 }
 
+enum class WeMoConnectionQuality(
+    val statusTitle: String,
+    val signalBars: Int
+) {
+    EXCELLENT(statusTitle = "Active", signalBars = 4),
+    GOOD(statusTitle = "Active", signalBars = 3),
+    SLOW(statusTitle = "High Latency", signalBars = 2),
+    OFFLINE(statusTitle = "Offline", signalBars = 0)
+}
+
 @Entity(tableName = "wemo_devices")
 data class WeMoDeviceEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
@@ -20,6 +30,8 @@ data class WeMoDeviceEntity(
     val isOn: Boolean = true,
     val isReachable: Boolean = true,
     val brightness: Int = 100,
+    val latencyMs: Int = 14,
+    val lastCheckedTime: String = "Just now",
     val lastMotionTime: String = "4:15:15 PM",
     val serialNumber: String = "221517K01018AB",
     val firmwareVersion: String = "WeMo_WW_2.00.11532.PVT",
@@ -29,6 +41,22 @@ data class WeMoDeviceEntity(
     val parsedType: WeMoDeviceType
         get() = runCatching { WeMoDeviceType.valueOf(deviceType) }
             .getOrDefault(WeMoDeviceType.SWITCH_PLUG)
+
+    val connectionQuality: WeMoConnectionQuality
+        get() = when {
+            !isReachable || latencyMs <= 0 -> WeMoConnectionQuality.OFFLINE
+            latencyMs <= 28 -> WeMoConnectionQuality.EXCELLENT
+            latencyMs <= 65 -> WeMoConnectionQuality.GOOD
+            else -> WeMoConnectionQuality.SLOW
+        }
+
+    val connectionBadgeText: String
+        get() = when (connectionQuality) {
+            WeMoConnectionQuality.OFFLINE -> "Offline • Timeout"
+            WeMoConnectionQuality.EXCELLENT -> "Active • ${latencyMs}ms"
+            WeMoConnectionQuality.GOOD -> "Active • ${latencyMs}ms"
+            WeMoConnectionQuality.SLOW -> "Slow • ${latencyMs}ms"
+        }
 }
 
 @Entity(tableName = "wemo_rules")

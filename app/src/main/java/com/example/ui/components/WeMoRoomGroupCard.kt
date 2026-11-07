@@ -298,10 +298,19 @@ fun WeMoRoomGroupHeaderCard(
 
                     Spacer(modifier = Modifier.height(2.dp))
 
+                    val onlineDevices = roomDevices.filter { it.isReachable && it.latencyMs > 0 }
+                    val avgLatency = if (onlineDevices.isNotEmpty()) {
+                        onlineDevices.map { it.latencyMs }.average().roundToInt()
+                    } else {
+                        0
+                    }
                     val roomSubtitle = buildString {
-                        append("Master Room Group • ${roomDevices.size} device${if (roomDevices.size == 1) "" else "s"}")
+                        append("${onlineDevices.size}/${roomDevices.size} Active")
+                        if (avgLatency > 0) {
+                            append(" • Avg ${avgLatency}ms")
+                        }
                         if (dimmableBulbs.isNotEmpty()) {
-                            append(" • ${avgBrightness}% brightness")
+                            append(" • ${avgBrightness}% dim")
                         } else if (totalControllable > 0) {
                             append(" • Tap ring to toggle all")
                         }
