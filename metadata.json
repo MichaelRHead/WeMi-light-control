@@ -1,0 +1,6 @@
+{
+  "name": "WeMi Switch Control",
+  "description": "Local network controller for WeMi and WeMo smart light switches, plugs, dimmers, bulbs, and motion sensors with UPnP/SOAP control and automation rules.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

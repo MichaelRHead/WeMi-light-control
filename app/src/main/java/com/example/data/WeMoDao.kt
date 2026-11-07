@@ -1,0 +1,56 @@
+package com.example.data
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface WeMoDao {
+    @Query("SELECT * FROM wemo_devices ORDER BY sortOrder ASC, id ASC")
+    fun getAllDevices(): Flow<List<WeMoDeviceEntity>>
+
+    @Query("SELECT COUNT(*) FROM wemo_devices")
+    suspend fun getDeviceCount(): Int
+
+    @Query("SELECT * FROM wemo_devices WHERE id = :id LIMIT 1")
+    suspend fun getDeviceById(id: Int): WeMoDeviceEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDevice(device: WeMoDeviceEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertDevices(devices: List<WeMoDeviceEntity>)
+
+    @Update
+    suspend fun updateDevice(device: WeMoDeviceEntity)
+
+    @Query("DELETE FROM wemo_devices WHERE id = :id")
+    suspend fun deleteDeviceById(id: Int)
+
+    @Query("DELETE FROM wemo_devices")
+    suspend fun deleteAllDevices()
+
+    @Query("SELECT * FROM wemo_rules ORDER BY id ASC")
+    fun getAllRules(): Flow<List<WeMoRuleEntity>>
+
+    @Query("SELECT COUNT(*) FROM wemo_rules")
+    suspend fun getRuleCount(): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRule(rule: WeMoRuleEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRules(rules: List<WeMoRuleEntity>)
+
+    @Update
+    suspend fun updateRule(rule: WeMoRuleEntity)
+
+    @Query("DELETE FROM wemo_rules WHERE id = :id")
+    suspend fun deleteRuleById(id: Int)
+
+    @Query("DELETE FROM wemo_rules")
+    suspend fun deleteAllRules()
+}

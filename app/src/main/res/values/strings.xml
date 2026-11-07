@@ -1,0 +1,25 @@
+<resources>
+    <string name="app_name">WeMi Switch Control</string>
+    <string name="header_brand_wemo">wemo</string>
+    <string name="header_brand_wemi">wemi</string>
+    <string name="action_refresh">Refresh Devices</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_done">Done</string>
+    <string name="action_add_device">Add Device</string>
+    <string name="tab_devices">Devices</string>
+    <string name="tab_rules">Rules</string>
+    <string name="tab_more">More</string>
+    <string name="status_not_detected">Not Detected</string>
+    <string name="status_motion_sensed">Motion sensed: %1$s</string>
+    <string name="content_desc_power_toggle">Toggle power for %1$s</string>
+    <string name="content_desc_expand_dimmer">Adjust brightness and settings for %1$s</string>
+    <string name="dialog_add_device_title">Add WeMi / WeMo Device</string>
+    <string name="dialog_scan_network">Scan Local Wi-Fi (SSDP UPnP)</string>
+    <string name="label_device_name">Friendly Name</string>
+    <string name="label_ip_address">Local IP Address</string>
+    <string name="label_port">UPnP Port (49152–49155)</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_test_soap">Test SOAP Ping</string>
+</resources>
