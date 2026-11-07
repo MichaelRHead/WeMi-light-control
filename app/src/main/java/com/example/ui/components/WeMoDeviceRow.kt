@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -37,6 +38,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -45,7 +47,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -86,219 +87,235 @@ fun WeMoDeviceRow(
 ) {
     val type = device.parsedType
 
-    Column(
+    Surface(
+        color = WemoRowSurface,
+        shape = RoundedCornerShape(14.dp),
+        tonalElevation = if (device.isReachable && device.isOn) 2.dp else 0.dp,
+        shadowElevation = if (device.isReachable && device.isOn) 2.dp else 0.5.dp,
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (device.isReachable && device.isOn && type != WeMoDeviceType.MOTION_SENSOR) {
+                WemoGreenPrimary.copy(alpha = 0.28f)
+            } else {
+                WemoDividerGray
+            }
+        ),
         modifier = modifier
             .fillMaxWidth()
-            .background(WemoRowSurface)
+            .padding(horizontal = 10.dp, vertical = 5.dp)
             .testTag("device_row_${device.id}")
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        when {
+                            isEditMode -> onEditDevice()
+                            !device.isReachable -> onReconnect()
+                            type == WeMoDeviceType.MOTION_SENSOR -> onTriggerMotion()
+                            else -> onToggleExpand()
+                        }
+                    }
+                    .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: Hardware Illustration
+                Box(
+                    modifier = Modifier.width(64.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    when (type) {
+                        WeMoDeviceType.SWITCH_PLUG -> WeMoSmartPlugIllustration(
+                            isReachable = device.isReachable,
+                            isOn = device.isOn
+                        )
+                        WeMoDeviceType.MOTION_SENSOR -> WeMoMotionSensorIllustration(
+                            isReachable = device.isReachable
+                        )
+                        WeMoDeviceType.LIGHTBULB_DIMMER -> WeMoLightbulbIllustration(
+                            isReachable = device.isReachable,
+                            isOn = device.isOn,
+                            brightness = device.brightness
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Middle: Device Name + Status / Percentage + Expand Chevron
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = device.name,
+                        color = if (device.isReachable) WemoTextPrimary else WemoTextPrimary.copy(alpha = 0.65f),
+                        fontFamily = WorkSansFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 19.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
                     when {
-                        isEditMode -> onEditDevice()
-                        !device.isReachable -> onReconnect()
-                        type == WeMoDeviceType.MOTION_SENSOR -> onTriggerMotion()
-                        else -> onToggleExpand()
-                    }
-                }
-                .padding(start = 16.dp, end = 14.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Left: Realistic Hardware Illustration matching the screenshot
-            Box(
-                modifier = Modifier.width(66.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                when (type) {
-                    WeMoDeviceType.SWITCH_PLUG -> WeMoSmartPlugIllustration(
-                        isReachable = device.isReachable,
-                        isOn = device.isOn
-                    )
-                    WeMoDeviceType.MOTION_SENSOR -> WeMoMotionSensorIllustration(
-                        isReachable = device.isReachable
-                    )
-                    WeMoDeviceType.LIGHTBULB_DIMMER -> WeMoLightbulbIllustration(
-                        isReachable = device.isReachable,
-                        isOn = device.isOn,
-                        brightness = device.brightness
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Middle: Device Name + Status / Percentage + Expand Chevron
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    text = device.name,
-                    color = if (device.isReachable) WemoTextPrimary else WemoTextPrimary.copy(alpha = 0.75f),
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.Light,
-                    fontSize = 21.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-
-                when {
-                    !device.isReachable -> {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = stringResource(R.string.status_not_detected),
-                            color = WemoTextSecondary,
-                            fontFamily = WorkSansFontFamily,
-                            fontWeight = FontWeight.Light,
-                            fontSize = 15.sp
-                        )
-                    }
-                    type == WeMoDeviceType.MOTION_SENSOR -> {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = stringResource(R.string.status_motion_sensed, device.lastMotionTime),
-                            color = WemoTextSecondary,
-                            fontFamily = WorkSansFontFamily,
-                            fontWeight = FontWeight.Light,
-                            fontSize = 15.sp
-                        )
-                    }
-                    type == WeMoDeviceType.LIGHTBULB_DIMMER -> {
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (device.isOn) "${device.brightness}%" else "Off (${device.brightness}%)",
-                            color = if (device.isOn) WemoGreenPrimary else WemoTextSecondary,
-                            fontFamily = WorkSansFontFamily,
-                            fontWeight = FontWeight.Normal,
-                            fontSize = 16.sp
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Icon(
-                            imageVector = if (isExpanded) {
-                                Icons.Default.KeyboardArrowUp
-                            } else {
-                                Icons.Default.KeyboardArrowDown
-                            },
-                            contentDescription = stringResource(
-                                R.string.content_desc_expand_dimmer,
-                                device.name
-                            ),
-                            tint = WemoGreenPrimary,
-                            modifier = Modifier
-                                .size(22.dp)
-                                .testTag("expand_chevron_${device.id}")
-                        )
-                    }
-                    else -> {
-                        // Standard WeMo Switch / Plug: keep clean vertical alignment like screenshot
-                        if (isExpanded || isEditMode) {
+                        !device.isReachable -> {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = stringResource(R.string.status_not_detected),
+                                color = WemoTextSecondary,
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.Normal,
+                                fontSize = 14.sp
+                            )
+                        }
+                        type == WeMoDeviceType.MOTION_SENSOR -> {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Text(
+                                text = stringResource(R.string.status_motion_sensed, device.lastMotionTime),
+                                color = WemoGreenDark,
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.Normal,
+                                fontSize = 14.sp
+                            )
+                        }
+                        type == WeMoDeviceType.LIGHTBULB_DIMMER -> {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Surface(
+                                    color = if (device.isOn) WemoGreenSoft else WemoDividerGray.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (device.isOn) "${device.brightness}%" else "Off • ${device.brightness}%",
+                                        color = if (device.isOn) WemoGreenDark else WemoTextSecondary,
+                                        fontFamily = WorkSansFontFamily,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Icon(
+                                    imageVector = if (isExpanded) {
+                                        Icons.Default.KeyboardArrowUp
+                                    } else {
+                                        Icons.Default.KeyboardArrowDown
+                                    },
+                                    contentDescription = stringResource(
+                                        R.string.content_desc_expand_dimmer,
+                                        device.name
+                                    ),
+                                    tint = WemoGreenPrimary,
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .testTag("expand_chevron_${device.id}")
+                                )
+                            }
+                        }
+                        else -> {
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "${device.ipAddress}:${device.port} • ${if (device.isOn) "ON" else "OFF"}",
-                                color = WemoTextSecondary,
+                                text = if (device.isOn) "Switch Active • ${device.ipAddress}" else "Standby • ${device.ipAddress}",
+                                color = if (device.isOn) WemoGreenDark else WemoTextSecondary,
                                 fontFamily = WorkSansFontFamily,
                                 fontSize = 13.sp
                             )
                         }
                     }
                 }
-            }
 
-            // Right: Edit mode controls OR Power Toggle Ring button
-            if (isEditMode) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = onMoveUp,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowUpward,
-                            contentDescription = "Move ${device.name} up",
-                            tint = WemoTextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
+                // Right: Edit mode controls OR Cyan-Teal Power Toggle Ring button
+                if (isEditMode) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = onMoveUp,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowUpward,
+                                contentDescription = "Move ${device.name} up",
+                                tint = WemoTextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onMoveDown,
+                            modifier = Modifier.size(40.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowDownward,
+                                contentDescription = "Move ${device.name} down",
+                                tint = WemoTextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = onEditDevice,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .testTag("edit_device_${device.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Configure ${device.name}",
+                                tint = WemoGreenDark
+                            )
+                        }
+                        IconButton(
+                            onClick = onDeleteDevice,
+                            modifier = Modifier
+                                .size(44.dp)
+                                .testTag("delete_device_${device.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteOutline,
+                                contentDescription = "Delete ${device.name}",
+                                tint = WemoErrorRed
+                            )
+                        }
                     }
-                    IconButton(
-                        onClick = onMoveDown,
-                        modifier = Modifier.size(40.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowDownward,
-                            contentDescription = "Move ${device.name} down",
-                            tint = WemoTextSecondary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onEditDevice,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .testTag("edit_device_${device.id}")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Configure ${device.name}",
-                            tint = WemoGreenDark
-                        )
-                    }
-                    IconButton(
-                        onClick = onDeleteDevice,
-                        modifier = Modifier
-                            .size(44.dp)
-                            .testTag("delete_device_${device.id}")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = "Delete ${device.name}",
-                            tint = WemoErrorRed
-                        )
-                    }
-                }
-            } else {
-                when {
-                    !device.isReachable -> {
-                        // In the screenshot, "Hall Lightbulb (Not Detected)" has no power ring on the right.
-                        // Tapping the row reconnects it, and we also provide an accessible subtle retry button if expanded.
-                        Spacer(modifier = Modifier.width(64.dp))
-                    }
-                    type == WeMoDeviceType.MOTION_SENSOR -> {
-                        // In the screenshot, "Bedroom Light Motion" has no power ring on the right.
-                        Spacer(modifier = Modifier.width(64.dp))
-                    }
-                    else -> {
-                        WeMoPowerRingButton(
-                            isOn = device.isOn,
-                            isToggling = isToggling,
-                            deviceName = device.name,
-                            onClick = onTogglePower,
-                            modifier = Modifier.testTag("power_button_${device.id}")
-                        )
+                } else {
+                    when {
+                        !device.isReachable -> {
+                            Spacer(modifier = Modifier.width(64.dp))
+                        }
+                        type == WeMoDeviceType.MOTION_SENSOR -> {
+                            Spacer(modifier = Modifier.width(64.dp))
+                        }
+                        else -> {
+                            WeMoPowerRingButton(
+                                isOn = device.isOn,
+                                isToggling = isToggling,
+                                deviceName = device.name,
+                                onClick = onTogglePower,
+                                modifier = Modifier.testTag("power_button_${device.id}")
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        // Expandable inline dimmer & UPnP controls drawer
-        AnimatedVisibility(
-            visible = isExpanded && !isEditMode,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            WeMoExpandedDrawer(
-                device = device,
-                onBrightnessChange = onBrightnessChange,
-                onTriggerMotion = onTriggerMotion,
-                onReconnect = onReconnect,
-                onEditDevice = onEditDevice
-            )
+            // Expandable inline dimmer & UPnP controls drawer
+            AnimatedVisibility(
+                visible = isExpanded && !isEditMode,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                Column {
+                    HorizontalDivider(thickness = 1.dp, color = WemoDividerGray)
+                    WeMoExpandedDrawer(
+                        device = device,
+                        onBrightnessChange = onBrightnessChange,
+                        onTriggerMotion = onTriggerMotion,
+                        onReconnect = onReconnect,
+                        onEditDevice = onEditDevice
+                    )
+                }
+            }
         }
-
-        HorizontalDivider(
-            thickness = 1.dp,
-            color = WemoDividerGray
-        )
     }
 }
 
@@ -319,7 +336,7 @@ private fun WeMoExpandedDrawer(
         modifier = Modifier
             .fillMaxWidth()
             .background(WemoRowExpandedSurface)
-            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .padding(horizontal = 18.dp, vertical = 12.dp)
     ) {
         if (type == WeMoDeviceType.LIGHTBULB_DIMMER && device.isReachable) {
             Row(
@@ -360,7 +377,6 @@ private fun WeMoExpandedDrawer(
                     .testTag("brightness_slider_${device.id}")
             )
 
-            // Quick dimmer presets (including 21% from screenshot!)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -383,7 +399,6 @@ private fun WeMoExpandedDrawer(
             Spacer(modifier = Modifier.height(6.dp))
         }
 
-        // Local UPnP endpoint metadata & quick actions
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,

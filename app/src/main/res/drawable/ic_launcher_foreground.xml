@@ -3,6 +3,6 @@
     <item
         android:width="66dp"
         android:height="66dp"
-        android:drawable="@drawable/img_play_store_icon_1794086176609"
+        android:drawable="@drawable/img_wemi_teal_icon_1794086800772"
         android:gravity="center" />
 </layer-list>

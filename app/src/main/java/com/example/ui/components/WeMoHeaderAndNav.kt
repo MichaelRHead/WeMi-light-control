@@ -21,7 +21,9 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -39,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -56,7 +59,9 @@ import com.example.R
 import com.example.ui.WeMoBottomTab
 import com.example.ui.theme.ComfortaaFontFamily
 import com.example.ui.theme.WemoGreenBottom
+import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
+import com.example.ui.theme.WemoGreenSoft
 import com.example.ui.theme.WemoGreenTop
 import com.example.ui.theme.WemoTextSecondary
 import com.example.ui.theme.WorkSansFontFamily
@@ -87,14 +92,33 @@ fun WeMoTopHeader(
         modifier = modifier
             .fillMaxWidth()
             .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(WemoGreenTop, WemoGreenBottom)
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        WemoGreenTop,
+                        WemoGreenPrimary,
+                        WemoGreenBottom
+                    ),
+                    start = Offset(0f, 0f),
+                    end = Offset(900f, 450f)
                 )
             )
+            .drawBehind {
+                // Atmospheric cyan-teal radial glow in upper-right header
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(
+                            Color(0x4422D3EE),
+                            Color.Transparent
+                        ),
+                        center = Offset(size.width * 0.85f, size.height * 0.2f),
+                        radius = size.width * 0.55f
+                    )
+                )
+            }
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
     ) {
-        // Top Row: Refresh icon on left, Edit button on right
+        // Top Row: Refresh button on left, Edit pill on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -104,6 +128,8 @@ fun WeMoTopHeader(
                 onClick = onRefreshClick,
                 modifier = Modifier
                     .size(48.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.14f))
                     .testTag("refresh_devices_button")
             ) {
                 Icon(
@@ -111,57 +137,82 @@ fun WeMoTopHeader(
                     contentDescription = stringResource(R.string.action_refresh),
                     tint = Color.White,
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(26.dp)
                         .rotate(if (isRefreshing) rotation else 0f)
                 )
             }
 
-            Box(
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = if (isEditMode) Color.White else Color.White.copy(alpha = 0.16f),
                 modifier = Modifier
                     .minimumInteractiveComponentSize()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(RoundedCornerShape(20.dp))
                     .clickable(onClick = onEditClick)
-                    .padding(horizontal = 8.dp, vertical = 6.dp)
-                    .testTag("edit_devices_button"),
-                contentAlignment = Alignment.Center
+                    .testTag("edit_devices_button")
             ) {
-                Text(
-                    text = if (isEditMode) stringResource(R.string.action_done) else stringResource(R.string.action_edit),
-                    color = Color.White,
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = if (isEditMode) FontWeight.SemiBold else FontWeight.Normal,
-                    fontSize = 19.sp
-                )
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = if (isEditMode) stringResource(R.string.action_done) else stringResource(R.string.action_edit),
+                        color = if (isEditMode) WemoGreenBottom else Color.White,
+                        fontFamily = WorkSansFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 16.sp
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // Second Row: "wemo" / "wemi" wordmark on left, white rounded square "+" button on right
+        // Second Row: "wemi" wordmark + subtitle on left, glowing cyan/white "+" button on right
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 4.dp, end = 4.dp, bottom = 6.dp),
+                .padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = if (useWeMiWordmark) {
-                    stringResource(R.string.header_brand_wemi)
-                } else {
-                    stringResource(R.string.header_brand_wemo)
-                },
-                color = Color.White,
-                fontFamily = ComfortaaFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 36.sp,
-                letterSpacing = (-1.0).sp,
+            Row(
+                verticalAlignment = Alignment.Bottom,
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
                     .clickable(onClick = onWordmarkClick)
                     .padding(horizontal = 4.dp)
                     .testTag("brand_wordmark_text")
-            )
+            ) {
+                Text(
+                    text = if (useWeMiWordmark) {
+                        stringResource(R.string.header_brand_wemi)
+                    } else {
+                        stringResource(R.string.header_brand_wemo)
+                    },
+                    color = Color.White,
+                    fontFamily = ComfortaaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 35.sp,
+                    letterSpacing = (-0.8).sp
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Surface(
+                    color = Color(0x3322D3EE),
+                    shape = RoundedCornerShape(6.dp),
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Text(
+                        text = "LAN SWITCHES",
+                        color = Color(0xFFE0F7FA),
+                        fontFamily = WorkSansFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 10.sp,
+                        letterSpacing = 0.8.sp,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                    )
+                }
+            }
 
             Box(
                 modifier = Modifier
@@ -171,16 +222,16 @@ fun WeMoTopHeader(
                 contentAlignment = Alignment.Center
             ) {
                 Surface(
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(10.dp),
                     color = Color.White,
-                    shadowElevation = 1.dp,
-                    modifier = Modifier.size(30.dp)
+                    shadowElevation = 2.dp,
+                    modifier = Modifier.size(34.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = stringResource(R.string.action_add_device),
-                            tint = WemoGreenBottom,
+                            tint = WemoGreenDark,
                             modifier = Modifier.size(24.dp)
                         )
                     }
@@ -191,8 +242,7 @@ fun WeMoTopHeader(
 }
 
 /**
- * Classic WeMo bottom navigation bar with thin green top border and 3 tabs:
- * Devices (plug icon), Rules (calendar + clock icon), More (three dots icon).
+ * Teal & Cyan bottom navigation bar with active pill highlights.
  */
 @Composable
 fun WeMoBottomNavigationBar(
@@ -202,7 +252,7 @@ fun WeMoBottomNavigationBar(
 ) {
     Surface(
         color = Color.White,
-        shadowElevation = 6.dp,
+        shadowElevation = 8.dp,
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
@@ -210,22 +260,22 @@ fun WeMoBottomNavigationBar(
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
         ) {
-            // Signature thin green top border line from screenshot
+            // Signature electric cyan-teal top accent border
             HorizontalDivider(
-                thickness = 1.5.dp,
+                thickness = 2.dp,
                 color = WemoGreenPrimary
             )
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp),
+                    .height(66.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Tab 1: Devices
                 val devicesActive = selectedTab == WeMoBottomTab.DEVICES
-                val devicesColor = if (devicesActive) WemoGreenPrimary else WemoTextSecondary
+                val devicesColor = if (devicesActive) WemoGreenDark else WemoTextSecondary
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -236,19 +286,27 @@ fun WeMoBottomNavigationBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    WeMoPlugTabIcon(tint = devicesColor)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (devicesActive) WemoGreenSoft else Color.Transparent)
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        WeMoPlugTabIcon(tint = devicesColor)
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = stringResource(R.string.tab_devices),
                         color = devicesColor,
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (devicesActive) FontWeight.Medium else FontWeight.Normal
+                        fontWeight = if (devicesActive) FontWeight.SemiBold else FontWeight.Normal
                     )
                 }
 
                 // Tab 2: Rules
                 val rulesActive = selectedTab == WeMoBottomTab.RULES
-                val rulesColor = if (rulesActive) WemoGreenPrimary else WemoTextSecondary
+                val rulesColor = if (rulesActive) WemoGreenDark else WemoTextSecondary
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -259,19 +317,27 @@ fun WeMoBottomNavigationBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    WeMoRulesCalendarClockIcon(tint = rulesColor)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (rulesActive) WemoGreenSoft else Color.Transparent)
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        WeMoRulesCalendarClockIcon(tint = rulesColor)
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = stringResource(R.string.tab_rules),
                         color = rulesColor,
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (rulesActive) FontWeight.Medium else FontWeight.Normal
+                        fontWeight = if (rulesActive) FontWeight.SemiBold else FontWeight.Normal
                     )
                 }
 
                 // Tab 3: More
                 val moreActive = selectedTab == WeMoBottomTab.MORE
-                val moreColor = if (moreActive) WemoGreenPrimary else WemoTextSecondary
+                val moreColor = if (moreActive) WemoGreenDark else WemoTextSecondary
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -282,18 +348,26 @@ fun WeMoBottomNavigationBar(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.MoreHoriz,
-                        contentDescription = stringResource(R.string.tab_more),
-                        tint = moreColor,
-                        modifier = Modifier.size(30.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(if (moreActive) WemoGreenSoft else Color.Transparent)
+                            .padding(horizontal = 16.dp, vertical = 2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MoreHoriz,
+                            contentDescription = stringResource(R.string.tab_more),
+                            tint = moreColor,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = stringResource(R.string.tab_more),
                         color = moreColor,
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = if (moreActive) FontWeight.Medium else FontWeight.Normal
+                        fontWeight = if (moreActive) FontWeight.SemiBold else FontWeight.Normal
                     )
                 }
             }
@@ -301,9 +375,6 @@ fun WeMoBottomNavigationBar(
     }
 }
 
-/**
- * Custom Canvas icon matching the "Rules" calendar + clock badge icon in the screenshot.
- */
 @Composable
 fun WeMoRulesCalendarClockIcon(
     tint: Color,
@@ -314,7 +385,6 @@ fun WeMoRulesCalendarClockIcon(
         val h = size.height
         val stroke = 1.8.dp.toPx()
 
-        // Calendar outer frame
         drawRoundRect(
             color = tint,
             topLeft = Offset(w * 0.14f, h * 0.14f),
@@ -322,14 +392,12 @@ fun WeMoRulesCalendarClockIcon(
             cornerRadius = CornerRadius(w * 0.08f, h * 0.08f),
             style = Stroke(width = stroke)
         )
-        // Top header bar of calendar
         drawLine(
             color = tint,
             start = Offset(w * 0.14f, h * 0.30f),
             end = Offset(w * 0.72f, h * 0.30f),
             strokeWidth = stroke
         )
-        // Two small binder rings at top
         drawLine(
             color = tint,
             start = Offset(w * 0.28f, h * 0.08f),
@@ -345,7 +413,6 @@ fun WeMoRulesCalendarClockIcon(
             cap = StrokeCap.Round
         )
 
-        // Small clock badge in bottom-right
         val clockCenter = Offset(w * 0.70f, h * 0.68f)
         val clockRadius = w * 0.20f
         drawCircle(
@@ -359,7 +426,6 @@ fun WeMoRulesCalendarClockIcon(
             center = clockCenter,
             style = Stroke(width = stroke)
         )
-        // Clock hands
         drawLine(
             color = tint,
             start = clockCenter,

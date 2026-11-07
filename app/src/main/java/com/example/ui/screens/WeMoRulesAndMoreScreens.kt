@@ -415,7 +415,7 @@ fun WeMoMoreScreen(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Image(
-                        painter = painterResource(id = R.drawable.img_play_feature_graphic_1794086183731),
+                        painter = painterResource(id = R.drawable.img_wemi_teal_feature_1794086803999),
                         contentDescription = "Google Play Feature Graphic Banner",
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
@@ -426,7 +426,7 @@ fun WeMoMoreScreen(
                     Spacer(modifier = Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Image(
-                            painter = painterResource(id = R.drawable.img_play_store_icon_1794086176609),
+                            painter = painterResource(id = R.drawable.img_wemi_teal_icon_1794086800772),
                             contentDescription = "Google Play 512x512 High-Res Icon",
                             contentScale = ContentScale.Crop,
                             modifier = Modifier

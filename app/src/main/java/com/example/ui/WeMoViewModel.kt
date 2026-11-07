@@ -71,7 +71,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     private val _statusBannerMessage = MutableStateFlow<String?>(null)
     val statusBannerMessage: StateFlow<String?> = _statusBannerMessage.asStateFlow()
 
-    private val _useWeMiWordmark = MutableStateFlow(false)
+    private val _useWeMiWordmark = MutableStateFlow(true)
     val useWeMiWordmark: StateFlow<Boolean> = _useWeMiWordmark.asStateFlow()
 
     init {

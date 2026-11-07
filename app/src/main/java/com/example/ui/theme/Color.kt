@@ -2,21 +2,21 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Classic WeMo / WeMi Signature Green Palette (from screenshot)
-val WemoGreenTop = Color(0xFF72D44B)
-val WemoGreenBottom = Color(0xFF4FB930)
-val WemoGreenPrimary = Color(0xFF59C639)
-val WemoGreenDark = Color(0xFF3E9C23)
-val WemoGreenSoft = Color(0xFFEBF8E6)
+// WeMi Signature Ocean Teal, Electric Cyan & Deep Azure Palette
+val WemoGreenTop = Color(0xFF06B6D4)       // Electric Cyan highlight
+val WemoGreenBottom = Color(0xFF0F4C81)    // Deep Sapphire / Ocean Blue
+val WemoGreenPrimary = Color(0xFF0891B2)   // Primary Cyan-Teal
+val WemoGreenDark = Color(0xFF0E7490)      // Deep Teal accent
+val WemoGreenSoft = Color(0xFFE0F7FA)      // Soft Cyan container tint
 
-// Neutral & Surface Palette matching the clean light UI in the screenshot
-val WemoBackgroundGray = Color(0xFFD9DDE0)
+// Cool Slate & Crisp Surface Palette
+val WemoBackgroundGray = Color(0xFFEEF2F6)
 val WemoRowSurface = Color(0xFFFFFFFF)
-val WemoRowExpandedSurface = Color(0xFFF7FAF6)
-val WemoDividerGray = Color(0xFFDCE0E4)
-val WemoTextPrimary = Color(0xFF3A3D40)
-val WemoTextSecondary = Color(0xFF8A8F94)
-val WemoRingInactive = Color(0xFFC5CBD0)
-val WemoMotionCyan = Color(0xFF4FC3F7)
+val WemoRowExpandedSurface = Color(0xFFF4FAFC)
+val WemoDividerGray = Color(0xFFDCE4EC)
+val WemoTextPrimary = Color(0xFF0F172A)
+val WemoTextSecondary = Color(0xFF64748B)
+val WemoRingInactive = Color(0xFFCBD5E1)
+val WemoMotionCyan = Color(0xFF00E5FF)
 val WemoAmberWarning = Color(0xFFF59E0B)
-val WemoErrorRed = Color(0xFFE53935)
+val WemoErrorRed = Color(0xFFEF4444)
