@@ -37,7 +37,9 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,6 +55,8 @@ import com.example.ui.components.AddOrEditWeMoDeviceDialog
 import com.example.ui.components.AddWeMoRuleDialog
 import com.example.ui.components.WeMoBottomNavigationBar
 import com.example.ui.components.WeMoDeviceRow
+import com.example.ui.components.WeMoRoomFilterBar
+import com.example.ui.components.WeMoRoomGroupHeaderCard
 import com.example.ui.components.WeMoSsdpDiscoveryBanner
 import com.example.ui.components.WeMoSsdpScannerModal
 import com.example.ui.components.WeMoTopHeader
@@ -95,6 +99,10 @@ fun WeMiSwitchApp(
     val soapLogs by viewModel.soapLogs.collectAsStateWithLifecycle()
     val latestSsdpReport by viewModel.latestSsdpReport.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
+    val isGroupedByRoom by viewModel.isGroupedByRoom.collectAsStateWithLifecycle()
+    val selectedRoomFilter by viewModel.selectedRoomFilter.collectAsStateWithLifecycle()
+    val collapsedRooms by viewModel.collapsedRooms.collectAsStateWithLifecycle()
+    val togglingRooms by viewModel.togglingRooms.collectAsStateWithLifecycle()
     val isEditMode by viewModel.isEditMode.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val showSsdpScannerSheet by viewModel.showSsdpScannerSheet.collectAsStateWithLifecycle()
@@ -107,10 +115,38 @@ fun WeMiSwitchApp(
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
 
-    BackHandler(enabled = showSsdpScannerSheet || isEditMode || selectedTab != WeMoBottomTab.DEVICES) {
+    val availableRooms by remember(devices) {
+        derivedStateOf {
+            devices.map { it.roomName }.distinct()
+        }
+    }
+
+    val filteredDevices by remember(devices, selectedRoomFilter) {
+        derivedStateOf {
+            if (selectedRoomFilter == null) {
+                devices
+            } else {
+                devices.filter { it.roomName.equals(selectedRoomFilter, ignoreCase = true) }
+            }
+        }
+    }
+
+    val groupedDevicesByRoom by remember(filteredDevices) {
+        derivedStateOf {
+            filteredDevices.groupBy { it.roomName }
+        }
+    }
+
+    BackHandler(
+        enabled = showSsdpScannerSheet ||
+            isEditMode ||
+            selectedRoomFilter != null ||
+            selectedTab != WeMoBottomTab.DEVICES
+    ) {
         when {
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
             isEditMode -> viewModel.setEditMode(false)
+            selectedRoomFilter != null -> viewModel.selectRoomFilter(null)
             else -> viewModel.selectTab(WeMoBottomTab.DEVICES)
         }
     }
@@ -202,36 +238,110 @@ fun WeMiSwitchApp(
                                         )
                                     }
 
-                                    items(devices, key = { it.id }) { device ->
-                                        WeMoDeviceRow(
-                                            device = device,
-                                            isExpanded = device.id in expandedDeviceIds,
-                                            isEditMode = isEditMode,
-                                            isToggling = device.id in togglingDeviceIds,
-                                            onTogglePower = { viewModel.toggleDevicePower(device) },
-                                            onToggleExpand = { viewModel.toggleExpandDevice(device.id) },
-                                            onBrightnessChange = { level ->
-                                                viewModel.updateBrightness(device, level)
-                                            },
-                                            onTriggerMotion = {
-                                                viewModel.simulateOrRefreshMotion(device)
-                                            },
-                                            onReconnect = {
-                                                viewModel.reconnectDevice(device)
-                                            },
-                                            onEditDevice = {
-                                                viewModel.openEditDeviceDialog(device)
-                                            },
-                                            onDeleteDevice = {
-                                                viewModel.deleteDevice(device)
-                                            },
-                                            onMoveUp = {
-                                                viewModel.moveDevice(device, moveUp = true)
-                                            },
-                                            onMoveDown = {
-                                                viewModel.moveDevice(device, moveUp = false)
-                                            }
+                                    item(key = "room_grouping_filter_bar") {
+                                        WeMoRoomFilterBar(
+                                            rooms = availableRooms,
+                                            isGroupedByRoom = isGroupedByRoom,
+                                            selectedRoomFilter = selectedRoomFilter,
+                                            onToggleGroupedByRoom = { viewModel.toggleGroupByRoom() },
+                                            onSelectRoomFilter = { viewModel.selectRoomFilter(it) }
                                         )
+                                    }
+
+                                    if (isGroupedByRoom) {
+                                        groupedDevicesByRoom.forEach { (roomName, roomDevices) ->
+                                            val isCollapsed = roomName in collapsedRooms
+                                            item(key = "room_header_item_$roomName") {
+                                                WeMoRoomGroupHeaderCard(
+                                                    roomName = roomName,
+                                                    roomDevices = roomDevices,
+                                                    isCollapsed = isCollapsed,
+                                                    isRoomToggling = roomName in togglingRooms,
+                                                    onToggleRoomPower = {
+                                                        viewModel.toggleRoomPower(roomName)
+                                                    },
+                                                    onToggleCollapse = {
+                                                        viewModel.toggleRoomCollapse(roomName)
+                                                    },
+                                                    onRoomBrightnessChange = { brightness ->
+                                                        viewModel.updateRoomBrightness(roomName, brightness)
+                                                    }
+                                                )
+                                            }
+
+                                            if (!isCollapsed) {
+                                                items(
+                                                    items = roomDevices,
+                                                    key = { "grouped_dev_${it.id}" }
+                                                ) { device ->
+                                                    WeMoDeviceRow(
+                                                        device = device,
+                                                        isExpanded = device.id in expandedDeviceIds,
+                                                        isEditMode = isEditMode,
+                                                        isToggling = device.id in togglingDeviceIds,
+                                                        onTogglePower = { viewModel.toggleDevicePower(device) },
+                                                        onToggleExpand = { viewModel.toggleExpandDevice(device.id) },
+                                                        onBrightnessChange = { level ->
+                                                            viewModel.updateBrightness(device, level)
+                                                        },
+                                                        onTriggerMotion = {
+                                                            viewModel.simulateOrRefreshMotion(device)
+                                                        },
+                                                        onReconnect = {
+                                                            viewModel.reconnectDevice(device)
+                                                        },
+                                                        onEditDevice = {
+                                                            viewModel.openEditDeviceDialog(device)
+                                                        },
+                                                        onDeleteDevice = {
+                                                            viewModel.deleteDevice(device)
+                                                        },
+                                                        onMoveUp = {
+                                                            viewModel.moveDevice(device, moveUp = true)
+                                                        },
+                                                        onMoveDown = {
+                                                            viewModel.moveDevice(device, moveUp = false)
+                                                        },
+                                                        modifier = Modifier.padding(start = 10.dp)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        items(
+                                            items = filteredDevices,
+                                            key = { "flat_dev_${it.id}" }
+                                        ) { device ->
+                                            WeMoDeviceRow(
+                                                device = device,
+                                                isExpanded = device.id in expandedDeviceIds,
+                                                isEditMode = isEditMode,
+                                                isToggling = device.id in togglingDeviceIds,
+                                                onTogglePower = { viewModel.toggleDevicePower(device) },
+                                                onToggleExpand = { viewModel.toggleExpandDevice(device.id) },
+                                                onBrightnessChange = { level ->
+                                                    viewModel.updateBrightness(device, level)
+                                                },
+                                                onTriggerMotion = {
+                                                    viewModel.simulateOrRefreshMotion(device)
+                                                },
+                                                onReconnect = {
+                                                    viewModel.reconnectDevice(device)
+                                                },
+                                                onEditDevice = {
+                                                    viewModel.openEditDeviceDialog(device)
+                                                },
+                                                onDeleteDevice = {
+                                                    viewModel.deleteDevice(device)
+                                                },
+                                                onMoveUp = {
+                                                    viewModel.moveDevice(device, moveUp = true)
+                                                },
+                                                onMoveDown = {
+                                                    viewModel.moveDevice(device, moveUp = false)
+                                                }
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -315,10 +425,11 @@ fun WeMiSwitchApp(
                 viewModel.closeAddDeviceDialog()
                 viewModel.closeEditDeviceDialog()
             },
-            onSave = { id, name, type, ip, port, brightness, reachable, isOn, autoOff ->
+            onSave = { id, name, roomName, type, ip, port, brightness, reachable, isOn, autoOff ->
                 viewModel.saveDevice(
                     id = id,
                     name = name,
+                    roomName = roomName,
                     deviceType = type,
                     ipAddress = ip,
                     port = port,

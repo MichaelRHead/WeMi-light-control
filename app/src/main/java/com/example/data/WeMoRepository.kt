@@ -80,6 +80,63 @@ class WeMoRepository(
         return updated
     }
 
+    /**
+     * Toggles all reachable switches and dimmable bulbs in a specific room ON or OFF simultaneously.
+     */
+    suspend fun toggleRoomPower(roomName: String, targetOn: Boolean): Int {
+        val currentDevices = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val roomSwitches = currentDevices.filter {
+            it.roomName.equals(roomName, ignoreCase = true) &&
+                it.isReachable &&
+                it.parsedType != WeMoDeviceType.MOTION_SENSOR
+        }
+        roomSwitches.forEach { dev ->
+            val result = networkClient.setBinaryState(
+                device = dev,
+                targetOn = targetOn,
+                targetBrightness = if (dev.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && targetOn && dev.brightness == 0) 100 else null
+            )
+            appendLog(result.logEntry)
+            dao.updateDevice(
+                dev.copy(
+                    isOn = targetOn,
+                    port = result.resolvedPort,
+                    brightness = if (dev.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && targetOn && dev.brightness == 0) 100 else dev.brightness
+                )
+            )
+        }
+        return roomSwitches.size
+    }
+
+    /**
+     * Sets the brightness level for all reachable dimmable bulbs in a specific room at once.
+     */
+    suspend fun updateRoomBrightness(roomName: String, newBrightness: Int): Int {
+        val clamped = newBrightness.coerceIn(1, 100)
+        val currentDevices = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val roomBulbs = currentDevices.filter {
+            it.roomName.equals(roomName, ignoreCase = true) &&
+                it.isReachable &&
+                it.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER
+        }
+        roomBulbs.forEach { bulb ->
+            val result = networkClient.setBinaryState(
+                device = bulb,
+                targetOn = true,
+                targetBrightness = clamped
+            )
+            appendLog(result.logEntry)
+            dao.updateDevice(
+                bulb.copy(
+                    isOn = true,
+                    brightness = clamped,
+                    port = result.resolvedPort
+                )
+            )
+        }
+        return roomBulbs.size
+    }
+
     suspend fun updateDeviceBrightness(device: WeMoDeviceEntity, newBrightness: Int) {
         val clamped = newBrightness.coerceIn(1, 100)
         val result = networkClient.setBinaryState(
@@ -137,10 +194,6 @@ class WeMoRepository(
         dao.updateDevice(device.copy(isReachable = reachable))
     }
 
-    /**
-     * Runs an SSDP M-SEARCH discovery scan over UDP 239.255.255.250:1900 and updates the
-     * latest SsdpScanReport with all discovered UPnP WeMi/WeMo devices on the network.
-     */
     suspend fun executeSsdpScan(
         searchTarget: String = "urn:Belkin:service:basicevent:1",
         autoAdoptNew: Boolean = false
@@ -159,9 +212,6 @@ class WeMoRepository(
         return report
     }
 
-    /**
-     * Adds or updates a single SSDP-discovered device in the Room database.
-     */
     suspend fun adoptDiscoveredDevice(discovered: SsdpDiscoveredDevice): WeMoDeviceEntity {
         val currentDevices = dao.getAllDevices().first()
         val existing = currentDevices.find {
@@ -170,6 +220,7 @@ class WeMoRepository(
         return if (existing == null) {
             val newEntity = WeMoDeviceEntity(
                 name = discovered.name,
+                roomName = discovered.roomName.ifBlank { inferRoomFromName(discovered.name) },
                 deviceType = discovered.deviceType.name,
                 ipAddress = discovered.ipAddress,
                 port = discovered.port,
@@ -195,9 +246,6 @@ class WeMoRepository(
         }
     }
 
-    /**
-     * Syncs all SSDP-discovered devices into the persistent Room database list.
-     */
     suspend fun adoptDiscoveredDevices(discoveredList: List<SsdpDiscoveredDevice>): Int {
         val currentDevices = dao.getAllDevices().first()
         var newlyAdded = 0
@@ -209,6 +257,7 @@ class WeMoRepository(
                 dao.insertDevice(
                     WeMoDeviceEntity(
                         name = item.name,
+                        roomName = item.roomName.ifBlank { inferRoomFromName(item.name) },
                         deviceType = item.deviceType.name,
                         ipAddress = item.ipAddress,
                         port = item.port,
@@ -291,10 +340,21 @@ class WeMoRepository(
     }
 
     companion object {
+        val DEFAULT_ROOMS = listOf(
+            "Living Room",
+            "Bedroom",
+            "Kitchen",
+            "Hallway & Landing",
+            "Ensuite",
+            "Outdoor",
+            "Office"
+        )
+
         fun defaultClassicDevices(): List<WeMoDeviceEntity> = listOf(
             WeMoDeviceEntity(
                 id = 1,
                 name = "Christmas Tree Living",
+                roomName = "Living Room",
                 deviceType = WeMoDeviceType.SWITCH_PLUG.name,
                 ipAddress = "192.168.1.101",
                 port = 49153,
@@ -307,6 +367,7 @@ class WeMoRepository(
             WeMoDeviceEntity(
                 id = 2,
                 name = "Christmas Candle",
+                roomName = "Living Room",
                 deviceType = WeMoDeviceType.SWITCH_PLUG.name,
                 ipAddress = "192.168.1.102",
                 port = 49153,
@@ -319,6 +380,7 @@ class WeMoRepository(
             WeMoDeviceEntity(
                 id = 3,
                 name = "Bedroom Light Motion",
+                roomName = "Bedroom",
                 deviceType = WeMoDeviceType.MOTION_SENSOR.name,
                 ipAddress = "192.168.1.103",
                 port = 49153,
@@ -331,6 +393,7 @@ class WeMoRepository(
             WeMoDeviceEntity(
                 id = 4,
                 name = "Christmas Tree Kitchen",
+                roomName = "Kitchen",
                 deviceType = WeMoDeviceType.SWITCH_PLUG.name,
                 ipAddress = "192.168.1.104",
                 port = 49153,
@@ -343,6 +406,7 @@ class WeMoRepository(
             WeMoDeviceEntity(
                 id = 5,
                 name = "Hall Lightbulb",
+                roomName = "Hallway & Landing",
                 deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
                 ipAddress = "192.168.1.105",
                 port = 49153,
@@ -355,6 +419,7 @@ class WeMoRepository(
             WeMoDeviceEntity(
                 id = 6,
                 name = "Lightbulb Landing",
+                roomName = "Hallway & Landing",
                 deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
                 ipAddress = "192.168.1.106",
                 port = 49153,
@@ -367,6 +432,7 @@ class WeMoRepository(
             WeMoDeviceEntity(
                 id = 7,
                 name = "Lightbulb Ensuite",
+                roomName = "Ensuite",
                 deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
                 ipAddress = "192.168.1.107",
                 port = 49153,
@@ -379,6 +445,7 @@ class WeMoRepository(
             WeMoDeviceEntity(
                 id = 8,
                 name = "Lightbulb Bedroom",
+                roomName = "Bedroom",
                 deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
                 ipAddress = "192.168.1.108",
                 port = 49153,

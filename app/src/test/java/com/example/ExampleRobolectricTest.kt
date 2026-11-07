@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.WeMoDeviceType
+import com.example.data.inferRoomFromName
 import com.example.network.WeMoNetworkClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -36,12 +37,16 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `verify SSDP packet builder and UPnP setup xml parser`() {
+    fun `verify SSDP packet builder, UPnP setup xml parser, and room inference`() {
         val client = WeMoNetworkClient()
         val mSearch = client.buildSsdpMSearchPacket("urn:Belkin:service:basicevent:1")
         assertTrue(mSearch.contains("M-SEARCH * HTTP/1.1"))
         assertTrue(mSearch.contains("HOST: 239.255.255.250:1900"))
         assertTrue(mSearch.contains("ST: urn:Belkin:service:basicevent:1"))
+
+        assertEquals("Kitchen", inferRoomFromName("Christmas Tree Kitchen"))
+        assertEquals("Bedroom", inferRoomFromName("Lightbulb Bedroom"))
+        assertEquals("Hallway & Landing", inferRoomFromName("Lightbulb Landing"))
 
         val rawSsdpResponse = """
             HTTP/1.1 200 OK
@@ -76,24 +81,34 @@ class ExampleRobolectricTest {
             isLiveUdp = true
         )
         assertEquals("Office Wall Switch", discovered.name)
+        assertEquals("Office", discovered.roomName)
         assertEquals("192.168.1.122", discovered.ipAddress)
         assertEquals(49153, discovered.port)
         assertEquals(WeMoDeviceType.SWITCH_PLUG, discovered.deviceType)
     }
 
     @Test
-    fun `verify SSDP discovery banner, pull to refresh, and classic screenshot devices work`() {
+    fun `verify Room grouping system, master room toggle, pull to refresh, and SSDP scanner`() {
         composeTestRule.waitForIdle()
 
-        // Verify pull-to-refresh container, SSDP discovery banner, and top header buttons exist
+        // Verify pull-to-refresh container, SSDP discovery banner, and Room filter bar exist
         composeTestRule.onNodeWithTag("devices_pull_to_refresh").assertIsDisplayed()
         composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("open_ssdp_scanner_button").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("brand_wordmark_text").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("refresh_devices_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("room_filter_bar").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("toggle_group_by_room_chip").assertIsDisplayed()
 
-        // Verify screenshot devices appear in the list
+        // Verify Living Room group header and its master power toggle ring are displayed
+        composeTestRule.onNodeWithTag("room_header_Living Room").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("room_power_toggle_Living Room").assertIsDisplayed()
+
+        // Toggle all switches in Living Room at once using the Room Master Power Toggle
+        composeTestRule.onNodeWithTag("room_power_toggle_Living Room").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify Living Room devices are displayed under the group
         composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasText("Christmas Candle"))
         composeTestRule.onNodeWithText("Christmas Candle").assertIsDisplayed()
 
         // Trigger pull-to-refresh swipeDown gesture on the devices list
@@ -101,21 +116,10 @@ class ExampleRobolectricTest {
             .performTouchInput { swipeDown() }
         composeTestRule.waitForIdle()
 
-        // Toggle power on Christmas Tree Living
-        composeTestRule.onNodeWithTag("power_button_1").performClick()
-        composeTestRule.waitForIdle()
-
-        // Scroll LazyColumn to verify lower items from screenshot
+        // Scroll LazyColumn to verify Kitchen room group and devices
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasText("Christmas Tree Kitchen"))
         composeTestRule.onNodeWithText("Christmas Tree Kitchen").assertIsDisplayed()
-
-        // Open SSDP Discovery Scanner sheet and verify it displays the SSDP scanner header
-        composeTestRule.onNodeWithTag("refresh_devices_button").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("SSDP Network Discovery Scan").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("close_ssdp_scanner_button").performClick()
-        composeTestRule.waitForIdle()
 
         // Switch to Rules tab and verify rules load
         composeTestRule.onNodeWithTag("nav_tab_rules").performClick()

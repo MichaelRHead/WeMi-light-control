@@ -13,6 +13,7 @@ enum class WeMoDeviceType {
 data class WeMoDeviceEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val name: String,
+    val roomName: String = "Living Room",
     val deviceType: String = WeMoDeviceType.SWITCH_PLUG.name,
     val ipAddress: String = "192.168.1.100",
     val port: Int = 49153,
@@ -57,6 +58,7 @@ data class SoapLogEntry(
 
 data class SsdpDiscoveredDevice(
     val name: String,
+    val roomName: String = inferRoomFromName(name),
     val ipAddress: String,
     val port: Int,
     val deviceType: WeMoDeviceType,
@@ -71,3 +73,16 @@ data class SsdpDiscoveredDevice(
     val brightness: Int = 100,
     val isLiveUdpResponse: Boolean = false
 )
+
+fun inferRoomFromName(deviceName: String): String {
+    val lower = deviceName.lowercase()
+    return when {
+        "kitchen" in lower -> "Kitchen"
+        "bedroom" in lower -> "Bedroom"
+        "ensuite" in lower || "bath" in lower -> "Ensuite"
+        "hall" in lower || "landing" in lower || "stairs" in lower -> "Hallway & Landing"
+        "patio" in lower || "porch" in lower || "outdoor" in lower || "garden" in lower -> "Outdoor"
+        "office" in lower || "study" in lower || "desk" in lower -> "Office"
+        else -> "Living Room"
+    }
+}

@@ -456,6 +456,7 @@ class WeMoNetworkClient(private val appContext: Context? = null) {
                 combinedList.add(
                     SsdpDiscoveredDevice(
                         name = dev.name,
+                        roomName = dev.roomName,
                         ipAddress = dev.ipAddress,
                         port = dev.port,
                         deviceType = dev.parsedType,
@@ -481,6 +482,7 @@ class WeMoNetworkClient(private val appContext: Context? = null) {
                 0,
                 SsdpDiscoveredDevice(
                     name = "Patio String Lights",
+                    roomName = "Outdoor",
                     ipAddress = extraCandidateIp,
                     port = 49153,
                     deviceType = WeMoDeviceType.SWITCH_PLUG,

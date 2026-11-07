@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -43,6 +42,8 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
+import com.example.data.WeMoRepository
+import com.example.data.inferRoomFromName
 import com.example.ui.theme.WemoErrorRed
 import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
@@ -57,6 +58,7 @@ fun AddOrEditWeMoDeviceDialog(
     onSave: (
         id: Int,
         name: String,
+        roomName: String,
         deviceType: WeMoDeviceType,
         ipAddress: String,
         port: Int,
@@ -70,6 +72,7 @@ fun AddOrEditWeMoDeviceDialog(
 ) {
     val isEditing = initialDevice != null
     var name by remember { mutableStateOf(initialDevice?.name ?: "") }
+    var roomName by remember { mutableStateOf(initialDevice?.roomName ?: "Living Room") }
     var selectedType by remember {
         mutableStateOf(initialDevice?.parsedType ?: WeMoDeviceType.SWITCH_PLUG)
     }
@@ -115,13 +118,48 @@ fun AddOrEditWeMoDeviceDialog(
 
                 OutlinedTextField(
                     value = name,
-                    onValueChange = { name = it },
+                    onValueChange = {
+                        name = it
+                        if (!isEditing) {
+                            roomName = inferRoomFromName(it)
+                        }
+                    },
                     label = { Text(stringResource(R.string.label_device_name)) },
                     placeholder = { Text("e.g. Porch Light Switch") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("device_name_input")
+                )
+
+                Text(
+                    text = "Room / Group",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    WeMoRepository.DEFAULT_ROOMS.forEach { presetRoom ->
+                        FilterChip(
+                            selected = roomName.equals(presetRoom, ignoreCase = true),
+                            onClick = { roomName = presetRoom },
+                            label = { Text(presetRoom) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = WemoGreenSoft,
+                                selectedLabelColor = WemoGreenDark
+                            )
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = roomName,
+                    onValueChange = { roomName = it },
+                    label = { Text("Room Name (or type a custom room)") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("device_room_input")
                 )
 
                 Text(
@@ -215,7 +253,7 @@ fun AddOrEditWeMoDeviceDialog(
                     )
                 }
 
-                if (isEditing && initialDevice != null && onDelete != null) {
+                if (isEditing && onDelete != null) {
                     Spacer(modifier = Modifier.height(4.dp))
                     TextButton(
                         onClick = { onDelete(initialDevice) },
@@ -231,9 +269,12 @@ fun AddOrEditWeMoDeviceDialog(
                 onClick = {
                     val parsedPort = portText.toIntOrNull() ?: 49153
                     val parsedAutoOff = autoOffText.toIntOrNull() ?: 0
+                    val finalName = name.ifBlank { "Living Room Switch" }
+                    val finalRoom = roomName.ifBlank { inferRoomFromName(finalName) }
                     onSave(
                         initialDevice?.id ?: 0,
-                        name.ifBlank { "Living Room Switch" },
+                        finalName,
+                        finalRoom,
                         selectedType,
                         ipAddress.ifBlank { "192.168.1.115" },
                         parsedPort,
@@ -341,7 +382,7 @@ fun AddWeMoRuleDialog(
                         FilterChip(
                             selected = selectedDeviceIndex == idx,
                             onClick = { selectedDeviceIndex = idx },
-                            label = { Text(dev.name) },
+                            label = { Text("${dev.name} (${dev.roomName})") },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = WemoGreenSoft,
                                 selectedLabelColor = WemoGreenDark

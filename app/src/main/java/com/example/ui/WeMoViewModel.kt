@@ -10,6 +10,7 @@ import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
 import com.example.data.WeMoRepository
 import com.example.data.WeMoRuleEntity
+import com.example.data.inferRoomFromName
 import com.example.network.SsdpScanReport
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,18 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _selectedTab = MutableStateFlow(WeMoBottomTab.DEVICES)
     val selectedTab: StateFlow<WeMoBottomTab> = _selectedTab.asStateFlow()
+
+    private val _isGroupedByRoom = MutableStateFlow(true)
+    val isGroupedByRoom: StateFlow<Boolean> = _isGroupedByRoom.asStateFlow()
+
+    private val _selectedRoomFilter = MutableStateFlow<String?>(null)
+    val selectedRoomFilter: StateFlow<String?> = _selectedRoomFilter.asStateFlow()
+
+    private val _collapsedRooms = MutableStateFlow<Set<String>>(emptySet())
+    val collapsedRooms: StateFlow<Set<String>> = _collapsedRooms.asStateFlow()
+
+    private val _togglingRooms = MutableStateFlow<Set<String>>(emptySet())
+    val togglingRooms: StateFlow<Set<String>> = _togglingRooms.asStateFlow()
 
     private val _isEditMode = MutableStateFlow(false)
     val isEditMode: StateFlow<Boolean> = _isEditMode.asStateFlow()
@@ -94,6 +107,55 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         _selectedTab.value = tab
         if (tab != WeMoBottomTab.DEVICES) {
             _isEditMode.value = false
+        }
+    }
+
+    fun toggleGroupByRoom() {
+        _isGroupedByRoom.value = !_isGroupedByRoom.value
+    }
+
+    fun selectRoomFilter(roomName: String?) {
+        _selectedRoomFilter.value = roomName
+    }
+
+    fun toggleRoomCollapse(roomName: String) {
+        val current = _collapsedRooms.value
+        _collapsedRooms.value = if (roomName in current) {
+            current - roomName
+        } else {
+            current + roomName
+        }
+    }
+
+    /**
+     * Toggles all reachable switches/bulbs in [roomName] ON or OFF at once.
+     * If any switch in the room is currently ON, turns all switches in the room OFF;
+     * otherwise turns all switches in the room ON.
+     */
+    fun toggleRoomPower(roomName: String) {
+        viewModelScope.launch {
+            val roomSwitches = devices.value.filter {
+                it.roomName.equals(roomName, ignoreCase = true) &&
+                    it.isReachable &&
+                    it.parsedType != WeMoDeviceType.MOTION_SENSOR
+            }
+            if (roomSwitches.isEmpty()) return@launch
+            val anyOn = roomSwitches.any { it.isOn }
+            val targetOn = !anyOn
+
+            _togglingRooms.value = _togglingRooms.value + roomName
+            val count = repository.toggleRoomPower(roomName, targetOn)
+            _togglingRooms.value = _togglingRooms.value - roomName
+            showTransientStatus(
+                "$roomName: Turned ${if (targetOn) "ON" else "OFF"} $count light switch(es)"
+            )
+        }
+    }
+
+    fun updateRoomBrightness(roomName: String, brightness: Int) {
+        viewModelScope.launch {
+            val count = repository.updateRoomBrightness(roomName, brightness)
+            showTransientStatus("$roomName: Set $count dimmable light(s) to $brightness%")
         }
     }
 
@@ -185,7 +247,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     fun adoptSsdpDevice(discovered: SsdpDiscoveredDevice) {
         viewModelScope.launch {
             val saved = repository.adoptDiscoveredDevice(discovered)
-            showTransientStatus("Synced ${saved.name} (${saved.ipAddress}:${saved.port})")
+            showTransientStatus("Synced ${saved.name} to ${saved.roomName} (${saved.ipAddress}:${saved.port})")
         }
     }
 
@@ -194,7 +256,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             val list = latestSsdpReport.value?.discoveredDevices.orEmpty()
             val added = repository.adoptDiscoveredDevices(list)
             showTransientStatus(
-                if (added > 0) "Added $added newly discovered SSDP switch(es) to Devices"
+                if (added > 0) "Added $added newly discovered SSDP switch(es) to Rooms"
                 else "All ${list.size} SSDP-discovered devices are synced"
             )
         }
@@ -219,6 +281,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     fun saveDevice(
         id: Int,
         name: String,
+        roomName: String,
         deviceType: WeMoDeviceType,
         ipAddress: String,
         port: Int,
@@ -229,9 +292,12 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             val existing = devices.value.find { it.id == id }
+            val resolvedName = name.trim().ifEmpty { "WeMi Light Switch" }
+            val resolvedRoom = roomName.trim().ifEmpty { inferRoomFromName(resolvedName) }
             val entity = WeMoDeviceEntity(
                 id = id,
-                name = name.trim().ifEmpty { "WeMi Light Switch" },
+                name = resolvedName,
+                roomName = resolvedRoom,
                 deviceType = deviceType.name,
                 ipAddress = ipAddress.trim().ifEmpty { "192.168.1.115" },
                 port = port.coerceIn(1, 65535),
@@ -246,7 +312,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             repository.saveDevice(entity)
             _showAddDeviceDialog.value = false
             _editingDevice.value = null
-            showTransientStatus("Saved ${entity.name} (${entity.ipAddress}:${entity.port})")
+            showTransientStatus("Saved ${entity.name} in ${entity.roomName}")
         }
     }
 
@@ -343,7 +409,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     fun resetToClassicScreenshotDevices() {
         viewModelScope.launch {
             repository.resetToClassicScreenshotPreset()
-            showTransientStatus("Restored classic 8 devices from screenshot")
+            showTransientStatus("Restored classic 8 devices organized into Rooms")
         }
     }
 

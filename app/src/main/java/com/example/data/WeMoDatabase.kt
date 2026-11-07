@@ -7,7 +7,7 @@ import androidx.room.RoomDatabase
 
 @Database(
     entities = [WeMoDeviceEntity::class, WeMoRuleEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class WeMoDatabase : RoomDatabase() {
@@ -23,7 +23,9 @@ abstract class WeMoDatabase : RoomDatabase() {
                     context.applicationContext,
                     WeMoDatabase::class.java,
                     "wemi_switch_database"
-                ).build()
+                )
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
                 INSTANCE = instance
                 instance
             }

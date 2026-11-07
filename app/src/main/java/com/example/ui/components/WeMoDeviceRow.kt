@@ -143,20 +143,39 @@ fun WeMoDeviceRow(
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Middle: Device Name + Status / Percentage + Expand Chevron
+                // Middle: Device Name + Room Badge + Status / Percentage + Expand Chevron
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.Center
                 ) {
-                    Text(
-                        text = device.name,
-                        color = if (device.isReachable) WemoTextPrimary else WemoTextPrimary.copy(alpha = 0.65f),
-                        fontFamily = WorkSansFontFamily,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 19.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = device.name,
+                            color = if (device.isReachable) WemoTextPrimary else WemoTextPrimary.copy(alpha = 0.65f),
+                            fontFamily = WorkSansFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 19.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Surface(
+                            color = WemoGreenSoft.copy(alpha = 0.7f),
+                            shape = RoundedCornerShape(5.dp)
+                        ) {
+                            Text(
+                                text = device.roomName,
+                                color = WemoGreenDark,
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 10.sp,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
 
                     when {
                         !device.isReachable -> {
