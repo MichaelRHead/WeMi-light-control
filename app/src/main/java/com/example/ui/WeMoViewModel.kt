@@ -18,6 +18,7 @@ import com.example.network.LanNetworkSnapshot
 import com.example.network.SsdpScanReport
 import com.example.network.WeMoNetworkMonitor
 import com.example.network.WeMoScannedAp
+import com.example.network.WeMoSetupDeviceDescriptor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -102,6 +103,12 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _scannedSetupAps = MutableStateFlow<List<WeMoScannedAp>>(emptyList())
     val scannedSetupAps: StateFlow<List<WeMoScannedAp>> = _scannedSetupAps.asStateFlow()
+
+    private val _detectedSetupDevice = MutableStateFlow<WeMoSetupDeviceDescriptor?>(null)
+    val detectedSetupDevice: StateFlow<WeMoSetupDeviceDescriptor?> = _detectedSetupDevice.asStateFlow()
+
+    private val _setupApStatusMessage = MutableStateFlow<String?>(null)
+    val setupApStatusMessage: StateFlow<String?> = _setupApStatusMessage.asStateFlow()
 
     private val _isScanningSetupAp = MutableStateFlow(false)
     val isScanningSetupAp: StateFlow<Boolean> = _isScanningSetupAp.asStateFlow()
@@ -712,8 +719,14 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun openProvisionApDialog() {
+        _setupApStatusMessage.value = null
         _showProvisionApDialog.value = true
-        scanSetupApNetworks()
+        val preferredHost = if (lanNetworkState.value.isWemoSetupApSubnet) {
+            lanNetworkState.value.gatewayIp.ifBlank { "10.22.22.1" }
+        } else {
+            "10.22.22.1"
+        }
+        scanSetupApNetworks(preferredHost)
     }
 
     fun closeProvisionApDialog() {
@@ -723,11 +736,30 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     fun scanSetupApNetworks(apHost: String = "10.22.22.1") {
         viewModelScope.launch {
             _isScanningSetupAp.value = true
-            val list = repository.scanSetupApNetworks(apHost = apHost)
+            _setupApStatusMessage.value = null
+            val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
+            val descriptor = repository.probeSetupApDevice(apHost = cleanHost)
+            _detectedSetupDevice.value = descriptor
+            val list = repository.scanSetupApNetworks(
+                apHost = cleanHost,
+                apPort = descriptor?.port ?: 49152
+            )
             _scannedSetupAps.value = list
             _isScanningSetupAp.value = false
-            if (list.isNotEmpty()) {
-                showTransientStatus("WeMo Setup AP ($apHost): Found ${list.size} nearby 2.4 GHz Wi-Fi network(s)")
+
+            if (list.isNotEmpty() || descriptor != null) {
+                val hwSummary = if (descriptor != null) {
+                    "Detected ${descriptor.friendlyName} (${descriptor.hardwareSku} • Port ${descriptor.port} • Auto Method ${descriptor.recommendedEncryptionMethod})"
+                } else {
+                    "WeMo Setup AP ($cleanHost)"
+                }
+                val msg = "$hwSummary • Found ${list.size} nearby 2.4 GHz Wi-Fi network(s)"
+                _setupApStatusMessage.value = msg
+                showTransientStatus(msg)
+            } else {
+                val err = "No response from WeMo Setup AP at $cleanHost — Open Android Wi-Fi Settings and connect to WeMo.Light.xxx / WeMo.Mini.xxx / WeMo.Dimmer.xxx first."
+                _setupApStatusMessage.value = err
+                showTransientStatus(err)
             }
         }
     }
@@ -739,20 +771,31 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         channel: Int = 6,
         authMode: String = "WPA2PSK",
         encryptionType: String = "AES",
-        encryptionMethod: Int = 1
+        encryptionMethod: Int = 0,
+        addPasswordLengths: Boolean? = null,
+        customDeviceName: String = "",
+        roomName: String = "",
+        deviceType: WeMoDeviceType? = null
     ) {
         viewModelScope.launch {
             _isProvisioningAp.value = true
+            _setupApStatusMessage.value = "Provisioning switch on $apHost to '$ssid'..."
             val res = repository.provisionSetupApDevice(
-                apHost = apHost,
+                apHost = apHost.trim().ifBlank { "10.22.22.1" },
                 ssid = ssid.trim(),
                 plainPassword = password,
                 channel = channel,
                 authMode = authMode,
                 encryptionType = encryptionType,
-                encryptionMethod = encryptionMethod
+                encryptionMethod = encryptionMethod,
+                addPasswordLengths = addPasswordLengths,
+                customDeviceName = customDeviceName.trim(),
+                roomName = roomName.trim(),
+                deviceType = deviceType,
+                activeNetworkKey = _activeNetworkKey.value
             )
             _isProvisioningAp.value = false
+            _setupApStatusMessage.value = res.statusMessage
             if (res.success) {
                 _showProvisionApDialog.value = false
             }

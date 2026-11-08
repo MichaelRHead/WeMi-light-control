@@ -10,8 +10,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.NetworkInterface
+import java.net.Socket
 import java.util.Locale
+import javax.net.SocketFactory
 
 data class LanNetworkSnapshot(
     val isConnected: Boolean = true,
@@ -25,9 +28,9 @@ data class LanNetworkSnapshot(
  * Zero-Location-permission Wi-Fi / LAN subnet monitor using ConnectivityManager.NetworkCallback
  * and LinkProperties.
  * - Detects live IPv4 address, /24 subnetPrefix, and default gateway IP.
- * - Flags when the Android device is connected to a factory-reset Belkin WeMo Setup AP (10.22.22.x).
- * - Pairs with WeMo switches' metainfo1#GetMetaInfo (AccessPointSSID) to populate real Wi-Fi SSID
- *   labels without requiring ACCESS_FINE_LOCATION on Android 10+.
+ * - Prioritizes TRANSPORT_WIFI networks over Cellular (cm.activeNetwork) so that connecting to an
+ *   unconfigured Belkin WeMo Setup AP (WeMo.Light.xxx / 10.22.22.x) with no Internet access is
+ *   reliably detected and routed over Wi-Fi even when mobile data is active.
  */
 class WeMoNetworkMonitor(
     private val context: Context?,
@@ -71,14 +74,17 @@ class WeMoNetworkMonitor(
             }
 
             override fun onLost(network: Network) {
-                _networkState.value = computeSnapshotFromInterfaces()
+                _networkState.value = computeSnapshot()
             }
         }
 
         runCatching {
+            // Note: Do NOT require NET_CAPABILITY_INTERNET so factory-reset WeMo Setup APs (10.22.22.1)
+            // without Internet access trigger callbacks immediately.
             val request = NetworkRequest.Builder()
                 .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
                 .addTransportType(NetworkCapabilities.TRANSPORT_ETHERNET)
+                .removeCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
                 .build()
             cm.registerNetworkCallback(request, callback)
             registeredCallback = callback
@@ -95,7 +101,7 @@ class WeMoNetworkMonitor(
     private fun computeSnapshot(network: Network? = null): LanNetworkSnapshot {
         val cm = connectivityManager
         if (cm != null) {
-            val targetNet = network ?: runCatching { cm.activeNetwork }.getOrNull()
+            val targetNet = network ?: findPreferredWifiOrLanNetwork(cm) ?: runCatching { cm.activeNetwork }.getOrNull()
             if (targetNet != null) {
                 val lp = runCatching { cm.getLinkProperties(targetNet) }.getOrNull()
                 if (lp != null) {
@@ -165,5 +171,65 @@ class WeMoNetworkMonitor(
             gatewayIp = "$prefix.1",
             isWemoSetupApSubnet = prefix == "10.22.22"
         )
+    }
+
+    companion object {
+        /**
+         * Finds the active Wi-Fi or Ethernet [Network] even when Android has not marked it as the
+         * default Internet network (e.g. when connected to a Belkin WeMo Setup AP at 10.22.22.1
+         * while mobile data is active).
+         */
+        @Suppress("DEPRECATION")
+        fun findPreferredWifiOrLanNetwork(cm: ConnectivityManager?): Network? {
+            if (cm == null) return null
+            return runCatching {
+                val networks = cm.allNetworks.orEmpty()
+                // Prefer a TRANSPORT_WIFI network that has a valid IPv4 address (especially 10.22.22.x or LAN)
+                networks.firstOrNull { net ->
+                    val caps = cm.getNetworkCapabilities(net)
+                    caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                } ?: networks.firstOrNull { net ->
+                    val caps = cm.getNetworkCapabilities(net)
+                    caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                }
+            }.getOrNull()
+        }
+
+        /**
+         * Creates a [SocketFactory] that binds outbound connections to the active Wi-Fi/LAN [Network]
+         * when available (bypassing Android's cellular fallback on unvalidated 10.22.22.1 WeMo Setup APs),
+         * while always using the standard loopback socket factory for localhost/127.x.x.x.
+         */
+        fun createWifiBoundSocketFactory(context: Context?): SocketFactory {
+            val appCtx = context?.applicationContext
+            return object : SocketFactory() {
+                private fun delegateForHost(host: String?): SocketFactory {
+                    if (host == null || host == "localhost" || host.startsWith("127.")) {
+                        return getDefault()
+                    }
+                    val cm = appCtx?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                    val wifiNet = findPreferredWifiOrLanNetwork(cm)
+                    return wifiNet?.socketFactory ?: getDefault()
+                }
+
+                override fun createSocket(): Socket {
+                    val cm = appCtx?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                    val wifiNet = findPreferredWifiOrLanNetwork(cm)
+                    return runCatching { wifiNet?.socketFactory?.createSocket() }.getOrNull() ?: Socket()
+                }
+
+                override fun createSocket(host: String?, port: Int): Socket =
+                    delegateForHost(host).createSocket(host, port)
+
+                override fun createSocket(host: String?, port: Int, localHost: InetAddress?, localPort: Int): Socket =
+                    delegateForHost(host).createSocket(host, port, localHost, localPort)
+
+                override fun createSocket(host: InetAddress?, port: Int): Socket =
+                    delegateForHost(host?.hostAddress).createSocket(host, port)
+
+                override fun createSocket(address: InetAddress?, port: Int, localAddress: InetAddress?, localPort: Int): Socket =
+                    delegateForHost(address?.hostAddress).createSocket(address, port, localAddress, localPort)
+            }
+        }
     }
 }

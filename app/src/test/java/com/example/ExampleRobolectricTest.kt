@@ -8,7 +8,9 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.test.core.app.ApplicationProvider
@@ -240,4 +242,44 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("connection_status_badge_5", useUnmergedTree = true).assertIsDisplayed()
         composeTestRule.onNodeWithTag("reconnect_button_5").assertIsDisplayed()
     }
+
+    @Test
+    fun `verify fresh-device setup wizard (ProvisionWeMoApDialog) scans APs, previews semantic icon, provisions switch, and adds it to device list`() {
+        composeTestRule.waitForIdle()
+
+        // Open Add Device dialog via add_device_button -> launch Setup Factory-Reset WeMo AP (10.22.22.1) wizard
+        composeTestRule.onNodeWithTag("add_device_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("open_provision_ap_wizard_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify ProvisionWeMoApDialog is displayed and shows scanned APs / status box
+        composeTestRule.onNodeWithTag("provision_ap_ip_input").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("scan_setup_ap_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("provision_ssid_input").performScrollTo().assertIsDisplayed()
+
+        // Enter a custom name ("Porch Christmas Tree") and Wi-Fi password, then click Provision Switch
+        composeTestRule.onNodeWithTag("provision_password_input")
+            .performScrollTo()
+            .performTextReplacement("HomeWifiPass123")
+        composeTestRule.onNodeWithTag("provision_device_name_input")
+            .performScrollTo()
+            .performTextReplacement("Porch Christmas Tree")
+        composeTestRule.waitForIdle()
+
+        // Verify live semantic category preview updates to Tree Lights (WeMoDeviceCategory.CHRISTMAS_TREE.displayName)
+        composeTestRule.onNodeWithText("Icon Category: Tree Lights")
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("confirm_provision_ap_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify the newly provisioned switch is added to the device list
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasText("Porch Christmas Tree"))
+        composeTestRule.onNodeWithText("Porch Christmas Tree").assertIsDisplayed()
+    }
 }
+
+

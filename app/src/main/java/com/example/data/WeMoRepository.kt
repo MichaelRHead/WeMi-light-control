@@ -10,6 +10,7 @@ import com.example.network.WeMoNetworkClient
 import com.example.network.WeMoProvisionResult
 import com.example.network.WeMoProvisionerClient
 import com.example.network.WeMoScannedAp
+import com.example.network.WeMoSetupDeviceDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,7 +47,7 @@ class WeMoRepository(
     private val dao: WeMoDao,
     private val context: Context? = null,
     private val networkClient: WeMoNetworkClient = WeMoNetworkClient(context),
-    private val provisionerClient: WeMoProvisionerClient = WeMoProvisionerClient(),
+    private val provisionerClient: WeMoProvisionerClient = WeMoProvisionerClient(context),
     initialDemoModeOverride: Boolean? = null
 ) {
     private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -1147,20 +1148,95 @@ class WeMoRepository(
     }
 
     /**
+     * Probes the factory-reset Belkin WeMo Setup AP at [apHost] (`10.22.22.1`) for its
+     * `/setup.xml` / `/Lightsetup.xml` and `GetMetaInfo` descriptor (including `<rtos>`, `<iot>`,
+     * `<binaryOption>`, and recommended AES-128-CBC encryption method).
+     */
+    suspend fun probeSetupApDevice(
+        apHost: String = "10.22.22.1",
+        apPort: Int = 49152
+    ): WeMoSetupDeviceDescriptor? {
+        val useFastDemo = _isDemoShowroomMode.value &&
+            apHost == "10.22.22.1" &&
+            !detectCurrentLanIp().startsWith("10.22.22.")
+        val live = if (useFastDemo) null else provisionerClient.probeSetupDevice(apHost = apHost, preferredPort = apPort)
+        if (live != null) return live
+        if (_isDemoShowroomMode.value && apHost == "10.22.22.1") {
+            return WeMoSetupDeviceDescriptor(
+                host = apHost,
+                port = apPort,
+                friendlyName = "WeMo Smart Switch",
+                modelName = "WLS040",
+                hardwareSku = WeMoNetworkClient.SKU_WLS040_3WAY,
+                deviceType = WeMoDeviceType.SWITCH_PLUG,
+                serialNumber = "221840K01088SETUP",
+                macAddress = "EC1A59881122",
+                udn = "uuid:Lightswitch-2_0-221840K01088SETUP",
+                firmwareVersion = "WeMo_WW_2.00.11563.PVT-RTOS",
+                isRtos = true,
+                isIot = false,
+                binaryOption = false,
+                recommendedEncryptionMethod = 2,
+                recommendedAddLengths = false
+            )
+        }
+        return null
+    }
+
+    /**
      * Phase 6 (Confirmed A4): Scans nearby 2.4 GHz Wi-Fi APs from a factory-reset Belkin WeMo
-     * Setup AP at 10.22.22.1 via urn:Belkin:service:WiFiSetup:1#GetApList.
+     * Setup AP at 10.22.22.1 via urn:Belkin:service:WiFiSetup:1#GetApList (with GetNetworkList fallback).
      */
     suspend fun scanSetupApNetworks(
         apHost: String = "10.22.22.1",
         apPort: Int = 49152
     ): List<WeMoScannedAp> {
-        return provisionerClient.fetchAvailableApList(apHost = apHost, apPort = apPort)
+        val useFastDemo = _isDemoShowroomMode.value &&
+            apHost == "10.22.22.1" &&
+            !detectCurrentLanIp().startsWith("10.22.22.")
+        val liveList = if (useFastDemo) emptyList() else provisionerClient.fetchAvailableApList(apHost = apHost, apPort = apPort)
+        if (liveList.isNotEmpty()) {
+            appendLog(
+                SoapLogEntry(
+                    timestamp = nowFormatted(),
+                    deviceName = "WeMo Setup AP ($apHost)",
+                    endpoint = "http://$apHost:$apPort/upnp/control/WiFiSetup1",
+                    soapAction = "WiFiSetup1#GetApList",
+                    statusText = "Discovered ${liveList.size} 2.4 GHz Wi-Fi network(s)",
+                    xmlSnippet = liveList.joinToString("\n") { "${it.ssid}|${it.channel}|${it.signalStrengthPercent}|${it.authMode}/${it.encryptionType}" },
+                    isLiveLanSuccess = true
+                )
+            )
+            return liveList
+        }
+        if (_isDemoShowroomMode.value && apHost == "10.22.22.1") {
+            val demoAps = listOf(
+                WeMoScannedAp("WeMi-Home-5G", channel = 6, signalStrengthPercent = 92, authMode = "WPA2PSK", encryptionType = "AES"),
+                WeMoScannedAp("WeMi-Home-2.4G", channel = 1, signalStrengthPercent = 96, authMode = "WPA2PSK", encryptionType = "AES"),
+                WeMoScannedAp("PineLake-Cabin-WiFi", channel = 11, signalStrengthPercent = 78, authMode = "WPA2PSK", encryptionType = "AES"),
+                WeMoScannedAp("Studio-Guest-LAN", channel = 6, signalStrengthPercent = 68, authMode = "WPA2PSK", encryptionType = "TKIPAES")
+            )
+            appendLog(
+                SoapLogEntry(
+                    timestamp = nowFormatted(),
+                    deviceName = "WeMo Setup AP ($apHost)",
+                    endpoint = "http://$apHost:$apPort/upnp/control/WiFiSetup1",
+                    soapAction = "WiFiSetup1#GetApList (Demo Showroom)",
+                    statusText = "Simulated ${demoAps.size} nearby 2.4 GHz APs",
+                    xmlSnippet = demoAps.joinToString("\n") { "${it.ssid}|${it.channel}|${it.signalStrengthPercent}|${it.authMode}/${it.encryptionType}" },
+                    isLiveLanSuccess = false
+                )
+            )
+            return demoAps
+        }
+        return emptyList()
     }
 
     /**
      * Phase 6 (Confirmed A4): Provisions a factory-reset Belkin WeMo switch at 10.22.22.1 onto
-     * the home 2.4 GHz Wi-Fi network via AES-128-CBC (Method 1 OpenWrt or Method 2 RTOS) and
-     * double-send ConnectHomeNetwork + CloseSetup.
+     * the home 2.4 GHz Wi-Fi network via AES-128-CBC (Auto-Detect or Methods 1/2/3),
+     * double-send ConnectHomeNetwork, multi-poll GetNetworkStatus, CloseSetup, and SetSetupDoneStatus,
+     * and automatically registers the newly provisioned switch in Room (`wemo_devices`) under [activeNetworkKey].
      */
     suspend fun provisionSetupApDevice(
         apHost: String = "10.22.22.1",
@@ -1170,9 +1246,19 @@ class WeMoRepository(
         channel: Int = 6,
         authMode: String = "WPA2PSK",
         encryptionType: String = "AES",
-        encryptionMethod: Int = 1
+        encryptionMethod: Int = 0,
+        addPasswordLengths: Boolean? = null,
+        customDeviceName: String? = null,
+        roomName: String? = null,
+        deviceType: WeMoDeviceType? = null,
+        activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
+        maxStatusPolls: Int = 10,
+        statusPollDelayMs: Long = 750L
     ): WeMoProvisionResult {
-        val result = provisionerClient.provisionDeviceToHomeWifi(
+        val useFastDemo = _isDemoShowroomMode.value &&
+            apHost == "10.22.22.1" &&
+            !detectCurrentLanIp().startsWith("10.22.22.")
+        val liveResult = if (useFastDemo) null else provisionerClient.provisionDeviceToHomeWifi(
             apHost = apHost,
             apPort = apPort,
             ssid = ssid,
@@ -1180,32 +1266,237 @@ class WeMoRepository(
             channel = channel,
             authMode = authMode,
             encryptionType = encryptionType,
-            encryptionMethod = encryptionMethod
+            encryptionMethod = encryptionMethod,
+            addPasswordLengths = addPasswordLengths,
+            customFriendlyName = customDeviceName,
+            maxStatusPolls = maxStatusPolls,
+            statusPollDelayMs = statusPollDelayMs
         )
-        appendLog(result.logEntry)
-        return result
+
+        val finalResult = if ((liveResult == null || (!liveResult.success && liveResult.networkStatusCode != 2)) && _isDemoShowroomMode.value && apHost == "10.22.22.1") {
+            val isOpen = encryptionType.equals("NONE", ignoreCase = true) || authMode.equals("OPEN", ignoreCase = true) || plainPassword.isEmpty()
+            if (!isOpen && plainPassword.length in 1..7) {
+                WeMoProvisionResult(
+                    success = false,
+                    networkStatusCode = 2,
+                    statusMessage = "Password rejected by WeMo (Status=2): Wi-Fi password must be at least 8 characters",
+                    encryptedPasswordPayload = "",
+                    logEntry = SoapLogEntry(
+                        timestamp = nowFormatted(),
+                        deviceName = "WeMo Setup AP ($apHost)",
+                        endpoint = "http://$apHost:$apPort/upnp/control/WiFiSetup1",
+                        soapAction = "WiFiSetup1#ConnectHomeNetwork($ssid)",
+                        statusText = "ShortPassword (Status=2): < 8 chars",
+                        xmlSnippet = "<NetworkStatus>2</NetworkStatus>",
+                        isLiveLanSuccess = false
+                    )
+                )
+            } else {
+                val demoDescriptor = probeSetupApDevice(apHost, apPort)
+                val effMethod = if (encryptionMethod in 1..3) encryptionMethod else (demoDescriptor?.recommendedEncryptionMethod ?: 2)
+                val effLengths = addPasswordLengths ?: (effMethod != 2)
+                val encPwd = if (isOpen) "" else provisionerClient.encryptWifiPassword(
+                    plainPassword = plainPassword,
+                    macAddress = demoDescriptor?.macAddress ?: "EC1A59881122",
+                    serialNumber = demoDescriptor?.serialNumber ?: "221840K01088SETUP",
+                    encryptionMethod = effMethod,
+                    addPasswordLengths = effLengths
+                )
+                val resolvedLabel = customDeviceName?.trim()?.takeIf { it.isNotEmpty() }
+                    ?: demoDescriptor?.friendlyName
+                    ?: "WeMo Smart Switch"
+                val msg = "Provisioned '$resolvedLabel' to '$ssid' (Status=1, Method $effMethod) • Added to switches"
+                WeMoProvisionResult(
+                    success = true,
+                    networkStatusCode = 1,
+                    statusMessage = msg,
+                    encryptedPasswordPayload = encPwd,
+                    logEntry = SoapLogEntry(
+                        timestamp = nowFormatted(),
+                        deviceName = resolvedLabel,
+                        endpoint = "http://$apHost:$apPort/upnp/control/WiFiSetup1",
+                        soapAction = "WiFiSetup1#ConnectHomeNetwork($ssid, Method $effMethod, lengths=$effLengths)",
+                        statusText = msg,
+                        xmlSnippet = "<ConnectHomeNetwork><ssid>$ssid</ssid><channel>$channel</channel></ConnectHomeNetwork>",
+                        isLiveLanSuccess = false
+                    ),
+                    closeSetupStatus = "success",
+                    effectiveEncryptionMethod = effMethod,
+                    addedLengthSuffix = effLengths,
+                    setupDevice = demoDescriptor?.copy(
+                        friendlyName = resolvedLabel,
+                        deviceType = deviceType ?: demoDescriptor.deviceType
+                    )
+                )
+            }
+        } else {
+            liveResult!!
+        }
+
+        appendLog(finalResult.logEntry)
+
+        // Automatically register/remember the newly provisioned device in Room so it appears
+        // in the user's device list and automatically resolves its DHCP IP on the home Wi-Fi!
+        if (finalResult.success) {
+            val desc = finalResult.setupDevice
+            val resolvedName = customDeviceName?.trim()?.takeIf { it.isNotEmpty() }
+                ?: desc?.friendlyName?.takeIf { it.isNotBlank() && !it.equals("WeMo Switch", ignoreCase = true) }
+                ?: "WeMo Smart Switch"
+            val resolvedRoom = roomName?.trim()?.takeIf { it.isNotEmpty() }
+                ?: inferRoomFromName(resolvedName)
+            val resolvedType = deviceType ?: desc?.deviceType ?: WeMoDeviceType.SWITCH_PLUG
+            val existingDevices = dao.getAllDevices().first()
+
+            val homeNetworks = dao.getAllHomeNetworks().first()
+            val matchedHomeBySsid = homeNetworks.find { it.ssidLabel.equals(ssid, ignoreCase = true) }
+            val targetNetworkKey = matchedHomeBySsid?.networkKey ?: activeNetworkKey
+            val homePrefix = homeNetworks.find { it.networkKey == targetNetworkKey }?.subnetPrefix ?: "192.168.1"
+
+            val serial = desc?.serialNumber?.takeIf { it.isNotBlank() && it != "221517K01018AB" }
+                ?: "221840K${(100000..999999).random()}"
+            val mac = desc?.macAddress?.takeIf { it.isNotBlank() } ?: "EC1A59881122"
+            val sku = desc?.hardwareSku?.takeIf { it.isNotBlank() } ?: when (resolvedType) {
+                WeMoDeviceType.LIGHTBULB_DIMMER -> WeMoNetworkClient.SKU_WDS060_DIMMER_V2
+                else -> WeMoNetworkClient.SKU_WLS040_3WAY
+            }
+            val udn = desc?.udn?.takeIf { it.isNotBlank() } ?: "uuid:Lightswitch-2_0-$serial"
+            val firmware = desc?.firmwareVersion?.takeIf { it.isNotBlank() } ?: "WeMo_WW_2.00.11563.PVT"
+
+            val existing = existingDevices.find {
+                (serial.isNotBlank() && it.serialNumber.equals(serial, ignoreCase = true)) ||
+                    (it.networkKey == targetNetworkKey && it.name.equals(resolvedName, ignoreCase = true))
+            }
+
+            val nextOctet = (120 + (existingDevices.size % 120)).coerceIn(101, 250)
+            val placeholderLanIp = "$homePrefix.$nextOctet"
+
+            if (existing == null) {
+                val newEntity = WeMoDeviceEntity(
+                    name = resolvedName,
+                    roomName = resolvedRoom,
+                    networkKey = targetNetworkKey,
+                    wifiSsid = ssid,
+                    deviceType = resolvedType.name,
+                    ipAddress = existing?.ipAddress ?: placeholderLanIp,
+                    port = desc?.port ?: 49153,
+                    isOn = false,
+                    isReachable = true,
+                    brightness = 100,
+                    latencyMs = 15,
+                    lastCheckedTime = "Provisioned • ${nowFormatted()}",
+                    serialNumber = serial,
+                    firmwareVersion = firmware,
+                    hardwareModel = sku,
+                    macAddress = mac,
+                    udn = udn,
+                    signalStrengthPercent = 90,
+                    sortOrder = existingDevices.size
+                )
+                dao.insertDevice(newEntity)
+            } else {
+                dao.updateDevice(
+                    existing.copy(
+                        name = resolvedName,
+                        roomName = resolvedRoom,
+                        networkKey = targetNetworkKey,
+                        wifiSsid = ssid,
+                        deviceType = resolvedType.name,
+                        port = desc?.port ?: existing.port,
+                        isReachable = true,
+                        lastCheckedTime = "Provisioned • ${nowFormatted()}",
+                        serialNumber = serial,
+                        firmwareVersion = firmware,
+                        hardwareModel = sku,
+                        macAddress = mac,
+                        udn = udn
+                    )
+                )
+            }
+        }
+
+        return finalResult
     }
 
     /**
-     * Saves a newly added or edited device to Room, and optionally pushes a friendlyName
-     * change to the physical Belkin WeMo hardware via urn:Belkin:service:basicevent:1#ChangeFriendlyName.
+     * Saves a newly added or edited device to Room:
+     * - Automatically probes `device.ipAddress` across all 9 WeMo ports (`probeAndFetchDeviceDescriptor`)
+     *   so fresh devices added by IP immediately learn their real port, serial number, MAC, SKU,
+     *   firmware version, and live ON/OFF state.
+     * - Optionally pushes a `<FriendlyName>` change to the physical Belkin WeMo hardware via
+     *   `urn:Belkin:service:basicevent:1#ChangeFriendlyName`.
      */
     suspend fun saveDevice(
         device: WeMoDeviceEntity,
         syncFriendlyNameToHardware: Boolean = false
-    ) {
-        if (device.id == 0) {
-            val count = dao.getDeviceCount()
-            dao.insertDevice(device.copy(sortOrder = count))
+    ): WeMoDeviceEntity {
+        val isPlaceholderSerial = device.serialNumber.isBlank() ||
+            device.serialNumber == "221517K01018NEW" ||
+            device.serialNumber == "221517K01018AB"
+
+        val liveDesc = if (device.id == 0 || isPlaceholderSerial) {
+            lanSemaphore.withPermit {
+                networkClient.probeAndFetchDeviceDescriptor(
+                    ipAddress = device.ipAddress,
+                    preferredPort = device.port
+                )
+            }
         } else {
-            dao.updateDevice(device)
+            null
         }
+
+        val enriched = if (liveDesc != null) {
+            val resolvedName = device.name.trim().ifBlank { liveDesc.name }
+            val resolvedRoom = if (device.name.isBlank() && device.roomName == "Living Room") {
+                liveDesc.roomName
+            } else {
+                device.roomName.ifBlank { liveDesc.roomName }
+            }
+            val resolvedType = if (device.name.isBlank()) {
+                liveDesc.deviceType.name
+            } else {
+                device.deviceType
+            }
+            device.copy(
+                name = resolvedName,
+                roomName = resolvedRoom,
+                deviceType = resolvedType,
+                port = liveDesc.port,
+                isReachable = true,
+                isOn = liveDesc.isOn,
+                brightness = liveDesc.brightness,
+                latencyMs = liveDesc.responseTimeMs.toInt().coerceAtLeast(1),
+                lastCheckedTime = nowFormatted(),
+                serialNumber = liveDesc.serialNumber.ifBlank { device.serialNumber },
+                firmwareVersion = liveDesc.firmwareVersion.ifBlank { device.firmwareVersion },
+                hardwareModel = liveDesc.hardwareSku.ifBlank { device.hardwareModel },
+                macAddress = liveDesc.macAddress.ifBlank { device.macAddress },
+                udn = liveDesc.usn.ifBlank { device.udn },
+                wifiSsid = liveDesc.wifiSsid.ifBlank { device.wifiSsid },
+                signalStrengthPercent = liveDesc.signalStrengthPercent
+            )
+        } else if (isPlaceholderSerial && !_isDemoShowroomMode.value) {
+            device.copy(serialNumber = "")
+        } else {
+            device
+        }
+
+        val saved = if (enriched.id == 0) {
+            val count = dao.getDeviceCount()
+            val toInsert = enriched.copy(sortOrder = count)
+            val newId = dao.insertDevice(toInsert).toInt()
+            toInsert.copy(id = newId)
+        } else {
+            dao.updateDevice(enriched)
+            enriched
+        }
+
         if (syncFriendlyNameToHardware) {
             val renameResult = lanSemaphore.withPermit {
-                networkClient.changeFriendlyName(device, device.name)
+                networkClient.changeFriendlyName(saved, saved.name)
             }
             appendLog(renameResult.logEntry)
         }
+        return saved
     }
 
     suspend fun deleteDevice(id: Int) {

@@ -136,3 +136,21 @@ flowchart TD
 - **Integrated Across Phone, Tablet, SSDP Scanner, Dialogs, and Android TV**:
   - `WeMoDeviceRow`, `WeMoSsdpScannerModal`, `WeMoTvScreen`, and `AddOrEditWeMoDeviceDialog` (with live as-you-type icon preview) all render `WeMoDeviceCategoryIllustration` and display the classified category badge (`Tree Lights`, `Fan`, `Light`, `Motion`, `Switch`).
 
+### 4.7 Fresh-Device Setup & Provisioning (`pywemo`-Exact `WiFiSetup1`, Android Wi-Fi Socket Binding & Manual IP Probing)
+- **Byte-for-Byte `pywemo` OpenSSL AES-128-CBC Password Encryption (`WeMoProvisionerClient.kt`)**:
+  - Matches `pywemo/ouimeaux_device/api/wifi_setup.py` (`encrypt_aes128` + `encrypt_method_1/2/3`) across all three Belkin hardware generations:
+    - **Key & IV Derivation**: Uses `salt = keydata[0..8]`, `derivedKey = MD5(keydata + salt)[0..16]`, and `iv = keydata[0..16]` (matching OpenSSL `enc -aes-128-cbc -md md5 -S <hex_salt> -iv <hex_iv>`).
+    - **Method 1 (Gen 1 OpenWrt `F7C030` / `F7C059` / `F7C063`)**: `keydata = mac[0..6] + serial + mac[6..12]` with `addLengths = true` (`Base64(ciphertext) + "%02x%02x".format(ciphertext.size, plainPassword.length)`).
+    - **Method 2 (Gen 2 RTOS `WLS040` / `WLS0403` / `WDS060`)**: `keydata = mac[0..6] + serial + mac[6..12] + "b3{8t;80dIN{ra83eC1s?M70?683@2Yf"` with `addLengths = false` (pure Base64 without hex length suffix).
+    - **Method 3 (`<binaryOption>1</binaryOption>` Symmetric Firmware)**: `keydata = mac[0..3] + mac[9..12] + serial + "bVduaWFyZkllaWVAb3RjbHAkcm9uT2Jh" + mac[6..9] + mac[3..6]` with `addLengths = true`.
+  - Includes `decryptWifiPassword(...)` for round-trip verification across all 3 methods.
+- **9-Port Setup AP Probing & Auto-Detected Encryption Method (`probeSetupDevice`)**:
+  - Probes all 9 candidate WeMo ports (`49152..49159`) on `10.22.22.1` checking both `/setup.xml` and `/Lightsetup.xml` with fast `650ms` connect-timeout abort, parses `<rtos>`, `<iot>`, and `<binaryOption>`, and automatically selects `recommendedEncryptionMethod` (`rtos==1 && iot!=1 -> Method 2`, `binaryOption==1 -> Method 3`, else `Method 1`).
+  - Falls back from `WiFiSetup1#GetApList` to `WiFiSetup1#GetNetworkList` for legacy firmware compatibility.
+- **Multi-Poll `GetNetworkStatus`, `CloseSetup`, `SetSetupDoneStatus` & Automatic Room Adoption**:
+  - Optionally pushes `basicevent1#ChangeFriendlyName` while still on the setup AP, double-sends `WiFiSetup1#ConnectHomeNetwork` (`100ms` apart with XML entity escaping), polls `WiFiSetup1#GetNetworkStatus` across `2s + 1.5s` intervals (`0` = connecting, `3` = WPA2 handshake, `1` = connected, `2` = short password), always sends `WiFiSetup1#CloseSetup` and `basicevent1#SetSetupDoneStatus`, and automatically inserts/updates the newly provisioned switch in Room (`wemo_devices`) under the target Wi-Fi Home.
+- **Android No-Internet Setup AP Detection & Wi-Fi Socket Binding (`WeMoNetworkMonitor.kt`)**:
+  - Removes `NET_CAPABILITY_INTERNET` from `NetworkRequest` and prioritizes active `TRANSPORT_WIFI` networks over cellular `cm.activeNetwork` so joining a no-Internet `WeMo.Light.xxx` AP (`10.22.22.x`) with mobile data active still routes all `10.22.22.1` and LAN HTTP/TCP sockets over Wi-Fi via `createWifiBoundSocketFactory(context)`.
+- **Automatic Hardware Probe on Manual IP Entry (`probeAndFetchDeviceDescriptor`)**:
+  - When a user adds a fresh device manually by IP (`saveDevice`), the app automatically probes all 9 WeMo ports at that IP and fetches `/setup.xml`, `GetBinaryState`, `GetMetaInfo`, and `GetSignalStrength` so real port, `<serialNumber>`, `<macAddress>`, hardware SKU, and initial `ON`/`OFF` state are saved instead of a placeholder serial.
+

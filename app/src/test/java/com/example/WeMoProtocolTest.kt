@@ -490,7 +490,7 @@ class WeMoProtocolTest {
     }
 
     @Test
-    fun `verify Phase 6 WeMoProvisionerClient GetApList parsing and AES-128-CBC password encryption Methods 1 and 2`() {
+    fun `verify Phase 6 WeMoProvisionerClient GetApList parsing and pywemo AES-128-CBC round-trip encryption across Methods 1, 2, and 3`() {
         val provisioner = WeMoProvisionerClient()
         val sampleApXml = """
             <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
@@ -513,23 +513,428 @@ class WeMoProtocolTest {
         assertEquals("WPA2PSK", aps[0].authMode)
         assertEquals("AES", aps[0].encryptionType)
 
-        // Verify Method 1 (OpenWrt) and Method 2 (RTOS) produce deterministic Base64 + 4-hex-digit length suffixes
+        // Verify pywemo-exact keydata construction for Methods 1, 2, and 3
+        val mac = "EC:1A:59:AA:11:22"
+        val serial = "221517K01018AB"
+        assertEquals(
+            "EC1A59221517K01018ABAA1122",
+            provisioner.buildKeyData(mac, serial, encryptionMethod = 1)
+        )
+        assertEquals(
+            "EC1A59221517K01018ABAA1122b3{8t;80dIN{ra83eC1s?M70?683@2Yf",
+            provisioner.buildKeyData(mac, serial, encryptionMethod = 2)
+        )
+        assertEquals(
+            "EC1122221517K01018ABbVduaWFyZkllaWVAb3RjbHAkcm9uT2JhAA1A59",
+            provisioner.buildKeyData(mac, serial, encryptionMethod = 3)
+        )
+
+        val plainPassword = "MyHomeWifiPassword123" // 21 bytes (0x15), padded to 32 bytes (0x20)
         val method1Enc = provisioner.encryptWifiPassword(
-            plainPassword = "MyHomeWifiPassword123",
-            macAddress = "EC:1A:59:AA:11:22",
-            serialNumber = "221517K01018AB",
+            plainPassword = plainPassword,
+            macAddress = mac,
+            serialNumber = serial,
             encryptionMethod = 1
         )
         val method2Enc = provisioner.encryptWifiPassword(
-            plainPassword = "MyHomeWifiPassword123",
-            macAddress = "EC:1A:59:AA:11:22",
-            serialNumber = "221517K01018AB",
+            plainPassword = plainPassword,
+            macAddress = mac,
+            serialNumber = serial,
             encryptionMethod = 2
         )
-        // Original password length is 21 bytes -> 0x15 hex suffix
-        assertTrue(method1Enc.endsWith("15"))
-        assertTrue(method2Enc.endsWith("15"))
+        val method3Enc = provisioner.encryptWifiPassword(
+            plainPassword = plainPassword,
+            macAddress = mac,
+            serialNumber = serial,
+            encryptionMethod = 3
+        )
+
+        // Method 1 & Method 3 append 4-hex-digit length suffix (Base64 len 44 = 0x2c + original len 21 = 0x15 -> "2c15")
+        assertTrue(method1Enc.endsWith("2c15"))
+        assertTrue(method3Enc.endsWith("2c15"))
+        // Method 2 (Gen 2 RTOS) uses addLengths = false in pywemo -> pure Base64 without hex length suffix
+        assertFalse(method2Enc.endsWith("2c15"))
         assertFalse(method1Enc == method2Enc)
+        assertFalse(method1Enc == method3Enc)
+
+        // Verify byte-for-byte OpenSSL AES-128-CBC round-trip decryption for all 3 methods
+        assertEquals(
+            plainPassword,
+            provisioner.decryptWifiPassword(method1Enc, mac, serial, encryptionMethod = 1)
+        )
+        assertEquals(
+            plainPassword,
+            provisioner.decryptWifiPassword(method2Enc, mac, serial, encryptionMethod = 2)
+        )
+        assertEquals(
+            plainPassword,
+            provisioner.decryptWifiPassword(method3Enc, mac, serial, encryptionMethod = 3)
+        )
+    }
+
+    @Test
+    fun `verify full loopback fresh-device WiFiSetup1 provisioning with GetNetworkList fallback, RTOS Method 2 auto-detection, status polling, CloseSetup, SetSetupDoneStatus, and Room insertion`() = runBlocking {
+        val running = AtomicBoolean(true)
+        val connectCalls = AtomicInteger(0)
+        val statusPolls = AtomicInteger(0)
+        val closeSetupCalled = AtomicBoolean(false)
+        val setupDoneCalled = AtomicBoolean(false)
+        val hardwareFriendlyName = AtomicReference("WeMo LightSwitch")
+        val receivedEncryptedPassword = AtomicReference("")
+
+        val serverSocket = ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"))
+        val setupPort = serverSocket.localPort
+
+        val serverThread = thread(start = true, isDaemon = true) {
+            while (running.get() && !serverSocket.isClosed) {
+                try {
+                    serverSocket.accept().use { sock ->
+                        val reader = BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.UTF_8))
+                        val reqLine = reader.readLine() ?: return@use
+                        var contentLength = 0
+                        var soapAction = ""
+                        while (true) {
+                            val h = reader.readLine() ?: break
+                            if (h.isEmpty()) break
+                            if (h.startsWith("Content-Length:", ignoreCase = true)) {
+                                contentLength = h.substringAfter(":").trim().toIntOrNull() ?: 0
+                            } else if (h.startsWith("SOAPACTION:", ignoreCase = true)) {
+                                soapAction = h.substringAfter(":").trim()
+                            }
+                        }
+                        val buf = CharArray(contentLength)
+                        var read = 0
+                        while (read < contentLength) {
+                            val n = reader.read(buf, read, contentLength - read)
+                            if (n == -1) break
+                            read += n
+                        }
+                        val reqBody = String(buf, 0, read)
+
+                        var statusCode = "200 OK"
+                        val respXml = when {
+                            reqLine.contains("GET /setup.xml") -> {
+                                // Simulate firmware that only serves /Lightsetup.xml so fallback path is tested
+                                statusCode = "404 Not Found"
+                                "<error/>"
+                            }
+                            reqLine.contains("GET /Lightsetup.xml") -> """
+                                <?xml version="1.0"?>
+                                <root xmlns="urn:Belkin:device-1-0">
+                                  <device>
+                                    <deviceType>urn:Belkin:device:lightswitch:1</deviceType>
+                                    <friendlyName>${hardwareFriendlyName.get()}</friendlyName>
+                                    <modelName>WLS040</modelName>
+                                    <serialNumber>WLS040FRESH99</serialNumber>
+                                    <firmwareVersion>WeMo_WW_2.00.12055.PVT</firmwareVersion>
+                                    <UDN>uuid:Lightswitch-2_0-WLS040FRESH99</UDN>
+                                    <macAddress>EC1A59BB3344</macAddress>
+                                    <rtos>1</rtos>
+                                    <iot>0</iot>
+                                    <binaryOption>0</binaryOption>
+                                  </device>
+                                </root>
+                            """.trimIndent()
+                            soapAction.contains("GetApList") -> {
+                                // Simulate older firmware rejecting GetApList so GetNetworkList fallback is tested
+                                statusCode = "500 Internal Server Error"
+                                "<s:Fault/>"
+                            }
+                            soapAction.contains("GetNetworkList") -> """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:GetNetworkListResponse xmlns:u="urn:Belkin:service:WiFiSetup:1">
+                                      <NetworkList>Page:1/1/2$
+                                HeadFamily-2.4G|6|91|WPA2PSK/AES,
+                                NeighborNet|11|42|WPA2PSK/AES,
+                                      </NetworkList>
+                                    </u:GetNetworkListResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                            """.trimIndent()
+                            soapAction.contains("GetMetaInfo") -> """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
+                                      <MetaInfo>EC1A59BB3344|WLS040FRESH99|WLS040|WeMo_WW_2.00.12055.PVT|WeMo.Light.F99|LightSwitch</MetaInfo>
+                                    </u:GetMetaInfoResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                            """.trimIndent()
+                            soapAction.contains("ChangeFriendlyName") -> {
+                                val newName = Regex("<FriendlyName>([^<]+)</FriendlyName>")
+                                    .find(reqBody)?.groupValues?.getOrNull(1)?.trim() ?: hardwareFriendlyName.get()
+                                hardwareFriendlyName.set(newName)
+                                """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:ChangeFriendlyNameResponse xmlns:u="urn:Belkin:service:basicevent:1">
+                                      <PluginKey>0</PluginKey>
+                                    </u:ChangeFriendlyNameResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                                """.trimIndent()
+                            }
+                            soapAction.contains("ConnectHomeNetwork") -> {
+                                connectCalls.incrementAndGet()
+                                val pwd = Regex("<password>([^<]+)</password>")
+                                    .find(reqBody)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+                                receivedEncryptedPassword.set(pwd)
+                                """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:ConnectHomeNetworkResponse xmlns:u="urn:Belkin:service:WiFiSetup:1">
+                                      <PairingStatus>1</PairingStatus>
+                                    </u:ConnectHomeNetworkResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                                """.trimIndent()
+                            }
+                            soapAction.contains("GetNetworkStatus") -> {
+                                // Poll 1 -> 0 (still connecting), Poll 2 -> 3 (WPA2 handshake), Poll 3 -> 1 (connected!)
+                                val pollNum = statusPolls.incrementAndGet()
+                                val statusVal = when (pollNum) {
+                                    1 -> 0
+                                    2 -> 3
+                                    else -> 1
+                                }
+                                """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:GetNetworkStatusResponse xmlns:u="urn:Belkin:service:WiFiSetup:1">
+                                      <NetworkStatus>$statusVal</NetworkStatus>
+                                    </u:GetNetworkStatusResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                                """.trimIndent()
+                            }
+                            soapAction.contains("CloseSetup") -> {
+                                closeSetupCalled.set(true)
+                                """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:CloseSetupResponse xmlns:u="urn:Belkin:service:WiFiSetup:1">
+                                      <status>success</status>
+                                    </u:CloseSetupResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                                """.trimIndent()
+                            }
+                            soapAction.contains("SetSetupDoneStatus") -> {
+                                setupDoneCalled.set(true)
+                                """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:SetSetupDoneStatusResponse xmlns:u="urn:Belkin:service:basicevent:1">
+                                      <Status>0</Status>
+                                    </u:SetSetupDoneStatusResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                                """.trimIndent()
+                            }
+                            else -> "<root/>"
+                        }
+
+                        val bytes = respXml.toByteArray(Charsets.UTF_8)
+                        val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
+                        writer.write("HTTP/1.1 $statusCode\r\n")
+                        writer.write("Content-Type: text/xml; charset=\"utf-8\"\r\n")
+                        writer.write("Content-Length: ${bytes.size}\r\n")
+                        writer.write("Connection: close\r\n\r\n")
+                        writer.write(respXml)
+                        writer.flush()
+                    }
+                } catch (_: Exception) {
+                    if (!running.get()) break
+                }
+            }
+        }
+
+        try {
+            val client = WeMoNetworkClient(extraCandidatePorts = listOf(setupPort))
+            val provisioner = WeMoProvisionerClient()
+            val repo = WeMoRepository(
+                dao = database.wemoDao(),
+                networkClient = client,
+                provisionerClient = provisioner,
+                initialDemoModeOverride = false
+            )
+            repo.ensureSeeded()
+
+            // 1. Verify scanSetupApNetworks discovers the setup device on setupPort via /Lightsetup.xml
+            //    and falls back from GetApList to GetNetworkList
+            val scannedAps = repo.scanSetupApNetworks(apHost = "127.0.0.1", apPort = setupPort)
+            assertEquals(2, scannedAps.size)
+            assertEquals("HeadFamily-2.4G", scannedAps[0].ssid)
+
+            // 2. Provision the switch using encryptionMethod = 0 (Auto-Detect -> should select Method 2 because <rtos>1</rtos>)
+            val result = repo.provisionSetupApDevice(
+                apHost = "127.0.0.1",
+                apPort = setupPort,
+                ssid = "HeadFamily-2.4G",
+                plainPassword = "SuperSecretHomePass!24",
+                channel = 6,
+                authMode = "WPA2PSK",
+                encryptionType = "AES",
+                encryptionMethod = 0, // Auto-Detect from /Lightsetup.xml (<rtos>1</rtos> -> Method 2)
+                customDeviceName = "Porch Christmas Tree",
+                roomName = "Outdoor / Porch",
+                activeNetworkKey = "wifi_home_192_168_1",
+                statusPollDelayMs = 20L
+            )
+
+            assertTrue(result.success)
+            assertEquals(1, result.networkStatusCode)
+            assertEquals(2, result.effectiveEncryptionMethod)
+            assertEquals(2, connectCalls.get()) // Double-send verified
+            assertTrue(statusPolls.get() >= 3)  // Polled through 0 -> 3 -> 1
+            assertTrue(closeSetupCalled.get())  // CloseSetup called
+            assertTrue(setupDoneCalled.get())   // SetSetupDoneStatus called
+            assertEquals("Porch Christmas Tree", hardwareFriendlyName.get())
+
+            // Verify the switch hardware can decrypt the exact password using Method 2
+            val decryptedByHardware = provisioner.decryptWifiPassword(
+                encryptedPayload = receivedEncryptedPassword.get(),
+                macAddress = "EC1A59BB3344",
+                serialNumber = "WLS040FRESH99",
+                encryptionMethod = 2
+            )
+            assertEquals("SuperSecretHomePass!24", decryptedByHardware)
+
+            // Verify the newly provisioned switch was automatically saved into Room for the active Wi-Fi Home
+            val savedDevices = database.wemoDao().getAllDevices().first()
+            assertEquals(1, savedDevices.size)
+            val provisionedSwitch = savedDevices.single()
+            assertEquals("Porch Christmas Tree", provisionedSwitch.name)
+            assertEquals("Outdoor / Porch", provisionedSwitch.roomName)
+            assertEquals("WLS040FRESH99", provisionedSwitch.serialNumber)
+            assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, provisionedSwitch.visualCategory)
+        } finally {
+            running.set(false)
+            runCatching { serverSocket.close() }
+            serverThread.join(500)
+        }
+    }
+
+    @Test
+    fun `verify manual saveDevice probes fresh switch IP for real port, serialNumber, hardware SKU, and initial binaryState`() = runBlocking {
+        val running = AtomicBoolean(true)
+        val serverSocket = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
+        val realPort = serverSocket.localPort
+
+        val serverThread = thread(start = true, isDaemon = true) {
+            while (running.get() && !serverSocket.isClosed) {
+                try {
+                    serverSocket.accept().use { sock ->
+                        val reader = BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.UTF_8))
+                        val reqLine = reader.readLine() ?: return@use
+                        var contentLen = 0
+                        var soapAction = ""
+                        while (true) {
+                            val h = reader.readLine() ?: break
+                            if (h.isEmpty()) break
+                            if (h.startsWith("Content-Length:", ignoreCase = true)) {
+                                contentLen = h.substringAfter(":").trim().toIntOrNull() ?: 0
+                            } else if (h.startsWith("SOAPACTION:", ignoreCase = true)) {
+                                soapAction = h.substringAfter(":").trim()
+                            }
+                        }
+                        if (contentLen > 0) reader.skip(contentLen.toLong())
+
+                        val respXml = when {
+                            reqLine.contains("GET /setup.xml") -> """
+                                <?xml version="1.0"?>
+                                <root xmlns="urn:Belkin:device-1-0">
+                                  <device>
+                                    <deviceType>urn:Belkin:device:controllee:1</deviceType>
+                                    <friendlyName>Attic Exhaust Fan</friendlyName>
+                                    <modelName>Socket</modelName>
+                                    <serialNumber>WSP080MANUAL77</serialNumber>
+                                    <firmwareVersion>WeMo_WW_2.00.11888.PVT</firmwareVersion>
+                                    <UDN>uuid:Socket-1_0-WSP080MANUAL77</UDN>
+                                    <macAddress>EC1A59CC5566</macAddress>
+                                    <binaryState>0</binaryState>
+                                  </device>
+                                </root>
+                            """.trimIndent()
+                            soapAction.contains("GetBinaryState") -> """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:GetBinaryStateResponse xmlns:u="urn:Belkin:service:basicevent:1">
+                                      <BinaryState>0</BinaryState>
+                                    </u:GetBinaryStateResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                            """.trimIndent()
+                            soapAction.contains("GetMetaInfo") -> """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
+                                      <MetaInfo>EC1A59CC5566|WSP080MANUAL77|WSP080|WeMo_WW_2.00.11888.PVT|HeadFamily-2.4G|Socket</MetaInfo>
+                                    </u:GetMetaInfoResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                            """.trimIndent()
+                            soapAction.contains("GetSignalStrength") -> """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:GetSignalStrengthResponse xmlns:u="urn:Belkin:service:basicevent:1">
+                                      <SignalStrength>89</SignalStrength>
+                                    </u:GetSignalStrengthResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                            """.trimIndent()
+                            else -> "<root/>"
+                        }
+
+                        val bytes = respXml.toByteArray(Charsets.UTF_8)
+                        val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
+                        writer.write("HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n$respXml")
+                        writer.flush()
+                    }
+                } catch (_: Exception) {
+                    if (!running.get()) break
+                }
+            }
+        }
+
+        try {
+            val client = WeMoNetworkClient(extraCandidatePorts = listOf(realPort))
+            val repo = WeMoRepository(
+                dao = database.wemoDao(),
+                networkClient = client,
+                initialDemoModeOverride = false
+            )
+            repo.ensureSeeded()
+
+            // Save a manual device by IP ("127.0.0.1") with wrong default port 49153 and placeholder serial "221517K01018NEW"
+            repo.saveDevice(
+                device = WeMoDeviceEntity(
+                    id = 0,
+                    name = "",
+                    roomName = "Living Room",
+                    ipAddress = "127.0.0.1",
+                    port = 49153,
+                    serialNumber = "221517K01018NEW"
+                ),
+                syncFriendlyNameToHardware = false
+            )
+
+            val saved = database.wemoDao().getAllDevices().first().single()
+            assertEquals("Attic Exhaust Fan", saved.name)
+            assertEquals(realPort, saved.port)
+            assertEquals("WSP080MANUAL77", saved.serialNumber)
+            assertEquals("EC1A59CC5566", saved.macAddress)
+            assertTrue(saved.hardwareModel.startsWith("WSP080"))
+            assertTrue(saved.isReachable)
+            assertFalse(saved.isOn) // Probed real OFF state from GetBinaryState
+            assertEquals(89, saved.signalStrengthPercent)
+            assertEquals(WeMoDeviceCategory.FAN, saved.visualCategory)
+        } finally {
+            running.set(false)
+            runCatching { serverSocket.close() }
+            serverThread.join(500)
+        }
     }
 
     @Test
@@ -818,4 +1223,5 @@ class WeMoProtocolTest {
         }
     }
 }
+
 

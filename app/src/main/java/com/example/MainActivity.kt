@@ -119,6 +119,8 @@ fun WeMiSwitchApp(
     val showAddHomeDialog by viewModel.showAddHomeDialog.collectAsStateWithLifecycle()
     val showProvisionApDialog by viewModel.showProvisionApDialog.collectAsStateWithLifecycle()
     val scannedSetupAps by viewModel.scannedSetupAps.collectAsStateWithLifecycle()
+    val detectedSetupDevice by viewModel.detectedSetupDevice.collectAsStateWithLifecycle()
+    val setupApStatusMessage by viewModel.setupApStatusMessage.collectAsStateWithLifecycle()
     val isScanningSetupAp by viewModel.isScanningSetupAp.collectAsStateWithLifecycle()
     val isProvisioningAp by viewModel.isProvisioningAp.collectAsStateWithLifecycle()
     val lanNetworkState by viewModel.lanNetworkState.collectAsStateWithLifecycle()
@@ -356,6 +358,7 @@ fun WeMiSwitchApp(
                                             EmptyDevicesState(
                                                 onAddClick = { viewModel.openAddDeviceDialog() },
                                                 onScanSsdpClick = { viewModel.openSsdpScannerAndScan() },
+                                                onOpenProvisionApClick = { viewModel.openProvisionApDialog() },
                                                 onRestoreClassicClick = { viewModel.resetToClassicScreenshotDevices() }
                                             )
                                         }
@@ -549,8 +552,10 @@ fun WeMiSwitchApp(
             isScanning = isScanningSetupAp,
             isProvisioning = isProvisioningAp,
             defaultSsid = currentSsid,
+            detectedDevice = detectedSetupDevice,
+            statusMessage = setupApStatusMessage,
             onScanApList = { apHost -> viewModel.scanSetupApNetworks(apHost) },
-            onProvision = { apHost, ssid, pwd, ch, auth, enc, method ->
+            onProvision = { apHost, ssid, pwd, ch, auth, enc, method, customName, roomName ->
                 viewModel.provisionWeMoAp(
                     apHost = apHost,
                     ssid = ssid,
@@ -558,7 +563,9 @@ fun WeMiSwitchApp(
                     channel = ch,
                     authMode = auth,
                     encryptionType = enc,
-                    encryptionMethod = method
+                    encryptionMethod = method,
+                    customDeviceName = customName,
+                    roomName = roomName
                 )
             },
             onDismiss = { viewModel.closeProvisionApDialog() }
@@ -633,6 +640,7 @@ fun WeMiSwitchApp(
 private fun EmptyDevicesState(
     onAddClick: () -> Unit,
     onScanSsdpClick: () -> Unit,
+    onOpenProvisionApClick: () -> Unit,
     onRestoreClassicClick: () -> Unit
 ) {
     Column(
@@ -651,7 +659,7 @@ private fun EmptyDevicesState(
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, add a switch by IP, or restore the default preset.",
+            text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, provision a factory-reset switch (10.22.22.1), add a switch by IP, or restore the default preset.",
             fontFamily = WorkSansFontFamily,
             fontSize = 14.sp,
             color = WemoTextSecondary
@@ -662,6 +670,14 @@ private fun EmptyDevicesState(
             colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary)
         ) {
             Text("Scan Local Network (SSDP)")
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(
+            onClick = onOpenProvisionApClick,
+            colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
+            modifier = Modifier.testTag("empty_state_provision_ap_button")
+        ) {
+            Text("Setup Factory-Reset WeMo AP (10.22.22.1)")
         }
         Spacer(modifier = Modifier.height(8.dp))
         Button(
@@ -679,3 +695,4 @@ private fun EmptyDevicesState(
         }
     }
 }
+

@@ -65,7 +65,10 @@ class WeMoNetworkClient(
     private val appContext: Context? = null,
     private val extraCandidatePorts: List<Int> = emptyList()
 ) {
+    private val wifiSocketFactory = WeMoNetworkMonitor.createWifiBoundSocketFactory(appContext)
+
     private val httpClient = OkHttpClient.Builder()
+        .socketFactory(wifiSocketFactory)
         .connectTimeout(750, TimeUnit.MILLISECONDS)
         .readTimeout(1200, TimeUnit.MILLISECONDS)
         .writeTimeout(900, TimeUnit.MILLISECONDS)
@@ -75,6 +78,9 @@ class WeMoNetworkClient(
     private val xmlMediaType = "text/xml; charset=\"utf-8\"".toMediaType()
 
     companion object {
+        const val SKU_WLS040_3WAY = "WLS040 (2nd-Gen 3-Way Switch)"
+        const val SKU_WDS060_DIMMER_V2 = "WDS060 (Gen-2 Smart Dimmer)"
+
         /**
          * Canonical Belkin WeMo UPnP port order matching pywemo/ouimeaux_device/__init__.py (probe_wemo).
          * 49153 and 49152 are the primary active ports on 1st-Gen OpenWrt and 2nd-Gen RTOS switches;
@@ -301,7 +307,7 @@ class WeMoNetworkClient(
         for (port in ports) {
             // Fast TCP handshake check so we can distinguish host-down timeout vs ECONNREFUSED
             try {
-                Socket().use { tcpSocket ->
+                wifiSocketFactory.createSocket().use { tcpSocket ->
                     tcpSocket.connect(InetSocketAddress(ipAddress, port), 550)
                 }
             } catch (_: SocketTimeoutException) {
@@ -953,6 +959,38 @@ class WeMoNetworkClient(
         } catch (_: Exception) {
             null
         }
+    }
+
+    /**
+     * Probes a single IP address across all 9 WeMo ports (`probeWemoPort`) and fetches its full
+     * `/setup.xml` (or `/Lightsetup.xml`), `GetBinaryState`, `GetMetaInfo`, and `GetSignalStrength`
+     * descriptor so newly added devices learn their real port, serial number, MAC, SKU, and state.
+     */
+    suspend fun probeAndFetchDeviceDescriptor(
+        ipAddress: String,
+        preferredPort: Int = 49153
+    ): SsdpDiscoveredDevice? = withContext(Dispatchers.IO) {
+        val cleanIp = ipAddress.trim()
+        if (cleanIp.isEmpty()) return@withContext null
+        val startMs = System.currentTimeMillis()
+        val resolvedPort = probeWemoPort(
+            ipAddress = cleanIp,
+            preferredPort = preferredPort,
+            expectedSerialOrUdn = null
+        ) ?: return@withContext null
+        val rtt = (System.currentTimeMillis() - startMs).coerceAtLeast(1L)
+
+        for (path in listOf("/setup.xml", "/Lightsetup.xml")) {
+            val desc = fetchLiveDeviceDescriptor(
+                locationUrl = "http://$cleanIp:$resolvedPort$path",
+                usnHeader = "",
+                stHeader = "urn:Belkin:service:basicevent:1",
+                responseTimeMs = rtt,
+                isLiveUdp = false
+            )
+            if (desc != null) return@withContext desc
+        }
+        null
     }
 
     /**
