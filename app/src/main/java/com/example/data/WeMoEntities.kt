@@ -57,6 +57,11 @@ data class WeMoDeviceEntity(
     val lastMotionTime: String = "4:15:15 PM",
     val serialNumber: String = "221517K01018AB",
     val firmwareVersion: String = "WeMo_WW_2.00.11532.PVT",
+    val hardwareModel: String = "LightSwitch",
+    val macAddress: String = "",
+    val udn: String = "",
+    val signalStrengthPercent: Int = 85,
+    val nightModeEnabled: Boolean = false,
     val sortOrder: Int = 0,
     val autoOffMinutes: Int = 0
 ) {
@@ -121,18 +126,26 @@ data class SsdpDiscoveredDevice(
     val responseTimeMs: Long,
     val isOn: Boolean = true,
     val brightness: Int = 100,
-    val isLiveUdpResponse: Boolean = false
+    val isLiveUdpResponse: Boolean = false,
+    val hardwareSku: String = modelName,
+    val macAddress: String = "",
+    val wifiSsid: String = "",
+    val signalStrengthPercent: Int = 85
 )
 
 fun inferRoomFromName(deviceName: String): String {
     val lower = deviceName.lowercase()
     return when {
-        "kitchen" in lower -> "Kitchen"
-        "bedroom" in lower || "loft" in lower -> "Bedroom"
-        "ensuite" in lower || "bath" in lower -> "Ensuite"
-        "hall" in lower || "landing" in lower || "stairs" in lower -> "Hallway & Landing"
-        "patio" in lower || "porch" in lower || "outdoor" in lower || "garden" in lower || "dock" in lower -> "Outdoor"
+        "kitchen" in lower || "pantry" in lower || "island" in lower -> "Kitchen"
+        "dining" in lower -> "Dining Room"
+        "bedroom" in lower || "loft" in lower || "master" in lower || "nursery" in lower || "guest" in lower -> "Bedroom"
+        "ensuite" in lower || "bath" in lower || "powder" in lower || "vanity" in lower -> "Ensuite"
+        "hall" in lower || "landing" in lower || "stairs" in lower || "foyer" in lower || "entry" in lower -> "Hallway & Landing"
+        "patio" in lower || "porch" in lower || "outdoor" in lower || "garden" in lower || "dock" in lower || "yard" in lower || "deck" in lower || "flood" in lower -> "Outdoor"
+        "garage" in lower || "workshop" in lower || "driveway" in lower -> "Garage"
+        "basement" in lower || "cellar" in lower -> "Basement"
         "office" in lower || "study" in lower || "desk" in lower || "studio" in lower -> "Office"
+        "living" in lower || "family" in lower || "den" in lower || "lounge" in lower -> "Living Room"
         else -> "Living Room"
     }
 }

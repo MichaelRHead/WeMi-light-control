@@ -226,10 +226,12 @@ fun WeMoMoreScreen(
     devices: List<WeMoDeviceEntity>,
     soapLogs: List<SoapLogEntry>,
     useWeMiWordmark: Boolean,
+    isDemoShowroomMode: Boolean = false,
     onTurnAllOn: () -> Unit,
     onTurnAllOff: () -> Unit,
     onScanNetwork: () -> Unit,
     onResetClassicDevices: () -> Unit,
+    onToggleDemoShowroomMode: (Boolean) -> Unit = {},
     onToggleBrandWordmark: () -> Unit,
     onClearLogs: () -> Unit,
     modifier: Modifier = Modifier
@@ -324,12 +326,46 @@ fun WeMoMoreScreen(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Communicates directly with WeMi / Belkin WeMo switches over local Wi-Fi via SSDP (UDP 239.255.255.250:1900) and SOAP HTTP (/upnp/control/basicevent1 on ports 49152–49155) — no cloud account required.",
+                        text = "Communicates directly with WeMi / Belkin WeMo switches over local Wi-Fi via SSDP (UDP 239.255.255.250:1900) and SOAP HTTP (/upnp/control/basicevent1 on ports 49151–49159) — no cloud account required.",
                         fontFamily = WorkSansFontFamily,
                         fontSize = 13.sp,
                         color = WemoTextSecondary
                     )
                     Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Demo Showroom Mode",
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 15.sp,
+                                color = WemoTextPrimary
+                            )
+                            Text(
+                                text = if (isDemoShowroomMode) {
+                                    "Showing 13 showcase devices across 3 Wi-Fi Homes"
+                                } else {
+                                    "Real LAN Mode • Controlling physical Belkin WeMo switches only"
+                                },
+                                fontFamily = WorkSansFontFamily,
+                                fontSize = 13.sp,
+                                color = WemoTextSecondary
+                            )
+                        }
+                        Switch(
+                            checked = isDemoShowroomMode,
+                            onCheckedChange = { onToggleDemoShowroomMode(it) },
+                            colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary),
+                            modifier = Modifier.testTag("demo_showroom_mode_switch")
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),

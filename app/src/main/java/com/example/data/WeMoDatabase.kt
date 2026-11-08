@@ -11,7 +11,7 @@ import androidx.room.RoomDatabase
         WeMoRuleEntity::class,
         WeMoHomeNetworkEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class WeMoDatabase : RoomDatabase() {

@@ -353,7 +353,7 @@ fun WeMoSsdpScannerModal(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.testTag("sync_all_ssdp_button")
                     ) {
-                        Text("Sync All", fontSize = 13.sp)
+                        Text("Adopt All", fontSize = 13.sp)
                     }
                 }
             }
@@ -370,9 +370,11 @@ fun WeMoSsdpScannerModal(
                 contentPadding = PaddingValues(vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(discoveredList, key = { "${it.ipAddress}:${it.port}_${it.name}" }) { item ->
+                items(discoveredList, key = { "${it.ipAddress}:${it.port}_${it.serialNumber}_${it.name}" }) { item ->
                     val alreadySaved = existingDevices.any {
-                        (it.ipAddress == item.ipAddress || it.name.equals(item.name, ignoreCase = true)) && it.isReachable
+                        ((item.serialNumber.isNotBlank() && it.serialNumber.equals(item.serialNumber, ignoreCase = true)) ||
+                            it.ipAddress == item.ipAddress ||
+                            it.name.equals(item.name, ignoreCase = true)) && it.isReachable
                     }
                     SsdpDiscoveredDeviceRow(
                         item = item,
@@ -463,7 +465,7 @@ private fun SsdpDiscoveredDeviceRow(
                 }
 
                 Text(
-                    text = "${item.ipAddress}:${item.port} • Model: ${item.modelName} • SN: ${item.serialNumber}",
+                    text = "${item.ipAddress}:${item.port} • ${item.hardwareSku} • SN: ${item.serialNumber}",
                     color = WemoGreenDark,
                     fontFamily = WorkSansFontFamily,
                     fontWeight = FontWeight.Medium,
@@ -503,7 +505,7 @@ private fun SsdpDiscoveredDeviceRow(
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Synced", color = WemoGreenDark, fontSize = 12.sp)
+                    Text("Adopted", color = WemoGreenDark, fontSize = 12.sp)
                 }
             } else {
                 Button(
@@ -519,7 +521,7 @@ private fun SsdpDiscoveredDeviceRow(
                         modifier = Modifier.size(15.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Add", fontSize = 12.sp)
+                    Text("Adopt", fontSize = 12.sp)
                 }
             }
         }

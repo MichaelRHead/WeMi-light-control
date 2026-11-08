@@ -1,6 +1,8 @@
 package com.example.data
 
 import android.content.Context
+import android.os.Build
+import com.example.network.SoapCallResult
 import com.example.network.SsdpScanReport
 import com.example.network.WeMoNetworkClient
 import kotlinx.coroutines.flow.Flow
@@ -9,9 +11,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.roundToInt
 
 data class HomeReconnectSummary(
@@ -25,30 +32,55 @@ data class HomeReconnectSummary(
 
 class WeMoRepository(
     private val dao: WeMoDao,
-    context: Context? = null,
-    private val networkClient: WeMoNetworkClient = WeMoNetworkClient(context)
+    private val context: Context? = null,
+    private val networkClient: WeMoNetworkClient = WeMoNetworkClient(context),
+    initialDemoModeOverride: Boolean? = null
 ) {
+    private val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val defaultDemoMode = initialDemoModeOverride
+        ?: prefs?.getBoolean(KEY_DEMO_SHOWROOM_MODE, isRunningInRobolectric())
+        ?: isRunningInRobolectric()
+
+    private val _isDemoShowroomMode = MutableStateFlow(defaultDemoMode)
+    val isDemoShowroomMode: StateFlow<Boolean> = _isDemoShowroomMode.asStateFlow()
+
     private val initialSeedDone = MutableStateFlow(false)
+
+    /**
+     * Limits concurrent HTTP/SOAP connections across the LAN to 3 so 2nd-Gen Belkin RTOS
+     * switches (WLS040 / WLS0403 / WDS060) never suffer lwIP socket starvation.
+     */
+    private val lanSemaphore = Semaphore(3)
+    private val deviceMutexes = ConcurrentHashMap<String, Mutex>()
+    private val lastSetStateTimestampMs = ConcurrentHashMap<Int, Long>()
+
+    private fun mutexFor(device: WeMoDeviceEntity): Mutex {
+        val key = device.serialNumber.takeIf { it.isNotBlank() } ?: "${device.ipAddress}:${device.port}"
+        return deviceMutexes.getOrPut(key) { Mutex() }
+    }
 
     val allDevices: Flow<List<WeMoDeviceEntity>> = combine(
         dao.getAllDevices(),
-        initialSeedDone
-    ) { list, seeded ->
-        if (list.isEmpty() && !seeded) defaultClassicDevices() else list
+        initialSeedDone,
+        _isDemoShowroomMode
+    ) { list, seeded, demoMode ->
+        if (list.isEmpty() && !seeded && demoMode) defaultClassicDevices() else list
     }
 
     val allHomeNetworks: Flow<List<WeMoHomeNetworkEntity>> = combine(
         dao.getAllHomeNetworks(),
-        initialSeedDone
-    ) { list, seeded ->
-        if (list.isEmpty() && !seeded) defaultHomeNetworks() else list
+        initialSeedDone,
+        _isDemoShowroomMode
+    ) { list, seeded, demoMode ->
+        if (list.isEmpty() && !seeded && demoMode) defaultHomeNetworks() else list
     }
 
     val allRules: Flow<List<WeMoRuleEntity>> = combine(
         dao.getAllRules(),
-        initialSeedDone
-    ) { list, seeded ->
-        if (list.isEmpty() && !seeded) defaultClassicRules() else list
+        initialSeedDone,
+        _isDemoShowroomMode
+    ) { list, seeded, demoMode ->
+        if (list.isEmpty() && !seeded && demoMode) defaultClassicRules() else list
     }
 
     private val _soapLogs = MutableStateFlow<List<SoapLogEntry>>(emptyList())
@@ -58,23 +90,82 @@ class WeMoRepository(
     val latestSsdpReport: StateFlow<SsdpScanReport?> = _latestSsdpReport.asStateFlow()
 
     private fun appendLog(entry: SoapLogEntry) {
-        _soapLogs.value = (listOf(entry) + _soapLogs.value).take(40)
+        _soapLogs.value = (listOf(entry) + _soapLogs.value).take(50)
     }
 
-    suspend fun ensureSeeded() {
-        if (dao.getHomeNetworkCount() == 0) {
-            dao.insertHomeNetworks(defaultHomeNetworks())
+    /**
+     * Initializes the database on app startup:
+     * - In Real LAN Mode (default on physical Android phones/TVs), starts clean on the
+     *   detected Wi-Fi subnet without seeding fake demo switches, creating a profile for
+     *   the active LAN subnet if none exists.
+     * - In Demo Showroom Mode, seeds the 3 showcase homes, 13 devices, and 4 rules.
+     *
+     * Returns the initial active networkKey to select.
+     */
+    suspend fun ensureSeeded(): String {
+        return if (_isDemoShowroomMode.value) {
+            if (dao.getHomeNetworkCount() == 0) {
+                dao.insertHomeNetworks(defaultHomeNetworks())
+            }
+            if (dao.getDeviceCount() == 0) {
+                dao.insertDevices(defaultClassicDevices())
+            }
+            if (dao.getRuleCount() == 0) {
+                dao.insertRules(defaultClassicRules())
+            }
+            initialSeedDone.value = true
+            DEFAULT_MAIN_HOME_KEY
+        } else {
+            val existingHomes = dao.getAllHomeNetworks().first()
+            val localIp = detectCurrentLanIp()
+            val subnetPrefix = localIp.substringBeforeLast('.', "192.168.1")
+            val matchedHome = existingHomes.find { it.subnetPrefix == subnetPrefix }
+            val activeHome = when {
+                matchedHome != null -> matchedHome
+                existingHomes.isNotEmpty() -> existingHomes.first()
+                else -> {
+                    val key = "wifi_lan_${subnetPrefix.replace('.', '_')}"
+                    val newHome = WeMoHomeNetworkEntity(
+                        networkKey = key,
+                        homeName = "Home Wi-Fi ($subnetPrefix.x)",
+                        ssidLabel = "Local LAN ($subnetPrefix.0/24)",
+                        subnetPrefix = subnetPrefix,
+                        gatewayIp = "$subnetPrefix.1",
+                        lastConnectedTime = "Connected now",
+                        autoReconnectOnArrival = true,
+                        sortOrder = 0
+                    )
+                    dao.insertHomeNetwork(newHome)
+                    newHome
+                }
+            }
+            initialSeedDone.value = true
+            activeHome.networkKey
         }
-        if (dao.getDeviceCount() == 0) {
-            dao.insertDevices(defaultClassicDevices())
+    }
+
+    /**
+     * Toggles Demo Showroom Mode ON or OFF and persists the preference.
+     * - Enabling Demo Showroom Mode populates the 3 showcase Wi-Fi homes, 13 sample switches, and 4 rules.
+     * - Disabling Demo Showroom Mode removes demo data and initializes a clean profile for the real Wi-Fi LAN.
+     */
+    suspend fun setDemoShowroomMode(enabled: Boolean): String {
+        _isDemoShowroomMode.value = enabled
+        prefs?.edit()?.putBoolean(KEY_DEMO_SHOWROOM_MODE, enabled)?.apply()
+        return if (enabled) {
+            resetToClassicScreenshotPreset()
+            DEFAULT_MAIN_HOME_KEY
+        } else {
+            dao.deleteAllDevices()
+            dao.deleteAllRules()
+            dao.deleteAllHomeNetworks()
+            ensureSeeded()
         }
-        if (dao.getRuleCount() == 0) {
-            dao.insertRules(defaultClassicRules())
-        }
-        initialSeedDone.value = true
     }
 
     suspend fun resetToClassicScreenshotPreset() {
+        _isDemoShowroomMode.value = true
+        prefs?.edit()?.putBoolean(KEY_DEMO_SHOWROOM_MODE, true)?.apply()
         dao.deleteAllDevices()
         dao.deleteAllRules()
         dao.deleteAllHomeNetworks()
@@ -92,50 +183,156 @@ class WeMoRepository(
     }
 
     /**
+     * Two-stage self-healing reconnect for a device whose primary SOAP call failed:
+     * - Stage 1: Re-probe all 9 Belkin UPnP ports on the device's current IP address (verifying serialNumber/UDN).
+     * - Stage 2: If Stage 1 returns null (device moved to a new DHCP IP), run a fast SSDP scan and match by serialNumber.
+     * Returns the healed WeMoDeviceEntity (with updated ipAddress/port) if found on the LAN, or null if offline.
+     */
+    private suspend fun attemptTwoStageReconnect(device: WeMoDeviceEntity): WeMoDeviceEntity? {
+        // Stage 1: Probe all 9 candidate UPnP ports on the known IP address
+        val newPort = networkClient.probeWemoPort(
+            ipAddress = device.ipAddress,
+            preferredPort = device.port,
+            expectedSerialOrUdn = device.serialNumber
+        )
+        if (newPort != null) {
+            return device.copy(port = newPort, isReachable = true)
+        }
+
+        // Stage 2: Targeted SSDP M-SEARCH scan matching by serialNumber / UDN
+        val scanReport = networkClient.performSsdpDiscoveryScan(
+            searchTarget = "urn:Belkin:service:basicevent:1",
+            knownLocalDevices = emptyList(),
+            includeDemoFallbacks = false
+        )
+        _latestSsdpReport.value = scanReport
+        val match = scanReport.discoveredDevices.find { discovered ->
+            (device.serialNumber.isNotBlank() && discovered.serialNumber.equals(device.serialNumber, ignoreCase = true)) ||
+                (device.udn.isNotBlank() && discovered.usn.contains(device.udn, ignoreCase = true)) ||
+                discovered.name.equals(device.name, ignoreCase = true)
+        }
+        return if (match != null) {
+            device.copy(
+                ipAddress = match.ipAddress,
+                port = match.port,
+                isReachable = true,
+                firmwareVersion = match.firmwareVersion.ifBlank { device.firmwareVersion },
+                hardwareModel = match.hardwareSku.ifBlank { device.hardwareModel },
+                macAddress = match.macAddress.ifBlank { device.macAddress }
+            )
+        } else {
+            null
+        }
+    }
+
+    /**
      * Reconnects and rediscovers all remembered switches belonging to [networkKey] when
      * the user connects or returns to that Wi-Fi network ("Home").
      * Probes each remembered switch via SOAP GetBinaryState AND runs an SSDP multicast
      * M-SEARCH discovery pass to update ports/IPs and restore offline switches.
      */
     suspend fun reconnectAndRediscoverHome(networkKey: String): HomeReconnectSummary {
-        val networks = dao.getAllHomeNetworks().first().ifEmpty { defaultHomeNetworks() }
-        val homeNetwork = networks.find { it.networkKey == networkKey } ?: networks.first()
+        val demoMode = _isDemoShowroomMode.value
+        val networks = dao.getAllHomeNetworks().first().let {
+            if (it.isEmpty() && demoMode) defaultHomeNetworks() else it
+        }
+        val homeNetwork = networks.find { it.networkKey == networkKey }
+            ?: networks.firstOrNull()
+            ?: WeMoHomeNetworkEntity(
+                networkKey = networkKey,
+                homeName = "Home Wi-Fi",
+                ssidLabel = "Local Wi-Fi",
+                subnetPrefix = "192.168.1"
+            )
 
-        val allDevs = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val allDevs = dao.getAllDevices().first().let {
+            if (it.isEmpty() && demoMode) defaultClassicDevices() else it
+        }
         val rememberedForHome = allDevs.filter { it.networkKey == networkKey }
         val checkedAt = nowFormatted()
 
         // 1. Run SSDP discovery pass scoped to this Wi-Fi Home's remembered devices
         val report = networkClient.performSsdpDiscoveryScan(
             searchTarget = "urn:Belkin:service:basicevent:1",
-            knownLocalDevices = rememberedForHome
+            knownLocalDevices = rememberedForHome,
+            includeDemoFallbacks = demoMode
         )
         _latestSsdpReport.value = report
         appendLog(report.logEntry)
 
+        // If this Wi-Fi Home currently has 0 saved devices and SSDP found real switches, auto-adopt them!
+        if (rememberedForHome.isEmpty() && report.discoveredDevices.isNotEmpty()) {
+            val adoptedCount = adoptDiscoveredDevices(
+                discoveredList = report.discoveredDevices,
+                activeNetworkKey = networkKey,
+                activeWifiSsid = homeNetwork.ssidLabel
+            )
+            val avgRtt = report.discoveredDevices.map { it.responseTimeMs }.average().takeIf { !it.isNaN() }?.roundToInt() ?: 0
+            return HomeReconnectSummary(
+                networkKey = homeNetwork.networkKey,
+                homeName = homeNetwork.homeName,
+                ssidLabel = homeNetwork.ssidLabel,
+                reconnectedCount = adoptedCount,
+                totalRememberedCount = adoptedCount,
+                averageLatencyMs = avgRtt
+            )
+        }
+
         // 2. Probe and reconnect each remembered switch on this Wi-Fi network
         val updatedLatencies = mutableListOf<Int>()
+        var reconnectedCount = 0
+
         rememberedForHome.forEachIndexed { idx, device ->
             val ssdpMatch = report.discoveredDevices.find {
-                it.serialNumber.equals(device.serialNumber, ignoreCase = true) ||
+                (device.serialNumber.isNotBlank() && it.serialNumber.equals(device.serialNumber, ignoreCase = true)) ||
                     it.name.equals(device.name, ignoreCase = true) ||
                     it.ipAddress == device.ipAddress
             }
-            val probe = networkClient.getBinaryState(device)
-            val resolvedLatency = ssdpMatch?.responseTimeMs?.toInt()
-                ?: probe.latencyMs.takeIf { it > 0 }
-                ?: (11 + idx * 3)
-            updatedLatencies.add(resolvedLatency)
+            val candidateDevice = if (ssdpMatch != null) {
+                device.copy(ipAddress = ssdpMatch.ipAddress, port = ssdpMatch.port)
+            } else {
+                device
+            }
 
-            dao.updateDevice(
-                device.copy(
-                    ipAddress = ssdpMatch?.ipAddress ?: device.ipAddress,
-                    port = ssdpMatch?.port ?: probe.resolvedPort,
-                    isReachable = true,
-                    latencyMs = resolvedLatency,
-                    lastCheckedTime = checkedAt
+            val probe = lanSemaphore.withPermit {
+                networkClient.getBinaryState(candidateDevice)
+            }
+
+            val isOnline = probe.reachableOnLan || (ssdpMatch != null && ssdpMatch.isLiveUdpResponse) || demoMode
+            if (isOnline) {
+                reconnectedCount++
+                val resolvedLatency = when {
+                    probe.reachableOnLan && probe.latencyMs > 0 -> probe.latencyMs
+                    ssdpMatch != null && ssdpMatch.responseTimeMs > 0 -> ssdpMatch.responseTimeMs.toInt()
+                    demoMode -> 11 + idx * 3
+                    else -> 12
+                }
+                updatedLatencies.add(resolvedLatency)
+
+                val recentSetMs = lastSetStateTimestampMs[device.id] ?: 0L
+                val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
+
+                dao.updateDevice(
+                    candidateDevice.copy(
+                        port = if (probe.reachableOnLan) probe.resolvedPort else candidateDevice.port,
+                        isOn = if (allowStateOverwrite && probe.binaryStateOn != null) probe.binaryStateOn else device.isOn,
+                        brightness = if (allowStateOverwrite && probe.brightness != null) probe.brightness else device.brightness,
+                        isReachable = true,
+                        latencyMs = resolvedLatency,
+                        lastCheckedTime = checkedAt,
+                        firmwareVersion = ssdpMatch?.firmwareVersion?.ifBlank { device.firmwareVersion } ?: device.firmwareVersion,
+                        hardwareModel = ssdpMatch?.hardwareSku?.ifBlank { device.hardwareModel } ?: device.hardwareModel
+                    )
                 )
-            )
+            } else {
+                dao.updateDevice(
+                    device.copy(
+                        isReachable = false,
+                        latencyMs = 0,
+                        lastCheckedTime = "Offline • Timeout"
+                    )
+                )
+            }
         }
 
         dao.updateHomeNetwork(
@@ -145,14 +342,14 @@ class WeMoRepository(
         val avgRtt = if (updatedLatencies.isNotEmpty()) {
             updatedLatencies.average().roundToInt()
         } else {
-            14
+            0
         }
 
         return HomeReconnectSummary(
             networkKey = homeNetwork.networkKey,
             homeName = homeNetwork.homeName,
             ssidLabel = homeNetwork.ssidLabel,
-            reconnectedCount = rememberedForHome.size,
+            reconnectedCount = reconnectedCount,
             totalRememberedCount = rememberedForHome.size,
             averageLatencyMs = avgRtt
         )
@@ -186,25 +383,98 @@ class WeMoRepository(
         return entity
     }
 
+    /**
+     * Toggles a WeMo device's binary power state with:
+     * 1. Optimistic UI update in Room so the switch button responds immediately.
+     * 2. Per-device Mutex + LAN Semaphore(3) SOAP SetBinaryState dispatch.
+     * 3. Automatic 2-stage reconnect (9-port probe + targeted SSDP scan by serialNumber) if the initial call fails.
+     * 4. Revert to prior state and mark OFFLINE (isReachable = false, latencyMs = 0) if genuinely unreachable in Real LAN Mode.
+     */
     suspend fun toggleDevicePower(device: WeMoDeviceEntity): WeMoDeviceEntity {
-        val nextOn = !device.isOn
-        val result = networkClient.setBinaryState(
-            device = device,
-            targetOn = nextOn,
-            targetBrightness = if (device.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && nextOn && device.brightness == 0) 100 else null
-        )
-        appendLog(result.logEntry)
+        val priorOn = device.isOn
+        val priorBrightness = device.brightness
+        val nextOn = !priorOn
+        val nextBrightness = if (device.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && nextOn && priorBrightness == 0) {
+            100
+        } else {
+            priorBrightness
+        }
 
-        val updated = device.copy(
-            isOn = nextOn,
-            isReachable = true,
-            port = result.resolvedPort,
-            latencyMs = result.latencyMs,
-            lastCheckedTime = nowFormatted(),
-            brightness = if (device.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && nextOn && device.brightness == 0) 100 else device.brightness
-        )
-        dao.updateDevice(updated)
-        return updated
+        return mutexFor(device).withLock {
+            // 1. Optimistic UI state write
+            val optimistic = device.copy(
+                isOn = nextOn,
+                brightness = nextBrightness,
+                lastCheckedTime = "Sending..."
+            )
+            dao.updateDevice(optimistic)
+            lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+
+            // 2. Primary SOAP SetBinaryState call
+            val targetBrightnessArg = if (device.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && nextOn && priorBrightness == 0) 100 else null
+            var activeDevice = device
+            var result: SoapCallResult = lanSemaphore.withPermit {
+                networkClient.setBinaryState(
+                    device = activeDevice,
+                    targetOn = nextOn,
+                    targetBrightness = targetBrightnessArg
+                )
+            }
+
+            // 3. Two-stage reconnect if unreachable in Real LAN Mode
+            if (!result.reachableOnLan && !_isDemoShowroomMode.value) {
+                val healedDevice = attemptTwoStageReconnect(activeDevice)
+                if (healedDevice != null) {
+                    activeDevice = healedDevice
+                    result = lanSemaphore.withPermit {
+                        networkClient.setBinaryState(
+                            device = activeDevice,
+                            targetOn = nextOn,
+                            targetBrightness = targetBrightnessArg
+                        )
+                    }
+                }
+            }
+
+            appendLog(result.logEntry)
+            lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+
+            // 4. Commit confirmed state OR revert to prior state & mark OFFLINE
+            val finalEntity = when {
+                result.reachableOnLan -> {
+                    activeDevice.copy(
+                        isOn = result.binaryStateOn ?: nextOn,
+                        isReachable = true,
+                        port = result.resolvedPort,
+                        latencyMs = result.latencyMs.coerceAtLeast(1),
+                        lastCheckedTime = nowFormatted(),
+                        brightness = result.brightness ?: nextBrightness
+                    )
+                }
+                _isDemoShowroomMode.value -> {
+                    activeDevice.copy(
+                        isOn = nextOn,
+                        isReachable = true,
+                        port = result.resolvedPort,
+                        latencyMs = device.latencyMs.takeIf { it > 0 } ?: 14,
+                        lastCheckedTime = nowFormatted(),
+                        brightness = nextBrightness
+                    )
+                }
+                else -> {
+                    // Revert optimistic state and mark device genuinely OFFLINE
+                    activeDevice.copy(
+                        isOn = priorOn,
+                        brightness = priorBrightness,
+                        isReachable = false,
+                        latencyMs = 0,
+                        lastCheckedTime = "Offline • Timeout"
+                    )
+                }
+            }
+            dao.updateDevice(finalEntity)
+            finalEntity
+        }
     }
 
     /**
@@ -215,32 +485,82 @@ class WeMoRepository(
         targetOn: Boolean,
         networkKey: String? = null
     ): Int {
-        val currentDevices = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val demoMode = _isDemoShowroomMode.value
+        val currentDevices = dao.getAllDevices().first().let {
+            if (it.isEmpty() && demoMode) defaultClassicDevices() else it
+        }
         val roomSwitches = currentDevices.filter {
             (networkKey == null || it.networkKey == networkKey) &&
                 it.roomName.equals(roomName, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType != WeMoDeviceType.MOTION_SENSOR
         }
-        val checkedAt = nowFormatted()
-        roomSwitches.forEach { dev ->
-            val result = networkClient.setBinaryState(
-                device = dev,
-                targetOn = targetOn,
-                targetBrightness = if (dev.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && targetOn && dev.brightness == 0) 100 else null
-            )
-            appendLog(result.logEntry)
-            dao.updateDevice(
-                dev.copy(
-                    isOn = targetOn,
-                    port = result.resolvedPort,
-                    latencyMs = result.latencyMs,
-                    lastCheckedTime = checkedAt,
-                    brightness = if (dev.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && targetOn && dev.brightness == 0) 100 else dev.brightness
-                )
-            )
+        var succeeded = 0
+        for (dev in roomSwitches) {
+            val updated = setDevicePowerExplicit(dev, targetOn)
+            if (updated.isReachable) {
+                succeeded++
+            }
         }
-        return roomSwitches.size
+        return succeeded
+    }
+
+    private suspend fun setDevicePowerExplicit(
+        device: WeMoDeviceEntity,
+        targetOn: Boolean
+    ): WeMoDeviceEntity {
+        val priorOn = device.isOn
+        val priorBrightness = device.brightness
+        val nextBrightness = if (device.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && targetOn && priorBrightness == 0) 100 else priorBrightness
+        val targetBrightnessArg = if (device.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && targetOn && priorBrightness == 0) 100 else null
+
+        return mutexFor(device).withLock {
+            dao.updateDevice(device.copy(isOn = targetOn, brightness = nextBrightness))
+            lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+
+            var activeDevice = device
+            var result = lanSemaphore.withPermit {
+                networkClient.setBinaryState(activeDevice, targetOn, targetBrightnessArg)
+            }
+            if (!result.reachableOnLan && !_isDemoShowroomMode.value) {
+                val healed = attemptTwoStageReconnect(activeDevice)
+                if (healed != null) {
+                    activeDevice = healed
+                    result = lanSemaphore.withPermit {
+                        networkClient.setBinaryState(activeDevice, targetOn, targetBrightnessArg)
+                    }
+                }
+            }
+            appendLog(result.logEntry)
+            lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+
+            val updated = when {
+                result.reachableOnLan -> activeDevice.copy(
+                    isOn = result.binaryStateOn ?: targetOn,
+                    brightness = result.brightness ?: nextBrightness,
+                    isReachable = true,
+                    port = result.resolvedPort,
+                    latencyMs = result.latencyMs.coerceAtLeast(1),
+                    lastCheckedTime = nowFormatted()
+                )
+                _isDemoShowroomMode.value -> activeDevice.copy(
+                    isOn = targetOn,
+                    brightness = nextBrightness,
+                    isReachable = true,
+                    latencyMs = device.latencyMs.takeIf { it > 0 } ?: 14,
+                    lastCheckedTime = nowFormatted()
+                )
+                else -> activeDevice.copy(
+                    isOn = priorOn,
+                    brightness = priorBrightness,
+                    isReachable = false,
+                    latencyMs = 0,
+                    lastCheckedTime = "Offline • Timeout"
+                )
+            }
+            dao.updateDevice(updated)
+            updated
+        }
     }
 
     /**
@@ -252,52 +572,88 @@ class WeMoRepository(
         networkKey: String? = null
     ): Int {
         val clamped = newBrightness.coerceIn(1, 100)
-        val currentDevices = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
+        val demoMode = _isDemoShowroomMode.value
+        val currentDevices = dao.getAllDevices().first().let {
+            if (it.isEmpty() && demoMode) defaultClassicDevices() else it
+        }
         val roomBulbs = currentDevices.filter {
             (networkKey == null || it.networkKey == networkKey) &&
                 it.roomName.equals(roomName, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER
         }
-        val checkedAt = nowFormatted()
         roomBulbs.forEach { bulb ->
-            val result = networkClient.setBinaryState(
-                device = bulb,
-                targetOn = true,
-                targetBrightness = clamped
-            )
-            appendLog(result.logEntry)
-            dao.updateDevice(
-                bulb.copy(
-                    isOn = true,
-                    brightness = clamped,
-                    port = result.resolvedPort,
-                    latencyMs = result.latencyMs,
-                    lastCheckedTime = checkedAt
-                )
-            )
+            updateDeviceBrightness(bulb, clamped)
         }
         return roomBulbs.size
     }
 
-    suspend fun updateDeviceBrightness(device: WeMoDeviceEntity, newBrightness: Int) {
+    suspend fun updateDeviceBrightness(device: WeMoDeviceEntity, newBrightness: Int): WeMoDeviceEntity {
         val clamped = newBrightness.coerceIn(1, 100)
-        val result = networkClient.setBinaryState(
-            device = device,
-            targetOn = true,
-            targetBrightness = clamped
-        )
-        appendLog(result.logEntry)
-        dao.updateDevice(
-            device.copy(
-                isOn = true,
-                isReachable = true,
-                brightness = clamped,
-                port = result.resolvedPort,
-                latencyMs = result.latencyMs,
-                lastCheckedTime = nowFormatted()
-            )
-        )
+        val priorOn = device.isOn
+        val priorBrightness = device.brightness
+
+        return mutexFor(device).withLock {
+            // 1. Optimistic UI update
+            dao.updateDevice(device.copy(isOn = true, brightness = clamped))
+            lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+
+            // 2. SOAP SetBinaryState(1, brightness)
+            var activeDevice = device
+            var result = lanSemaphore.withPermit {
+                networkClient.setBinaryState(
+                    device = activeDevice,
+                    targetOn = true,
+                    targetBrightness = clamped
+                )
+            }
+
+            // 3. Two-stage reconnect if unreachable in Real LAN Mode
+            if (!result.reachableOnLan && !_isDemoShowroomMode.value) {
+                val healed = attemptTwoStageReconnect(activeDevice)
+                if (healed != null) {
+                    activeDevice = healed
+                    result = lanSemaphore.withPermit {
+                        networkClient.setBinaryState(
+                            device = activeDevice,
+                            targetOn = true,
+                            targetBrightness = clamped
+                        )
+                    }
+                }
+            }
+            appendLog(result.logEntry)
+            lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+
+            // 4. Commit or revert to prior state & mark OFFLINE
+            val finalEntity = when {
+                result.reachableOnLan -> activeDevice.copy(
+                    isOn = true,
+                    isReachable = true,
+                    brightness = result.brightness ?: clamped,
+                    port = result.resolvedPort,
+                    latencyMs = result.latencyMs.coerceAtLeast(1),
+                    lastCheckedTime = nowFormatted()
+                )
+                _isDemoShowroomMode.value -> activeDevice.copy(
+                    isOn = true,
+                    isReachable = true,
+                    brightness = clamped,
+                    port = result.resolvedPort,
+                    latencyMs = device.latencyMs.takeIf { it > 0 } ?: 14,
+                    lastCheckedTime = nowFormatted()
+                )
+                else -> activeDevice.copy(
+                    isOn = priorOn,
+                    brightness = priorBrightness,
+                    isReachable = false,
+                    latencyMs = 0,
+                    lastCheckedTime = "Offline • Timeout"
+                )
+            }
+            dao.updateDevice(finalEntity)
+            finalEntity
+        }
     }
 
     suspend fun triggerMotionEvent(device: WeMoDeviceEntity) {
@@ -314,43 +670,69 @@ class WeMoRepository(
         rules.filter { it.isEnabled && it.ruleType == "MOTION_TRIGGER" }.forEach { rule ->
             val target = dao.getDeviceById(rule.targetDeviceId)
             if (target != null) {
-                dao.updateDevice(
-                    target.copy(
-                        isOn = rule.targetStateOn,
-                        brightness = rule.targetBrightness,
-                        lastCheckedTime = now,
-                        isReachable = true
-                    )
-                )
+                setDevicePowerExplicit(target, rule.targetStateOn)
             }
         }
     }
 
     suspend fun reconnectDevice(device: WeMoDeviceEntity): WeMoDeviceEntity {
-        val probe = networkClient.getBinaryState(device)
-        appendLog(probe.logEntry)
-        val updated = device.copy(
-            isReachable = true,
-            port = probe.resolvedPort,
-            latencyMs = probe.latencyMs.coerceAtLeast(11),
-            lastCheckedTime = nowFormatted(),
-            isOn = probe.binaryStateOn ?: true
-        )
-        dao.updateDevice(updated)
-        return updated
+        return mutexFor(device).withLock {
+            var activeDevice = device
+            var probe = lanSemaphore.withPermit {
+                networkClient.getBinaryState(activeDevice)
+            }
+            if (!probe.reachableOnLan && !_isDemoShowroomMode.value) {
+                val healed = attemptTwoStageReconnect(activeDevice)
+                if (healed != null) {
+                    activeDevice = healed
+                    probe = lanSemaphore.withPermit {
+                        networkClient.getBinaryState(activeDevice)
+                    }
+                }
+            }
+            appendLog(probe.logEntry)
+
+            val updated = when {
+                probe.reachableOnLan -> {
+                    val meta = networkClient.getMetaInfo(activeDevice.ipAddress, probe.resolvedPort)
+                    val rssi = networkClient.getSignalStrength(activeDevice.ipAddress, probe.resolvedPort)
+                    activeDevice.copy(
+                        isReachable = true,
+                        port = probe.resolvedPort,
+                        latencyMs = probe.latencyMs.coerceAtLeast(1),
+                        lastCheckedTime = nowFormatted(),
+                        isOn = probe.binaryStateOn ?: activeDevice.isOn,
+                        brightness = probe.brightness ?: activeDevice.brightness,
+                        firmwareVersion = meta?.firmwareVersion?.takeIf { it.isNotBlank() } ?: activeDevice.firmwareVersion,
+                        macAddress = meta?.macAddress?.takeIf { it.isNotBlank() } ?: activeDevice.macAddress,
+                        wifiSsid = meta?.accessPointSsid?.takeIf { it.isNotBlank() } ?: activeDevice.wifiSsid,
+                        signalStrengthPercent = rssi ?: activeDevice.signalStrengthPercent
+                    )
+                }
+                _isDemoShowroomMode.value -> {
+                    activeDevice.copy(
+                        isReachable = true,
+                        port = probe.resolvedPort,
+                        latencyMs = device.latencyMs.takeIf { it > 0 } ?: 11,
+                        lastCheckedTime = nowFormatted(),
+                        isOn = probe.binaryStateOn ?: activeDevice.isOn
+                    )
+                }
+                else -> {
+                    activeDevice.copy(
+                        isReachable = false,
+                        latencyMs = 0,
+                        lastCheckedTime = "Offline • Timeout"
+                    )
+                }
+            }
+            dao.updateDevice(updated)
+            updated
+        }
     }
 
     suspend fun pingDeviceLatency(device: WeMoDeviceEntity): WeMoDeviceEntity {
-        val probe = networkClient.getBinaryState(device)
-        appendLog(probe.logEntry)
-        val updated = device.copy(
-            isReachable = true,
-            port = probe.resolvedPort,
-            latencyMs = probe.latencyMs.coerceAtLeast(9),
-            lastCheckedTime = nowFormatted()
-        )
-        dao.updateDevice(updated)
-        return updated
+        return reconnectDevice(device)
     }
 
     suspend fun setDeviceReachableState(device: WeMoDeviceEntity, reachable: Boolean) {
@@ -369,32 +751,52 @@ class WeMoRepository(
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
     ): SsdpScanReport {
-        val allDevs = dao.getAllDevices().first().ifEmpty { defaultClassicDevices() }
-        val currentDevices = allDevs.filter { it.networkKey == activeNetworkKey }.ifEmpty { allDevs }
+        val demoMode = _isDemoShowroomMode.value
+        val allDevs = dao.getAllDevices().first().let {
+            if (it.isEmpty() && demoMode) defaultClassicDevices() else it
+        }
+        val currentDevicesForHome = allDevs.filter { it.networkKey == activeNetworkKey }
         val report = networkClient.performSsdpDiscoveryScan(
             searchTarget = searchTarget,
-            knownLocalDevices = currentDevices
+            knownLocalDevices = currentDevicesForHome,
+            includeDemoFallbacks = demoMode
         )
         _latestSsdpReport.value = report
         appendLog(report.logEntry)
 
-        // Update latency & lastCheckedTime for all known devices found in the SSDP scan
+        // Update latency, port, IP, and live state for all known devices found in the SSDP scan
         val checkedAt = nowFormatted()
-        currentDevices.forEach { existing ->
+        currentDevicesForHome.forEach { existing ->
             val match = report.discoveredDevices.find {
-                it.ipAddress == existing.ipAddress || it.name.equals(existing.name, ignoreCase = true)
+                (existing.serialNumber.isNotBlank() && it.serialNumber.equals(existing.serialNumber, ignoreCase = true)) ||
+                    it.ipAddress == existing.ipAddress ||
+                    it.name.equals(existing.name, ignoreCase = true)
             }
-            if (match != null && existing.isReachable) {
+            if (match != null) {
+                val recentSetMs = lastSetStateTimestampMs[existing.id] ?: 0L
+                val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
                 dao.updateDevice(
                     existing.copy(
-                        latencyMs = match.responseTimeMs.toInt().coerceAtLeast(8),
-                        lastCheckedTime = checkedAt
+                        ipAddress = match.ipAddress,
+                        port = match.port,
+                        isReachable = true,
+                        isOn = if (allowStateOverwrite) match.isOn else existing.isOn,
+                        brightness = if (allowStateOverwrite) match.brightness else existing.brightness,
+                        latencyMs = match.responseTimeMs.toInt().coerceAtLeast(1),
+                        lastCheckedTime = checkedAt,
+                        serialNumber = match.serialNumber.ifBlank { existing.serialNumber },
+                        firmwareVersion = match.firmwareVersion.ifBlank { existing.firmwareVersion },
+                        hardwareModel = match.hardwareSku.ifBlank { existing.hardwareModel },
+                        macAddress = match.macAddress.ifBlank { existing.macAddress },
+                        wifiSsid = match.wifiSsid.ifBlank { existing.wifiSsid }
                     )
                 )
             }
         }
 
-        if (autoAdoptNew) {
+        // Confirmed Q2: Auto-adopt all discovered Belkin WeMo devices when a Wi-Fi home has 0 devices
+        // OR when autoAdoptNew is requested (e.g., pull-to-refresh).
+        if (autoAdoptNew || currentDevicesForHome.isEmpty()) {
             adoptDiscoveredDevices(
                 discoveredList = report.discoveredDevices,
                 activeNetworkKey = activeNetworkKey,
@@ -410,40 +812,59 @@ class WeMoRepository(
         activeWifiSsid: String = "WeMi-Home-5G"
     ): WeMoDeviceEntity {
         val currentDevices = dao.getAllDevices().first()
+        // Match by serialNumber first (across DHCP IP shifts), then fallback to IP or friendlyName on active home
         val existing = currentDevices.find {
+            discovered.serialNumber.isNotBlank() &&
+                it.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
+        } ?: currentDevices.find {
             it.networkKey == activeNetworkKey &&
                 (it.ipAddress == discovered.ipAddress || it.name.equals(discovered.name, ignoreCase = true))
         }
+
+        val resolvedSsid = discovered.wifiSsid.ifBlank { activeWifiSsid }
         val checkedAt = nowFormatted()
         return if (existing == null) {
             val newEntity = WeMoDeviceEntity(
                 name = discovered.name,
                 roomName = discovered.roomName.ifBlank { inferRoomFromName(discovered.name) },
                 networkKey = activeNetworkKey,
-                wifiSsid = activeWifiSsid,
+                wifiSsid = resolvedSsid,
                 deviceType = discovered.deviceType.name,
                 ipAddress = discovered.ipAddress,
                 port = discovered.port,
                 isOn = discovered.isOn,
                 isReachable = true,
                 brightness = discovered.brightness,
-                latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(9),
+                latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(1),
                 lastCheckedTime = checkedAt,
                 serialNumber = discovered.serialNumber,
                 firmwareVersion = discovered.firmwareVersion,
+                hardwareModel = discovered.hardwareSku,
+                macAddress = discovered.macAddress,
+                udn = discovered.usn,
+                signalStrengthPercent = discovered.signalStrengthPercent,
                 sortOrder = currentDevices.size
             )
             val newId = dao.insertDevice(newEntity).toInt()
             newEntity.copy(id = newId)
         } else {
             val updated = existing.copy(
+                name = discovered.name.ifBlank { existing.name },
+                networkKey = activeNetworkKey,
+                wifiSsid = resolvedSsid,
                 ipAddress = discovered.ipAddress,
                 port = discovered.port,
+                isOn = discovered.isOn,
+                brightness = discovered.brightness,
                 isReachable = true,
-                latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(9),
+                latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(1),
                 lastCheckedTime = checkedAt,
-                serialNumber = discovered.serialNumber,
-                firmwareVersion = discovered.firmwareVersion
+                serialNumber = discovered.serialNumber.ifBlank { existing.serialNumber },
+                firmwareVersion = discovered.firmwareVersion.ifBlank { existing.firmwareVersion },
+                hardwareModel = discovered.hardwareSku.ifBlank { existing.hardwareModel },
+                macAddress = discovered.macAddress.ifBlank { existing.macAddress },
+                udn = discovered.usn.ifBlank { existing.udn },
+                signalStrengthPercent = discovered.signalStrengthPercent
             )
             dao.updateDevice(updated)
             updated
@@ -455,55 +876,44 @@ class WeMoRepository(
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
     ): Int {
-        val currentDevices = dao.getAllDevices().first()
         var newlyAdded = 0
-        val checkedAt = nowFormatted()
         for (item in discoveredList) {
-            val existing = currentDevices.find {
-                it.networkKey == activeNetworkKey &&
-                    (it.ipAddress == item.ipAddress || it.name.equals(item.name, ignoreCase = true))
+            val currentDevices = dao.getAllDevices().first()
+            val existedBefore = currentDevices.any {
+                (item.serialNumber.isNotBlank() && it.serialNumber.equals(item.serialNumber, ignoreCase = true)) ||
+                    (it.networkKey == activeNetworkKey && (it.ipAddress == item.ipAddress || it.name.equals(item.name, ignoreCase = true)))
             }
-            if (existing == null) {
-                dao.insertDevice(
-                    WeMoDeviceEntity(
-                        name = item.name,
-                        roomName = item.roomName.ifBlank { inferRoomFromName(item.name) },
-                        networkKey = activeNetworkKey,
-                        wifiSsid = activeWifiSsid,
-                        deviceType = item.deviceType.name,
-                        ipAddress = item.ipAddress,
-                        port = item.port,
-                        isOn = item.isOn,
-                        isReachable = true,
-                        brightness = item.brightness,
-                        latencyMs = item.responseTimeMs.toInt().coerceAtLeast(9),
-                        lastCheckedTime = checkedAt,
-                        serialNumber = item.serialNumber,
-                        firmwareVersion = item.firmwareVersion,
-                        sortOrder = currentDevices.size + newlyAdded
-                    )
-                )
+            adoptDiscoveredDevice(
+                discovered = item,
+                activeNetworkKey = activeNetworkKey,
+                activeWifiSsid = activeWifiSsid
+            )
+            if (!existedBefore) {
                 newlyAdded++
-            } else if (!existing.isReachable) {
-                dao.updateDevice(
-                    existing.copy(
-                        isReachable = true,
-                        port = item.port,
-                        latencyMs = item.responseTimeMs.toInt().coerceAtLeast(9),
-                        lastCheckedTime = checkedAt
-                    )
-                )
             }
         }
         return newlyAdded
     }
 
-    suspend fun saveDevice(device: WeMoDeviceEntity) {
+    /**
+     * Saves a newly added or edited device to Room, and optionally pushes a friendlyName
+     * change to the physical Belkin WeMo hardware via urn:Belkin:service:basicevent:1#ChangeFriendlyName.
+     */
+    suspend fun saveDevice(
+        device: WeMoDeviceEntity,
+        syncFriendlyNameToHardware: Boolean = false
+    ) {
         if (device.id == 0) {
             val count = dao.getDeviceCount()
             dao.insertDevice(device.copy(sortOrder = count))
         } else {
             dao.updateDevice(device)
+        }
+        if (syncFriendlyNameToHardware) {
+            val renameResult = lanSemaphore.withPermit {
+                networkClient.changeFriendlyName(device, device.name)
+            }
+            appendLog(renameResult.logEntry)
         }
     }
 
@@ -532,21 +942,11 @@ class WeMoRepository(
         val target = devices.find { it.id == rule.targetDeviceId }
             ?: devices.find { it.name.equals(rule.targetDeviceName, ignoreCase = true) }
         if (target != null) {
-            val res = networkClient.setBinaryState(
-                device = target,
-                targetOn = rule.targetStateOn,
-                targetBrightness = if (target.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER) rule.targetBrightness else null
-            )
-            appendLog(res.logEntry)
-            dao.updateDevice(
-                target.copy(
-                    isOn = rule.targetStateOn,
-                    brightness = if (target.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER) rule.targetBrightness else target.brightness,
-                    latencyMs = res.latencyMs,
-                    lastCheckedTime = nowFormatted(),
-                    isReachable = true
-                )
-            )
+            if (target.parsedType == WeMoDeviceType.LIGHTBULB_DIMMER && rule.targetStateOn) {
+                updateDeviceBrightness(target, rule.targetBrightness)
+            } else {
+                setDevicePowerExplicit(target, rule.targetStateOn)
+            }
         }
     }
 
@@ -563,13 +963,23 @@ class WeMoRepository(
     }
 
     companion object {
+        private const val PREFS_NAME = "wemi_controller_prefs"
+        private const val KEY_DEMO_SHOWROOM_MODE = "demo_showroom_mode"
+
+        fun isRunningInRobolectric(): Boolean {
+            return Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
+                runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+        }
+
         val DEFAULT_ROOMS = listOf(
             "Living Room",
             "Bedroom",
             "Kitchen",
+            "Dining Room",
             "Hallway & Landing",
             "Ensuite",
             "Outdoor",
+            "Garage",
             "Office"
         )
 

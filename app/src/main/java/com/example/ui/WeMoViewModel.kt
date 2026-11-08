@@ -306,15 +306,26 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
             val updated = repository.toggleDevicePower(device)
             _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
-            showTransientStatus(
-                "${updated.name}: Turned ${if (updated.isOn) "ON" else "OFF"} (${updated.latencyMs}ms • ${updated.ipAddress}:${updated.port})"
-            )
+            if (updated.isReachable) {
+                showTransientStatus(
+                    "${updated.name}: Turned ${if (updated.isOn) "ON" else "OFF"} (${updated.latencyMs}ms • ${updated.ipAddress}:${updated.port})"
+                )
+            } else {
+                showTransientStatus(
+                    "${updated.name}: Offline • Unreachable at ${updated.ipAddress}:${updated.port} (State reverted)"
+                )
+            }
         }
     }
 
     fun updateBrightness(device: WeMoDeviceEntity, brightness: Int) {
         viewModelScope.launch {
-            repository.updateDeviceBrightness(device, brightness)
+            val updated = repository.updateDeviceBrightness(device, brightness)
+            if (!updated.isReachable) {
+                showTransientStatus(
+                    "${updated.name}: Offline • Could not set brightness at ${updated.ipAddress}:${updated.port}"
+                )
+            }
         }
     }
 
@@ -330,9 +341,15 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
             val updated = repository.reconnectDevice(device)
             _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
-            showTransientStatus(
-                "${updated.name} Active (${updated.latencyMs}ms RTT) at ${updated.ipAddress}:${updated.port}"
-            )
+            if (updated.isReachable) {
+                showTransientStatus(
+                    "${updated.name} Active (${updated.latencyMs}ms RTT) at ${updated.ipAddress}:${updated.port}"
+                )
+            } else {
+                showTransientStatus(
+                    "${updated.name} is Offline (No response at ${updated.ipAddress})"
+                )
+            }
         }
     }
 
@@ -341,9 +358,15 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
             val updated = repository.pingDeviceLatency(device)
             _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
-            showTransientStatus(
-                "${updated.name}: Connection Active • ${updated.latencyMs}ms latency (${updated.ipAddress}:${updated.port})"
-            )
+            if (updated.isReachable) {
+                showTransientStatus(
+                    "${updated.name}: Connection Active • ${updated.latencyMs}ms latency (${updated.ipAddress}:${updated.port})"
+                )
+            } else {
+                showTransientStatus(
+                    "${updated.name}: Offline • Unreachable at ${updated.ipAddress}:${updated.port}"
+                )
+            }
         }
     }
 
@@ -406,7 +429,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
                 activeWifiSsid = currentWifiSsid()
             )
             showTransientStatus(
-                if (added > 0) "Remembered $added newly discovered SSDP switch(es) on ${currentWifiSsid()}"
+                if (added > 0) "Adopted $added newly discovered WeMo switch(es) on ${currentWifiSsid()}"
                 else "All ${list.size} SSDP-discovered devices are remembered on ${currentWifiSsid()}"
             )
         }
@@ -438,7 +461,8 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         brightness: Int,
         isReachable: Boolean,
         isOn: Boolean,
-        autoOffMinutes: Int
+        autoOffMinutes: Int,
+        syncFriendlyNameToHardware: Boolean = false
     ) {
         viewModelScope.launch {
             val existing = devices.value.find { it.id == id }
@@ -462,13 +486,25 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
                 lastCheckedTime = existing?.lastCheckedTime ?: "Connected now",
                 lastMotionTime = existing?.lastMotionTime ?: "4:15:15 PM",
                 serialNumber = existing?.serialNumber ?: "221517K01018NEW",
+                firmwareVersion = existing?.firmwareVersion ?: "WeMo_WW_2.00.11532.PVT",
+                hardwareModel = existing?.hardwareModel ?: "LightSwitch",
+                macAddress = existing?.macAddress.orEmpty(),
+                udn = existing?.udn.orEmpty(),
+                signalStrengthPercent = existing?.signalStrengthPercent ?: 85,
+                nightModeEnabled = existing?.nightModeEnabled ?: false,
                 sortOrder = existing?.sortOrder ?: devices.value.size,
                 autoOffMinutes = autoOffMinutes.coerceIn(0, 240)
             )
-            repository.saveDevice(entity)
+            repository.saveDevice(entity, syncFriendlyNameToHardware = syncFriendlyNameToHardware)
             _showAddDeviceDialog.value = false
             _editingDevice.value = null
-            showTransientStatus("Remembered ${entity.name} in ${entity.roomName} (${entity.wifiSsid})")
+            showTransientStatus(
+                if (syncFriendlyNameToHardware) {
+                    "Saved ${entity.name} in ${entity.roomName} & synced hardware FriendlyName"
+                } else {
+                    "Remembered ${entity.name} in ${entity.roomName} (${entity.wifiSsid})"
+                }
+            )
         }
     }
 
@@ -564,6 +600,20 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             repository.deleteRule(rule.id)
             showTransientStatus("Deleted rule: ${rule.name}")
+        }
+    }
+
+    fun toggleDemoShowroomMode(enabled: Boolean = !isDemoShowroomMode.value) {
+        viewModelScope.launch {
+            val nextKey = repository.setDemoShowroomMode(enabled)
+            _activeNetworkKey.value = nextKey
+            _selectedRoomFilter.value = null
+            if (enabled) {
+                showTransientStatus("Demo Showroom Mode Enabled: Loaded 13 showcase devices across 3 Wi-Fi Homes")
+            } else {
+                reconnectCurrentHomeNetwork()
+                showTransientStatus("Real LAN Mode Active: Scanning local Wi-Fi for physical Belkin WeMo switches")
+            }
         }
     }
 

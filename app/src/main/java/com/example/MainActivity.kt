@@ -135,6 +135,7 @@ fun WeMiSwitchApp(
     val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
+    val isDemoShowroomMode by viewModel.isDemoShowroomMode.collectAsStateWithLifecycle()
     val isTvMode by viewModel.isTvMode.collectAsStateWithLifecycle()
 
     val homeDevices by remember(devices, activeNetworkKey) {
@@ -438,10 +439,12 @@ fun WeMiSwitchApp(
                                 devices = homeDevices,
                                 soapLogs = soapLogs,
                                 useWeMiWordmark = useWeMiWordmark,
+                                isDemoShowroomMode = isDemoShowroomMode,
                                 onTurnAllOn = { viewModel.turnAllSwitches(true) },
                                 onTurnAllOff = { viewModel.turnAllSwitches(false) },
                                 onScanNetwork = { viewModel.openSsdpScannerAndScan() },
                                 onResetClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
+                                onToggleDemoShowroomMode = { viewModel.toggleDemoShowroomMode(it) },
                                 onToggleBrandWordmark = { viewModel.toggleBrandWordmark() },
                                 onClearLogs = { viewModel.clearSoapLogs() }
                             )
@@ -511,7 +514,7 @@ fun WeMiSwitchApp(
                 viewModel.closeAddDeviceDialog()
                 viewModel.closeEditDeviceDialog()
             },
-            onSave = { id, name, roomName, type, ip, port, brightness, reachable, isOn, autoOff ->
+            onSave = { id, name, roomName, type, ip, port, brightness, reachable, isOn, autoOff, syncHwName ->
                 viewModel.saveDevice(
                     id = id,
                     name = name,
@@ -522,7 +525,8 @@ fun WeMiSwitchApp(
                     brightness = brightness,
                     isReachable = reachable,
                     isOn = isOn,
-                    autoOffMinutes = autoOff
+                    autoOffMinutes = autoOff,
+                    syncFriendlyNameToHardware = syncHwName
                 )
             },
             onDelete = if (editingDevice != null) {

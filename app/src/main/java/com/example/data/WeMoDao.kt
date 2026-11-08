@@ -18,6 +18,12 @@ interface WeMoDao {
     @Query("SELECT * FROM wemo_devices WHERE id = :id LIMIT 1")
     suspend fun getDeviceById(id: Int): WeMoDeviceEntity?
 
+    @Query("SELECT * FROM wemo_devices WHERE LOWER(serialNumber) = LOWER(:serialNumber) LIMIT 1")
+    suspend fun getDeviceBySerial(serialNumber: String): WeMoDeviceEntity?
+
+    @Query("SELECT * FROM wemo_devices WHERE ipAddress = :ipAddress LIMIT 1")
+    suspend fun getDeviceByIp(ipAddress: String): WeMoDeviceEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertDevice(device: WeMoDeviceEntity): Long
 

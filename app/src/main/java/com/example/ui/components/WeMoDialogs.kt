@@ -65,7 +65,8 @@ fun AddOrEditWeMoDeviceDialog(
         brightness: Int,
         isReachable: Boolean,
         isOn: Boolean,
-        autoOffMinutes: Int
+        autoOffMinutes: Int,
+        syncFriendlyNameToHardware: Boolean
     ) -> Unit,
     onDelete: ((WeMoDeviceEntity) -> Unit)? = null,
     onScanNetwork: (() -> Unit)? = null
@@ -82,6 +83,7 @@ fun AddOrEditWeMoDeviceDialog(
     var isReachable by remember { mutableStateOf(initialDevice?.isReachable ?: true) }
     var isOn by remember { mutableStateOf(initialDevice?.isOn ?: true) }
     var autoOffText by remember { mutableStateOf((initialDevice?.autoOffMinutes ?: 0).toString()) }
+    var syncNameToHardware by remember { mutableStateOf(isEditing) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -131,6 +133,31 @@ fun AddOrEditWeMoDeviceDialog(
                         .fillMaxWidth()
                         .testTag("device_name_input")
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Sync Name to WeMo Hardware",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Updates <friendlyName> on switch via ChangeFriendlyName SOAP",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = syncNameToHardware,
+                        onCheckedChange = { syncNameToHardware = it },
+                        colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary),
+                        modifier = Modifier.testTag("sync_hardware_name_switch")
+                    )
+                }
 
                 Text(
                     text = "Room / Group",
@@ -281,7 +308,8 @@ fun AddOrEditWeMoDeviceDialog(
                         brightness.roundToInt(),
                         isReachable,
                         isOn,
-                        parsedAutoOff
+                        parsedAutoOff,
+                        syncNameToHardware
                     )
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
