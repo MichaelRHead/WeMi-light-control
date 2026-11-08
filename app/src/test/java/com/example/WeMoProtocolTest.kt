@@ -7,7 +7,12 @@ import com.example.data.WeMoDatabase
 import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
 import com.example.data.WeMoRepository
+import com.example.data.WeMoRuleScheduler
+import com.example.network.GenaEventNotification
+import com.example.network.WeMoGenaSubscriptionManager
 import com.example.network.WeMoNetworkClient
+import com.example.network.WeMoProvisionerClient
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -26,6 +31,7 @@ import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.InetAddress
 import java.net.ServerSocket
+import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -343,4 +349,178 @@ class WeMoProtocolTest {
         assertFalse(persisted.isReachable)
         assertTrue(persisted.isOn)
     }
+
+    @Test
+    fun `verify Phase 3 UPnP GENA SUBSCRIBE, HTTP 412 recovery, and embedded NOTIFY propertyset callback`() = runBlocking {
+        val receivedNotification = AtomicReference<GenaEventNotification?>(null)
+        val genaManager = WeMoGenaSubscriptionManager(
+            localIpProvider = { "127.0.0.1" },
+            preferredListenPort = 0, // Use ephemeral port
+            onNotification = { receivedNotification.set(it) }
+        )
+
+        val running = AtomicBoolean(true)
+        val simulate412OnNextRenew = AtomicBoolean(false)
+        val sidSequence = AtomicInteger(100)
+        val wemoEventServer = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
+        val wemoPort = wemoEventServer.localPort
+
+        val serverThread = thread(start = true, isDaemon = true) {
+            while (running.get() && !wemoEventServer.isClosed) {
+                try {
+                    wemoEventServer.accept().use { sock ->
+                        val reader = BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.UTF_8))
+                        val reqLine = reader.readLine() ?: return@use
+                        var hasCallback = false
+                        while (true) {
+                            val h = reader.readLine() ?: break
+                            if (h.isEmpty()) break
+                            if (h.startsWith("CALLBACK:", ignoreCase = true)) {
+                                hasCallback = true
+                            }
+                        }
+                        val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
+                        if (reqLine.startsWith("SUBSCRIBE") && !hasCallback && simulate412OnNextRenew.getAndSet(false)) {
+                            writer.write("HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                        } else {
+                            val nextSid = "uuid:sub-wls0403-${sidSequence.incrementAndGet()}"
+                            writer.write("HTTP/1.1 200 OK\r\nSID: $nextSid\r\nTIMEOUT: Second-300\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                        }
+                        writer.flush()
+                    }
+                } catch (_: Exception) {
+                    if (!running.get()) break
+                }
+            }
+        }
+
+        try {
+            val device = WeMoDeviceEntity(
+                id = 42,
+                name = "Kitchen 3-Way Switch",
+                roomName = "Kitchen",
+                ipAddress = "127.0.0.1",
+                port = wemoPort,
+                serialNumber = "WLS0403KITCHEN"
+            )
+
+            // 1. Initial SUBSCRIBE
+            val sub1 = genaManager.subscribeOrRenew(device, timeoutSeconds = 300)
+            assertNotNull(sub1)
+            assertEquals("uuid:sub-wls0403-101", sub1?.sid)
+
+            // 2. Simulate HTTP 412 on renewal (e.g. switch rebooted and forgot SID) -> must recover with fresh SID
+            simulate412OnNextRenew.set(true)
+            val sub2 = genaManager.subscribeOrRenew(device, timeoutSeconds = 300)
+            assertNotNull(sub2)
+            assertEquals("uuid:sub-wls0403-102", sub2?.sid)
+
+            // 3. Push a physical wall-switch flip via HTTP NOTIFY to the embedded GENA callback server
+            val callbackPort = genaManager.activeListenPort
+            assertTrue(callbackPort > 0)
+            val propertysetXml = """
+                <e:propertyset xmlns:e="urn:schemas-upnp-org:event-1-0">
+                  <e:property>
+                    <BinaryState>1|78</BinaryState>
+                  </e:property>
+                </e:propertyset>
+            """.trimIndent()
+            val bodyBytes = propertysetXml.toByteArray(Charsets.UTF_8)
+
+            Socket("127.0.0.1", callbackPort).use { sock ->
+                val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
+                writer.write("NOTIFY /gena/WLS0403KITCHEN HTTP/1.1\r\n")
+                writer.write("HOST: 127.0.0.1:$callbackPort\r\n")
+                writer.write("CONTENT-TYPE: text/xml; charset=\"utf-8\"\r\n")
+                writer.write("NT: upnp:event\r\n")
+                writer.write("NTS: upnp:propchange\r\n")
+                writer.write("SID: uuid:sub-wls0403-102\r\n")
+                writer.write("CONTENT-LENGTH: ${bodyBytes.size}\r\n\r\n")
+                writer.write(propertysetXml)
+                writer.flush()
+                val respLine = BufferedReader(InputStreamReader(sock.getInputStream())).readLine()
+                assertTrue(respLine.contains("200 OK"))
+            }
+
+            delay(100)
+            val event = receivedNotification.get()
+            assertNotNull(event)
+            assertEquals("WLS0403KITCHEN", event?.deviceKey)
+            assertEquals(true, event?.binaryStateOn)
+            assertEquals(78, event?.brightness)
+        } finally {
+            running.set(false)
+            genaManager.stopServer()
+            runCatching { wemoEventServer.close() }
+            serverThread.join(500)
+        }
+    }
+
+    @Test
+    fun `verify Phase 5 WeMoRuleScheduler schedule time parsing and Auto-Off countdown timer`() = runBlocking {
+        assertEquals(Pair(19, 0), WeMoRuleScheduler.parseScheduleTime24h("Daily at 7:00 PM"))
+        assertEquals(Pair(17, 15), WeMoRuleScheduler.parseScheduleTime24h("Daily at Sunset (5:15 PM)"))
+        assertEquals(Pair(22, 0), WeMoRuleScheduler.parseScheduleTime24h("Every night at 10:00 PM"))
+        assertEquals(Pair(6, 30), WeMoRuleScheduler.parseScheduleTime24h("Daily at Sunrise (6:30 AM)"))
+        assertEquals(30, WeMoRuleScheduler.parseMinutesFromSummary("After 30 minutes ON"))
+
+        val expiredDeviceId = AtomicInteger(-1)
+        val scheduler = WeMoRuleScheduler(
+            onAutoOffExpired = { id -> expiredDeviceId.set(id) },
+            onScheduleRuleTriggered = {}
+        )
+        try {
+            scheduler.startAutoOffCountdownSeconds(deviceId = 77, durationSeconds = 1)
+            assertTrue(scheduler.activeCountdownsSec.value.containsKey(77))
+            delay(1300L)
+            assertEquals(77, expiredDeviceId.get())
+            assertFalse(scheduler.activeCountdownsSec.value.containsKey(77))
+        } finally {
+            scheduler.stopAll()
+        }
+    }
+
+    @Test
+    fun `verify Phase 6 WeMoProvisionerClient GetApList parsing and AES-128-CBC password encryption Methods 1 and 2`() {
+        val provisioner = WeMoProvisionerClient()
+        val sampleApXml = """
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+              <s:Body>
+                <u:GetApListResponse xmlns:u="urn:Belkin:service:WiFiSetup:1">
+                  <ApList>Page:1/1/2$
+            HeadFamily-2.4G|6|88|WPA2PSK/AES,
+            GuestNetwork|11|54|OPEN/NONE,
+                  </ApList>
+                </u:GetApListResponse>
+              </s:Body>
+            </s:Envelope>
+        """.trimIndent()
+
+        val aps = provisioner.parseApListXml(sampleApXml)
+        assertEquals(2, aps.size)
+        assertEquals("HeadFamily-2.4G", aps[0].ssid)
+        assertEquals(6, aps[0].channel)
+        assertEquals(88, aps[0].signalStrengthPercent)
+        assertEquals("WPA2PSK", aps[0].authMode)
+        assertEquals("AES", aps[0].encryptionType)
+
+        // Verify Method 1 (OpenWrt) and Method 2 (RTOS) produce deterministic Base64 + 4-hex-digit length suffixes
+        val method1Enc = provisioner.encryptWifiPassword(
+            plainPassword = "MyHomeWifiPassword123",
+            macAddress = "EC:1A:59:AA:11:22",
+            serialNumber = "221517K01018AB",
+            encryptionMethod = 1
+        )
+        val method2Enc = provisioner.encryptWifiPassword(
+            plainPassword = "MyHomeWifiPassword123",
+            macAddress = "EC:1A:59:AA:11:22",
+            serialNumber = "221517K01018AB",
+            encryptionMethod = 2
+        )
+        // Original password length is 21 bytes -> 0x15 hex suffix
+        assertTrue(method1Enc.endsWith("15"))
+        assertTrue(method2Enc.endsWith("15"))
+        assertFalse(method1Enc == method2Enc)
+    }
 }
+

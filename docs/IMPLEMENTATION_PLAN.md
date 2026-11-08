@@ -237,3 +237,21 @@ Because Belkin shut down the official WeMo app/cloud in January 2026, users who 
    - Verify port rotation (`49153` → `49151`), UDN mismatch protection, `<BinaryState>Error</BinaryState>` handling, `GetMetaInfo` SKU/SSID parsing, `WiFiSetup1` AES-128-CBC encryption vectors against `pywemo` test outputs, and GENA `NOTIFY` push updates.
 2. **Robolectric UI & Repository Integration Tests (`ExampleRobolectricTest.kt`)**:
    - Verify real offline state (`isReachable = false`) when a device is unreachable, live discovery adoption by `serialNumber`, multi-home switching, room batch controls, and Android TV mode.
+
+---
+
+## 4. Confirmed Design Decisions & Completed Implementation Status
+
+All **8 design decisions** were reviewed and confirmed during implementation, and all **7 phases** are now implemented in the codebase:
+
+| Decision | Confirmed Choice | Implemented In |
+| :--- | :--- | :--- |
+| **Q1 — Startup & Demo Mode** | **Clean Real-LAN Startup + "Demo Showroom Mode" Toggle**: Real hardware starts clean (`isDemoShowroomMode = false`) on the detected local `/24` subnet; the 13 sample switches are behind the **Demo Showroom Mode** switch in **More**. | `WeMoRepository.kt`, `WeMoViewModel.kt`, `WeMoRulesAndMoreScreens.kt` |
+| **Q2 — Discovery & Adoption** | **Auto-Adopt on First Scan + "Adopt" / "Adopt All" Buttons**: Auto-adopts discovered Belkin WeMo switches when a Wi-Fi Home has 0 saved devices, and shows per-device **"Adopt"** and **"Adopt All"** buttons in `WeMoSsdpScannerModal`. | `WeMoRepository.kt`, `WeMoSsdpScannerModal.kt` |
+| **Q3 — Room Assignment & Hardware Rename** | **Auto-Infer Room + "Sync Name to WeMo Hardware" Switch**: Infers initial room from `<friendlyName>` keywords and provides a **"Sync Name to WeMo Hardware"** switch in `AddOrEditWeMoDeviceDialog` calling `basicevent1#ChangeFriendlyName`. | `WeMoEntities.kt`, `WeMoNetworkClient.kt`, `WeMoDialogs.kt` |
+| **Q4 — Optimistic UI & Offline Revert** | **Optimistic UI + 2-Stage Reconnect + Offline Revert**: Updates Room immediately on tap, runs SOAP + 2-stage reconnect (9-port probe → targeted SSDP by `serialNumber`), and reverts to prior state with `OFFLINE` (`isReachable = false, latencyMs = 0`) if unreachable in Real LAN Mode. | `WeMoRepository.kt`, `WeMoNetworkClient.kt` |
+| **A1 — Real-Time Physical Switch Sync (Phase 3)** | **Hybrid UPnP GENA Push + 30s Fallback Poll**: Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, 240s renewal, HTTP 412 recovery) + 30s `GetBinaryState` fallback poll. | `WeMoGenaSubscriptionManager.kt`, `WeMoRepository.kt`, `WeMoViewModel.kt` |
+| **A2 — Wi-Fi Home & SSID Detection (Phase 4)** | **Zero-Permission Subnet + WeMo `GetMetaInfo` SSID**: Uses `ConnectivityManager.NetworkCallback` `/24` subnet matching and populates the real 2.4 GHz Wi-Fi SSID from WeMo switches' `metainfo1#GetMetaInfo` (`AccessPointSSID`) without requiring Android Location permission. | `WeMoNetworkMonitor.kt`, `WeMoRepository.kt` |
+| **A3 — Rules, Schedules & Night Mode (Phase 5)** | **App-Driven Scheduler + Hardware Night Mode**: Executes `SCHEDULE` and `AUTO_OFF` timers over LAN (`WeMoRuleScheduler`) with live countdown badges, and syncs Dimmer Night Mode (`20%` cap) to `F7C059`/`WDS060` hardware via `ConfigureNightMode`. | `WeMoRuleScheduler.kt`, `WeMoDeviceRow.kt`, `WeMoRepository.kt` |
+| **A4 — Zero-Cloud Wi-Fi Setup `10.22.22.1` (Phase 6)** | **Auto-Detect `10.22.22.x` Setup AP Banner + Provisioning Wizard**: Auto-detects `10.22.22.x` WeMo Setup AP subnet and provides `ProvisionWeMoApDialog` (`WiFiSetup1#GetApList`, AES-128-CBC Methods 1 & 2, double-send `ConnectHomeNetwork` + `CloseSetup`). | `WeMoProvisionerClient.kt`, `WeMoDialogs.kt`, `MainActivity.kt` |
+

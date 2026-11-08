@@ -107,6 +107,8 @@ fun WeMoDeviceRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onPingLatency: () -> Unit = onReconnect,
+    onToggleNightMode: (() -> Unit)? = null,
+    autoOffRemainingSeconds: Int? = null,
     modifier: Modifier = Modifier
 ) {
     val type = device.parsedType
@@ -269,8 +271,15 @@ fun WeMoDeviceRow(
                                 )
                             }
                             else -> {
+                                val subLabel = if (autoOffRemainingSeconds != null && autoOffRemainingSeconds > 0) {
+                                    val mins = autoOffRemainingSeconds / 60
+                                    val secs = autoOffRemainingSeconds % 60
+                                    "${device.ipAddress} • Auto-Off ${mins}:${secs.toString().padStart(2, '0')}"
+                                } else {
+                                    device.ipAddress
+                                }
                                 Text(
-                                    text = device.ipAddress,
+                                    text = subLabel,
                                     color = WemoTextSecondary,
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 11.sp,
@@ -395,7 +404,8 @@ fun WeMoDeviceRow(
                         onTriggerMotion = onTriggerMotion,
                         onReconnect = onReconnect,
                         onPingLatency = onPingLatency,
-                        onEditDevice = onEditDevice
+                        onEditDevice = onEditDevice,
+                        onToggleNightMode = onToggleNightMode
                     )
                 }
             }
@@ -515,7 +525,8 @@ private fun WeMoExpandedDrawer(
     onTriggerMotion: () -> Unit,
     onReconnect: () -> Unit,
     onPingLatency: () -> Unit,
-    onEditDevice: () -> Unit
+    onEditDevice: () -> Unit,
+    onToggleNightMode: (() -> Unit)? = null
 ) {
     val type = device.parsedType
     var sliderVal by remember(device.brightness) {
@@ -638,6 +649,18 @@ private fun WeMoExpandedDrawer(
                             selectedContainerColor = WemoGreenSoft,
                             selectedLabelColor = WemoGreenDark
                         )
+                    )
+                }
+                if (onToggleNightMode != null) {
+                    FilterChip(
+                        selected = device.nightModeEnabled,
+                        onClick = onToggleNightMode,
+                        label = { Text("Night Mode (20%)") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WemoGreenSoft,
+                            selectedLabelColor = WemoGreenDark
+                        ),
+                        modifier = Modifier.testTag("night_mode_chip_${device.id}")
                     )
                 }
             }

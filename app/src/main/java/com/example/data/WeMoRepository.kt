@@ -2,15 +2,24 @@ package com.example.data
 
 import android.content.Context
 import android.os.Build
+import com.example.network.GenaEventNotification
 import com.example.network.SoapCallResult
 import com.example.network.SsdpScanReport
+import com.example.network.WeMoGenaSubscriptionManager
 import com.example.network.WeMoNetworkClient
+import com.example.network.WeMoProvisionResult
+import com.example.network.WeMoProvisionerClient
+import com.example.network.WeMoScannedAp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -34,8 +43,10 @@ class WeMoRepository(
     private val dao: WeMoDao,
     private val context: Context? = null,
     private val networkClient: WeMoNetworkClient = WeMoNetworkClient(context),
+    private val provisionerClient: WeMoProvisionerClient = WeMoProvisionerClient(),
     initialDemoModeOverride: Boolean? = null
 ) {
+    private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val defaultDemoMode = initialDemoModeOverride
         ?: prefs?.getBoolean(KEY_DEMO_SHOWROOM_MODE, isRunningInRobolectric())
@@ -53,6 +64,18 @@ class WeMoRepository(
     private val lanSemaphore = Semaphore(3)
     private val deviceMutexes = ConcurrentHashMap<String, Mutex>()
     private val lastSetStateTimestampMs = ConcurrentHashMap<Int, Long>()
+
+    /**
+     * Embedded UPnP GENA event manager for <100ms physical wall-switch push notifications.
+     */
+    val genaManager = WeMoGenaSubscriptionManager(
+        localIpProvider = { detectCurrentLanIp() },
+        onNotification = { notification ->
+            repoScope.launch {
+                handleGenaNotification(notification)
+            }
+        }
+    )
 
     private fun mutexFor(device: WeMoDeviceEntity): Mutex {
         val key = device.serialNumber.takeIf { it.isNotBlank() } ?: "${device.ipAddress}:${device.port}"
@@ -822,6 +845,9 @@ class WeMoRepository(
         }
 
         val resolvedSsid = discovered.wifiSsid.ifBlank { activeWifiSsid }
+        if (discovered.wifiSsid.isNotBlank()) {
+            syncHomeSsidFromDeviceSsid(activeNetworkKey, discovered.wifiSsid)
+        }
         val checkedAt = nowFormatted()
         return if (existing == null) {
             val newEntity = WeMoDeviceEntity(
@@ -893,6 +919,221 @@ class WeMoRepository(
             }
         }
         return newlyAdded
+    }
+
+    /**
+     * Phase 3: Handles incoming UPnP GENA <e:propertyset> push events from physical wall switches
+     * and 3-way traveler rockers, updating Room state immediately (<100ms).
+     */
+    suspend fun handleGenaNotification(event: GenaEventNotification) {
+        appendLog(event.logEntry)
+        val devices = dao.getAllDevices().first()
+        val matched = devices.find {
+            (event.deviceKey.isNotBlank() && it.serialNumber.equals(event.deviceKey, ignoreCase = true)) ||
+                event.deviceKey == "dev_${it.id}" ||
+                (event.sourceIp.isNotBlank() && it.ipAddress == event.sourceIp)
+        } ?: return
+
+        val recentSetMs = lastSetStateTimestampMs[matched.id] ?: 0L
+        if ((System.currentTimeMillis() - recentSetMs) < 1200L) {
+            // Ignore echo from an in-flight SOAP SetBinaryState initiated by the user
+            return
+        }
+
+        val updated = matched.copy(
+            isOn = event.binaryStateOn ?: matched.isOn,
+            brightness = event.brightness?.coerceIn(1, 100) ?: matched.brightness,
+            isReachable = true,
+            lastCheckedTime = "GENA Push • ${nowFormatted()}"
+        )
+        dao.updateDevice(updated)
+    }
+
+    /**
+     * Phase 3: Subscribes or renews UPnP GENA event subscriptions for all reachable devices on [networkKey].
+     */
+    suspend fun refreshGenaSubscriptionsForHome(networkKey: String): Int {
+        if (_isDemoShowroomMode.value) return 0
+        val devices = dao.getAllDevices().first().filter {
+            it.networkKey == networkKey && it.isReachable && it.parsedType != WeMoDeviceType.MOTION_SENSOR
+        }
+        var subscribedCount = 0
+        for (dev in devices) {
+            val rec = lanSemaphore.withPermit {
+                genaManager.subscribeOrRenew(dev, timeoutSeconds = 300)
+            }
+            if (rec != null) {
+                subscribedCount++
+            }
+        }
+        return subscribedCount
+    }
+
+    /**
+     * Phase 3: 30-second fallback GetBinaryState poll for the active Wi-Fi home in Real LAN Mode.
+     * Ensures switches that drop GENA subscriptions or reboot are kept in sync.
+     */
+    suspend fun pollActiveHomeStates(networkKey: String) {
+        if (_isDemoShowroomMode.value) return
+        val devices = dao.getAllDevices().first().filter { it.networkKey == networkKey }
+        if (devices.isEmpty()) return
+        val checkedAt = nowFormatted()
+        for (dev in devices) {
+            val recentSetMs = lastSetStateTimestampMs[dev.id] ?: 0L
+            if ((System.currentTimeMillis() - recentSetMs) < 2000L) continue
+
+            val probe = lanSemaphore.withPermit {
+                networkClient.getBinaryState(dev)
+            }
+            if (probe.reachableOnLan) {
+                dao.updateDevice(
+                    dev.copy(
+                        port = probe.resolvedPort,
+                        isReachable = true,
+                        isOn = probe.binaryStateOn ?: dev.isOn,
+                        brightness = probe.brightness ?: dev.brightness,
+                        latencyMs = probe.latencyMs.coerceAtLeast(1),
+                        lastCheckedTime = checkedAt
+                    )
+                )
+            } else {
+                dao.updateDevice(
+                    dev.copy(
+                        isReachable = false,
+                        latencyMs = 0,
+                        lastCheckedTime = "Offline • Timeout"
+                    )
+                )
+            }
+        }
+    }
+
+    /**
+     * Phase 4 (Confirmed A2): Zero-Permission Subnet + WeMo GetMetaInfo SSID matching.
+     * Finds or creates a WeMoHomeNetworkEntity for [subnetPrefix] when on a real LAN.
+     */
+    suspend fun resolveOrCreateHomeForSubnet(
+        subnetPrefix: String,
+        gatewayIp: String = "$subnetPrefix.1"
+    ): WeMoHomeNetworkEntity? {
+        if (_isDemoShowroomMode.value || subnetPrefix == "10.22.22") return null
+        val cleanPrefix = subnetPrefix.trim().ifEmpty { "192.168.1" }
+        val existingHomes = dao.getAllHomeNetworks().first()
+        val matched = existingHomes.find { it.subnetPrefix == cleanPrefix }
+        if (matched != null) return matched
+
+        val key = "wifi_lan_${cleanPrefix.replace('.', '_')}"
+        val newHome = WeMoHomeNetworkEntity(
+            networkKey = key,
+            homeName = "Home Wi-Fi ($cleanPrefix.x)",
+            ssidLabel = "Local LAN ($cleanPrefix.0/24)",
+            subnetPrefix = cleanPrefix,
+            gatewayIp = gatewayIp,
+            lastConnectedTime = "Connected now",
+            autoReconnectOnArrival = true,
+            sortOrder = existingHomes.size
+        )
+        dao.insertHomeNetwork(newHome)
+        return newHome
+    }
+
+    /**
+     * Phase 4 (Confirmed A2): Updates the active Wi-Fi Home's ssidLabel from a Belkin WeMo switch's
+     * metainfo1#GetMetaInfo (AccessPointSSID) response so the real 2.4 GHz SSID is shown without
+     * requiring Android Location permission.
+     */
+    private suspend fun syncHomeSsidFromDeviceSsid(networkKey: String, reportedSsid: String) {
+        val cleanSsid = reportedSsid.trim()
+        if (cleanSsid.isEmpty()) return
+        val homes = dao.getAllHomeNetworks().first()
+        val home = homes.find { it.networkKey == networkKey } ?: return
+        val isGenericSsid = home.ssidLabel.startsWith("Local LAN", ignoreCase = true) ||
+            home.ssidLabel.startsWith("Local Wi-Fi", ignoreCase = true)
+        if (isGenericSsid && home.ssidLabel != cleanSsid) {
+            val updatedName = if (home.homeName.startsWith("Home Wi-Fi (")) "$cleanSsid Home" else home.homeName
+            dao.updateHomeNetwork(
+                home.copy(
+                    homeName = updatedName,
+                    ssidLabel = cleanSsid
+                )
+            )
+        }
+    }
+
+    /**
+     * Phase 5 (Confirmed A3): Toggles hardware Night Mode (20% brightness soft cap) on an
+     * In-Wall Smart Dimmer (F7C059 / WDS060) via urn:Belkin:service:basicevent:1#ConfigureNightMode.
+     */
+    suspend fun toggleDimmerNightMode(device: WeMoDeviceEntity): WeMoDeviceEntity {
+        val targetNightMode = !device.nightModeEnabled
+        val nextBrightness = if (targetNightMode && device.brightness > 20) 20 else device.brightness
+
+        return mutexFor(device).withLock {
+            val result = lanSemaphore.withPermit {
+                networkClient.configureNightMode(
+                    device = device,
+                    nightModeEnabled = targetNightMode,
+                    nightModeBrightness = 20
+                )
+            }
+            appendLog(result.logEntry)
+            val updated = device.copy(
+                nightModeEnabled = targetNightMode,
+                brightness = nextBrightness,
+                lastCheckedTime = nowFormatted()
+            )
+            dao.updateDevice(updated)
+            updated
+        }
+    }
+
+    /**
+     * Phase 5: Turns OFF a device by ID when its Auto-Off timer expires.
+     */
+    suspend fun turnOffDeviceById(deviceId: Int): WeMoDeviceEntity? {
+        val dev = dao.getDeviceById(deviceId) ?: return null
+        if (!dev.isOn) return dev
+        return setDevicePowerExplicit(dev, false)
+    }
+
+    /**
+     * Phase 6 (Confirmed A4): Scans nearby 2.4 GHz Wi-Fi APs from a factory-reset Belkin WeMo
+     * Setup AP at 10.22.22.1 via urn:Belkin:service:WiFiSetup:1#GetApList.
+     */
+    suspend fun scanSetupApNetworks(
+        apHost: String = "10.22.22.1",
+        apPort: Int = 49152
+    ): List<WeMoScannedAp> {
+        return provisionerClient.fetchAvailableApList(apHost = apHost, apPort = apPort)
+    }
+
+    /**
+     * Phase 6 (Confirmed A4): Provisions a factory-reset Belkin WeMo switch at 10.22.22.1 onto
+     * the home 2.4 GHz Wi-Fi network via AES-128-CBC (Method 1 OpenWrt or Method 2 RTOS) and
+     * double-send ConnectHomeNetwork + CloseSetup.
+     */
+    suspend fun provisionSetupApDevice(
+        apHost: String = "10.22.22.1",
+        apPort: Int = 49152,
+        ssid: String,
+        plainPassword: String,
+        channel: Int = 6,
+        authMode: String = "WPA2PSK",
+        encryptionType: String = "AES",
+        encryptionMethod: Int = 1
+    ): WeMoProvisionResult {
+        val result = provisionerClient.provisionDeviceToHomeWifi(
+            apHost = apHost,
+            apPort = apPort,
+            ssid = ssid,
+            plainPassword = plainPassword,
+            channel = channel,
+            authMode = authMode,
+            encryptionType = encryptionType,
+            encryptionMethod = encryptionMethod
+        )
+        appendLog(result.logEntry)
+        return result
     }
 
     /**

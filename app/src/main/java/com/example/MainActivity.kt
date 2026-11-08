@@ -57,6 +57,7 @@ import com.example.ui.WeMoViewModel
 import com.example.ui.components.AddOrEditWeMoDeviceDialog
 import com.example.ui.components.AddWeMoRuleDialog
 import com.example.ui.components.AddWifiHomeNetworkDialog
+import com.example.ui.components.ProvisionWeMoApDialog
 import com.example.ui.components.WeMoBottomNavigationBar
 import com.example.ui.components.WeMoDeviceRow
 import com.example.ui.components.WeMoRoomFilterBar
@@ -116,6 +117,12 @@ fun WeMiSwitchApp(
     val activeNetworkKey by viewModel.activeNetworkKey.collectAsStateWithLifecycle()
     val isReconnectingHome by viewModel.isReconnectingHome.collectAsStateWithLifecycle()
     val showAddHomeDialog by viewModel.showAddHomeDialog.collectAsStateWithLifecycle()
+    val showProvisionApDialog by viewModel.showProvisionApDialog.collectAsStateWithLifecycle()
+    val scannedSetupAps by viewModel.scannedSetupAps.collectAsStateWithLifecycle()
+    val isScanningSetupAp by viewModel.isScanningSetupAp.collectAsStateWithLifecycle()
+    val isProvisioningAp by viewModel.isProvisioningAp.collectAsStateWithLifecycle()
+    val lanNetworkState by viewModel.lanNetworkState.collectAsStateWithLifecycle()
+    val activeAutoOffCountdownsSec by viewModel.activeAutoOffCountdownsSec.collectAsStateWithLifecycle()
     val rules by viewModel.rules.collectAsStateWithLifecycle()
     val soapLogs by viewModel.soapLogs.collectAsStateWithLifecycle()
     val latestSsdpReport by viewModel.latestSsdpReport.collectAsStateWithLifecycle()
@@ -169,6 +176,7 @@ fun WeMiSwitchApp(
     BackHandler(
         enabled = showSsdpScannerSheet ||
             showAddHomeDialog ||
+            showProvisionApDialog ||
             (isTvMode && !isHardwareTelevision) ||
             isEditMode ||
             selectedRoomFilter != null ||
@@ -177,6 +185,7 @@ fun WeMiSwitchApp(
         when {
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
             showAddHomeDialog -> viewModel.closeAddHomeDialog()
+            showProvisionApDialog -> viewModel.closeProvisionApDialog()
             isTvMode && !isHardwareTelevision -> viewModel.setTvMode(false)
             isEditMode -> viewModel.setEditMode(false)
             selectedRoomFilter != null -> viewModel.selectRoomFilter(null)
@@ -280,6 +289,37 @@ fun WeMiSwitchApp(
                                         .testTag("devices_list"),
                                     contentPadding = PaddingValues(top = 6.dp, bottom = 36.dp)
                                 ) {
+                                    if (lanNetworkState.isWemoSetupApSubnet) {
+                                        item(key = "wemo_setup_ap_detected_banner") {
+                                            Surface(
+                                                color = WemoGreenDark,
+                                                shape = RoundedCornerShape(12.dp),
+                                                modifier = Modifier
+                                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                                                    .clickable { viewModel.openProvisionApDialog() }
+                                                    .testTag("wemo_setup_ap_banner")
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(14.dp)
+                                                ) {
+                                                    Text(
+                                                        text = "Belkin WeMo Setup AP Detected (${lanNetworkState.localIpv4})",
+                                                        color = Color.White,
+                                                        fontFamily = WorkSansFontFamily,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        fontSize = 14.sp
+                                                    )
+                                                    Text(
+                                                        text = "Tap here to provision this factory-reset WeMo switch (10.22.22.1) onto your 2.4 GHz Home Wi-Fi.",
+                                                        color = Color.White.copy(alpha = 0.9f),
+                                                        fontFamily = WorkSansFontFamily,
+                                                        fontSize = 12.sp
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+
                                     item(key = "wifi_home_selector_header") {
                                         WeMoWifiHomeBar(
                                             homeNetworks = homeNetworks,
@@ -376,6 +416,10 @@ fun WeMiSwitchApp(
                                                         onPingLatency = {
                                                             viewModel.pingDeviceLatency(device)
                                                         },
+                                                        onToggleNightMode = {
+                                                            viewModel.toggleDimmerNightMode(device)
+                                                        },
+                                                        autoOffRemainingSeconds = activeAutoOffCountdownsSec[device.id],
                                                         modifier = Modifier.padding(start = 10.dp)
                                                     )
                                                 }
@@ -416,7 +460,11 @@ fun WeMiSwitchApp(
                                                 },
                                                 onPingLatency = {
                                                     viewModel.pingDeviceLatency(device)
-                                                }
+                                                },
+                                                onToggleNightMode = {
+                                                    viewModel.toggleDimmerNightMode(device)
+                                                },
+                                                autoOffRemainingSeconds = activeAutoOffCountdownsSec[device.id]
                                             )
                                         }
                                     }
@@ -445,6 +493,7 @@ fun WeMiSwitchApp(
                                 onScanNetwork = { viewModel.openSsdpScannerAndScan() },
                                 onResetClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
                                 onToggleDemoShowroomMode = { viewModel.toggleDemoShowroomMode(it) },
+                                onOpenProvisionApWizard = { viewModel.openProvisionApDialog() },
                                 onToggleBrandWordmark = { viewModel.toggleBrandWordmark() },
                                 onClearLogs = { viewModel.clearSoapLogs() }
                             )
@@ -493,6 +542,29 @@ fun WeMiSwitchApp(
         )
     }
 
+    if (showProvisionApDialog) {
+        val currentSsid = homeNetworks.find { it.networkKey == activeNetworkKey }?.ssidLabel.orEmpty()
+        ProvisionWeMoApDialog(
+            scannedAps = scannedSetupAps,
+            isScanning = isScanningSetupAp,
+            isProvisioning = isProvisioningAp,
+            defaultSsid = currentSsid,
+            onScanApList = { apHost -> viewModel.scanSetupApNetworks(apHost) },
+            onProvision = { apHost, ssid, pwd, ch, auth, enc, method ->
+                viewModel.provisionWeMoAp(
+                    apHost = apHost,
+                    ssid = ssid,
+                    password = pwd,
+                    channel = ch,
+                    authMode = auth,
+                    encryptionType = enc,
+                    encryptionMethod = method
+                )
+            },
+            onDismiss = { viewModel.closeProvisionApDialog() }
+        )
+    }
+
     if (showSsdpScannerSheet) {
         WeMoSsdpScannerModal(
             isScanning = isRefreshing,
@@ -534,7 +606,8 @@ fun WeMiSwitchApp(
             } else {
                 null
             },
-            onScanNetwork = { viewModel.openSsdpScannerAndScan() }
+            onScanNetwork = { viewModel.openSsdpScannerAndScan() },
+            onOpenProvisionWizard = { viewModel.openProvisionApDialog() }
         )
     }
 

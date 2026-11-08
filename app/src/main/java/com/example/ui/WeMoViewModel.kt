@@ -12,14 +12,21 @@ import com.example.data.WeMoDeviceType
 import com.example.data.WeMoHomeNetworkEntity
 import com.example.data.WeMoRepository
 import com.example.data.WeMoRuleEntity
+import com.example.data.WeMoRuleScheduler
 import com.example.data.inferRoomFromName
+import com.example.network.LanNetworkSnapshot
 import com.example.network.SsdpScanReport
+import com.example.network.WeMoNetworkMonitor
+import com.example.network.WeMoScannedAp
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 enum class WeMoBottomTab {
@@ -34,25 +41,48 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         context = application.applicationContext
     )
 
+    val isDemoShowroomMode: StateFlow<Boolean> = repository.isDemoShowroomMode
+
+    private val networkMonitor = WeMoNetworkMonitor(
+        context = application.applicationContext,
+        fallbackIpResolver = { repository.detectCurrentLanIp() }
+    )
+    val lanNetworkState: StateFlow<LanNetworkSnapshot> = networkMonitor.networkState
+
+    private val ruleScheduler = WeMoRuleScheduler(
+        scope = viewModelScope,
+        onAutoOffExpired = { deviceId ->
+            val updated = repository.turnOffDeviceById(deviceId)
+            if (updated != null) {
+                showTransientStatus("${updated.name}: Turned OFF automatically by Auto-Off Timer")
+            }
+        },
+        onScheduleRuleTriggered = { rule ->
+            repository.runRuleNow(rule)
+            showTransientStatus("Scheduled Rule Executed: ${rule.name}")
+        }
+    )
+    val activeAutoOffCountdownsSec: StateFlow<Map<Int, Int>> = ruleScheduler.activeCountdownsSec
+
     val devices: StateFlow<List<WeMoDeviceEntity>> = repository.allDevices
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = WeMoRepository.defaultClassicDevices()
+            initialValue = if (repository.isDemoShowroomMode.value) WeMoRepository.defaultClassicDevices() else emptyList()
         )
 
     val homeNetworks: StateFlow<List<WeMoHomeNetworkEntity>> = repository.allHomeNetworks
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = WeMoRepository.defaultHomeNetworks()
+            initialValue = if (repository.isDemoShowroomMode.value) WeMoRepository.defaultHomeNetworks() else emptyList()
         )
 
     val rules: StateFlow<List<WeMoRuleEntity>> = repository.allRules
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
-            initialValue = WeMoRepository.defaultClassicRules()
+            initialValue = if (repository.isDemoShowroomMode.value) WeMoRepository.defaultClassicRules() else emptyList()
         )
 
     val soapLogs: StateFlow<List<SoapLogEntry>> = repository.soapLogs
@@ -66,6 +96,18 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _showAddHomeDialog = MutableStateFlow(false)
     val showAddHomeDialog: StateFlow<Boolean> = _showAddHomeDialog.asStateFlow()
+
+    private val _showProvisionApDialog = MutableStateFlow(false)
+    val showProvisionApDialog: StateFlow<Boolean> = _showProvisionApDialog.asStateFlow()
+
+    private val _scannedSetupAps = MutableStateFlow<List<WeMoScannedAp>>(emptyList())
+    val scannedSetupAps: StateFlow<List<WeMoScannedAp>> = _scannedSetupAps.asStateFlow()
+
+    private val _isScanningSetupAp = MutableStateFlow(false)
+    val isScanningSetupAp: StateFlow<Boolean> = _isScanningSetupAp.asStateFlow()
+
+    private val _isProvisioningAp = MutableStateFlow(false)
+    val isProvisioningAp: StateFlow<Boolean> = _isProvisioningAp.asStateFlow()
 
     private val _selectedTab = MutableStateFlow(WeMoBottomTab.DEVICES)
     val selectedTab: StateFlow<WeMoBottomTab> = _selectedTab.asStateFlow()
@@ -120,7 +162,59 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            repository.ensureSeeded()
+            val initialKey = repository.ensureSeeded()
+            _activeNetworkKey.value = initialKey
+            if (!isDemoShowroomMode.value) {
+                reconnectCurrentHomeNetwork()
+            }
+        }
+
+        // Phase 4: Start live zero-permission Wi-Fi / LAN subnet monitoring
+        networkMonitor.startMonitoring { snapshot ->
+            viewModelScope.launch {
+                if (snapshot.isWemoSetupApSubnet) {
+                    showTransientStatus(
+                        "Connected to Belkin WeMo Setup AP (10.22.22.1) • Tap 'Provision New WeMo AP' to join Home Wi-Fi"
+                    )
+                } else if (!isDemoShowroomMode.value) {
+                    val matchedHome = repository.resolveOrCreateHomeForSubnet(
+                        subnetPrefix = snapshot.subnetPrefix,
+                        gatewayIp = snapshot.gatewayIp
+                    )
+                    if (matchedHome != null && matchedHome.networkKey != _activeNetworkKey.value) {
+                        _activeNetworkKey.value = matchedHome.networkKey
+                        reconnectCurrentHomeNetwork()
+                    }
+                }
+            }
+        }
+
+        // Phase 5: Keep Auto-Off countdown timers and Schedule loop synced with live device/rule states
+        ruleScheduler.startScheduleLoop { rules.value }
+        viewModelScope.launch {
+            combine(devices, rules) { devList, ruleList -> Pair(devList, ruleList) }
+                .collectLatest { (devList, ruleList) ->
+                    devList.forEach { dev ->
+                        ruleScheduler.onDeviceStateUpdated(dev, ruleList)
+                    }
+                }
+        }
+
+        // Phase 3 (Confirmed A1): Hybrid UPnP GENA Push Subscriptions + 30s Fallback Poll in Real LAN Mode
+        viewModelScope.launch {
+            var tick = 0
+            while (isActive) {
+                delay(30_000L)
+                if (!isDemoShowroomMode.value) {
+                    val key = _activeNetworkKey.value
+                    repository.pollActiveHomeStates(key)
+                    if (tick % 8 == 0) {
+                        // Renew GENA 300s subscriptions every ~240s
+                        repository.refreshGenaSubscriptionsForHome(key)
+                    }
+                    tick++
+                }
+            }
         }
     }
 
@@ -147,6 +241,9 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _isReconnectingHome.value = true
             val summary = repository.reconnectAndRediscoverHome(targetKey)
+            if (!isDemoShowroomMode.value) {
+                repository.refreshGenaSubscriptionsForHome(targetKey)
+            }
             _isReconnectingHome.value = false
             showTransientStatus(
                 "Welcome back to ${summary.homeName} (${summary.ssidLabel}): Reconnected ${summary.reconnectedCount}/${summary.totalRememberedCount} remembered switches (Avg ${summary.averageLatencyMs}ms)"
@@ -603,12 +700,73 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun toggleDimmerNightMode(device: WeMoDeviceEntity) {
+        viewModelScope.launch {
+            _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
+            val updated = repository.toggleDimmerNightMode(device)
+            _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
+            showTransientStatus(
+                "${updated.name}: Hardware Night Mode (20% Cap) ${if (updated.nightModeEnabled) "ENABLED" else "DISABLED"}"
+            )
+        }
+    }
+
+    fun openProvisionApDialog() {
+        _showProvisionApDialog.value = true
+        scanSetupApNetworks()
+    }
+
+    fun closeProvisionApDialog() {
+        _showProvisionApDialog.value = false
+    }
+
+    fun scanSetupApNetworks(apHost: String = "10.22.22.1") {
+        viewModelScope.launch {
+            _isScanningSetupAp.value = true
+            val list = repository.scanSetupApNetworks(apHost = apHost)
+            _scannedSetupAps.value = list
+            _isScanningSetupAp.value = false
+            if (list.isNotEmpty()) {
+                showTransientStatus("WeMo Setup AP ($apHost): Found ${list.size} nearby 2.4 GHz Wi-Fi network(s)")
+            }
+        }
+    }
+
+    fun provisionWeMoAp(
+        apHost: String = "10.22.22.1",
+        ssid: String,
+        password: String,
+        channel: Int = 6,
+        authMode: String = "WPA2PSK",
+        encryptionType: String = "AES",
+        encryptionMethod: Int = 1
+    ) {
+        viewModelScope.launch {
+            _isProvisioningAp.value = true
+            val res = repository.provisionSetupApDevice(
+                apHost = apHost,
+                ssid = ssid.trim(),
+                plainPassword = password,
+                channel = channel,
+                authMode = authMode,
+                encryptionType = encryptionType,
+                encryptionMethod = encryptionMethod
+            )
+            _isProvisioningAp.value = false
+            if (res.success) {
+                _showProvisionApDialog.value = false
+            }
+            showTransientStatus(res.statusMessage)
+        }
+    }
+
     fun toggleDemoShowroomMode(enabled: Boolean = !isDemoShowroomMode.value) {
         viewModelScope.launch {
             val nextKey = repository.setDemoShowroomMode(enabled)
             _activeNetworkKey.value = nextKey
             _selectedRoomFilter.value = null
             if (enabled) {
+                repository.genaManager.stopServer()
                 showTransientStatus("Demo Showroom Mode Enabled: Loaded 13 showcase devices across 3 Wi-Fi Homes")
             } else {
                 reconnectCurrentHomeNetwork()
@@ -636,6 +794,13 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     fun dismissBanner() {
         _statusBannerMessage.value = null
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        networkMonitor.stopMonitoring()
+        ruleScheduler.stopAll()
+        repository.genaManager.stopServer()
     }
 
     private fun showTransientStatus(message: String) {

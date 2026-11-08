@@ -232,6 +232,7 @@ fun WeMoMoreScreen(
     onScanNetwork: () -> Unit,
     onResetClassicDevices: () -> Unit,
     onToggleDemoShowroomMode: (Boolean) -> Unit = {},
+    onOpenProvisionApWizard: () -> Unit = {},
     onToggleBrandWordmark: () -> Unit,
     onClearLogs: () -> Unit,
     modifier: Modifier = Modifier
@@ -326,7 +327,7 @@ fun WeMoMoreScreen(
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "Communicates directly with WeMi / Belkin WeMo switches over local Wi-Fi via SSDP (UDP 239.255.255.250:1900) and SOAP HTTP (/upnp/control/basicevent1 on ports 49151–49159) — no cloud account required.",
+                        text = "Communicates directly with WeMi / Belkin WeMo switches over local Wi-Fi via SSDP (UDP 239.255.255.250:1900), UPnP GENA Push (/upnp/event/basicevent1), and SOAP HTTP (/upnp/control/basicevent1 on ports 49151–49159) — no cloud account required.",
                         fontFamily = WorkSansFontFamily,
                         fontSize = 13.sp,
                         color = WemoTextSecondary
@@ -421,6 +422,17 @@ fun WeMoMoreScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Reset Preset", color = WemoTextPrimary)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = onOpenProvisionApWizard,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("more_provision_wemo_ap_button")
+                    ) {
+                        Text("Provision New WeMo AP (10.22.22.1)", color = WemoGreenDark)
                     }
                 }
             }

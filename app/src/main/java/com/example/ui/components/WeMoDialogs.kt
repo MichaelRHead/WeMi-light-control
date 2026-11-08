@@ -44,6 +44,7 @@ import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
 import com.example.data.WeMoRepository
 import com.example.data.inferRoomFromName
+import com.example.network.WeMoScannedAp
 import com.example.ui.theme.WemoErrorRed
 import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
@@ -69,7 +70,8 @@ fun AddOrEditWeMoDeviceDialog(
         syncFriendlyNameToHardware: Boolean
     ) -> Unit,
     onDelete: ((WeMoDeviceEntity) -> Unit)? = null,
-    onScanNetwork: (() -> Unit)? = null
+    onScanNetwork: (() -> Unit)? = null,
+    onOpenProvisionWizard: (() -> Unit)? = null
 ) {
     val isEditing = initialDevice != null
     var name by remember { mutableStateOf(initialDevice?.name ?: "") }
@@ -113,6 +115,23 @@ fun AddOrEditWeMoDeviceDialog(
                     ) {
                         Text(
                             text = stringResource(R.string.dialog_scan_network),
+                            color = WemoGreenDark
+                        )
+                    }
+                }
+
+                if (!isEditing && onOpenProvisionWizard != null) {
+                    OutlinedButton(
+                        onClick = {
+                            onOpenProvisionWizard()
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("open_provision_ap_wizard_button")
+                    ) {
+                        Text(
+                            text = "Provision New WeMo AP (10.22.22.1)",
                             color = WemoGreenDark
                         )
                     }
@@ -461,7 +480,7 @@ fun AddWeMoRuleDialog(
                 }
             }
         },
-        confirmButton = {
+                confirmButton = {
             Button(
                 onClick = {
                     if (selectedDevice != null) {
@@ -490,3 +509,184 @@ fun AddWeMoRuleDialog(
         }
     )
 }
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun ProvisionWeMoApDialog(
+    scannedAps: List<WeMoScannedAp>,
+    isScanning: Boolean,
+    isProvisioning: Boolean,
+    defaultSsid: String = "",
+    onScanApList: (String) -> Unit,
+    onProvision: (
+        apHost: String,
+        ssid: String,
+        password: String,
+        channel: Int,
+        authMode: String,
+        encryptionType: String,
+        encryptionMethod: Int
+    ) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var apHost by remember { mutableStateOf("10.22.22.1") }
+    var ssid by remember { mutableStateOf(defaultSsid) }
+    var password by remember { mutableStateOf("") }
+    var channelText by remember { mutableStateOf("6") }
+    var authMode by remember { mutableStateOf("WPA2PSK") }
+    var encryptionType by remember { mutableStateOf("AES") }
+    var encryptionMethod by remember { mutableIntStateOf(1) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Provision New WeMo AP (10.22.22.1)",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "1. Connect your phone/tablet Wi-Fi to the factory-reset switch's setup AP (e.g. WeMo.Light.xxx or WeMo.Mini.xxx).\n2. Scan or enter your 2.4 GHz Home Wi-Fi credentials below.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = apHost,
+                        onValueChange = { apHost = it },
+                        label = { Text("Setup AP IP") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("provision_ap_ip_input")
+                    )
+                    OutlinedButton(
+                        onClick = { onScanApList(apHost.ifBlank { "10.22.22.1" }) },
+                        enabled = !isScanning && !isProvisioning,
+                        modifier = Modifier.testTag("scan_setup_ap_button")
+                    ) {
+                        Text(if (isScanning) "Scanning..." else "Scan APs")
+                    }
+                }
+
+                if (scannedAps.isNotEmpty()) {
+                    Text(
+                        text = "Discovered 2.4 GHz Networks (from GetApList):",
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        scannedAps.forEach { ap ->
+                            FilterChip(
+                                selected = ssid == ap.ssid,
+                                onClick = {
+                                    ssid = ap.ssid
+                                    channelText = ap.channel.toString()
+                                    authMode = ap.authMode
+                                    encryptionType = ap.encryptionType
+                                },
+                                label = {
+                                    Text("${ap.ssid} (Ch ${ap.channel} • ${ap.signalStrengthPercent}%)")
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = WemoGreenSoft,
+                                    selectedLabelColor = WemoGreenDark
+                                )
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = ssid,
+                    onValueChange = { ssid = it },
+                    label = { Text("Target 2.4 GHz Wi-Fi SSID") },
+                    placeholder = { Text("e.g. Home-WiFi-2.4G") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("provision_ssid_input")
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = { password = it },
+                    label = { Text("Wi-Fi Password") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("provision_password_input")
+                )
+
+                Text(
+                    text = "Hardware AES-128-CBC Key Derivation",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    FilterChip(
+                        selected = encryptionMethod == 1,
+                        onClick = { encryptionMethod = 1 },
+                        label = { Text("Method 1: Gen 1 OpenWrt (F7C030/059/063)") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WemoGreenSoft,
+                            selectedLabelColor = WemoGreenDark
+                        )
+                    )
+                    FilterChip(
+                        selected = encryptionMethod == 2,
+                        onClick = { encryptionMethod = 2 },
+                        label = { Text("Method 2: Gen 2 RTOS (WLS040/0403/WDS060)") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WemoGreenSoft,
+                            selectedLabelColor = WemoGreenDark
+                        )
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    onProvision(
+                        apHost.ifBlank { "10.22.22.1" },
+                        ssid.ifBlank { "Home-WiFi-2.4G" },
+                        password,
+                        channelText.toIntOrNull() ?: 6,
+                        authMode.ifBlank { "WPA2PSK" },
+                        encryptionType.ifBlank { "AES" },
+                        encryptionMethod
+                    )
+                },
+                enabled = !isProvisioning,
+                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                modifier = Modifier.testTag("confirm_provision_ap_button")
+            ) {
+                Text(if (isProvisioning) "Provisioning..." else "Provision Switch")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+}
+
