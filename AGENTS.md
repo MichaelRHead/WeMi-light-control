@@ -53,7 +53,9 @@ The app supports four physical Belkin WeMo hardware families:
 
 ---
 
-## 3. Build & Verification Commands
+## 3. Build & Verification Commands (Mandatory Pre-Push Gate)
+
+> **CRITICAL RULE**: **Only push code to GitHub (`origin/main` or `origin/agent-docs`) after verifying that the full build and all automated tests pass with zero errors.** Never push unverified or non-compiling code.
 
 ```bash
 # Run Robolectric unit, protocol & UI integration tests (ExampleRobolectricTest + WeMoProtocolTest)
@@ -62,4 +64,8 @@ The app supports four physical Belkin WeMo hardware families:
 # Assemble debug APK
 ./gradlew assembleDebug
 ```
+
+- In remote VM environments where `HTTPS_PROXY` is active, ensure `~/.gradle/gradle.properties` configures `http.proxyHost`/`https.proxyHost` and `javax.net.ssl.trustStore` with the local proxy CA, and `ANDROID_HOME` points to the Android SDK (`platforms;android-36`, `build-tools;35.0.0`).
+- Update [`IMPLEMENTED.md`](IMPLEMENTED.md) and [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md) whenever new features or tests are completed.
+
 

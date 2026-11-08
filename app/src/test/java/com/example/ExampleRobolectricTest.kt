@@ -199,4 +199,45 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("tv_exit_button").performClick()
         composeTestRule.waitForIdle()
     }
+
+    @Test
+    fun `verify 3-state ON vs OFF Accessible Standby vs Disconnected switch UI and semantic badges`() {
+        composeTestRule.waitForIdle()
+
+        // 1. Scroll to Christmas Tree Living (id=1, reachable ON, CHRISTMAS_TREE category)
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("device_row_1"))
+        composeTestRule.onNodeWithTag("category_badge_1", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("connection_status_badge_1", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_state_badge_1", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_button_1").assertIsDisplayed()
+
+        // Toggle Christmas Tree Living OFF -> stays reachable in Accessible Standby OFF state
+        composeTestRule.onNodeWithTag("power_button_1").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("connection_status_badge_1", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_state_badge_1", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_button_1").assertIsDisplayed()
+
+        // 2. Scroll to Bedroom Ceiling Fan (id=14, reachable OFF standby, FAN category)
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("device_row_14"))
+        composeTestRule.onNodeWithTag("category_badge_14", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("connection_status_badge_14", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_state_badge_14", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_button_14").assertIsDisplayed()
+
+        // Toggle Bedroom Ceiling Fan ON -> transitions from OFF standby to ON
+        composeTestRule.onNodeWithTag("power_button_14").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("power_state_badge_14", useUnmergedTree = true).assertIsDisplayed()
+
+        // 3. Scroll to Lightbulb Bedroom (id=5, Disconnected / !isReachable, LIGHT category)
+        // Verify it renders the Disconnected connection badge and Retry button instead of the ON/OFF power ring
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("device_row_5"))
+        composeTestRule.onNodeWithTag("category_badge_5", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("connection_status_badge_5", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("reconnect_button_5").assertIsDisplayed()
+    }
 }

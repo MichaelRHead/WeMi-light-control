@@ -38,9 +38,9 @@ import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Gamepad
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Movie
@@ -627,7 +627,7 @@ private fun WeMoVirtualTvRemoteBar(
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         modifier = Modifier.testTag("tv_remote_dpad_dim_down")
                     ) {
-                        Icon(Icons.Default.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(16.dp))
                         Text("-10%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
 
@@ -639,7 +639,7 @@ private fun WeMoVirtualTvRemoteBar(
                         modifier = Modifier.testTag("tv_remote_dpad_dim_up")
                     ) {
                         Text("+10%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
                     }
                 }
 

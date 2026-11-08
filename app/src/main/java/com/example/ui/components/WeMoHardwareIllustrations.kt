@@ -389,6 +389,7 @@ fun WeMoSmartPlugIllustration(
 @Composable
 fun WeMoMotionSensorIllustration(
     isReachable: Boolean,
+    isOn: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val alphaVal = if (isReachable) 1f else 0.55f
