@@ -1,14 +1,15 @@
-# WeMi Light Control — Implemented Architecture & Completed Phases (`docs/IMPLEMENTED.md`)
+# WeMi Light Control — Implemented Architecture & Completed Phases (`IMPLEMENTED.md`)
 
 **Repository**: `MichaelRHead/WeMi-light-control` (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
 **Current Version**: `v10.0` (`versionCode = 10`)  
 **Target Platforms**: Android Phones, Tablets, and Android TV (`UI_MODE_TYPE_TELEVISION` 10-foot D-Pad interface)
 
 Related documentation:
-- [`docs/IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — Next-Iteration Roadmap & Future Engineering Ideas (Phases 8–13)
-- [`AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide
-- [`.agents/skills/wemi-light-control/SKILL.md`](../.agents/skills/wemi-light-control/SKILL.md) — Agent Skill Definition
-- [`.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md`](../.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md) — Complete `pywemo` & Home Assistant Wire Protocol Reference
+- [`USER_GUIDE.md`](USER_GUIDE.md) / [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — User Guide Index & Feature Documentation ([`docs/user-guide/`](docs/user-guide/))
+- [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — Next-Iteration Roadmap & Future Engineering Ideas (Phases 8–13)
+- [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
+- [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Agent Skill Definition
+- [`.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md`](.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md) — Complete `pywemo` & Home Assistant Wire Protocol Reference
 
 ---
 
@@ -18,13 +19,13 @@ All **7 core engineering phases** have been implemented, verified against local 
 
 | Phase | Subsystem | Status | Primary Source Files |
 | :--- | :--- | :--- | :--- |
-| **Phase 1** | **`pywemo`-Grade UPnP / SSDP / SOAP Engine** | **Completed** | [`WeMoNetworkClient.kt`](../app/src/main/java/com/example/network/WeMoNetworkClient.kt) |
-| **Phase 2** | **Self-Healing Repository, RTOS Concurrency & Optimistic UI** | **Completed** | [`WeMoRepository.kt`](../app/src/main/java/com/example/data/WeMoRepository.kt), [`WeMoEntities.kt`](../app/src/main/java/com/example/data/WeMoEntities.kt), [`WeMoDatabase.kt`](../app/src/main/java/com/example/data/WeMoDatabase.kt) |
-| **Phase 3** | **Real-Time Local Push Events (UPnP GENA `SUBSCRIBE` / `NOTIFY`)** | **Completed** | [`WeMoGenaSubscriptionManager.kt`](../app/src/main/java/com/example/network/WeMoGenaSubscriptionManager.kt), [`WeMoViewModel.kt`](../app/src/main/java/com/example/ui/WeMoViewModel.kt) |
-| **Phase 4** | **Zero-Permission Wi-Fi Subnet Monitor, `GetMetaInfo` SSID Sync & Demo Mode** | **Completed** | [`WeMoNetworkMonitor.kt`](../app/src/main/java/com/example/network/WeMoNetworkMonitor.kt), [`WeMoRulesAndMoreScreens.kt`](../app/src/main/java/com/example/ui/screens/WeMoRulesAndMoreScreens.kt) |
-| **Phase 5** | **App-Driven Rule Scheduler, Auto-Off Countdowns & Dimmer Night Mode** | **Completed** | [`WeMoRuleScheduler.kt`](../app/src/main/java/com/example/data/WeMoRuleScheduler.kt), [`WeMoDeviceRow.kt`](../app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt) |
-| **Phase 6** | **Zero-Cloud `10.22.22.1` Wi-Fi Setup Provisioner (`WiFiSetup1`)** | **Completed** | [`WeMoProvisionerClient.kt`](../app/src/main/java/com/example/network/WeMoProvisionerClient.kt), [`WeMoDialogs.kt`](../app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`MainActivity.kt`](../app/src/main/java/com/example/MainActivity.kt) |
-| **Phase 7** | **End-to-End Loopback Protocol & Repository Test Suite** | **Completed** | [`WeMoProtocolTest.kt`](../app/src/test/java/com/example/WeMoProtocolTest.kt), [`ExampleRobolectricTest.kt`](../app/src/test/java/com/example/ExampleRobolectricTest.kt) |
+| **Phase 1** | **`pywemo`-Grade UPnP / SSDP / SOAP Engine** | **Completed** | [`WeMoNetworkClient.kt`](app/src/main/java/com/example/network/WeMoNetworkClient.kt) |
+| **Phase 2** | **Self-Healing Repository, RTOS Concurrency & Optimistic UI** | **Completed** | [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt), [`WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt), [`WeMoDatabase.kt`](app/src/main/java/com/example/data/WeMoDatabase.kt) |
+| **Phase 3** | **Real-Time Local Push Events (UPnP GENA `SUBSCRIBE` / `NOTIFY`)** | **Completed** | [`WeMoGenaSubscriptionManager.kt`](app/src/main/java/com/example/network/WeMoGenaSubscriptionManager.kt), [`WeMoViewModel.kt`](app/src/main/java/com/example/ui/WeMoViewModel.kt) |
+| **Phase 4** | **Zero-Permission Wi-Fi Subnet Monitor, `GetMetaInfo` SSID Sync & Demo Mode** | **Completed** | [`WeMoNetworkMonitor.kt`](app/src/main/java/com/example/network/WeMoNetworkMonitor.kt), [`WeMoRulesAndMoreScreens.kt`](app/src/main/java/com/example/ui/screens/WeMoRulesAndMoreScreens.kt) |
+| **Phase 5** | **App-Driven Rule Scheduler, Auto-Off Countdowns & Dimmer Night Mode** | **Completed** | [`WeMoRuleScheduler.kt`](app/src/main/java/com/example/data/WeMoRuleScheduler.kt), [`WeMoDeviceRow.kt`](app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt) |
+| **Phase 6** | **Zero-Cloud `10.22.22.1` Wi-Fi Setup Provisioner (`WiFiSetup1`)** | **Completed** | [`WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt) |
+| **Phase 7** | **End-to-End Loopback Protocol & Repository Test Suite** | **Completed** | [`WeMoProtocolTest.kt`](app/src/test/java/com/example/WeMoProtocolTest.kt), [`ExampleRobolectricTest.kt`](app/src/test/java/com/example/ExampleRobolectricTest.kt) |
 
 ---
 
@@ -32,14 +33,14 @@ All **7 core engineering phases** have been implemented, verified against local 
 
 | Decision ID | Design Choice | Implementation Details |
 | :--- | :--- | :--- |
-| **Q1 — Startup & Demo Mode** | **Clean Real-LAN Startup + Explicit "Demo Showroom Mode" Toggle** | On physical Android / Android TV hardware (`!isRunningUnderRobolectric()`), [`WeMoRepository`](../app/src/main/java/com/example/data/WeMoRepository.kt) starts with `isDemoShowroomMode = false` and `0` fake devices on the detected local `/24` subnet. Users can toggle **Demo Showroom Mode** at any time in [`WeMoMoreScreen`](../app/src/main/java/com/example/ui/screens/WeMoRulesAndMoreScreens.kt) to preview the 13 classic sample devices. |
-| **Q2 — Discovery & Adoption** | **Auto-Adopt on Empty Home + Manual "Adopt" / "Adopt All" Buttons** | When an SSDP scan runs on a Wi-Fi Home with `0` saved devices in Real LAN Mode, all discovered Belkin WeMo devices are automatically adopted into Room. In [`WeMoSsdpScannerModal.kt`](../app/src/main/java/com/example/ui/components/WeMoSsdpScannerModal.kt), each discovered device also has an **"Adopt" / "Update"** button plus a batch **"Adopt All (N)"** button. |
-| **Q3 — Room Assignment & Hardware Rename** | **Keyword Room Inference + "Sync Name to WeMo Hardware" Switch** | [`inferRoomFromName`](../app/src/main/java/com/example/data/WeMoEntities.kt) assigns an initial room from `<friendlyName>` keywords (`Kitchen`, `Living Room`, `Bedroom`, `Hallway & Landing`, `Office`, `Porch & Patio`, etc.). [`AddOrEditWeMoDeviceDialog`](../app/src/main/java/com/example/ui/components/WeMoDialogs.kt) includes a **"Sync Name to WeMo Hardware"** toggle that calls `urn:Belkin:service:basicevent:1#ChangeFriendlyName`. |
+| **Q1 — Startup & Demo Mode** | **Clean Real-LAN Startup + Explicit "Demo Showroom Mode" Toggle** | On physical Android / Android TV hardware (`!isRunningUnderRobolectric()`), [`WeMoRepository`](app/src/main/java/com/example/data/WeMoRepository.kt) starts with `isDemoShowroomMode = false` and `0` fake devices on the detected local `/24` subnet. Users can toggle **Demo Showroom Mode** at any time in [`WeMoMoreScreen`](app/src/main/java/com/example/ui/screens/WeMoRulesAndMoreScreens.kt) to preview the 13 classic sample devices. |
+| **Q2 — Discovery & Adoption** | **Auto-Adopt on Empty Home + Manual "Adopt" / "Adopt All" Buttons** | When an SSDP scan runs on a Wi-Fi Home with `0` saved devices in Real LAN Mode, all discovered Belkin WeMo devices are automatically adopted into Room. In [`WeMoSsdpScannerModal.kt`](app/src/main/java/com/example/ui/components/WeMoSsdpScannerModal.kt), each discovered device also has an **"Adopt" / "Update"** button plus a batch **"Adopt All (N)"** button. |
+| **Q3 — Room Assignment & Hardware Rename** | **Keyword Room Inference + "Sync Name to WeMo Hardware" Switch** | [`inferRoomFromName`](app/src/main/java/com/example/data/WeMoEntities.kt) assigns an initial room from `<friendlyName>` keywords (`Kitchen`, `Living Room`, `Bedroom`, `Hallway & Landing`, `Office`, `Porch & Patio`, etc.). [`AddOrEditWeMoDeviceDialog`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt) includes a **"Sync Name to WeMo Hardware"** toggle that calls `urn:Belkin:service:basicevent:1#ChangeFriendlyName`. |
 | **Q4 — Optimistic UI & Offline Revert** | **Optimistic UI + 2-Stage Self-Healing Reconnect + Offline Revert** | Tapping a switch or dragging a dimmer updates Room immediately, dispatches the SOAP command under a per-device `Mutex` and LAN `Semaphore(3)`, runs a 2-stage self-healing reconnect (9-port probe + targeted SSDP scan by `serialNumber`) if unreachable, and reverts to the prior state with `OFFLINE` (`isReachable = false`, `latencyMs = 0`) if the device is genuinely offline in Real LAN Mode. |
-| **A1 — Real-Time Physical Switch Sync** | **Hybrid UPnP GENA Push (`<100ms`) + 30s Fallback Poll** | [`WeMoGenaSubscriptionManager`](../app/src/main/java/com/example/network/WeMoGenaSubscriptionManager.kt) runs an embedded HTTP `NOTIFY` server (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, 240s renewal, HTTP 412 recovery) so physical wall-switch and 3-way rocker presses update the UI immediately, backed by a 30s `GetBinaryState` poll. |
-| **A2 — Wi-Fi Home & SSID Detection** | **Zero-Permission `/24` Subnet Detection + `GetMetaInfo` SSID Sync** | [`WeMoNetworkMonitor`](../app/src/main/java/com/example/network/WeMoNetworkMonitor.kt) tracks the active `/24` IPv4 subnet without requiring Android Location permissions, and [`WeMoRepository`](../app/src/main/java/com/example/data/WeMoRepository.kt) automatically populates the Wi-Fi Home's `ssidLabel` from the connected switches' `metainfo1#GetMetaInfo` (`AccessPointSSID` field). |
-| **A3 — Rules, Schedules & Night Mode** | **App-Driven Scheduler + Live Countdown Badges + Hardware Night Mode** | [`WeMoRuleScheduler`](../app/src/main/java/com/example/data/WeMoRuleScheduler.kt) executes daily `SCHEDULE` rules (including Sunset/Sunrise times) and per-device/rule `AUTO_OFF` timers with live `MM:SS` countdown pills in [`WeMoDeviceRow`](../app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt), plus a **20% Night Mode** chip for `F7C059`/`WDS060` dimmers calling `ConfigureNightMode`. |
-| **A4 — Zero-Cloud Wi-Fi Setup (`10.22.22.1`)** | **Auto-Detected Setup AP Banner + `WiFiSetup1` Provisioning Wizard** | When connected to a `10.22.22.x` WeMo Setup AP, [`MainActivity`](../app/src/main/java/com/example/MainActivity.kt) displays a top **WeMo Setup AP Detected (`10.22.22.1`)** banner that opens [`ProvisionWeMoApDialog`](../app/src/main/java/com/example/ui/components/WeMoDialogs.kt) to scan 2.4 GHz APs (`GetApList`) and provision credentials using OpenWrt Method 1 & RTOS Method 2 AES-128-CBC encryption. |
+| **A1 — Real-Time Physical Switch Sync** | **Hybrid UPnP GENA Push (`<100ms`) + 30s Fallback Poll** | [`WeMoGenaSubscriptionManager`](app/src/main/java/com/example/network/WeMoGenaSubscriptionManager.kt) runs an embedded HTTP `NOTIFY` server (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, 240s renewal, HTTP 412 recovery) so physical wall-switch and 3-way rocker presses update the UI immediately, backed by a 30s `GetBinaryState` poll. |
+| **A2 — Wi-Fi Home & SSID Detection** | **Zero-Permission `/24` Subnet Detection + `GetMetaInfo` SSID Sync** | [`WeMoNetworkMonitor`](app/src/main/java/com/example/network/WeMoNetworkMonitor.kt) tracks the active `/24` IPv4 subnet without requiring Android Location permissions, and [`WeMoRepository`](app/src/main/java/com/example/data/WeMoRepository.kt) automatically populates the Wi-Fi Home's `ssidLabel` from the connected switches' `metainfo1#GetMetaInfo` (`AccessPointSSID` field). |
+| **A3 — Rules, Schedules & Night Mode** | **App-Driven Scheduler + Live Countdown Badges + Hardware Night Mode** | [`WeMoRuleScheduler`](app/src/main/java/com/example/data/WeMoRuleScheduler.kt) executes daily `SCHEDULE` rules (including Sunset/Sunrise times) and per-device/rule `AUTO_OFF` timers with live `MM:SS` countdown pills in [`WeMoDeviceRow`](app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt), plus a **20% Night Mode** chip for `F7C059`/`WDS060` dimmers calling `ConfigureNightMode`. |
+| **A4 — Zero-Cloud Wi-Fi Setup (`10.22.22.1`)** | **Auto-Detected Setup AP Banner + `WiFiSetup1` Provisioning Wizard** | When connected to a `10.22.22.x` WeMo Setup AP, [`MainActivity`](app/src/main/java/com/example/MainActivity.kt) displays a top **WeMo Setup AP Detected (`10.22.22.1`)** banner that opens [`ProvisionWeMoApDialog`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt) to scan 2.4 GHz APs (`GetApList`) and provision credentials using OpenWrt Method 1, RTOS Method 2, and Symmetric Method 3 AES-128-CBC encryption. |
 
 ---
 
@@ -67,7 +68,7 @@ flowchart TD
         Client["WeMoNetworkClient\n(9-Port Prober, SSDP MulticastLock, SOAP Control)"]
         Gena["WeMoGenaSubscriptionManager\n(SUBSCRIBE / Embedded HTTP NOTIFY Server)"]
         NetMon["WeMoNetworkMonitor\n(Zero-Permission /24 Subnet & 10.22.22.x Detector)"]
-        Prov["WeMoProvisionerClient\n(WiFiSetup1 GetApList & AES-128-CBC Methods 1 & 2)"]
+        Prov["WeMoProvisionerClient\n(WiFiSetup1 GetApList & AES-128-CBC Methods 1, 2 & 3)"]
     end
 
     Main --> VM
@@ -95,7 +96,7 @@ flowchart TD
 - **Hardware SKU Classification & Live Telemetry (`classifyHardwareSku`, `getMetaInfo`, `getSignalStrength`)**:
   - Accurately classifies **1st Gen In-Wall Switch (`F7C030`)**, **2nd Gen 3-Way Switch (`WLS040` / `WLS0403` RTOS)**, **In-Wall Smart Dimmer (`F7C059` OpenWrt / `WDS060` RTOS)**, and **Mini Smart Plug (`F7C063` / `WSP080`)**.
   - Queries `metainfo1#GetMetaInfo` for pipe-delimited `MAC|Serial|SKU|Firmware|AccessPointSSID|Model` and `basicevent1#GetSignalStrength` for live RSSI percentage.
-- **SOAP Quirk Handling (`setBinaryState`, `getBinaryState`, `changeFriendlyName`, `configureNightName`)**:
+- **SOAP Quirk Handling (`setBinaryState`, `getBinaryState`, `changeFriendlyName`, `configureNightMode`)**:
   - Sends `Connection: close` on every SOAP request.
   - Handles `pywemo`'s `<BinaryState>Error</BinaryState>` response when a switch is already in the requested state as a confirmed success.
   - Supports dimmer `<brightness>` (`1..100`), hardware `<FriendlyName>` updates (`ChangeFriendlyName`), and dimmer Night Mode (`ConfigureNightMode`).
@@ -103,15 +104,15 @@ flowchart TD
 ### 4.2 `WeMoGenaSubscriptionManager.kt` (UPnP GENA Push Server)
 - Hosts a lightweight daemon `ServerSocket` on the local Wi-Fi IP (`preferredListenPort = 8989` with automatic fallback to an ephemeral port).
 - Sends `SUBSCRIBE /upnp/event/basicevent1` with `CALLBACK: <http://localIp:port/gena/deviceKey>` and `TIMEOUT: Second-300`, tracks `SID` headers, renews before expiry, and automatically recovers from `HTTP/1.1 412 Precondition Failed` by clearing the stale `SID` and issuing a fresh `SUBSCRIBE`.
-- Parses inbound `NOTIFY` `<e:propertyset>` XML payloads (`<BinaryState>` and `<Brightness>`/`<brightness>`) and pushes `<100ms` state updates into [`WeMoRepository`](../app/src/main/java/com/example/data/WeMoRepository.kt).
+- Parses inbound `NOTIFY` `<e:propertyset>` XML payloads (`<BinaryState>` and `<Brightness>`/`<brightness>`) and pushes `<100ms` state updates into [`WeMoRepository`](app/src/main/java/com/example/data/WeMoRepository.kt).
 
 ### 4.3 `WeMoProvisionerClient.kt` (`10.22.22.1` Zero-Cloud Wi-Fi Setup)
-- Probes `10.22.22.1` (`49152, 49153, 49154, 49151`), fetches `/setup.xml` and `metainfo1#GetMetaInfo` (`MAC`, `SerialNumber`, `RTOS` flag), and lists visible 2.4 GHz access points via `WiFiSetup1#GetApList`.
-- Implements both **Method 1 (OpenWrt `F7C030`/`F7C059`/`F7C063`)** and **Method 2 (RTOS `WLS040`/`WLS0403`/`WDS060`/`WSP080`)** `pywemo` key derivation (`PBKDF2WithHmacSHA1`, 1000 iterations, MD5 16-byte key + 16-byte IV, `AES/CBC/PKCS5Padding`) with 2-hex-digit password length suffixes.
-- Dispatches `WiFiSetup1#ConnectHomeNetwork` twice (`120ms` apart per `pywemo`), polls `GetNetworkStatus`, and closes the setup AP via `CloseSetup`.
+- Probes `10.22.22.1` (`49152..49159`), fetches `/setup.xml` and `metainfo1#GetMetaInfo` (`MAC`, `SerialNumber`, `<rtos>`, `<iot>`, `<binaryOption>`), and lists visible 2.4 GHz access points via `WiFiSetup1#GetApList` (with `GetNetworkList` fallback).
+- Implements **Method 1 (OpenWrt `F7C030`/`F7C059`/`F7C063`)**, **Method 2 (RTOS `WLS040`/`WLS0403`/`WDS060`/`WSP080`)**, and **Method 3 (Symmetric `<binaryOption>1</binaryOption>`)** `pywemo` OpenSSL EVP_BytesToKey MD5 AES-128-CBC encryption (`MD5(keydata + salt)` key, `keydata[0..16]` IV).
+- Dispatches `WiFiSetup1#ConnectHomeNetwork` twice (`100ms` apart per `pywemo`), polls `GetNetworkStatus`, and closes the setup AP via `CloseSetup` + `SetSetupDoneStatus`.
 
 ### 4.4 Automated Verification (`WeMoProtocolTest.kt`, `ExampleRobolectricTest.kt` & `ExampleUnitTest.kt`)
-- **13 automated test cases** (`8` in `WeMoProtocolTest`, `4` in `ExampleRobolectricTest`, `1` in `ExampleUnitTest`) verified via Gradle 9.3.1 (`assembleDebug testDebugUnitTest` with zero compiler warnings or test failures) cover SKU classification, loopback UPnP port shifting, multi-device startup `ON` / `OFF (Accessible Standby)` / `Disconnected` state detection (`detectStartupDeviceStates` + `<binaryState>` parsing in `setup.xml`), semantic switch-name icon classification (`classifyDeviceCategory` for Christmas Trees, Fans, Lamps/Lights, Motion Sensors, and Switches), 3-state Compose UI rendering and interactive power toggling, DHCP serial mismatch protection, `<BinaryState>Error</BinaryState>` handling, `GetMetaInfo`, `GetSignalStrength`, `ConfigureNightMode`, `ChangeFriendlyName`, Real LAN Mode offline revert, GENA `SUBSCRIBE` / HTTP 412 / `NOTIFY` callbacks, `WeMoRuleScheduler` time parsing & Auto-Off countdowns, `WiFiSetup1` AP parsing & AES-128-CBC encryption, SSDP packet building, and multi-home room group controls.
+- **16 automated test cases** (`10` in `WeMoProtocolTest`, `5` in `ExampleRobolectricTest`, `1` in `ExampleUnitTest`) verified via Gradle 9.3.1 (`assembleDebug testDebugUnitTest` with zero compiler warnings or test failures) cover SKU classification, loopback UPnP port shifting, multi-device startup `ON` / `OFF (Accessible Standby)` / `Disconnected` state detection (`detectStartupDeviceStates` + `<binaryState>` parsing in `setup.xml`), semantic switch-name icon classification (`classifyDeviceCategory` for Christmas Trees, Fans, Lamps/Lights, Motion Sensors, and Switches), 3-state Compose UI rendering and interactive power toggling, fresh-device provisioning UI workflow (`ProvisionWeMoApDialog`), manual IP entry with automatic 9-port hardware probing (`saveDevice`), DHCP serial mismatch protection, `<BinaryState>Error</BinaryState>` handling, `GetMetaInfo`, `GetSignalStrength`, `ConfigureNightMode`, `ChangeFriendlyName`, Real LAN Mode offline revert, GENA `SUBSCRIBE` / HTTP 412 / `NOTIFY` callbacks, `WeMoRuleScheduler` time parsing & Auto-Off countdowns, `WiFiSetup1` AP parsing & AES-128-CBC encryption across Methods 1/2/3, SSDP packet building, and multi-home room group controls.
 
 ### 4.5 Startup State Detection & Distinct Three-State Iconography (`ON` vs. `OFF (Accessible)` vs. `Disconnected`)
 - **Immediate Startup `GetBinaryState` Probe (`WeMoRepository.detectStartupDeviceStates`)**:
@@ -128,13 +129,13 @@ flowchart TD
 ### 4.6 Semantic Switch-Name Classification & Custom Illustrations (`WeMoDeviceCategory`)
 - **Automatic Name-Based Classification (`classifyDeviceCategory` in `WeMoEntities.kt`)**:
   - Every `WeMoDeviceEntity` and `SsdpDiscoveredDevice` exposes `visualCategory: WeMoDeviceCategory`, classified automatically from the switch name and UPnP type without requiring a Room migration:
-    - **`CHRISTMAS_TREE` (`Tree Lights`)**: Names containing `tree`, `xmas`, `evergreen`, `spruce`, or `fir` → rendered with **`WeMoChristmasTreeIllustration`** (3-tiered evergreen tree on a stand with a 5-point star topper, garland cord, and 9 multi-color fairy lights that glow when `ON`, show unlit frosted bulbs + standby amber base LED when `OFF`, and show a dashed red offline outline when `Disconnected`).
-    - **`FAN` (`Fan`)**: Names containing `fan`, `blower`, `exhaust`, `ventilat`, or `circulator` → rendered with **`WeMoFanIllustration`** (4 aerodynamic blades inside a protective shroud that spin smoothly when `ON`, stand stationary with a warm amber hub standby LED when `OFF`, and show a dashed red offline outline when `Disconnected`).
-    - **`LIGHT` (`Light`)**: Dimmers (`LIGHTBULB_DIMMER`) or switches whose names contain `lamp`, `light`, `bulb`, `candle`, `sconce`, `chandelier`, `lantern`, `flood`, `spot`, `downlight`, `uplight`, `strip`, `neon`, `torch`, or `fixture` → rendered with **`WeMoLightbulbIllustration`**.
+    - **`CHRISTMAS_TREE` (`Tree Lights`)**: Names containing `tree`, `christmas`, `xmas`, `holiday`, `evergreen`, `spruce`, `fir`, `garland`, `wreath`, `tinsel`, or `noel` → rendered with **`WeMoChristmasTreeIllustration`** (3-tiered evergreen tree on a stand with a 5-point star topper, garland cord, and 9 multi-color fairy lights that glow when `ON`, show unlit frosted bulbs + standby amber base LED when `OFF`, and show a dashed red offline outline when `Disconnected`).
+    - **`FAN` (`Fan`)**: Names containing `fan`, `blower`, `vent`, `exhaust`, `ventilat`, or `circulator` → rendered with **`WeMoFanIllustration`** (4 aerodynamic blades inside a protective shroud that spin smoothly when `ON`, stand stationary with a warm amber hub standby LED when `OFF`, and show a dashed red offline outline when `Disconnected`).
+    - **`LIGHT` (`Light`)**: Dimmers (`LIGHTBULB_DIMMER`) or switches whose names contain `lamp`, `light`, `bulb`, `candle`, `sconce`, `chandelier`, `lantern`, `flood`, `spot`, `downlight`, `uplight`, `strip`, `neon`, `torch`, `dimmer`, `led`, or `fixture` → rendered with **`WeMoLightbulbIllustration`**.
     - **`MOTION_SENSOR` (`Motion`)**: Motion sensors (`MOTION_SENSOR`) or names containing `motion` / `sensor` → rendered with **`WeMoMotionSensorIllustration`**.
     - **`SWITCH_PLUG` (`Switch`)**: All other switches and outlets → rendered with **`WeMoSmartPlugIllustration`**.
 - **Integrated Across Phone, Tablet, SSDP Scanner, Dialogs, and Android TV**:
-  - `WeMoDeviceRow`, `WeMoSsdpScannerModal`, `WeMoTvScreen`, and `AddOrEditWeMoDeviceDialog` (with live as-you-type icon preview) all render `WeMoDeviceCategoryIllustration` and display the classified category badge (`Tree Lights`, `Fan`, `Light`, `Motion`, `Switch`).
+  - `WeMoDeviceRow`, `WeMoSsdpScannerModal`, `WeMoTvScreen`, `AddOrEditWeMoDeviceDialog`, and `ProvisionWeMoApDialog` (with live as-you-type icon preview) all render `WeMoDeviceCategoryIllustration` and display the classified category badge (`Tree Lights`, `Fan`, `Light`, `Motion`, `Switch`).
 
 ### 4.7 Fresh-Device Setup & Provisioning (`pywemo`-Exact `WiFiSetup1`, Android Wi-Fi Socket Binding & Manual IP Probing)
 - **Byte-for-Byte `pywemo` OpenSSL AES-128-CBC Password Encryption (`WeMoProvisionerClient.kt`)**:
@@ -153,4 +154,15 @@ flowchart TD
   - Removes `NET_CAPABILITY_INTERNET` from `NetworkRequest` and prioritizes active `TRANSPORT_WIFI` networks over cellular `cm.activeNetwork` so joining a no-Internet `WeMo.Light.xxx` AP (`10.22.22.x`) with mobile data active still routes all `10.22.22.1` and LAN HTTP/TCP sockets over Wi-Fi via `createWifiBoundSocketFactory(context)`.
 - **Automatic Hardware Probe on Manual IP Entry (`probeAndFetchDeviceDescriptor`)**:
   - When a user adds a fresh device manually by IP (`saveDevice`), the app automatically probes all 9 WeMo ports at that IP and fetches `/setup.xml`, `GetBinaryState`, `GetMetaInfo`, and `GetSignalStrength` so real port, `<serialNumber>`, `<macAddress>`, hardware SKU, and initial `ON`/`OFF` state are saved instead of a placeholder serial.
+
+### 4.8 Modular User Guide Documentation (`USER_GUIDE.md` & `docs/user-guide/*.md`)
+- Provides a top-level User Guide index ([`USER_GUIDE.md`](USER_GUIDE.md) / [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md)) that summarizes each major feature and links to 8 dedicated user-facing feature guides under [`docs/user-guide/`](docs/user-guide/):
+  1. [`docs/user-guide/main-screen.md`](docs/user-guide/main-screen.md) — Main Screen & Device Controls (3-state startup icons, semantic switch-name icons, latency badges, inline dimming, Night Mode, GENA push sync)
+  2. [`docs/user-guide/switch-discovery.md`](docs/user-guide/switch-discovery.md) — Switch Discovery & Network Scanning (SSDP multicast, unicast `/24` fallback, auto-adoption & `Adopt All`, self-healing reconnect)
+  3. [`docs/user-guide/fresh-device-setup.md`](docs/user-guide/fresh-device-setup.md) — Fresh Device Setup & Zero-Cloud Wi-Fi Provisioning (`10.22.22.1` `WiFiSetup1`)
+  4. [`docs/user-guide/room-grouping.md`](docs/user-guide/room-grouping.md) — Room Grouping & Master Room Controls (`Grouped by Room` vs. `Flat List`, room filter chips, Master Room Power Ring, Room Master Brightness Drawer)
+  5. [`docs/user-guide/editing-and-managing-devices.md`](docs/user-guide/editing-and-managing-devices.md) — Editing, Renaming, Reordering & Adding Switches (`Edit Mode`, live icon preview, `Sync Name to WeMo Hardware`, automatic 9-port IP probing)
+  6. [`docs/user-guide/wifi-homes.md`](docs/user-guide/wifi-homes.md) — Multi-Home Wi-Fi Profiles & Switching (zero-permission subnet detection, `GetMetaInfo` SSID sync, 1-tap `Reconnect`)
+  7. [`docs/user-guide/rules-and-timers.md`](docs/user-guide/rules-and-timers.md) — Rules, Schedules & Auto-Off Timers (daily schedules, Sunset/Sunrise, live `Auto-Off MM:SS` countdowns, motion triggers)
+  8. [`docs/user-guide/more-and-tv-mode.md`](docs/user-guide/more-and-tv-mode.md) — Master Controls, Diagnostics, Demo Mode & Android TV (`All Switches ON/OFF`, Real LAN vs. Demo Showroom Mode, SOAP Packet Log, `wemi TV` 10-foot D-Pad interface)
 

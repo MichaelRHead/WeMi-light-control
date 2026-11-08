@@ -7,7 +7,7 @@ description: Architecture, Belkin WeMo UPnP/SSDP/SOAP/GENA protocol reference, R
 
 Use this skill when working on the **WeMi Light Control** Android & Android TV application in `/home/antigravity/MichaelRHead/WeMi-light-control`.
 
-For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin WeMo switches, dimmers, and mini plugs, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md) and [`../../docs/IMPLEMENTATION_PLAN.md`](../../docs/IMPLEMENTATION_PLAN.md).
+For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin WeMo switches, dimmers, and mini plugs, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md), [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (and [`../../docs/user-guide/`](../../docs/user-guide/)), and [`../../docs/IMPLEMENTATION_PLAN.md`](../../docs/IMPLEMENTATION_PLAN.md). Always keep `IMPLEMENTED.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified.
 
 ---
 
