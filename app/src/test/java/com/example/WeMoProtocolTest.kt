@@ -270,15 +270,22 @@ class WeMoProtocolTest {
                     roomName = "Hallway & Landing",
                     ipAddress = "127.0.0.1",
                     port = 49153, // Stale port; real server is on activePort
-                    isOn = false,
+                    isOn = true,  // Stale cached ON state; real hardware relay is currently OFF (0)
                     isReachable = true,
                     serialNumber = "WLS0403SN9988"
                 )
             ).toInt()
             val savedDevice = database.wemoDao().getDeviceById(id)!!
 
-            // Toggle ON -> should auto-heal port to activePort and turn relay ON
-            val toggledOn = repo.toggleDevicePower(savedDevice)
+            // Verify startup state detection queries GetBinaryState, heals port, and detects switch is accessible but OFF
+            val startupStates = repo.detectStartupDeviceStates(savedDevice.networkKey)
+            val detectedOff = startupStates.single { it.id == id }
+            assertTrue(detectedOff.isReachable)
+            assertFalse(detectedOff.isOn)
+            assertEquals(activePort, detectedOff.port)
+
+            // Toggle ON -> should turn relay ON
+            val toggledOn = repo.toggleDevicePower(detectedOff)
             assertTrue(toggledOn.isReachable)
             assertTrue(toggledOn.isOn)
             assertEquals(activePort, toggledOn.port)

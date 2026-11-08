@@ -930,8 +930,8 @@ class WeMoNetworkClient(
             }
 
             base.copy(
-                isOn = stateProbe.binaryStateOn ?: true,
-                brightness = stateProbe.brightness ?: 100,
+                isOn = stateProbe.binaryStateOn ?: base.isOn,
+                brightness = stateProbe.brightness ?: base.brightness,
                 serialNumber = meta?.serialNumber?.takeIf { it.isNotBlank() } ?: base.serialNumber,
                 firmwareVersion = meta?.firmwareVersion?.takeIf { it.isNotBlank() } ?: base.firmwareVersion,
                 hardwareSku = enrichedSku,

@@ -111,4 +111,17 @@ flowchart TD
 - Dispatches `WiFiSetup1#ConnectHomeNetwork` twice (`120ms` apart per `pywemo`), polls `GetNetworkStatus`, and closes the setup AP via `CloseSetup`.
 
 ### 4.4 Automated Verification (`WeMoProtocolTest.kt` & `ExampleRobolectricTest.kt`)
-- **8 automated test suites** verify SKU classification, loopback UPnP port shifting, DHCP serial mismatch protection, `<BinaryState>Error</BinaryState>` handling, `GetMetaInfo` & `ChangeFriendlyName`, Real LAN Mode offline revert, GENA `SUBSCRIBE` / HTTP 412 / `NOTIFY` callbacks, `WeMoRuleScheduler` time parsing & Auto-Off countdowns, `WiFiSetup1` AP parsing & AES-128-CBC encryption, SSDP packet building, and multi-home room group controls.
+- **8 automated test suites** verify SKU classification, loopback UPnP port shifting, startup `OFF` state detection (`detectStartupDeviceStates`), DHCP serial mismatch protection, `<BinaryState>Error</BinaryState>` handling, `GetMetaInfo` & `ChangeFriendlyName`, Real LAN Mode offline revert, GENA `SUBSCRIBE` / HTTP 412 / `NOTIFY` callbacks, `WeMoRuleScheduler` time parsing & Auto-Off countdowns, `WiFiSetup1` AP parsing & AES-128-CBC encryption, SSDP packet building, and multi-home room group controls.
+
+### 4.5 Startup State Detection & Distinct Three-State Iconography (`ON` vs. `OFF (Accessible)` vs. `Disconnected`)
+- **Immediate Startup `GetBinaryState` Probe (`WeMoRepository.detectStartupDeviceStates`)**:
+  - On app launch and home network switch, all remembered switches are immediately probed in parallel (bounded by `Semaphore(3)` for RTOS safety) via `basicevent1#GetBinaryState` before the SSDP discovery sweep begins, updating each device's live `isOn`, `brightness`, `isReachable`, `port`, and `latencyMs` in Room as soon as it responds.
+  - `WeMoNetworkClient.parseSetupXmlDescriptor` also parses `<binaryState>` and `<brightness>` directly from `/setup.xml` and `fetchLiveDeviceDescriptor` preserves `stateProbe.binaryStateOn ?: base.isOn` so newly discovered `OFF` switches never default to `ON`.
+- **Three Unmistakable Visual States (`WeMoHardwareIllustrations.kt`, `WeMoDeviceRow.kt`, `WeMoTvScreen.kt`)**:
+  1. **Accessible & ON (`isReachable && isOn`)**:
+     - Ocean-Teal / Electric-Cyan hardware bezel, glowing cyan LED bar / luminous bulb globe, emerald corner badge with IEC `"I"` active power glyph, `WeMoPowerStatePill` (`"ON"`), and glowing cyan-green `WeMoPowerRingButton` with vertical `"I"` stem.
+  2. **Accessible & OFF (`isReachable && !isOn`)**:
+     - Full `1.0f` opacity Deep Slate-Navy metallic switch bezel (or smoke-slate bulb with visible unlit filament), **Warm Amber Standby Locator LED** (`#F59E0B`), dark-slate & amber corner badge with IEC `"O"` (binary `0` = OFF) standby ring, `WeMoPowerStatePill` (`"OFF"` with amber standby ring), and tactile recessed slate `WeMoPowerRingButton` with top amber pilot dot and closed `"O"` standby symbol.
+  3. **Disconnected / Offline (`!isReachable`)**:
+     - Desaturated housing with dashed red outline (`#DC2626`), red `"X"` offline corner badge, red `Offline` connection badge, and inline `Retry` button.
+

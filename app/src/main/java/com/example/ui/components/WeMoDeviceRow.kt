@@ -241,19 +241,11 @@ fun WeMoDeviceRow(
                                 )
                             }
                             type == WeMoDeviceType.LIGHTBULB_DIMMER -> {
-                                Surface(
-                                    color = if (device.isOn) WemoGreenSoft else WemoDividerGray.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(6.dp)
-                                ) {
-                                    Text(
-                                        text = if (device.isOn) "${device.brightness}%" else "Off • ${device.brightness}%",
-                                        color = if (device.isOn) WemoGreenDark else WemoTextSecondary,
-                                        fontFamily = WorkSansFontFamily,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                    )
-                                }
+                                WeMoPowerStatePill(
+                                    isOn = device.isOn,
+                                    label = if (device.isOn) "ON • ${device.brightness}%" else "OFF • ${device.brightness}%",
+                                    modifier = Modifier.testTag("power_state_badge_${device.id}")
+                                )
                                 Icon(
                                     imageVector = if (isExpanded) {
                                         Icons.Default.KeyboardArrowUp
@@ -271,10 +263,15 @@ fun WeMoDeviceRow(
                                 )
                             }
                             else -> {
+                                WeMoPowerStatePill(
+                                    isOn = device.isOn,
+                                    label = if (device.isOn) "ON" else "OFF",
+                                    modifier = Modifier.testTag("power_state_badge_${device.id}")
+                                )
                                 val subLabel = if (autoOffRemainingSeconds != null && autoOffRemainingSeconds > 0) {
                                     val mins = autoOffRemainingSeconds / 60
                                     val secs = autoOffRemainingSeconds % 60
-                                    "${device.ipAddress} • Auto-Off ${mins}:${secs.toString().padStart(2, '0')}"
+                                    "Auto-Off ${mins}:${secs.toString().padStart(2, '0')}"
                                 } else {
                                     device.ipAddress
                                 }
@@ -513,6 +510,76 @@ fun WeMoSignalBarsIndicator(
                 topLeft = Offset(x, y),
                 size = Size(barWidth, barHeight),
                 cornerRadius = CornerRadius(1.dp.toPx(), 1.dp.toPx())
+            )
+        }
+    }
+}
+
+/**
+ * Distinct power state badge displayed beside the connection status pill for reachable devices:
+ * - ON: Glowing emerald/cyan pill with IEC "I/O" active power icon
+ * - OFF (Accessible Standby): Slate-navy & warm-amber pill with IEC "O" (Zero/Off) open circle icon
+ */
+@Composable
+fun WeMoPowerStatePill(
+    isOn: Boolean,
+    label: String,
+    modifier: Modifier = Modifier
+) {
+    val bgColor = if (isOn) WemoGreenSoft else Color(0xFFF1F5F9)
+    val borderColor = if (isOn) WemoGreenPrimary.copy(alpha = 0.45f) else Color(0xFFF59E0B).copy(alpha = 0.65f)
+    val contentColor = if (isOn) WemoGreenDark else Color(0xFF334155)
+    val iconColor = if (isOn) WemoGreenDark else Color(0xFFD97706)
+
+    Surface(
+        color = bgColor,
+        shape = RoundedCornerShape(6.dp),
+        border = BorderStroke(0.9.dp, borderColor),
+        modifier = modifier
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
+        ) {
+            Canvas(modifier = Modifier.size(10.dp)) {
+                val r = size.minDimension * 0.40f
+                val c = Offset(size.width / 2f, size.height / 2f)
+                val stroke = 1.6.dp.toPx()
+                if (isOn) {
+                    drawArc(
+                        color = iconColor,
+                        startAngle = -50f,
+                        sweepAngle = 280f,
+                        useCenter = false,
+                        topLeft = Offset(c.x - r, c.y - r + 0.5.dp.toPx()),
+                        size = Size(r * 2f, r * 2f),
+                        style = Stroke(width = stroke, cap = StrokeCap.Round)
+                    )
+                    drawLine(
+                        color = iconColor,
+                        start = Offset(c.x, c.y - r - 1.dp.toPx()),
+                        end = Offset(c.x, c.y + 0.5.dp.toPx()),
+                        strokeWidth = stroke,
+                        cap = StrokeCap.Round
+                    )
+                } else {
+                    // Distinct IEC "O" (Zero = OFF) closed standby circle
+                    drawCircle(
+                        color = iconColor,
+                        radius = r,
+                        center = c,
+                        style = Stroke(width = stroke)
+                    )
+                }
+            }
+            Text(
+                text = label,
+                color = contentColor,
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp,
+                maxLines = 1
             )
         }
     }

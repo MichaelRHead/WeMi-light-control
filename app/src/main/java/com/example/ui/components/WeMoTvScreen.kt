@@ -772,18 +772,22 @@ private fun WeMoTvDeviceCard(
                     }
                 }
 
-                // Glowing Power Status Ring
+                // Distinct Power / Connection Status Ring (ON vs OFF-Standby vs Disconnected)
                 Surface(
                     shape = CircleShape,
                     color = when {
-                        !device.isReachable -> Color(0xFF334155)
+                        !device.isReachable -> Color(0xFF450A0A)
                         type == WeMoDeviceType.MOTION_SENSOR -> WemoGreenPrimary.copy(alpha = 0.25f)
                         device.isOn -> WemoGreenTop
                         else -> Color(0xFF1E293B)
                     },
                     border = BorderStroke(
                         width = 2.dp,
-                        color = if (device.isReachable && device.isOn) Color.White else TvCyanFocusBorder.copy(alpha = 0.5f)
+                        color = when {
+                            !device.isReachable -> Color(0xFFEF4444)
+                            device.isOn -> Color.White
+                            else -> Color(0xFFF59E0B)
+                        }
                     ),
                     modifier = Modifier.size(42.dp)
                 ) {
@@ -792,11 +796,16 @@ private fun WeMoTvDeviceCard(
                             imageVector = when {
                                 !device.isReachable -> Icons.Default.WifiOff
                                 type == WeMoDeviceType.MOTION_SENSOR -> Icons.Default.Sensors
+                                !device.isOn -> Icons.Default.PowerOff
                                 type == WeMoDeviceType.LIGHTBULB_DIMMER -> Icons.Default.Lightbulb
                                 else -> Icons.Default.PowerSettingsNew
                             },
                             contentDescription = "Toggle ${device.name}",
-                            tint = if (device.isReachable && device.isOn) TvDeepBackground else Color.White,
+                            tint = when {
+                                !device.isReachable -> Color(0xFFFCA5A5)
+                                device.isOn -> TvDeepBackground
+                                else -> Color(0xFFFBBF24)
+                            },
                             modifier = Modifier.size(22.dp)
                         )
                     }
@@ -819,16 +828,20 @@ private fun WeMoTvDeviceCard(
 
             val statusLabel = when {
                 isToggling -> "Sending SOAP SetBinaryState..."
-                !device.isReachable -> "Offline • Timeout (Press OK to Retry)"
+                !device.isReachable -> "Disconnected • Offline (Press OK to Retry)"
                 type == WeMoDeviceType.MOTION_SENSOR -> "${device.connectionBadgeText} • Motion: ${device.lastMotionTime ?: "Active"}"
                 type == WeMoDeviceType.LIGHTBULB_DIMMER ->
-                    if (device.isOn) "${device.connectionBadgeText} • ON (${device.brightness}%)" else "${device.connectionBadgeText} • OFF"
-                else -> if (device.isOn) "${device.connectionBadgeText} • ON (${device.ipAddress})" else "${device.connectionBadgeText} • Standby (${device.ipAddress})"
+                    if (device.isOn) "${device.connectionBadgeText} • ON (${device.brightness}%)" else "${device.connectionBadgeText} • OFF (Standby)"
+                else -> if (device.isOn) "${device.connectionBadgeText} • ON (${device.ipAddress})" else "${device.connectionBadgeText} • OFF (${device.ipAddress})"
             }
 
             Text(
                 text = statusLabel,
-                color = if (device.isReachable && device.isOn) TvCyanFocusBorder else TvTextSecondary,
+                color = when {
+                    !device.isReachable -> Color(0xFFF87171)
+                    device.isOn -> TvCyanFocusBorder
+                    else -> Color(0xFFFBBF24)
+                },
                 fontFamily = WorkSansFontFamily,
                 fontWeight = FontWeight.Medium,
                 fontSize = 13.sp,

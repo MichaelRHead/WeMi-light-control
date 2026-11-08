@@ -462,6 +462,12 @@ private fun SsdpDiscoveredDeviceRow(
                             modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
                         )
                     }
+                    if (item.deviceType != WeMoDeviceType.MOTION_SENSOR) {
+                        WeMoPowerStatePill(
+                            isOn = item.isOn,
+                            label = if (item.isOn) "ON" else "OFF"
+                        )
+                    }
                 }
 
                 Text(
