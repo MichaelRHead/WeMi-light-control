@@ -1,11 +1,11 @@
 # WeMi Light Control — Code Quality, Human-Readable Modularization & End-to-End Validation Plan
 
-**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v11.0`)  
+**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v12.0`)  
 **Status**: **Ready for Review** (Awaiting Go-Ahead Order before touching production `.kt` files)
 
 Related documents and skills:
 - [`AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md) — Completed Phases 1–7 & `v11.0` Architecture
+- [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md) — Completed Phases 1–7 & `v12.0` Architecture
 - [`docs/IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — Next-Iteration Feature Roadmap (Phases 8–13)
 - [`USER_GUIDE.md`](../USER_GUIDE.md) / [`docs/USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](user-guide/))
 - [`.agents/skills/android-code-modularization/SKILL.md`](../.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
@@ -29,26 +29,26 @@ The goal of this plan is to make the **WeMi Light Control** codebase effortlessl
    - **Accidental Complexity (Decompose Immediately)**:
      - Bundling 350 lines of static Demo Showroom seed data inside `WeMoRepository.kt`.
      - Copy-pasting the 75-line optimistic-update + `Semaphore(3)` + 2-stage reconnect + offline-revert block three times across `toggleDevicePower`, `setDevicePowerExplicit`, and `updateDeviceBrightness`.
-     - Packing 6 distinct 3-state `Canvas` hardware illustrations (`1,373` lines) or 3 unrelated modal dialogs (`881` lines) into single monolithic files.
+     - Packing 6 distinct 3-state `Canvas` hardware illustrations (`1,373` lines) or 3 unrelated modal dialogs (`903` lines) into single monolithic files.
 3. **Zero-Regression Public API Compatibility**:
    - All decompositions preserve existing package namespaces (`com.example.data`, `com.example.network`, `com.example.ui.components`, `com.example.ui.screens`) and public entry points (`WeMoRepository`, `WeMoNetworkClient`, `WeMoViewModel`, `WeMiSwitchApp`) so AI Studio, Compose Previews, and tests continue to work seamlessly.
 
 ---
 
-## 2. Current Codebase Audit (`14,694` Lines Across 24 Kotlin Files)
+## 2. Current Codebase Audit (`14,785` Lines Across 24 Kotlin Files)
 
 | File | Current Lines | Assessment | Underlying Subtlety vs. Accidental Bundling |
 | :--- | ---: | :--- | :--- |
-| [`data/WeMoRepository.kt`](../app/src/main/java/com/example/data/WeMoRepository.kt) | **1,899** | **Refactor (Priority 1)** | **Subtlety**: Concurrency (`Semaphore(3)` + per-device `Mutex`), 2-stage self-healing reconnect, optimistic UI rollback. **Accidental**: 350 lines of static demo fixtures, 270 lines of `10.22.22.1` setup AP orchestration, and 3x duplicated optimistic SOAP command boilerplate. |
+| [`data/WeMoRepository.kt`](../app/src/main/java/com/example/data/WeMoRepository.kt) | **1,898** | **Refactor (Priority 1)** | **Subtlety**: Concurrency (`Semaphore(3)` + per-device `Mutex`), 2-stage self-healing reconnect, optimistic UI rollback. **Accidental**: 350 lines of static demo fixtures, 270 lines of `10.22.22.1` setup AP orchestration, and 3x duplicated optimistic SOAP command boilerplate. |
 | [`ui/components/WeMoHardwareIllustrations.kt`](../app/src/main/java/com/example/ui/components/WeMoHardwareIllustrations.kt) | **1,373** | **Refactor (Priority 1)** | **Accidental**: Bundles 5 standalone 3-state `Canvas` illustrations (`SmartPlug`, `MotionSensor`, `Lightbulb`, `ChristmasTree`, `Fan`) plus `WeMoPowerRingButton` and `WeMoPlugTabIcon` in one file. |
-| [`network/WeMoNetworkClient.kt`](../app/src/main/java/com/example/network/WeMoNetworkClient.kt) | **1,269** | **Refactor (Priority 1)** | **Subtlety**: 9-port `probeWemoPort` & SOAP retry/quirk handling (`<BinaryState>Error</BinaryState>`). **Accidental**: Stateless XML/SSDP regex parsers, SKU classification table, and UDP multicast SSDP + `/24` unicast subnet scanner. |
+| [`network/WeMoNetworkClient.kt`](../app/src/main/java/com/example/network/WeMoNetworkClient.kt) | **1,268** | **Refactor (Priority 1)** | **Subtlety**: 9-port `probeWemoPort` & SOAP retry/quirk handling (`<BinaryState>Error</BinaryState>`). **Accidental**: Stateless XML/SSDP regex parsers, SKU classification table, and UDP multicast SSDP + `/24` unicast subnet scanner. |
 | [`test/.../WeMoProtocolTest.kt`](../app/src/test/java/com/example/WeMoProtocolTest.kt) | **1,227** | **Refactor (Priority 1)** | **Accidental**: Combines 10 distinct test suites (SKU classification, SOAP port-hop, offline revert, GENA push, RuleScheduler, AES-128-CBC crypto, full loopback provisioning, manual IP probing, startup state detection) and inline mock socket servers in one file. |
 | [`ui/components/WeMoTvScreen.kt`](../app/src/main/java/com/example/ui/components/WeMoTvScreen.kt) | **1,010** | **Refactor (Priority 2)** | **Accidental**: Combines the 10-foot Android TV dashboard shell, D-Pad remote simulator bar, TV scene cards, TV room group cards, TV device tiles, and SOAP footer in one file. |
-| [`ui/components/WeMoDialogs.kt`](../app/src/main/java/com/example/ui/components/WeMoDialogs.kt) | **881** | **Refactor (Priority 2)** | **Accidental**: Bundles 3 unrelated dialogs (`AddOrEditWeMoDeviceDialog`, `AddWeMoRuleDialog`, and `ProvisionWeMoApDialog`) into one file. |
-| [`ui/WeMoViewModel.kt`](../app/src/main/java/com/example/ui/WeMoViewModel.kt) | **859** | **Refactor (Priority 2)** | Coordinates 28 separate `MutableStateFlow` properties and background loops. Can be streamlined with cohesive state holders and concise action helpers. |
+| [`ui/components/WeMoDialogs.kt`](../app/src/main/java/com/example/ui/components/WeMoDialogs.kt) | **903** | **Refactor (Priority 2)** | **Accidental**: Bundles 3 unrelated dialogs (`AddOrEditWeMoDeviceDialog`, `AddWeMoRuleDialog`, and `ProvisionWeMoApDialog` with error-status highlighting and room preset chips) into one file. |
+| [`ui/WeMoViewModel.kt`](../app/src/main/java/com/example/ui/WeMoViewModel.kt) | **858** | **Refactor (Priority 2)** | Coordinates 28 separate `MutableStateFlow` properties and background loops. Can be streamlined with cohesive state holders and concise action helpers. |
 | [`ui/components/WeMoDeviceRow.kt`](../app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt) | **812** | **Refactor (Priority 2)** | Combines the primary skeuomorphic device row, inline dimmer slider, expandable hardware diagnostics drawer, and reusable status badges (`WeMoConnectionStatusBadge`, `WeMoSignalBarsIndicator`, `WeMoPowerStatePill`). |
+| [`MainActivity.kt`](../app/src/main/java/com/example/MainActivity.kt) | **767** | **Refactor (Priority 2)** | Mixes `ComponentActivity` setup, 34 `collectAsStateWithLifecycle()` calls, `BackHandler`, the entire `DEVICES` tab `PullToRefreshBox` + `LazyColumn`, the 4-icon `EmptyDevicesState` onboarding card, and dialog bindings. |
 | [`network/WeMoProvisionerClient.kt`](../app/src/main/java/com/example/network/WeMoProvisionerClient.kt) | **722** | **Refactor (Priority 3)** | **Subtlety**: Multi-step `10.22.22.1` `WiFiSetup1` provisioning state machine. Extracting pure OpenSSL AES-128-CBC crypto (`WeMoPasswordCrypto.kt`, ~170 lines) isolates the subtle cipher math from SOAP I/O. |
-| [`MainActivity.kt`](../app/src/main/java/com/example/MainActivity.kt) | **698** | **Refactor (Priority 2)** | Mixes `ComponentActivity` setup, 34 `collectAsStateWithLifecycle()` calls, `BackHandler`, the entire `DEVICES` tab `PullToRefreshBox` + `LazyColumn`, `EmptyDevicesState`, and dialog bindings. |
 | [`ui/screens/WeMoRulesAndMoreScreens.kt`](../app/src/main/java/com/example/ui/screens/WeMoRulesAndMoreScreens.kt) | **583** | **Refactor (Priority 3)** | Contains two separate bottom-nav tab screens (`WeMoRulesScreen` [~230 lines] and `WeMoMoreScreen` [~350 lines]). Splitting into `WeMoRulesScreen.kt` and `WeMoMoreScreen.kt` makes each tab self-contained. |
 | [`ui/components/WeMoSsdpScannerModal.kt`](../app/src/main/java/com/example/ui/components/WeMoSsdpScannerModal.kt) | **525** | **Keep / Minor Polish** | Cohesive single feature (SSDP discovery banner + live scanner bottom sheet). |
 | [`ui/components/WeMoHeaderAndNav.kt`](../app/src/main/java/com/example/ui/components/WeMoHeaderAndNav.kt) | **481** | **Keep** | Clean, cohesive top lime-green skeuomorphic header + bottom navigation bar. |
@@ -193,8 +193,8 @@ All extracted UI files remain in `package com.example.ui.components` or `package
 | **Real LAN Mode Optimistic UI & Offline Rollback (`isReachable = false, latencyMs = 0`)** | `WeMoRepository.toggleDevicePower` | `WeMoProtocolTest`: `verify Real LAN Mode reverts optimistic toggle...` |
 | **UPnP GENA Push Server (`SUBSCRIBE`, `TIMEOUT: Second-300`, HTTP 412 Recovery, `<100ms` `NOTIFY`)** | `WeMoGenaSubscriptionManager`, `WeMoRepository.handleGenaNotification` | `WeMoProtocolTest`: `verify Phase 3 UPnP GENA SUBSCRIBE...` |
 | **Rule Scheduler & Live `MM:SS` Auto-Off Countdowns** | `WeMoRuleScheduler` | `WeMoProtocolTest`: `verify Phase 5 WeMoRuleScheduler...` |
-| **Zero-Cloud `10.22.22.1` `WiFiSetup1` Provisioning & `pywemo` AES-128-CBC (Methods 1, 2 & 3)** | `WeMoProvisionerClient`, `WeMoRepository.provisionSetupApDevice` | `WeMoProtocolTest` (2 crypto & full loopback provisioning tests) + `ExampleRobolectricTest` (Provisioning UI wizard test) |
-| **Manual IP Entry Automatic 9-Port Hardware Probing** | `WeMoRepository.saveDevice`, `probeAndFetchDeviceDescriptor` | `WeMoProtocolTest`: `verify manual saveDevice probes fresh switch IP...` |
+| **Zero-Cloud `10.22.22.1` `WiFiSetup1` Provisioning, Error Status Box, Room Chips & `pywemo` AES-128-CBC (Methods 1, 2 & 3)** | `WeMoProvisionerClient`, `WeMoRepository.provisionSetupApDevice`, `ProvisionWeMoApDialog` (`provision_status_box` error styling & Room `FilterChip`s) | `WeMoProtocolTest` (2 crypto & full loopback provisioning tests) + `ExampleRobolectricTest` (Provisioning UI wizard test) |
+| **Manual IP Entry Automatic 9-Port Hardware Probing & Empty-Home Onboarding Card** | `WeMoRepository.saveDevice`, `probeAndFetchDeviceDescriptor`, `EmptyDevicesState` (`empty_devices_state_card`) | `WeMoProtocolTest`: `verify manual saveDevice probes fresh switch IP...` |
 | **Multi-Home Switching, Room Grouping, Master Room Toggle & Android TV 10-Foot Mode** | `MainActivity`, `WeMoViewModel`, `WeMoTvScreen` | `ExampleRobolectricTest`: `verify Wi-Fi Home network memory...` |
 
 ### 5.2 Step M4: Decompose `WeMoProtocolTest.kt` (`1,227` lines) & Expand E2E Test Suite
@@ -210,7 +210,7 @@ To make the test suite just as readable as the production code and close remaini
 3. **Add New End-to-End Compose + Loopback Tests in `ExampleRobolectricTest.kt` / `WeMoEndToEndUiTest.kt`**:
    - **E2E Test 1 — Full Loopback Hardware Control via Compose UI**: Seed a device pointing to `FakeWeMoUpnpServer` on `127.0.0.1`, tap its power ring and drag its dimmer slider in the Compose UI, and assert that `FakeWeMoUpnpServer` received the exact `SetBinaryState` SOAP XML and that the Compose UI displays the updated `ON`/`OFF` badge and live RTT latency.
    - **E2E Test 2 — Inline Device Diagnostics Drawer, Edit Mode Reordering & Hardware Rename**: Expand a device row in Compose, trigger `Ping RTT`, open `AddOrEditWeMoDeviceDialog`, rename the switch with `"Sync Name to WeMo Hardware"` enabled, and verify the updated name and semantic category icon render in the list.
-   - **E2E Test 3 — Rule Creation, Execution & Back-Navigation Priority**: Create a new rule via `AddWeMoRuleDialog`, trigger `"Run Now"`, and verify `BackHandler` priority across scanner sheet, dialogs, TV mode, Edit mode, room filter, and bottom tabs.
+   - **E2E Test 3 — Empty-Home Onboarding Card, Provisioning Error Banner, Room Chips & Rule Execution**: Switch to Real LAN Mode (`empty_devices_state_card`), verify `empty_state_scan_ssdp_button`, `empty_state_provision_ap_button`, `empty_state_add_manual_button`, and `empty_state_restore_classic_button`, test `ProvisionWeMoApDialog` short-password / unreachable error highlighting (`provision_status_box`) and room preset `FilterChip` selection, create/run a rule via `AddWeMoRuleDialog`, and verify `BackHandler` priority.
 
 ---
 

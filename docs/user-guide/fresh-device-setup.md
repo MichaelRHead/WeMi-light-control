@@ -56,14 +56,16 @@ sequenceDiagram
 
 Inside the **Provision New WeMo AP (`10.22.22.1`)** dialog:
 
-1. **Detected Hardware Banner**:
-   - The dialog automatically probes `10.22.22.1` across ports `49151–49159` and displays the detected hardware banner (e.g., `Detected: WeMo Light Switch`, `Port 49152 • MAC EC1A59XXXXXX • SN 2213... • Auto Method 1`).
+1. **Detected Hardware & Connection Status Banner**:
+   - The dialog automatically probes `10.22.22.1` across ports `49151–49159` and displays a green detected hardware banner (e.g., `Detected: WeMo Light Switch`, `Port 49152 • MAC EC1A59XXXXXX • SN 2213... • Auto Method 1`).
+   - If the switch is unreachable (for example, if your phone is not yet connected to the `WeMo.*` Setup AP) or rejects a short/invalid password, the status box highlights the error in soft red (`#FEF2F2`) with a clear diagnostic message.
 2. **Select Your 2.4 GHz Home Wi-Fi (`Scan APs`)**:
    - Tap **`Scan APs`** to query the switch for visible 2.4 GHz Wi-Fi networks (`GetApList` / `GetNetworkList`).
    - Tap your home Wi-Fi network chip from the **`Discovered 2.4 GHz Networks`** list. This automatically fills in the **Home 2.4 GHz SSID**, **Channel**, **Authentication Mode** (`WPA2PSK`), and **Encryption** (`AES`).
 3. **Name Your Switch & Choose Its Room**:
    - Enter a **Switch Name** (e.g., `Christmas Tree`, `Bedroom Fan`, `Porch Light`).
-   - Watch the **live icon preview** update automatically as you type (`Tree Lights`, `Fan`, `Light`, `Switch`), and select or type a **Room / Group**.
+   - Watch the **live icon preview** update automatically as you type (`Tree Lights`, `Fan`, `Light`, `Switch`).
+   - Type a custom **Room / Group** or tap one of the **Room Preset Chips** (`Living Room`, `Bedroom`, `Kitchen`, `Dining Room`, `Hallway & Landing`, `Ensuite`, `Outdoor`, `Garage`, `Office`) directly below the preview.
 4. **Enter Your 2.4 GHz Wi-Fi Password**:
    - Type your home Wi-Fi password in **Home Wi-Fi Password**.
 5. **Password Encryption Method (Auto-Detected)**:

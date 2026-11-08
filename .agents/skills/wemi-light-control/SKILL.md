@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
   ```bash
   ./gradlew assembleDebug
   ```
-- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "7.0"`).
+- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "12.0"`).
 
 ---
 
@@ -39,7 +39,7 @@ The user's real hardware fleet consists of four Belkin WeMo device families:
 
 ---
 
-## 3. Codebase Map (v7.0 / Completed Phases 1–7)
+## 3. Codebase Map (v12.0 / Completed Phases 1–7)
 
 ### Data & Scheduling Layer (`app/src/main/java/com/example/data/`)
 - **`WeMoEntities.kt`**:

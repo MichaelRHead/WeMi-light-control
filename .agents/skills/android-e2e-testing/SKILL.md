@@ -70,7 +70,8 @@ Every interactive or status-bearing Compose element must expose a deterministic 
   - `"power_state_badge_${device.id}"`
   - `"category_badge_${device.id}"`
 - Room Group header & toggle: `"room_header_$roomName"`, `"room_power_toggle_$roomName"`
-- Navigation & Modals: `"nav_tab_devices"`, `"nav_tab_rules"`, `"nav_tab_more"`, `"add_device_button"`, `"open_provision_ap_wizard_button"`, `"confirm_provision_ap_button"`
+- Empty-Home Onboarding Card (`EmptyDevicesState`): `"empty_devices_state_card"`, `"empty_state_scan_ssdp_button"`, `"empty_state_provision_ap_button"`, `"empty_state_add_manual_button"`, `"empty_state_restore_classic_button"`
+- Navigation & Modals: `"nav_tab_devices"`, `"nav_tab_rules"`, `"nav_tab_more"`, `"add_device_button"`, `"open_provision_ap_wizard_button"`, `"provision_status_box"`, `"confirm_provision_ap_button"`
 
 ---
 

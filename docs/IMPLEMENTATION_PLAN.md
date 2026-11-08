@@ -1,11 +1,11 @@
 # WeMi Light Control — Next-Iteration Implementation Plan (Phases 8–13)
 
 **Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
-**Current Baseline**: `v10.0` (Phases 1–7 Completed — see [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md))  
+**Current Baseline**: `v12.0` (Phases 1–7 Completed — see [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md))  
 **Target Platforms**: Android Phones, Tablets, Home Screen Widgets, Quick Settings, and Android TV (10-foot D-Pad Hub)
 
 Related documents in this repository:
-- [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md) — Completed Phases 1–7 Architecture & Design Decisions (`v11.0`)
+- [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md) — Completed Phases 1–7 Architecture & Design Decisions (`v12.0`)
 - [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Code Quality, Human-Readable Modularization & End-to-End Validation Plan (Phases M1–M4)
 - [`AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide
 - [`.agents/skills/wemi-light-control/SKILL.md`](../.agents/skills/wemi-light-control/SKILL.md) — Agent Skill Definition
@@ -15,7 +15,7 @@ Related documents in this repository:
 
 ---
 
-## 1. Completed Foundation (`v10.0` — Phases 1–7)
+## 1. Completed Foundation (`v12.0` — Phases 1–7)
 
 All 7 foundational phases for local-LAN Belkin WeMo discovery, control, self-healing, GENA push events, scheduling, and zero-cloud `10.22.22.1` provisioning are complete and documented in [`IMPLEMENTED.md`](../IMPLEMENTED.md):
 

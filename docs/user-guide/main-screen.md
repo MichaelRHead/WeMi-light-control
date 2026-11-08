@@ -90,3 +90,13 @@ Tap the body of any reachable switch or dimmer row to expand its **Inline Contro
 
 - **Instant Wall-Switch Push Updates (`<100ms`)**: When someone physically presses a Belkin WeMo wall paddle, 3-way rocker, or mini plug button, the switch sends a local UPnP GENA `NOTIFY` event directly to the app so the icon and power ring update immediately.
 - **Pull-to-Refresh**: Swipe down anywhere on the **Devices** list to re-probe all saved switches and run a background SSDP discovery pass.
+
+---
+
+## 7. Empty Wi-Fi Home Onboarding Card
+
+When a Wi-Fi Home has `0` saved switches (such as on first launch in **Real LAN Mode** before scanning your network), the **Devices** tab displays an onboarding card with a 4-icon category showcase (**Switch**, **Lightbulb**, **Christmas Tree**, and **Fan** in standby) and four quick-start actions:
+- **`Scan Local Network (SSDP)`**: Broadcasts a live UPnP SSDP scan (`239.255.255.250:1900`) and automatically adopts discovered Belkin WeMo switches onto the current Wi-Fi Home.
+- **`Setup Factory-Reset WeMo AP (10.22.22.1)`**: Opens the zero-cloud `WiFiSetup1` provisioning wizard.
+- **`Add Switch Manually`**: Opens the manual IP/Port entry dialog (which automatically probes all 9 WeMo ports at that IP).
+- **`Restore Classic Setup`**: Enables **Demo Showroom Mode** with the 13 sample switches across 3 Wi-Fi Homes.

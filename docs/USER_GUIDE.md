@@ -37,5 +37,6 @@ Each guide below explains one major area of the app in detail:
 
 For protocol details, architecture diagrams, and roadmap information, see:
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Completed Architecture, Protocol Engine & Automated Test Suite
+- [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization & End-to-End Validation Plan
 - [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — Next-Iteration Roadmap & Future Engineering Ideas
 - [`../AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide
