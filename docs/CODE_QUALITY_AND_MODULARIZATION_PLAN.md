@@ -37,7 +37,7 @@ The goal of this plan is to make the **WeMi Light Control** codebase effortlessl
 
 ---
 
-## 2. Current Codebase Audit (`14,785` Lines Across 24 Kotlin Files)
+## 2. Current Codebase Audit (`14,847` Lines Across 24 Kotlin Files)
 
 | File | Current Lines | Assessment | Underlying Subtlety vs. Accidental Bundling |
 | :--- | ---: | :--- | :--- |
@@ -46,10 +46,10 @@ The goal of this plan is to make the **WeMi Light Control** codebase effortlessl
 | [`network/WeMoNetworkClient.kt`](../app/src/main/java/com/example/network/WeMoNetworkClient.kt) | **1,268** | **Refactor (Priority 1)** | **Subtlety**: 9-port `probeWemoPort` & SOAP retry/quirk handling (`<BinaryState>Error</BinaryState>`). **Accidental**: Stateless XML/SSDP regex parsers, SKU classification table, and UDP multicast SSDP + `/24` unicast subnet scanner. |
 | [`test/.../WeMoProtocolTest.kt`](../app/src/test/java/com/example/WeMoProtocolTest.kt) | **1,227** | **Refactor (Priority 1)** | **Accidental**: Combines 10 distinct test suites (SKU classification, SOAP port-hop, offline revert, GENA push, RuleScheduler, AES-128-CBC crypto, full loopback provisioning, manual IP probing, startup state detection) and inline mock socket servers in one file. |
 | [`ui/components/WeMoTvScreen.kt`](../app/src/main/java/com/example/ui/components/WeMoTvScreen.kt) | **1,010** | **Refactor (Priority 2)** | **Accidental**: Combines the 10-foot Android TV dashboard shell, D-Pad remote simulator bar, TV scene cards, TV room group cards, TV device tiles, and SOAP footer in one file. |
-| [`ui/components/WeMoDialogs.kt`](../app/src/main/java/com/example/ui/components/WeMoDialogs.kt) | **903** | **Refactor (Priority 2)** | **Accidental**: Bundles 3 unrelated dialogs (`AddOrEditWeMoDeviceDialog`, `AddWeMoRuleDialog`, and `ProvisionWeMoApDialog` with error-status highlighting and room preset chips) into one file. |
+| [`ui/components/WeMoDialogs.kt`](../app/src/main/java/com/example/ui/components/WeMoDialogs.kt) | **905** | **Refactor (Priority 2)** | **Accidental**: Bundles 3 unrelated dialogs (`AddOrEditWeMoDeviceDialog`, `AddWeMoRuleDialog`, and `ProvisionWeMoApDialog` with error-status highlighting and room preset chips) into one file. |
 | [`ui/WeMoViewModel.kt`](../app/src/main/java/com/example/ui/WeMoViewModel.kt) | **858** | **Refactor (Priority 2)** | Coordinates 28 separate `MutableStateFlow` properties and background loops. Can be streamlined with cohesive state holders and concise action helpers. |
 | [`ui/components/WeMoDeviceRow.kt`](../app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt) | **812** | **Refactor (Priority 2)** | Combines the primary skeuomorphic device row, inline dimmer slider, expandable hardware diagnostics drawer, and reusable status badges (`WeMoConnectionStatusBadge`, `WeMoSignalBarsIndicator`, `WeMoPowerStatePill`). |
-| [`MainActivity.kt`](../app/src/main/java/com/example/MainActivity.kt) | **767** | **Refactor (Priority 2)** | Mixes `ComponentActivity` setup, 34 `collectAsStateWithLifecycle()` calls, `BackHandler`, the entire `DEVICES` tab `PullToRefreshBox` + `LazyColumn`, the 4-icon `EmptyDevicesState` onboarding card, and dialog bindings. |
+| [`MainActivity.kt`](../app/src/main/java/com/example/MainActivity.kt) | **771** | **Refactor (Priority 2)** | Mixes `ComponentActivity` setup, 34 `collectAsStateWithLifecycle()` calls, `BackHandler`, the entire `DEVICES` tab `PullToRefreshBox` + `LazyColumn`, the 4-icon `EmptyDevicesState` onboarding card, and dialog bindings. |
 | [`network/WeMoProvisionerClient.kt`](../app/src/main/java/com/example/network/WeMoProvisionerClient.kt) | **722** | **Refactor (Priority 3)** | **Subtlety**: Multi-step `10.22.22.1` `WiFiSetup1` provisioning state machine. Extracting pure OpenSSL AES-128-CBC crypto (`WeMoPasswordCrypto.kt`, ~170 lines) isolates the subtle cipher math from SOAP I/O. |
 | [`ui/screens/WeMoRulesAndMoreScreens.kt`](../app/src/main/java/com/example/ui/screens/WeMoRulesAndMoreScreens.kt) | **583** | **Refactor (Priority 3)** | Contains two separate bottom-nav tab screens (`WeMoRulesScreen` [~230 lines] and `WeMoMoreScreen` [~350 lines]). Splitting into `WeMoRulesScreen.kt` and `WeMoMoreScreen.kt` makes each tab self-contained. |
 | [`ui/components/WeMoSsdpScannerModal.kt`](../app/src/main/java/com/example/ui/components/WeMoSsdpScannerModal.kt) | **525** | **Keep / Minor Polish** | Cohesive single feature (SSDP discovery banner + live scanner bottom sheet). |
@@ -57,9 +57,9 @@ The goal of this plan is to make the **WeMi Light Control** codebase effortlessl
 | [`ui/components/WeMoRoomGroupCard.kt`](../app/src/main/java/com/example/ui/components/WeMoRoomGroupCard.kt) | **447** | **Keep** | Cohesive room filter bar + collapsible room group card with master power & dimmer slider. |
 | [`ui/components/WeMoWifiHomeBar.kt`](../app/src/main/java/com/example/ui/components/WeMoWifiHomeBar.kt) | **358** | **Keep** | Cohesive multi-home Wi-Fi bar & `AddWifiHomeNetworkDialog`. |
 | [`network/WeMoGenaSubscriptionManager.kt`](../app/src/main/java/com/example/network/WeMoGenaSubscriptionManager.kt) | **357** | **Keep (Justified Subtlety)** | Self-contained UPnP GENA `SUBSCRIBE` client + embedded `ServerSocket` `NOTIFY` push listener & HTTP 412 recovery. |
-| [`test/.../ExampleRobolectricTest.kt`](../app/src/test/java/com/example/ExampleRobolectricTest.kt) | **286** | **Expand E2E Suite** | Clean, readable Robolectric + Compose UI E2E test suite (5 tests). |
+| [`test/.../ExampleRobolectricTest.kt`](../app/src/test/java/com/example/ExampleRobolectricTest.kt) | **324** | **Expand E2E Suite** | Clean, readable Robolectric + Compose UI E2E test suite (6 tests). |
 | [`network/WeMoNetworkMonitor.kt`](../app/src/main/java/com/example/network/WeMoNetworkMonitor.kt) | **235** | **Keep (Justified Subtlety)** | Focused zero-permission `/24` subnet & `10.22.22.x` Setup AP detector + `createWifiBoundSocketFactory`. |
-| [`data/WeMoEntities.kt`](../app/src/main/java/com/example/data/WeMoEntities.kt) | **217** | **Keep** | Clean Room v5 entities, enums, `inferRoomFromName`, and `classifyDeviceCategory`. |
+| [`data/WeMoEntities.kt`](../app/src/main/java/com/example/data/WeMoEntities.kt) | **234** | **Keep** | Clean Room v5 entities, enums, `inferRoomFromName`, and `classifyDeviceCategory`. |
 | [`data/WeMoRuleScheduler.kt`](../app/src/main/java/com/example/data/WeMoRuleScheduler.kt) | **179** | **Keep** | Focused coroutine engine for `AUTO_OFF` countdowns and daily `SCHEDULE` evaluation. |
 | [`data/WeMoDao.kt`](../app/src/main/java/com/example/data/WeMoDao.kt) & [`WeMoDatabase.kt`](../app/src/main/java/com/example/data/WeMoDatabase.kt) | **86 / 38** | **Keep** | Crisp Room v5 DAO and database singleton. |
 | [`ui/theme/Color.kt`](../app/src/main/java/com/example/ui/theme/Color.kt), [`Theme.kt`](../app/src/main/java/com/example/ui/theme/Theme.kt), [`Type.kt`](../app/src/main/java/com/example/ui/theme/Type.kt) | **22 / 34 / 62** | **Keep** | Clean theme definitions. |
@@ -183,7 +183,7 @@ All extracted UI files remain in `package com.example.ui.components` or `package
 
 ## 5. Implementation Validation & End-to-End (E2E) Test Coverage Plan
 
-### 5.1 Current Implementation Validation Matrix (`v11.0` — 16 Passing Tests)
+### 5.1 Current Implementation Validation Matrix (`v12.0` — 17 Passing Tests)
 
 | Requirement / Subsystem | Implementation Verified In | Current Automated Test Coverage |
 | :--- | :--- | :--- |
@@ -195,8 +195,8 @@ All extracted UI files remain in `package com.example.ui.components` or `package
 | **Real LAN Mode Optimistic UI & Offline Rollback (`isReachable = false, latencyMs = 0`)** | `WeMoRepository.toggleDevicePower` | `WeMoProtocolTest`: `verify Real LAN Mode reverts optimistic toggle...` |
 | **UPnP GENA Push Server (`SUBSCRIBE`, `TIMEOUT: Second-300`, HTTP 412 Recovery, `<100ms` `NOTIFY`)** | `WeMoGenaSubscriptionManager`, `WeMoRepository.handleGenaNotification` | `WeMoProtocolTest`: `verify Phase 3 UPnP GENA SUBSCRIBE...` |
 | **Rule Scheduler & Live `MM:SS` Auto-Off Countdowns** | `WeMoRuleScheduler` | `WeMoProtocolTest`: `verify Phase 5 WeMoRuleScheduler...` |
-| **Zero-Cloud `10.22.22.1` `WiFiSetup1` Provisioning, Error Status Box, Room Chips & `pywemo` AES-128-CBC (Methods 1, 2 & 3)** | `WeMoProvisionerClient`, `WeMoRepository.provisionSetupApDevice`, `ProvisionWeMoApDialog` (`provision_status_box` error styling & Room `FilterChip`s) | `WeMoProtocolTest` (2 crypto & full loopback provisioning tests) + `ExampleRobolectricTest` (Provisioning UI wizard test) |
-| **Manual IP Entry Automatic 9-Port Hardware Probing & Empty-Home Onboarding Card** | `WeMoRepository.saveDevice`, `probeAndFetchDeviceDescriptor`, `EmptyDevicesState` (`empty_devices_state_card`) | `WeMoProtocolTest`: `verify manual saveDevice probes fresh switch IP...` |
+| **Zero-Cloud `10.22.22.1` `WiFiSetup1` Provisioning, Error Status Box, Room Chips & `pywemo` AES-128-CBC (Methods 1, 2 & 3)** | `WeMoProvisionerClient`, `WeMoRepository.provisionSetupApDevice`, `ProvisionWeMoApDialog` (`provision_ap_status_box` / `provision_status_box` error styling & Room `FilterChip`s) | `WeMoProtocolTest` (2 crypto & full loopback provisioning tests) + `ExampleRobolectricTest` (Provisioning UI wizard test) |
+| **Manual IP Entry Automatic 9-Port Hardware Probing & Empty-Home Onboarding Card** | `WeMoRepository.saveDevice`, `probeAndFetchDeviceDescriptor`, `EmptyDevicesState` (`empty_devices_state_card`) | `WeMoProtocolTest`: `verify manual saveDevice probes fresh switch IP...` + `ExampleRobolectricTest`: `verify EmptyDevicesState onboarding card...` |
 | **Multi-Home Switching, Room Grouping, Master Room Toggle & Android TV 10-Foot Mode** | `MainActivity`, `WeMoViewModel`, `WeMoTvScreen` | `ExampleRobolectricTest`: `verify Wi-Fi Home network memory...` |
 
 ### 5.2 Step M4: Decompose `WeMoProtocolTest.kt` (`1,227` lines) & Expand E2E Test Suite
@@ -212,7 +212,7 @@ To make the test suite just as readable as the production code and close remaini
 3. **Add New End-to-End Compose + Loopback Tests in `ExampleRobolectricTest.kt` / `WeMoEndToEndUiTest.kt`**:
    - **E2E Test 1 — Full Loopback Hardware Control via Compose UI**: Seed a device pointing to `FakeWeMoUpnpServer` on `127.0.0.1`, tap its power ring and drag its dimmer slider in the Compose UI, and assert that `FakeWeMoUpnpServer` received the exact `SetBinaryState` SOAP XML and that the Compose UI displays the updated `ON`/`OFF` badge and live RTT latency.
    - **E2E Test 2 — Inline Device Diagnostics Drawer, Edit Mode Reordering & Hardware Rename**: Expand a device row in Compose, trigger `Ping RTT`, open `AddOrEditWeMoDeviceDialog`, rename the switch with `"Sync Name to WeMo Hardware"` enabled, and verify the updated name and semantic category icon render in the list.
-   - **E2E Test 3 — Empty-Home Onboarding Card, Provisioning Error Banner, Room Chips & Rule Execution**: Switch to Real LAN Mode (`empty_devices_state_card`), verify `empty_state_scan_ssdp_button`, `empty_state_provision_ap_button`, `empty_state_add_manual_button`, and `empty_state_restore_classic_button`, test `ProvisionWeMoApDialog` short-password / unreachable error highlighting (`provision_status_box`) and room preset `FilterChip` selection, create/run a rule via `AddWeMoRuleDialog`, and verify `BackHandler` priority.
+   - **E2E Test 3 — Provisioning Error Banner, Room Chips & Rule Execution**: Test `ProvisionWeMoApDialog` short-password / unreachable error highlighting (`provision_ap_status_box` / `provision_status_box`) and room preset `FilterChip` selection, create/run a rule via `AddWeMoRuleDialog`, and verify `BackHandler` priority.
 
 ---
 
@@ -242,7 +242,7 @@ When executing Phases M1–M4, preserve the following four subtle protocol and U
 2. **Companion Delegation & Constant Compatibility (`Step M1 & Step M2`)**:
    - Keep delegating companion/instance methods and SKU constants on `WeMoRepository` (`DEFAULT_ROOMS`, `defaultHomeNetworks`, `defaultClassicDevices`, `defaultClassicRules`), `WeMoNetworkClient` (`classifyHardwareSku`, `parseSetupXmlDescriptor`, `buildSsdpMSearchPacket`, `parseSsdpHeaders`, `SKU_*` constants), and `WeMoProvisionerClient` (`encryptWifiPassword`, `decryptWifiPassword`) so existing callers and unit tests compile without signature breakage.
 3. **Preserved Package Namespaces & Semantic `testTag`s (`Step M3`)**:
-   - Keep extracted UI files in `package com.example.ui.components` or `package com.example.ui.screens` and preserve all `Modifier.testTag(...)` strings (`device_row_${id}`, `power_button_${id}`, `reconnect_button_${id}`, `connection_status_badge_${id}`, `power_state_badge_${id}`, `category_badge_${id}`, `provision_status_box`, `empty_devices_state_card`, etc.).
+   - Keep extracted UI files in `package com.example.ui.components` or `package com.example.ui.screens` and preserve all `Modifier.testTag(...)` strings (`device_row_${id}`, `power_button_${id}`, `reconnect_button_${id}`, `connection_status_badge_${id}`, `power_state_badge_${id}`, `category_badge_${id}`, `provision_ap_status_box`, `provision_status_box`, `empty_devices_state_card`, etc.).
 4. **Change Log Maintenance (`Step M1–M4`)**:
-   - Follow [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](../.agents/skills/wemi-changelog-and-docs/SKILL.md) to prepend completed modularization and E2E testing milestones at the top of [`IMPLEMENTED.md`](../IMPLEMENTED.md) and [`docs/IMPLEMENTED.md`](IMPLEMENTED.md).
+   - Follow [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](../.agents/skills/wemi-changelog-and-docs/SKILL.md) and [`.agents/skills/multi-agent-git-sync/SKILL.md`](../.agents/skills/multi-agent-git-sync/SKILL.md) to prepend completed modularization and E2E testing milestones at the top of [`IMPLEMENTED.md`](../IMPLEMENTED.md) and [`docs/IMPLEMENTED.md`](IMPLEMENTED.md).
 
