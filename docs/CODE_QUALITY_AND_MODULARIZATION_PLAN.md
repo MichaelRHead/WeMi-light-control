@@ -226,3 +226,22 @@ Once you give the go-ahead order, we will execute this plan in 4 clean, atomic s
    ./gradlew testDebugUnitTest assembleDebug
    ```
    before pushing to `origin/main`.
+
+---
+
+## 7. Architecture & Protocol Review Sign-Off (Invariants to Preserve During Execution)
+
+**Review Status**: **Approved for Execution (Phases M1–M4)**
+
+When executing Phases M1–M4, preserve the following four subtle protocol and UI invariants:
+
+1. **Shared RTOS Concurrency & GENA Echo-Suppression State (`Step M1`)**:
+   - `WeMoDiscoveryCoordinator` and `WeMoProvisioningCoordinator` must share the **single** `lanSemaphore = Semaphore(3)`, `deviceMutexes`, and `lastSetStateTimestampMs` map owned by `WeMoRepository` (passed into their constructors) rather than instantiating separate semaphores or maps. This guarantees that concurrent startup probes (`detectStartupDeviceStates`), background polls, and manual power toggles never exceed 3 simultaneous TCP sockets against 2nd-Gen RTOS (`WLS040` / `WLS0403`) switches.
+   - `executeOptimisticDeviceCommand(...)` must stamp `lastSetStateTimestampMs[device.id]` both before dispatching the SOAP command and upon completion so the `1200ms–1500ms` GENA echo-suppression window prevents UI flicker.
+2. **Companion Delegation & Constant Compatibility (`Step M1 & Step M2`)**:
+   - Keep delegating companion/instance methods and SKU constants on `WeMoRepository` (`DEFAULT_ROOMS`, `defaultHomeNetworks`, `defaultClassicDevices`, `defaultClassicRules`), `WeMoNetworkClient` (`classifyHardwareSku`, `parseSetupXmlDescriptor`, `buildSsdpMSearchPacket`, `parseSsdpHeaders`, `SKU_*` constants), and `WeMoProvisionerClient` (`encryptWifiPassword`, `decryptWifiPassword`) so existing callers and unit tests compile without signature breakage.
+3. **Preserved Package Namespaces & Semantic `testTag`s (`Step M3`)**:
+   - Keep extracted UI files in `package com.example.ui.components` or `package com.example.ui.screens` and preserve all `Modifier.testTag(...)` strings (`device_row_${id}`, `power_button_${id}`, `reconnect_button_${id}`, `connection_status_badge_${id}`, `power_state_badge_${id}`, `category_badge_${id}`, `provision_status_box`, `empty_devices_state_card`, etc.).
+4. **Change Log Maintenance (`Step M1–M4`)**:
+   - Follow [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](../.agents/skills/wemi-changelog-and-docs/SKILL.md) to prepend completed modularization and E2E testing milestones at the top of [`IMPLEMENTED.md`](../IMPLEMENTED.md) and [`docs/IMPLEMENTED.md`](IMPLEMENTED.md).
+
