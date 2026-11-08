@@ -1,257 +1,109 @@
-# Full Implementation Plan: Making WeMi Light Control a Real, Production-Ready Belkin WeMo App
+# WeMi Light Control — Next-Iteration Implementation Plan (Phases 8–13)
 
-**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example.wemi`)  
-**Target Platforms**: Android Phones, Tablets, and Android TV (10-foot D-Pad UI)  
-**Target Hardware Fleet**:
-- **1st-Gen In-Wall Light Switch** (`F7C030` — OpenWrt, `uuid:Lightswitch-1_0-...`)
-- **2nd-Gen In-Wall 3-Way Light Switch** (`WLS040` / `WLS0403` — RTOS, `uuid:Lightswitch-2_0-...` / `3_0`)
-- **In-Wall Wi-Fi Smart Dimmer** (`F7C059` Gen 1 OpenWrt & `WDS060` Gen 2 RTOS — `uuid:Dimmer-1_0-...` / `2_0`)
-- **WeMo Mini Smart Plug** (`F7C063` Gen 1 & `WSP080` Gen 2 — `uuid:Socket-1_0-...`)
+**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
+**Current Baseline**: `v10.0` (Phases 1–7 Completed — see [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md))  
+**Target Platforms**: Android Phones, Tablets, Home Screen Widgets, Quick Settings, and Android TV (10-foot D-Pad Hub)
 
 Related documents in this repository:
+- [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md) — Completed Phases 1–7 Architecture & Design Decisions (`v10.0`)
 - [`AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide
 - [`.agents/skills/wemi-light-control/SKILL.md`](../.agents/skills/wemi-light-control/SKILL.md) — Agent Skill Definition
 - [`.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md`](../.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md) — Complete `pywemo` & Home Assistant Wire Protocol Reference
 
 ---
 
-## 1. Executive Summary: What Must Change from Skeleton to Production
+## 1. Completed Foundation (`v10.0` — Phases 1–7)
 
-The AI Studio prototype (`v6.0` / `d323be0`) provides a rich 2013-era skeuomorphic Jetpack Compose UI, Room v4 schema, multi-home switcher bar, SSDP scanner modal, and Android TV dashboard, but relies on **simulated network fallbacks** so it can be previewed without hardware.
+All 7 foundational phases for local-LAN Belkin WeMo discovery, control, self-healing, GENA push events, scheduling, and zero-cloud `10.22.22.1` provisioning are complete and documented in [`IMPLEMENTED.md`](../IMPLEMENTED.md):
 
-To make **WeMi Light Control** a full-fledged app that works reliably with physical WeMo devices on a real home LAN (post-January 2026 Belkin cloud shutdown), we will implement **7 engineering phases**:
+- **Phase 1**: `pywemo`-grade UPnP / SSDP (`MulticastLock` + 1s retransmit + unicast `/24` fallback) + 9-port smart probing (`49151..49159`) + SOAP control (`<BinaryState>Error</BinaryState>`, Dimmer `<brightness>`, `GetMetaInfo`, `GetSignalStrength`, `ChangeFriendlyName`, `ConfigureNightMode`).
+- **Phase 2**: Real LAN Mode vs. Demo Showroom Mode, `Semaphore(3)` RTOS protection, per-device `Mutex`, 2-stage self-healing reconnect, optimistic UI with offline revert, and `serialNumber` deduplication.
+- **Phase 3**: Embedded UPnP GENA HTTP `NOTIFY` push server (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery) + 30s fallback poll.
+- **Phase 4**: Zero-permission `/24` Wi-Fi subnet monitor (`WeMoNetworkMonitor`) + automatic `AccessPointSSID` sync from `GetMetaInfo`.
+- **Phase 5**: App-driven `WeMoRuleScheduler` for daily `SCHEDULE` rules, live `MM:SS` `AUTO_OFF` countdown pills, and Dimmer `20%` Night Mode.
+- **Phase 6**: Zero-cloud `10.22.22.1` WeMo Setup AP auto-detection banner and `WiFiSetup1` AES-128-CBC (Methods 1 & 2) provisioning wizard.
+- **Phase 7**: 8 automated JUnit / Robolectric protocol & repository test suites (`WeMoProtocolTest.kt` & `ExampleRobolectricTest.kt`).
 
-| Phase | Subsystem | Key Deliverables |
+---
+
+## 2. Next-Iteration Roadmap Overview (Phases 8–13)
+
+With the core local UPnP/SSDP/SOAP/GENA engine complete, the next iteration transforms **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
+
+| Phase | Feature Area | Key Deliverables |
 | :--- | :--- | :--- |
-| **Phase 1** | **`pywemo`-Grade UPnP / SSDP / SOAP Engine** (`WeMoNetworkClient.kt`) | Real `MulticastLock` SSDP with 1s retransmit, unicast `/24` port-sweep fallback, 9-port smart probing (`49151..49159`) with UDN verification & TCP connect/read timeout split, `Connection: close`, `<BinaryState>Error</BinaryState>` handling, Dimmer `<brightness>`, `metainfo1#GetMetaInfo` (SKU & SSID), `GetSignalStrength`, and `ConfigureNightMode`. |
-| **Phase 2** | **Real Reachability, Concurrency & Self-Healing Repository** (`WeMoRepository.kt`) | Remove all fake `isReachable = true` overrides; add `Semaphore(3)` LAN concurrency cap + per-device `Mutex` (preventing `WLS0403` RTOS socket starvation); 2-stage auto-reconnect (port re-probe → targeted SSDP by serial/UDN); serial-based deduplication & "Adopt All Discovered". |
-| **Phase 3** | **Real-Time Local Push Events (UPnP GENA)** (`WeMoGenaSubscriptionManager.kt`) | Embedded coroutine HTTP `NOTIFY` callback server (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, `412` recovery) for sub-second UI updates when physical wall switches or 3-way switches are flipped. |
-| **Phase 4** | **Live Wi-Fi Subnet Detection & Explicit Demo Mode** (`WeMoNetworkMonitor.kt`, `WeMoRepository.kt`) | `ConnectivityManager.NetworkCallback` live subnet detection, auto-matching/creating `WeMoHomeNetworkEntity` using `metainfo1` `AccessPointSSID`, starting clean on real LANs, and moving the 13 fake seeded devices behind an explicit **"Demo Mode"** toggle. |
-| **Phase 5** | **Working Rules, Schedules & Auto-Off Timers** (`WeMoRuleScheduler.kt`) | Real execution of `AUTO_OFF_TIMER`, `TIME_SCHEDULE`, and `SUNSET_SUNRISE` rules via Android `AlarmManager` / `WorkManager` + coroutine timers, plus optional on-device `rules.db` reading (`rules1#FetchRules`). |
-| **Phase 6** | **Zero-Cloud Wi-Fi Setup Provisioner (`10.22.22.1`) & Hardware Management** (`WeMoProvisionerClient.kt`) | In-app provisioning wizard for factory-reset WeMo devices (`WeMo.Light.xxx` / `WeMo.Mini.xxx` at `10.22.22.1:49152`) via `WiFiSetup1` (`GetApList`, AES-128-CBC Methods 1/2/3, double-send `ConnectHomeNetwork`), plus hardware rename (`ChangeFriendlyName`) and hardware reset (`ReSetup`). |
-| **Phase 7** | **End-to-End Loopback & Robolectric Test Suite** (`WeMoProtocolTest.kt`, `ExampleRobolectricTest.kt`) | Embedded local HTTP/UDP mock WeMo server tests covering all 4 hardware models (`F7C030`, `WLS0403`, `F7C059`/`WDS060`, `F7C063`/`WSP080`), port rotation, GENA `NOTIFY` push, and offline handling. |
+| **Phase 8** | **On-Device Hardware Rules DB (`rules.db` SQLite over SOAP)** | Read, decode, and write the embedded SQLite `rules.db` (`urn:Belkin:service:rules:1#FetchRules` & `#StoreRules` Base64 ZIP) on OpenWrt switches (`F7C030`, `F7C059`, `F7C063`) so schedules & auto-off timers run inside the wall switch even when all phones are away from home. |
+| **Phase 9** | **Android Quick Settings Tiles, Home Screen Widgets & Always-On TV Hub Service** | Android `TileService` quick toggles, Jetpack Glance / `AppWidgetProvider` skeuomorphic 1x1 & 4x1 room widgets, and an optional `BOOT_COMPLETED` foreground service for Android TV / wall tablets acting as a 24/7 LAN controller. |
+| **Phase 10** | **Expanded WeMo Hardware Fleet (`Insight`, `Maker`, `Link`, Dimmer Long-Press & Faders)** | Real-time power/wattage/kWh monitoring for **WeMo Insight (`F7C029`)** via `insight1#GetInsightParams`, hardware fade ramps & `<LongPress>` scene triggers for **Dimmers (`F7C059`/`WDS060`)**, and **WeMo Maker (`F7C043`)** / **Link (`F7C031`)** support. |
+| **Phase 11** | **One-Tap OS Wi-Fi Handoff (`WifiNetworkSpecifier`) for `10.22.22.1` Setup** | Android 10+ `WifiNetworkSpecifier` in-app connection to `WeMo.Light.*` / `WeMo.Mini.*` APs without leaving the app, plus `pywemo` Method 3 (`binaryOption`) password encryption and `basicevent1#ReSetup` factory reset control. |
+| **Phase 12** | **Offline Astronomical Solar Calculator & GENA Motion-Sensor Automation Chains** | Offline NOAA latitude/longitude solar calculator for exact daily Sunrise/Sunset times (`Sunset - 20m`, `Sunrise + 15m`) and sub-second GENA `Motion` (`F7C028`) → multi-switch trigger chains with configurable hold timers. |
+| **Phase 13** | **Household Profile Sync (JSON / QR Export-Import) & Local Webhook / Home Assistant Bridge** | Export/import remembered Wi-Fi Homes, room names, custom ordering, and rules via JSON file or on-screen QR code (ideal for syncing a phone setup onto an Android TV), plus an optional local REST/Webhook endpoint on Android TV. |
 
 ---
 
-## 2. System Architecture Diagram
+## 3. Detailed Specifications for Next Iteration
 
-```mermaid
-flowchart TD
-    subgraph UI["Jetpack Compose UI (Mobile, Tablet & Android TV)"]
-        Main["MainActivity / WeMiMainScreen"]
-        HomeBar["WeMoWifiHomeBar\n(Live Subnet + Remembered Homes)"]
-        Scanner["WeMoSsdpScannerModal\n(Live UDP + Unicast Fallback + Adopt All)"]
-        Provision["WeMoProvisionDialog\n(10.22.22.1 Zero-Cloud Wi-Fi Setup)"]
-        Rooms["WeMoRoomGroupCard / WeMoDeviceRow / WeMoTvScreen"]
-        RulesUI["WeMoRulesScreen & WeMoMoreScreen"]
-    end
-
-    subgraph Domain["State, Scheduling & Push Coordination"]
-        VM["WeMoViewModel"]
-        Repo["WeMoRepository\n(Semaphore(3) + Per-Device Mutex)"]
-        NetMon["WeMoNetworkMonitor\n(ConnectivityManager Callback)"]
-        Gena["WeMoGenaSubscriptionManager\n(SUBSCRIBE / HTTP NOTIFY Server)"]
-        Sched["WeMoRuleScheduler\n(Auto-Off Timers & Schedules)"]
-    end
-
-    subgraph Net["Kotlin WeMo Protocol Engine (com.example.network)"]
-        SSDP["SSDP Multicast + Unicast Sweep\n(MulticastLock, 1s Retransmit)"]
-        Prober["Smart Port Prober (49151..49159)\n(UDN Match, Connect vs Read Timeout)"]
-        SOAP["SOAP Client (Connection: close)\n(basicevent1, metainfo1, rules1, WiFiSetup1)"]
-    end
-
-    subgraph Storage["Persistence (Room v5)"]
-        DB[("WeMoDatabase\nwemo_devices / wemo_home_networks / wemo_rules")]
-    end
-
-    Main --> VM
-    HomeBar & Scanner & Provision & Rooms & RulesUI --> VM
-    VM --> Repo
-    NetMon -->|Active Subnet / Interface Change| Repo
-    Gena -->|Instant Wall-Switch Push Event| Repo
-    Sched -->|Trigger Scheduled / Auto-Off Action| Repo
-    Repo <--> DB
-    Repo --> SSDP & Prober & SOAP
-    Repo <--> Gena
-```
+### Phase 8: On-Device Hardware Rules DB (`WeMoHardwareRulesManager.kt`)
+Currently, `WeMoRuleScheduler` executes schedules and auto-off timers from the Android device over the LAN. However, 1st-Gen OpenWrt Belkin WeMo devices (`F7C030`, `F7C059`, `F7C063`) also run a local SQLite rule engine (`/tmp/Belkin_settings/rules.db`) inside the switch itself:
+1. **`FetchRules` Inspection (`urn:Belkin:service:rules:1#FetchRules`)**:
+   - Query `<ruleDbPath>` (typically `http://<ip>:<port>/rules.db`) and `<ruleDbVersion>`.
+   - Download the ZIP archive from `<ruleDbPath>`, extract the inner `rules.db` SQLite file into a temporary cache file, and read `RULES`, `RULEDEVICES`, and `DEVICECOMBINATION` using Android's built-in `SQLiteDatabase.openDatabase`.
+2. **Two-Way Hardware Rule Sync (`StoreRules`)**:
+   - Package modified `rules.db` into a deflated ZIP archive, Base64-encode it into `<ruleDbBody>`, increment `<ruleDbVersion>`, and push via `urn:Belkin:service:rules:1#StoreRules` (`<processDb>1</processDb>`).
+   - Gracefully fall back to app-driven `WeMoRuleScheduler` for 2nd-Gen RTOS devices (`WLS0403`, `WDS060`, `WSP080`) that return HTTP 404 on `/upnp/control/rules1`.
+3. **Hardware Time Sync (`timesync1#TimeSync`)**:
+   - Because Belkin's NTP servers were retired alongside the cloud shutdown, add `urn:Belkin:service:timesync:1#TimeSync` to push the phone's current UTC epoch, timezone offset, and DST flags directly to each switch so hardware schedules fire at the right local clock time.
 
 ---
 
-## 3. Detailed Phase Specifications
-
-### Phase 1: `pywemo`-Grade UPnP / SSDP / SOAP Engine (`WeMoNetworkClient.kt`)
-
-#### 1.1 Smart Port Probing (`probeWemoPort`)
-- **Complete Port List**:
-  ```kotlin
-  val PROBE_PORTS = listOf(49153, 49152, 49154, 49151, 49155, 49156, 49157, 49158, 49159)
-  ```
-- **Candidate Ordering**: When probing a device with a known `port`, test `port` first, followed by the remaining `PROBE_PORTS`.
-- **UDN / Serial Verification (`expectedSerialOrUdn`)**:
-  - Fetch `http://<ip>:<port>/setup.xml` (or `/Lightsetup.xml`).
-  - Parse `<serialNumber>` and `<UDN>`. If `expectedSerialOrUdn != null` and neither matches, **reject the port and continue** (prevents toggling the wrong WeMo switch if DHCP swapped IP addresses).
-- **Split TCP Connect Timeout vs. `ECONNREFUSED` vs. HTTP Read Timeout**:
-  - Open a raw `Socket()` and call `socket.connect(InetSocketAddress(ip, port), 1000)` before (or as part of) the HTTP probe:
-    - **`SocketTimeoutException` on `connect()`**: The host IP is unreachable on the Wi-Fi LAN (powered off or wrong subnet). **Break out of the port loop immediately** so an offline device fails fast in ~1s instead of blocking for `9 × timeout`.
-    - **`ConnectException` (`ECONNREFUSED`)**: The WeMo's TCP stack is alive and sent `RST` on that port. Immediately try the next port (`0 ms` delay).
-    - **`SocketTimeoutException` on HTTP `read()`**: The TCP port accepted the connection (`SYN/ACK`) but the HTTP listener on that old port is wedged (`pywemo` bug). Continue probing the remaining ports.
-
-#### 1.2 Real SSDP Discovery (`performSsdpDiscoveryScan`)
-- **`WifiManager.MulticastLock`**:
-  - Acquire `wifiManager.createMulticastLock("wemi_ssdp").apply { setReferenceCounted(false); acquire() }` before opening the UDP socket and release it in `finally`.
-- **Interface Binding & 1-Second Retransmit (`pywemo/ssdp.py`)**:
-  - Bind `DatagramSocket(InetSocketAddress(localInetAddress, 0))` so multicast routes out the active Wi-Fi interface.
-  - Set `socket.soTimeout = 1000`. Over a `4500 ms` total window, transmit `M-SEARCH` for both `ST: urn:Belkin:service:basicevent:1` and `ST: upnp:rootdevice` at `t = 0s, 1s, 2s, 3s` whenever a 1-second receive window finishes, overcoming Wi-Fi UDP multicast packet loss.
-- **Exact `LOCATION` Fetching & Belkin Manufacturer Validation**:
-  - Parse `LOCATION:` and `USN:` headers (`udn = usn.substringBefore("::")`), deduplicating by `(udn, location)`.
-  - Fetch the exact `LOCATION` URL (supports both `/setup.xml` and `/Lightsetup.xml` on 1st-gen `F7C030`).
-  - Verify `<manufacturer>` contains `Belkin` or `<deviceType>` / `<UDN>` is a Belkin URN (`urn:Belkin:...`). Ignore non-WeMo UPnP responses (routers, smart TVs, Hue bridges, Sonos).
-- **Remove All Fake Discovery Injections**:
-  - Delete the hardcoded `"Patio String Lights"` (`$subnetPrefix.118:49153`) injection and the synthetic loop that re-emitted `knownLocalDevices` as fake SSDP packets.
-- **Unicast `/24` Subnet Sweep Fallback**:
-  - Add `performUnicastSubnetSweep(subnetPrefix, onLogLine, onDeviceFound)` using `Semaphore(24)` coroutines to probe `1..254` on ports `49153, 49152` (`350 ms` TCP connect timeout).
-  - Run automatically if UDP multicast returns 0 devices (common on routers with AP isolation or IGMP snooping issues) or when the user taps **"Deep Subnet Scan"**.
-
-#### 1.3 Accurate Hardware Classification & Live Telemetry Probing
-- Immediately after fetching `setup.xml` for a discovered device, query:
-  1. **`getBinaryState(ip, port)`**: Populate real `isOn`, `brightness` (`1..100`), and `latencyMs` instead of hardcoding `isOn = true, brightness = 100`.
-  2. **`getMetaInfo(ip, port)`** (`POST /upnp/control/metainfo1`, `urn:Belkin:service:metainfo:1#GetMetaInfo`):
-     - Unpack `<MetaInfo>` (`MAC|SerialNumber|DeviceSKU|FirmwareVersion|AccessPointSSID|ModelName`).
-     - Extract `deviceSku` (`F7C030`, `WLS040`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`) and `accessPointSsid` (the real 2.4 GHz Wi-Fi SSID the switch is joined to).
-  3. **`getSignalStrength(ip, port)`** (`POST /upnp/control/basicevent1`, `urn:Belkin:service:basicevent:1#GetSignalStrength`):
-     - Populate real `signalStrengthPercent` (`0..100%`).
-- **Classification Rules (`classifyWeMoHardwareType`)**:
-  - `IN_WALL_DIMMER`: `udn` starts with `uuid:Dimmer` (`Dimmer-1_0` / `Dimmer-2_0`), `modelName` contains `Dimmer` or `WDS060`, or `sku` in `{"F7C059", "WDS060"}`.
-  - `THREE_WAY_SWITCH`: `udn` starts with `uuid:Lightswitch-2_0` or `uuid:Lightswitch-3_0`, or `sku` / `modelName` / `modelDescription` / `friendlyName` contains `WLS0403`, `WLS040`, or `3-Way`.
-  - `IN_WALL_SWITCH`: `udn` starts with `uuid:Lightswitch-1_0`, `deviceType` contains `lightswitch`, or `sku == "F7C030"`.
-  - `MINI_PLUG`: `udn` starts with `uuid:Socket` or `uuid:OutdoorPlug`, `deviceType` contains `controllee`, or `sku` in `{"F7C063", "WSP080"}`.
-
-#### 1.4 SOAP Control Refinements (`setBinaryState`, `getBinaryState`, `configureNightMode`, `changeFriendlyName`)
-- Always set `Connection: close` and `Content-Type: text/xml; charset="utf-8"`.
-- **Handle `<BinaryState>Error</BinaryState>` (`pywemo/ouimeaux_device/switch.py`)**:
-  - When a WeMo device is already ON and receives `SetBinaryState(1)` (or already OFF and receives `0`), it returns HTTP 200 with `<BinaryState>Error</BinaryState>`. Treat HTTP 200 with `Error` as confirming the target `isOn` state.
-- **Handle Pipe-Delimited `<BinaryState>`**:
-  - Parse `rawBinaryState.substringBefore("|").trim()`, where `"1"` or `"8"` is ON and `"0"` is OFF.
-- **Avoid Confirm-Read Race**:
-  - Do not immediately overwrite a successful `SetBinaryState` with an instant `GetBinaryState` read within `1500 ms`, as dimmer faders and relays may report pre-transition state during the ramp window.
-- **Dimmer Night Mode & Hardware Rename**:
-  - Implement `configureNightMode(ip, port, enabled, nightBrightness = 20)` via `basicevent1#ConfigureNightMode`.
-  - Implement `changeFriendlyName(ip, port, newName)` via `basicevent1#ChangeFriendlyName` so renaming a device in the app also updates the hardware's `<friendlyName>`.
+### Phase 9: Android OS Widgets, Quick Settings & Always-On TV Hub Mode
+1. **Skeuomorphic Home Screen Widgets (`WeMoAppWidgetProvider`)**:
+   - **Single Switch 1x1 Widget**: Classic brushed-aluminum WeMo tile with glowing green/amber power ring and live latency dot.
+   - **Room Group 4x1 Bar Widget**: Shows active Wi-Fi Home, room master toggle, and up to 4 pinned switches/dimmers.
+2. **Android Quick Settings Tile (`WeMoQuickSettingsTileService`)**:
+   - Allows pulling down the Android notification shade and toggling a favorite switch or whole room (e.g., `"Living Room Lights"`) with a single tap—even from the lock screen.
+3. **Always-On Android TV / Tablet LAN Hub Service (`WeMoHubForegroundService`)**:
+   - Optional toggle in **More** (`"Run as Always-On Local Automation Hub"`), automatically enabled on Android TV (`UI_MODE_TYPE_TELEVISION`) and started on `BOOT_COMPLETED`.
+   - Keeps `WeMoGenaSubscriptionManager` and `WeMoRuleScheduler` alive in the background so scheduled rules, motion triggers, and `timesync1` clock updates run 24/7 on an Android TV box.
 
 ---
 
-### Phase 2: Real Reachability, Concurrency & Self-Healing Repository (`WeMoRepository.kt`)
-
-1. **Remove All Simulated `isReachable = true` Fallbacks**:
-   - In `toggleDevicePower`, `updateDeviceBrightness`, `reconnectDevice`, `pingDeviceLatency`, `refreshAllDevicesState`, and `reconnectAndRediscoverHome`, **never** force `isReachable = true` when `result.reachableOnLan == false`.
-   - If a device cannot be reached after reconnection attempts, update Room with `isReachable = false, latencyMs = 0, lastCheckedTime = "Offline"` and return a clear status message so the UI displays the red `OFFLINE` badge and inline `Retry` button.
-2. **Protect Embedded RTOS Switches with Concurrency Controls**:
-   - Add `private val lanRequestSemaphore = Semaphore(3)` (matching Home Assistant's `MAX_CONCURRENCY = 3`) and `private val deviceLocks = ConcurrentHashMap<String, Mutex>()` keyed by `serialNumber`/`id`.
-   - Every network operation on a device acquires its per-device `Mutex` and the LAN `Semaphore(3)` so `WLS040`/`WLS0403` 3-way switches and `WDS060` dimmers are never hit with overlapping HTTP requests.
-3. **Two-Stage Self-Healing Reconnect (`healAndRetryDevice`)**:
-   - When `setBinaryState` or `getBinaryState` fails on `device.ipAddress:device.port`:
-     - **Stage 1**: Call `networkClient.probeWemoPort(device.ipAddress, device.port, expectedSerial = device.serialNumber)`. If a new port responds, update `port` in Room and retry the SOAP command.
-     - **Stage 2**: If Stage 1 fails (e.g. router DHCP reassigned the device's IP), perform a targeted 2-second SSDP `M-SEARCH` looking for `device.serialNumber`. If found at a new `ip:port`, update both `ipAddress` and `port` in Room and retry the SOAP command.
-4. **Serial-Based Deduplication & Batch Adoption (`adoptDiscoveredDevice`, `adoptAllDiscoveredDevices`)**:
-   - Look up existing devices in Room by `serialNumber` first (falling back to `ipAddress`).
-   - If a device with the same `serialNumber` already exists, update its `ipAddress`, `port`, `firmwareVersion`, `macAddress`, `signalStrengthPercent`, `isOn`, `brightness`, `isReachable = true`, `latencyMs`, and `wifiSsid` while preserving the user's custom `roomName` and `sortOrder`.
-   - Add **"Adopt All New Devices"** in `WeMoSsdpScannerModal` so users with many switches can add their entire house in one tap.
+### Phase 10: Expanded Belkin WeMo Hardware Support
+1. **WeMo Insight Energy Monitoring Plug (`F7C029` — `urn:Belkin:service:insight:1`)**:
+   - Parse pipe-delimited `<InsightParams>` (`State|LastChangeTS|OnForSec|OnTodaySec|OnTotalSec|TimeWindow|AvgPowerW|CurrentPowerMw|TodayMwMin|TotalMwMin|StandbyThresholdMw`).
+   - Distinguish `State = 1` (**ON / Drawing Load**) vs. `State = 8` (**Standby** — plugged-in appliance is idle below `StandbyThresholdMw`).
+   - Render live Wattage (`W`) and daily energy (`Wh`/`kWh`) telemetry pills in [`WeMoDeviceRow`](../app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt).
+2. **Dimmer (`F7C059` / `WDS060`) Fader Ramps & Physical `<LongPress>` Scene Triggers**:
+   - Support `<fader>` SOAP parameter (`<fader>300:1770000000:1:0:100</fader>`) for smooth sleep/wake fade-out and fade-in transitions.
+   - Listen for `<LongPress>1</LongPress>` in `WeMoGenaSubscriptionManager` so long-pressing a wall dimmer can trigger a multi-device WeMi Room Scene (e.g. turning off all switches in the house).
+3. **WeMo Maker (`F7C043`) & WeMo Link (`F7C031`)**:
+   - Support momentary relay mode (garage door / gate opener) and dry-contact sensor status on WeMo Maker.
+   - Support `urn:Belkin:service:bridge:1#GetEndDevices` and `#SetDeviceStatus` for WeMo Link Zigbee smart bulbs.
 
 ---
 
-### Phase 3: Real-Time Local Push Events via UPnP GENA (`WeMoGenaSubscriptionManager.kt`)
-
-When someone physically presses a WeMo wall switch or flips a 3-way traveler switch at the other end of a hallway, the app should reflect the new state immediately without waiting for a manual pull-to-refresh:
-
-1. **Local HTTP `NOTIFY` Server**:
-   - Start a lightweight coroutine-backed `ServerSocket` bound to the Android device's Wi-Fi IP (`resolveLocalIpv4Address()`) on port `8989` (scanning `8989..9050` or ephemeral port `0` if busy).
-2. **Subscription Lifecycle (`SUBSCRIBE` / `UNSUBSCRIBE`)**:
-   - For each reachable device in the active Wi-Fi home, send:
-     ```http
-     SUBSCRIBE /upnp/event/basicevent1 HTTP/1.1
-     HOST: <deviceIp>:<devicePort>
-     CALLBACK: <http://<localIp>:<callbackPort>/upnp/event/<serialNumber>>
-     NT: upnp:event
-     TIMEOUT: Second-300
-     Connection: close
-     ```
-   - Store the returned `SID` header and schedule renewal every `240 seconds` (`SUBSCRIBE` with `SID: <sid>` and `TIMEOUT: Second-300`).
-   - If renewal returns `HTTP 412 Precondition Failed` (device rebooted), send `UNSUBSCRIBE`, clear `SID`, and issue a fresh `SUBSCRIBE`.
-3. **Handling Incoming `NOTIFY` Requests**:
-   - Verify the sender IP matches the subscribed device (`pywemo` defense-in-depth check).
-   - Parse `<e:propertyset>` XML for `<BinaryState>` and `<Brightness>` / `<brightness>`.
-   - Reply `HTTP/1.1 200 OK` and invoke `repository.onGenaPushEvent(serialNumber, isOn, brightness)` to update Room immediately (`lastCheckedTime = "Live push"`).
+### Phase 11: Frictionless `10.22.22.1` Setup with `WifiNetworkSpecifier`
+1. **In-App Setup AP Join (`Android 10+ WifiNetworkSpecifier`)**:
+   - Add a **"Find & Join WeMo.xxx Setup AP"** button inside `ProvisionWeMoApDialog` using `WifiNetworkSpecifier.Builder().setSsidPattern(PatternMatcher("WeMo.", PatternMatcher.PATTERN_PREFIX)).build()`.
+   - Bind the provisioning OkHttp client specifically to the `Network` returned by `ConnectivityManager.requestNetwork(...)` so `10.22.22.1` SOAP calls route over the WeMo Setup AP even while mobile data remains active.
+2. **Method 3 (`binaryOption`) Password Encryption & Hardware Reset (`ReSetup`)**:
+   - Add `pywemo` Method 3 (`len + iv + ciphertext` prefix) alongside Methods 1 and 2 in `WeMoProvisionerClient`.
+   - Expose a confirmation-protected **"Factory Reset Wi-Fi (`ReSetup`)"** action in the device edit dialog (`urn:Belkin:service:basicevent:1#ReSetup`) so users migrating to a new router can put an existing switch back into `10.22.22.1` setup mode without unscrewing the wall faceplate.
 
 ---
 
-### Phase 4: Live Wi-Fi Subnet Detection & Explicit Demo Mode (`WeMoNetworkMonitor.kt`)
-
-1. **Automatic Subnet & Home Profile Matching**:
-   - Create `WeMoNetworkMonitor` using Android `ConnectivityManager.NetworkCallback` + `NetworkInterface` inspection to expose a reactive `StateFlow<DetectedLanNetwork?>` (`localIp`, `subnetPrefix`, `gatewayIp`, `ssidLabel`).
-   - When the app starts on a real Wi-Fi network (e.g. `192.168.86.x`):
-     - If a remembered `WeMoHomeNetworkEntity` matches `subnetPrefix` (or `ssidLabel` discovered via `metainfo1#GetMetaInfo` `AccessPointSSID`), automatically select it as `activeHomeKey`.
-     - If no remembered home matches the current `/24` subnet, automatically create/update a `"Current Wi-Fi Home (<subnet>.x)"` profile and select it!
-2. **Clean Startup vs. Explicit Demo Mode**:
-   - Do **not** auto-seed the 13 fake devices (`Living Room Ceiling`, `Lake Cabin`, etc.) into production user databases on first launch.
-   - Instead, provide a **"Load / Clear Demo Showroom Devices"** button in the **More** tab (and a flag on `WeMoRepository` so Robolectric tests that test the seeded sample data continue to work seamlessly).
+### Phase 12: Offline Astronomical Solar Calculator & GENA Motion Chains
+1. **Offline Sunrise/Sunset Calculator (`WeMoSolarCalculator.kt`)**:
+   - Compute exact daily local Sunrise, Sunset, and Civil Twilight times from an optional user-configured city/latitude-longitude (zero location permission required if selected from a city preset or manual coordinates).
+   - Automatically update `SUNSET` / `SUNRISE` rules each day (with custom offsets like `Sunset - 15m` or `Sunrise + 30m`).
+2. **Real-Time Motion Sensor (`F7C028`) Automation Chains**:
+   - When `WeMoGenaSubscriptionManager` receives `<BinaryState>1</BinaryState>` from a `MOTION_SENSOR` (`urn:Belkin:device:sensor:1` / `urn:Belkin:device:NetCamSensor:1`), immediately evaluate all enabled `MOTION_TRIGGER` rules and turn ON the target room/switches, starting an automatic re-triggerable hold timer (`autoOffMinutes`).
 
 ---
 
-### Phase 5: Working Rules, Schedules & Auto-Off Timers (`WeMoRuleScheduler.kt`)
-
-Make the **Rules** tab (`TIME_SCHEDULE`, `SUNSET_SUNRISE`, `AUTO_OFF_TIMER`) genuinely functional:
-
-1. **Auto-Off Countdown Enforcement**:
-   - Whenever a device turns ON (either via `toggleDevicePower` in the app or via a physical wall switch press received by `WeMoGenaSubscriptionManager`), check if `device.autoOffMinutes > 0` or if an enabled `AUTO_OFF_TIMER` rule targets that device.
-   - Schedule a coroutine / `WorkManager` / `AlarmManager` countdown that turns the device OFF via `setBinaryState(isOn = false)` when the timer elapses.
-2. **Daily Time & Sunset/Sunrise Schedules**:
-   - Parse `scheduleTimeText` (e.g., `"06:30 AM"`, `"Sunset + 15m"`, `"11:00 PM"`) and `daysCsv` (`"Mon,Tue,Wed,Thu,Fri"`).
-   - Schedule exact or windowed triggers so phones and always-on Android TV devices on the LAN execute the rule's target action (`turnOn` + `targetBrightness`) across all matched devices.
-3. **Hardware `rules.db` Discovery (Gen-1 OpenWrt)**:
-   - Add `fetchDeviceRulesSummary(ip, port)` (`urn:Belkin:service:rules:1#FetchRules`) to inspect on-device rules Version/Path in the hardware diagnostics drawer (gracefully handling HTTP 404 on RTOS `WDS060`).
-
----
-
-### Phase 6: Zero-Cloud Wi-Fi Provisioning (`10.22.22.1`) & Hardware Management
-
-Because Belkin shut down the official WeMo app/cloud in January 2026, users who factory-reset a WeMo switch or plug need a way to join it to their 2.4 GHz Wi-Fi network:
-
-1. **`WeMoProvisionerClient.kt` (`10.22.22.1:49152` / `49153`)**:
-   - Detect when the phone is connected to a `WeMo.*` setup AP (`subnetPrefix == "10.22.22"` or probe `10.22.22.1` ports `49152, 49153`).
-   - Implement `getAvailableApList("10.22.22.1", port)` via `WiFiSetup1#GetApList`.
-   - Implement `encryptWeMoWifiPassword(password, metaInfo, isRtos, binaryOption)` supporting all 3 `pywemo` AES-128-CBC / MD5 key-derivation methods (`Method 1` OpenWrt, `Method 2` RTOS, `Method 3` binaryOption).
-   - Implement `connectHomeNetwork(...)` sending `WiFiSetup1#ConnectHomeNetwork` twice (`100 ms` apart), polling `GetNetworkStatus`, and calling `CloseSetup` + `SetSetupDoneStatus`.
-2. **In-App Provisioning UI (`WeMoProvisionDeviceDialog`)**:
-   - Accessible from the SSDP Scanner modal and the **More** tab (**"Provision New / Reset WeMo AP (10.22.22.1)"**): scans visible 2.4 GHz SSIDs from the WeMo, prompts for the WPA2 password, pairs the device, and transitions back to the home LAN scan.
-
----
-
-### Phase 7: Verification & Automated Test Suite
-
-1. **Loopback UPnP / SOAP / GENA Protocol Tests (`WeMoProtocolTest.kt`)**:
-   - Spin up a local loopback `ServerSocket` / `DatagramSocket` in JUnit simulating:
-     - 1st-Gen `F7C030` (`/Lightsetup.xml`, `uuid:Lightswitch-1_0-...`)
-     - 2nd-Gen 3-Way `WLS0403` (`/setup.xml`, `<rtos>1</rtos>`, `uuid:Lightswitch-2_0-...`)
-     - Smart Dimmer `WDS060` (`<BinaryState>1</BinaryState><brightness>65</brightness>`)
-     - Mini Plug `WSP080` (`uuid:Socket-1_0-...`)
-   - Verify port rotation (`49153` → `49151`), UDN mismatch protection, `<BinaryState>Error</BinaryState>` handling, `GetMetaInfo` SKU/SSID parsing, `WiFiSetup1` AES-128-CBC encryption vectors against `pywemo` test outputs, and GENA `NOTIFY` push updates.
-2. **Robolectric UI & Repository Integration Tests (`ExampleRobolectricTest.kt`)**:
-   - Verify real offline state (`isReachable = false`) when a device is unreachable, live discovery adoption by `serialNumber`, multi-home switching, room batch controls, and Android TV mode.
-
----
-
-## 4. Confirmed Design Decisions & Completed Implementation Status
-
-All **8 design decisions** were reviewed and confirmed during implementation, and all **7 phases** are now implemented in the codebase:
-
-| Decision | Confirmed Choice | Implemented In |
-| :--- | :--- | :--- |
-| **Q1 — Startup & Demo Mode** | **Clean Real-LAN Startup + "Demo Showroom Mode" Toggle**: Real hardware starts clean (`isDemoShowroomMode = false`) on the detected local `/24` subnet; the 13 sample switches are behind the **Demo Showroom Mode** switch in **More**. | `WeMoRepository.kt`, `WeMoViewModel.kt`, `WeMoRulesAndMoreScreens.kt` |
-| **Q2 — Discovery & Adoption** | **Auto-Adopt on First Scan + "Adopt" / "Adopt All" Buttons**: Auto-adopts discovered Belkin WeMo switches when a Wi-Fi Home has 0 saved devices, and shows per-device **"Adopt"** and **"Adopt All"** buttons in `WeMoSsdpScannerModal`. | `WeMoRepository.kt`, `WeMoSsdpScannerModal.kt` |
-| **Q3 — Room Assignment & Hardware Rename** | **Auto-Infer Room + "Sync Name to WeMo Hardware" Switch**: Infers initial room from `<friendlyName>` keywords and provides a **"Sync Name to WeMo Hardware"** switch in `AddOrEditWeMoDeviceDialog` calling `basicevent1#ChangeFriendlyName`. | `WeMoEntities.kt`, `WeMoNetworkClient.kt`, `WeMoDialogs.kt` |
-| **Q4 — Optimistic UI & Offline Revert** | **Optimistic UI + 2-Stage Reconnect + Offline Revert**: Updates Room immediately on tap, runs SOAP + 2-stage reconnect (9-port probe → targeted SSDP by `serialNumber`), and reverts to prior state with `OFFLINE` (`isReachable = false, latencyMs = 0`) if unreachable in Real LAN Mode. | `WeMoRepository.kt`, `WeMoNetworkClient.kt` |
-| **A1 — Real-Time Physical Switch Sync (Phase 3)** | **Hybrid UPnP GENA Push + 30s Fallback Poll**: Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, 240s renewal, HTTP 412 recovery) + 30s `GetBinaryState` fallback poll. | `WeMoGenaSubscriptionManager.kt`, `WeMoRepository.kt`, `WeMoViewModel.kt` |
-| **A2 — Wi-Fi Home & SSID Detection (Phase 4)** | **Zero-Permission Subnet + WeMo `GetMetaInfo` SSID**: Uses `ConnectivityManager.NetworkCallback` `/24` subnet matching and populates the real 2.4 GHz Wi-Fi SSID from WeMo switches' `metainfo1#GetMetaInfo` (`AccessPointSSID`) without requiring Android Location permission. | `WeMoNetworkMonitor.kt`, `WeMoRepository.kt` |
-| **A3 — Rules, Schedules & Night Mode (Phase 5)** | **App-Driven Scheduler + Hardware Night Mode**: Executes `SCHEDULE` and `AUTO_OFF` timers over LAN (`WeMoRuleScheduler`) with live countdown badges, and syncs Dimmer Night Mode (`20%` cap) to `F7C059`/`WDS060` hardware via `ConfigureNightMode`. | `WeMoRuleScheduler.kt`, `WeMoDeviceRow.kt`, `WeMoRepository.kt` |
-| **A4 — Zero-Cloud Wi-Fi Setup `10.22.22.1` (Phase 6)** | **Auto-Detect `10.22.22.x` Setup AP Banner + Provisioning Wizard**: Auto-detects `10.22.22.x` WeMo Setup AP subnet and provides `ProvisionWeMoApDialog` (`WiFiSetup1#GetApList`, AES-128-CBC Methods 1 & 2, double-send `ConnectHomeNetwork` + `CloseSetup`). | `WeMoProvisionerClient.kt`, `WeMoDialogs.kt`, `MainActivity.kt` |
-
+### Phase 13: Household Configuration Sync (JSON / QR) & Android TV Local Bridge
+1. **Zero-Cloud Household Sync (`WeMoBackupManager.kt`)**:
+   - Export all `wemo_home_networks`, `wemo_devices` (including custom names, rooms, and sort order), and `wemo_rules` to a compact JSON file or multi-frame / compressed QR code.
+   - On Android TV, display a **"Pair from Phone"** local HTTP receiver (`http://<tv-ip>:8990/sync`) so the user can push their entire phone configuration to their living room TV in one tap over the home LAN.
+2. **Optional Local REST / Webhook Endpoint**:
+   - Allow local scripts, Tasker, or Home Assistant on the LAN to query or trigger WeMi scenes via simple local HTTP calls when Android TV Hub Mode is active.
