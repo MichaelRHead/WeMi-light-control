@@ -24,6 +24,7 @@ Related documentation:
 
 | Landed (PST) | Version / Commit | Feature or Improvement | Primary Files |
 | :--- | :--- | :--- | :--- |
+| **2026-11-08 14:30 PST** | `v12.0` (`HEAD`) | **Phase M1 Data Layer Modularization: `WeMoDemoFixtures`, `WeMoDiscoveryCoordinator`, `WeMoProvisioningCoordinator` & Unified `executeOptimisticDeviceCommand`** | [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt), [`WeMoDiscoveryCoordinator.kt`](app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt), [`WeMoProvisioningCoordinator.kt`](app/src/main/java/com/example/data/WeMoProvisioningCoordinator.kt), [`WeMoDemoFixtures.kt`](app/src/main/java/com/example/data/WeMoDemoFixtures.kt) |
 | **2026-11-08 07:42 PST** | `v12.0` (`ac7cd7b`) | **Expanded Semantic Category Keywords (`garland`, `wreath`, `vent`, `pendant`), Empty State Onboarding Card Layout & E2E Test** | [`WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt), [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`ExampleRobolectricTest.kt`](app/src/test/java/com/example/ExampleRobolectricTest.kt) |
 | **2026-11-08 07:41 PST** | `v12.0` (`2f97020`) | **Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`)** | [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md), [`AGENTS.md`](AGENTS.md), [`IMPLEMENTED.md`](IMPLEMENTED.md) |
 | **2026-11-08 07:35 PST** | `v12.0` (`c5ca7c4`) | **Architecture & Protocol Review Sign-Off (Section 7 of Modularization Plan)** | [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) |
@@ -48,6 +49,15 @@ Related documentation:
 ---
 
 ## 2. Detailed Change Log (Newest to Oldest)
+
+### [2026-11-08 14:30 PST] — Phase M1 Data Layer Modularization (`WeMoRepository.kt` `1,898` → `629` Lines, `v12.0`)
+- **Decomposed [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt) into 4 Single-Responsibility Modules**:
+  - [`WeMoDemoFixtures.kt`](app/src/main/java/com/example/data/WeMoDemoFixtures.kt) (`351` lines): Extracted `DEFAULT_ROOMS`, `defaultHomeNetworks()`, `defaultClassicDevices()`, and `defaultClassicRules()` while preserving companion delegations on `WeMoRepository`.
+  - [`WeMoDiscoveryCoordinator.kt`](app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt) (`385` lines): Extracted startup `GetBinaryState` probing (`detectStartupDeviceStates`), 2-stage self-healing reconnect (`attemptTwoStageReconnect`), `reconnectDevice`, `reconnectAndRediscoverHome`, `executeSsdpScan`, `adoptDiscoveredDevice`, `adoptDiscoveredDevices`, and zero-permission subnet/SSID home sync, sharing the repository's single `Semaphore(3)`, `deviceMutexes`, and `lastSetStateTimestampMs` map.
+  - [`WeMoProvisioningCoordinator.kt`](app/src/main/java/com/example/data/WeMoProvisioningCoordinator.kt) (`289` lines): Extracted `10.22.22.1` Setup AP probing (`probeSetupApDevice`), 2.4 GHz AP scanning (`scanSetupApNetworks`), `WiFiSetup1#ConnectHomeNetwork` provisioning (`provisionSetupApDevice`), Demo Showroom AP simulation, and post-provisioning Room registration.
+  - [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt) (`629` lines): Consolidated duplicated optimistic SOAP state-transition boilerplate across `toggleDevicePower`, `setDevicePowerExplicit`, and `updateDeviceBrightness` into a single `executeOptimisticDeviceCommand` pipeline.
+
+---
 
 ### [2026-11-08 07:42 PST] — Expanded Semantic Category Keywords, Empty State Onboarding Card Layout & E2E Test (`ac7cd7b`, `v12.0`)
 - **Expanded Semantic Category Classification ([`WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt))**:

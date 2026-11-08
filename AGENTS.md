@@ -46,7 +46,10 @@ The app supports four physical Belkin WeMo hardware families:
     - `WeMoDeviceEntity` (`wemo_devices`): Device state, network address (`ipAddress`, `port`, `networkKey`, `wifiSsid`), hardware telemetry (`serialNumber`, `firmwareVersion`, `hardwareModel`, `macAddress`, `udn`, `signalStrengthPercent`, `nightModeEnabled`), and live connection status (`isReachable`, `latencyMs`, `lastCheckedTime`, `isOn`, `brightness`, `autoOffMinutes`).
     - `WeMoRuleEntity` (`wemo_rules`): Local schedules and timers (`SCHEDULE`, `MOTION_TRIGGER`, `AUTO_OFF`).
   - `WeMoDao.kt` & `WeMoDatabase.kt`: Room database (`wemo_control_database.db`, schema `version = 5`).
-  - `WeMoRepository.kt`: Bridges Room DAO, `WeMoNetworkClient`, `WeMoGenaSubscriptionManager`, and `WeMoProvisionerClient` with `Semaphore(3)` RTOS protection, per-device `Mutex`, 2-stage self-healing reconnect, startup `GetBinaryState` detection (`detectStartupDeviceStates`), manual IP 9-port hardware probing, optimistic UI with offline revert, and **Real LAN Mode** vs. **Demo Showroom Mode**.
+  - `WeMoRepository.kt`: Public repository facade (~625 lines) holding `Semaphore(3)` RTOS protection, per-device `Mutex`, unified `executeOptimisticDeviceCommand` (optimistic UI write, `lastSetStateTimestampMs` GENA echo suppression, 2-stage reconnect, and offline revert), UPnP GENA push handling, and Room CRUD.
+  - `WeMoDiscoveryCoordinator.kt`: Startup `GetBinaryState` detection (`detectStartupDeviceStates`), 2-stage self-healing reconnect (`attemptTwoStageReconnect`), SSDP scan & auto-adoption (`executeSsdpScan`, `adoptDiscoveredDevice`), and zero-permission subnet/SSID home sync.
+  - `WeMoProvisioningCoordinator.kt`: `10.22.22.1` Setup AP probing (`probeSetupApDevice`), 2.4 GHz AP scanning (`scanSetupApNetworks`), `WiFiSetup1#ConnectHomeNetwork` provisioning (`provisionSetupApDevice`), Demo Showroom AP simulation, and post-provisioning Room registration.
+  - `WeMoDemoFixtures.kt`: Showcase Demo Showroom fixtures (`DEFAULT_ROOMS`, `defaultHomeNetworks`, `defaultClassicDevices`, `defaultClassicRules`).
   - `WeMoRuleScheduler.kt`: Coroutine engine for per-device/rule Auto-Off countdowns (`activeCountdownsSec`) and daily `SCHEDULE` / Sunset / Sunrise rule execution.
 - **`network/` (`pywemo`-Grade UPnP / SSDP / SOAP / GENA & Provisioning Engine)**:
   - `WeMoNetworkClient.kt`:
