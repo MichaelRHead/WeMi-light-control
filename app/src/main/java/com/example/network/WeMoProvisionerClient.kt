@@ -126,8 +126,9 @@ class WeMoProvisionerClient(
             .find(unescaped)?.groupValues?.getOrNull(1)?.trim() ?: return emptyList()
 
         val results = mutableListOf<WeMoScannedAp>()
-        for (line in rawList.lines()) {
-            val clean = line.trim()
+        val normalizedList = rawList.replace(Regex("Page:[^$\\n]*\\$?"), "\n")
+        for (rawLine in normalizedList.lines()) {
+            val clean = rawLine.trim().removeSuffix(",").trim()
             if (clean.isEmpty() || clean.startsWith("Page:")) continue
             val parts = clean.split("|")
             if (parts.size >= 4) {
@@ -135,9 +136,9 @@ class WeMoProvisionerClient(
                 if (ssid.isEmpty()) continue
                 val channel = parts[1].trim().toIntOrNull() ?: 6
                 val rssi = parts[2].trim().toIntOrNull()?.coerceIn(1, 100) ?: 75
-                val secParts = parts[3].trim().split("/")
+                val secParts = parts[3].trim().removeSuffix(",").split("/")
                 val auth = secParts.getOrNull(0)?.trim().orEmpty().ifEmpty { "WPA2PSK" }
-                val enc = secParts.getOrNull(1)?.trim().orEmpty().ifEmpty { "AES" }
+                val enc = secParts.getOrNull(1)?.trim()?.removeSuffix(",").orEmpty().ifEmpty { "AES" }
                 if (results.none { it.ssid == ssid }) {
                     results.add(
                         WeMoScannedAp(

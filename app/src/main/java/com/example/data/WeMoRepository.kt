@@ -1072,8 +1072,8 @@ class WeMoRepository(
             val result = lanSemaphore.withPermit {
                 networkClient.configureNightMode(
                     device = device,
-                    nightModeEnabled = targetNightMode,
-                    nightModeBrightness = 20
+                    enabled = targetNightMode,
+                    nightBrightness = 20
                 )
             }
             appendLog(result.logEntry)

@@ -70,8 +70,12 @@ class WeMoRuleScheduler(
      */
     fun startAutoOffCountdownSeconds(deviceId: Int, durationSeconds: Int) {
         countdownJobs.remove(deviceId)?.cancel()
-        if (durationSeconds <= 0) return
+        if (durationSeconds <= 0) {
+            _activeCountdownsSec.value = _activeCountdownsSec.value - deviceId
+            return
+        }
 
+        _activeCountdownsSec.value = _activeCountdownsSec.value + (deviceId to durationSeconds)
         val job = scope.launch {
             var remaining = durationSeconds
             while (isActive && remaining > 0) {
