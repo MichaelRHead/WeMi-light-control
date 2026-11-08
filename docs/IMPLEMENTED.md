@@ -24,7 +24,8 @@ Related documentation:
 
 | Landed (PST) | Version / Commit | Feature or Improvement | Primary Files |
 | :--- | :--- | :--- | :--- |
-| **2026-11-08 14:30 PST** | `v12.0` (`HEAD`) | **Phase M1 Data Layer Modularization: `WeMoDemoFixtures`, `WeMoDiscoveryCoordinator`, `WeMoProvisioningCoordinator` & Unified `executeOptimisticDeviceCommand`** | [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt), [`WeMoDiscoveryCoordinator.kt`](app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt), [`WeMoProvisioningCoordinator.kt`](app/src/main/java/com/example/data/WeMoProvisioningCoordinator.kt), [`WeMoDemoFixtures.kt`](app/src/main/java/com/example/data/WeMoDemoFixtures.kt) |
+| **2026-11-08 14:48 PST** | `v12.0` (`HEAD`) | **Phase M2 Network Layer Modularization: `WeMoXmlAndSkuParser`, `WeMoSsdpDiscoveryEngine` & `WeMoPasswordCrypto`** | [`WeMoNetworkClient.kt`](app/src/main/java/com/example/network/WeMoNetworkClient.kt), [`WeMoXmlAndSkuParser.kt`](app/src/main/java/com/example/network/WeMoXmlAndSkuParser.kt), [`WeMoSsdpDiscoveryEngine.kt`](app/src/main/java/com/example/network/WeMoSsdpDiscoveryEngine.kt), [`WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt), [`WeMoPasswordCrypto.kt`](app/src/main/java/com/example/network/WeMoPasswordCrypto.kt) |
+| **2026-11-08 14:30 PST** | `v12.0` (`bace660`) | **Phase M1 Data Layer Modularization: `WeMoDemoFixtures`, `WeMoDiscoveryCoordinator`, `WeMoProvisioningCoordinator` & Unified `executeOptimisticDeviceCommand`** | [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt), [`WeMoDiscoveryCoordinator.kt`](app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt), [`WeMoProvisioningCoordinator.kt`](app/src/main/java/com/example/data/WeMoProvisioningCoordinator.kt), [`WeMoDemoFixtures.kt`](app/src/main/java/com/example/data/WeMoDemoFixtures.kt) |
 | **2026-11-08 07:42 PST** | `v12.0` (`ac7cd7b`) | **Expanded Semantic Category Keywords (`garland`, `wreath`, `vent`, `pendant`), Empty State Onboarding Card Layout & E2E Test** | [`WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt), [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`ExampleRobolectricTest.kt`](app/src/test/java/com/example/ExampleRobolectricTest.kt) |
 | **2026-11-08 07:41 PST** | `v12.0` (`2f97020`) | **Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`)** | [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md), [`AGENTS.md`](AGENTS.md), [`IMPLEMENTED.md`](IMPLEMENTED.md) |
 | **2026-11-08 07:35 PST** | `v12.0` (`c5ca7c4`) | **Architecture & Protocol Review Sign-Off (Section 7 of Modularization Plan)** | [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) |
@@ -49,6 +50,15 @@ Related documentation:
 ---
 
 ## 2. Detailed Change Log (Newest to Oldest)
+
+### [2026-11-08 14:48 PST] — Phase M2 Network Layer Modularization (`WeMoNetworkClient.kt` `1,268` → `856` Lines, `WeMoProvisionerClient.kt` `722` → `586` Lines, `v12.0`)
+- **Decomposed [`WeMoNetworkClient.kt`](app/src/main/java/com/example/network/WeMoNetworkClient.kt) and [`WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt) into Single-Responsibility Wire Protocol Modules**:
+  - [`WeMoXmlAndSkuParser.kt`](app/src/main/java/com/example/network/WeMoXmlAndSkuParser.kt) (`239` lines): Extracted stateless UPnP/SSDP/SOAP parsers and SKU classifiers (`buildSsdpMSearchPacket`, `parseSsdpHeaders`, `classifyHardwareSku`, `parseSetupXmlDescriptor`, `parseMetaInfoSoapResponse`, `parseSignalStrengthSoapResponse`, `parseApListXml`).
+  - [`WeMoSsdpDiscoveryEngine.kt`](app/src/main/java/com/example/network/WeMoSsdpDiscoveryEngine.kt) (`308` lines): Extracted UDP `239.255.255.250:1900` `M-SEARCH` discovery (`performSsdpDiscoveryScan` with `MulticastLock` + 1s retransmit + Demo Showroom fallback synthesis) and `Semaphore(24)` `/24` unicast sweep (`scanSubnetUnicast`).
+  - [`WeMoPasswordCrypto.kt`](app/src/main/java/com/example/network/WeMoPasswordCrypto.kt) (`98` lines): Extracted `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC Wi-Fi password encryption/decryption across Methods 1 (OpenWrt), 2 (RTOS), and 3 (`binaryOption`).
+  - Preserved all companion/method delegations on [`WeMoNetworkClient.kt`](app/src/main/java/com/example/network/WeMoNetworkClient.kt) (`856` lines) and [`WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt) (`586` lines) for zero-regression compatibility.
+
+---
 
 ### [2026-11-08 14:30 PST] — Phase M1 Data Layer Modularization (`WeMoRepository.kt` `1,898` → `629` Lines, `v12.0`)
 - **Decomposed [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt) into 4 Single-Responsibility Modules**:

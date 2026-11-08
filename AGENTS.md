@@ -54,10 +54,13 @@ The app supports four physical Belkin WeMo hardware families:
 - **`network/` (`pywemo`-Grade UPnP / SSDP / SOAP / GENA & Provisioning Engine)**:
   - `WeMoNetworkClient.kt`:
     - 9-port `probeWemoPort` (`49153, 49152, 49154, 49151, 49155..49159`) with TCP connect timeout vs. `ECONNREFUSED` vs. read timeout separation and `<serialNumber>`/`<UDN>` verification.
-    - `setBinaryState` (with `<BinaryState>Error</BinaryState>` handling), `getBinaryState`, `getMetaInfo`, `getSignalStrength`, `changeFriendlyName`, `configureNightMode`, `scanSubnetUnicast`, and `performSsdpDiscoveryScan` (`MulticastLock` + 1s retransmit).
+    - `setBinaryState` (with `<BinaryState>Error</BinaryState>` handling), `getBinaryState`, `getMetaInfo`, `getSignalStrength`, `changeFriendlyName`, `configureNightMode`, and companion delegations to `WeMoXmlAndSkuParser` and `WeMoSsdpDiscoveryEngine`.
+  - `WeMoXmlAndSkuParser.kt`: Stateless UPnP/SSDP/SOAP parsers (`buildSsdpMSearchPacket`, `parseSsdpHeaders`, `classifyHardwareSku`, `parseSetupXmlDescriptor`, `parseMetaInfoSoapResponse`, `parseSignalStrengthSoapResponse`, `parseApListXml`).
+  - `WeMoSsdpDiscoveryEngine.kt`: UDP `239.255.255.250:1900` `M-SEARCH` scanner (`performSsdpDiscoveryScan` with `MulticastLock` + 1s retransmit) and `/24` `Semaphore(24)` unicast sweep (`scanSubnetUnicast`).
   - `WeMoGenaSubscriptionManager.kt`: Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery) for `<100ms` physical switch updates.
   - `WeMoNetworkMonitor.kt`: Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory`.
-  - `WeMoProvisionerClient.kt`: `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` and `pywemo`-exact OpenSSL EVP_BytesToKey MD5 AES-128-CBC (Methods 1, 2 & 3) double-send `ConnectHomeNetwork` + `CloseSetup` + `SetSetupDoneStatus` provisioner.
+  - `WeMoProvisionerClient.kt`: `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` / `GetNetworkList` and double-send `ConnectHomeNetwork` + `GetNetworkStatus` + `CloseSetup` + `SetSetupDoneStatus` provisioner.
+  - `WeMoPasswordCrypto.kt`: Stateless `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC Wi-Fi password encryption/decryption (Methods 1, 2 & 3).
 - **`ui/` (Jetpack Compose Skeuomorphic UI)**:
   - `WeMoViewModel.kt`, `components/WeMoWifiHomeBar.kt`, `components/WeMoDeviceRow.kt`, `components/WeMoRoomGroupCard.kt`, `components/WeMoSsdpScannerModal.kt`, `components/WeMoDialogs.kt`, `components/WeMoTvScreen.kt`, `components/WeMoHardwareIllustrations.kt`, and `screens/WeMoRulesAndMoreScreens.kt`.
 

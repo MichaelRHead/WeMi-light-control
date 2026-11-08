@@ -16,15 +16,10 @@ import java.io.OutputStreamWriter
 import java.net.ConnectException
 import java.net.InetSocketAddress
 import java.net.SocketTimeoutException
-import java.security.MessageDigest
 import java.text.SimpleDateFormat
-import java.util.Base64
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import javax.crypto.Cipher
-import javax.crypto.spec.IvParameterSpec
-import javax.crypto.spec.SecretKeySpec
 
 data class WeMoScannedAp(
     val ssid: String,
@@ -65,17 +60,11 @@ data class WeMoProvisionResult(
 )
 
 /**
- * Zero-cloud Belkin WeMo Wi-Fi setup provisioner (10.22.22.1) matching
- * pywemo/ouimeaux_device/__init__.py and pywemo/ouimeaux_device/api/wifi_setup.py.
+ * Zero-cloud Belkin WeMo Wi-Fi setup provisioner (`10.22.22.1`) matching
+ * `pywemo/ouimeaux_device/__init__.py` and `pywemo/ouimeaux_device/api/wifi_setup.py`.
  *
- * Supports:
- * - Fast 9-port setup descriptor probing (/setup.xml and /Lightsetup.xml) over Wi-Fi-bound sockets
- * - Auto-detection of encryption method (1, 2, or 3) from <rtos>, <iot>, and <binaryOption> tags
- * - Scanning nearby 2.4 GHz Wi-Fi networks via WiFiSetup1#GetApList (with GetNetworkList fallback)
- * - Exact pywemo AES-128-CBC password encryption (Methods 1, 2, and 3)
- * - Optional hardware FriendlyName configuration during setup (basicevent1#ChangeFriendlyName)
- * - Double-send ConnectHomeNetwork (100ms apart), multi-poll GetNetworkStatus (0/3 -> 1),
- *   CloseSetup, and basicevent1#SetSetupDoneStatus
+ * Delegates OpenSSL `EVP_BytesToKey` MD5 `AES-128-CBC` password encryption (Methods 1, 2, and 3)
+ * to [WeMoPasswordCrypto] and AP list XML parsing to [WeMoXmlAndSkuParser].
  */
 class WeMoProvisionerClient(
     private val appContext: Context? = null,
@@ -95,8 +84,8 @@ class WeMoProvisionerClient(
     private val setupPorts = listOf(49152, 49153, 49154, 49151, 49155, 49156, 49157, 49158, 49159)
 
     companion object {
-        const val METHOD_2_RTOS_SALT_SUFFIX = "b3{8t;80dIN{ra83eC1s?M70?683@2Yf"
-        const val METHOD_3_BINARY_OPTION_EXTRA = "bVduaWFyZkllaWVAb3RjbHAkcm9uT2Jh"
+        const val METHOD_2_RTOS_SALT_SUFFIX = WeMoPasswordCrypto.METHOD_2_RTOS_SALT_SUFFIX
+        const val METHOD_3_BINARY_OPTION_EXTRA = WeMoPasswordCrypto.METHOD_3_BINARY_OPTION_EXTRA
 
         private fun escapeXml(input: String): String {
             return input
@@ -140,10 +129,8 @@ class WeMoProvisionerClient(
                     try {
                         sock.connect(InetSocketAddress(apHost, port), 650)
                     } catch (_: ConnectException) {
-                        // Port closed (ECONNREFUSED) — host is alive, try next port immediately
                         break
                     } catch (_: SocketTimeoutException) {
-                        // Host IP itself timed out on TCP SYN — abort port sweep immediately
                         hostUnreachable = true
                         break
                     }
@@ -216,10 +203,6 @@ class WeMoProvisionerClient(
             else -> WeMoDeviceType.SWITCH_PLUG
         }
 
-        // pywemo auto-detection rule from setup.xml:
-        // - rtos == 1 and iot != 1 -> Method 2 (addLengths = false)
-        // - binaryOption == 1 -> Method 3 (addLengths = true)
-        // - default -> Method 1 (addLengths = true)
         val recommendedMethod = when {
             isRtos && !isIot -> 2
             binaryOption -> 3
@@ -249,18 +232,10 @@ class WeMoProvisionerClient(
         )
     }
 
-    /**
-     * Resolves the active setup port on the WeMo AP (10.22.22.1:49152 or :49153).
-     */
     suspend fun resolveSetupPort(apHost: String = defaultApHost, preferredPort: Int = 49152): Int {
         return probeSetupDevice(apHost, preferredPort)?.port ?: preferredPort
     }
 
-    /**
-     * Queries urn:Belkin:service:WiFiSetup:1#GetApList (with GetNetworkList fallback) from the
-     * WeMo setup AP (10.22.22.1) and parses the pipe-delimited AP list:
-     * SSID|Channel|RSSI|AuthMode/EncrypType.
-     */
     suspend fun fetchAvailableApList(
         apHost: String = defaultApHost,
         apPort: Int = 49152
@@ -304,152 +279,50 @@ class WeMoProvisionerClient(
         emptyList()
     }
 
-    fun parseApListXml(xml: String): List<WeMoScannedAp> {
-        val unescaped = xml
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&amp;", "&")
-        val rawList = Regex("<(?:ApList|NetworkList)>([\\s\\S]*?)</(?:ApList|NetworkList)>", RegexOption.IGNORE_CASE)
-            .find(unescaped)?.groupValues?.getOrNull(1)?.trim() ?: return emptyList()
+    fun parseApListXml(xml: String): List<WeMoScannedAp> =
+        WeMoXmlAndSkuParser.parseApListXml(xml)
 
-        val results = mutableListOf<WeMoScannedAp>()
-        val normalizedList = rawList.replace(Regex("Page:[^$\\n]*\\$?"), "\n")
-        for (rawLine in normalizedList.lines()) {
-            val clean = rawLine.trim().removeSuffix(",").trim()
-            if (clean.isEmpty() || clean.startsWith("Page:") || !clean.contains("|")) continue
-            val parts = clean.split("|")
-            if (parts.size >= 4) {
-                val ssid = parts[0].trim()
-                if (ssid.isEmpty()) continue
-                val channel = parts[1].trim().toIntOrNull() ?: 6
-                val rssi = parts[2].trim().toIntOrNull()?.coerceIn(1, 100) ?: 75
-                val secString = parts.last().trim().removeSuffix(",")
-                val secParts = secString.split("/")
-                val auth = secParts.getOrNull(0)?.trim().orEmpty().ifEmpty { "WPA2PSK" }
-                val enc = secParts.getOrNull(1)?.trim()?.removeSuffix(",").orEmpty().ifEmpty { "AES" }
-                if (results.none { it.ssid == ssid }) {
-                    results.add(
-                        WeMoScannedAp(
-                            ssid = ssid,
-                            channel = channel,
-                            signalStrengthPercent = rssi,
-                            authMode = auth,
-                            encryptionType = enc
-                        )
-                    )
-                }
-            }
-        }
-        return results
-    }
-
-    /**
-     * Builds the raw `keydata` string for Belkin WeMo's AES-128-CBC key derivation (Methods 1, 2, or 3)
-     * matching `pywemo/ouimeaux_device/__init__.py` (`encrypt_aes128`):
-     * - Method 1 (Gen 1 OpenWrt F7C030/F7C059/F7C063): `mac[0..6] + serial + mac[6..12]`
-     * - Method 2 (Gen 2 RTOS WLS040/WLS0403/WDS060/WSP080): `mac[0..6] + serial + mac[6..12] + "b3{8t;80dIN{ra83eC1s?M70?683@2Yf"`
-     * - Method 3 (`binaryOption = 1`): `mac[0..3] + mac[9..12] + serial + "bVduaWFyZkllaWVAb3RjbHAkcm9uT2Jh" + mac[6..9] + mac[3..6]`
-     */
     fun buildKeyData(
         macAddress: String,
         serialNumber: String,
         encryptionMethod: Int = 1
-    ): String {
-        val cleanMac = macAddress.replace(":", "").replace("-", "").trim()
-            .padEnd(12, '0').take(12)
-        val cleanSerial = serialNumber.trim()
-        return when (encryptionMethod) {
-            2 -> cleanMac.substring(0, 6) + cleanSerial + cleanMac.substring(6, 12) + METHOD_2_RTOS_SALT_SUFFIX
-            3 -> cleanMac.substring(0, 3) + cleanMac.substring(9, 12) + cleanSerial +
-                METHOD_3_BINARY_OPTION_EXTRA + cleanMac.substring(6, 9) + cleanMac.substring(3, 6)
-            else -> cleanMac.substring(0, 6) + cleanSerial + cleanMac.substring(6, 12)
-        }
-    }
+    ): String = WeMoPasswordCrypto.buildKeyData(
+        macAddress = macAddress,
+        serialNumber = serialNumber,
+        encryptionMethod = encryptionMethod
+    )
 
-    /**
-     * Encrypts the Wi-Fi password using Belkin WeMo's exact AES-128-CBC key derivation
-     * (`pywemo/ouimeaux_device/api/wifi_setup.py` + `pywemo/ouimeaux_device/__init__.py`):
-     * - `salt = keydata[0..8]`
-     * - `iv = keydata[0..16]` (UTF-8 bytes)
-     * - `derivedKey = MD5(keydata + salt)[0..16]`
-     * - `AES/CBC/PKCS5Padding` encrypted and Base64-encoded
-     * - By default (`addPasswordLengths == null`), appends the 4-hex-digit suffix (`xxyy`) for
-     *   Methods 1 and 3, and omits it for Method 2 (matching `pywemo`: `add_lengths = method in (1, 3)`).
-     */
     fun encryptWifiPassword(
         plainPassword: String,
         macAddress: String,
         serialNumber: String,
         encryptionMethod: Int = 1,
         addPasswordLengths: Boolean? = null
-    ): String {
-        val keydata = buildKeyData(macAddress, serialNumber, encryptionMethod).padEnd(16, '0')
-        val keyBytes = keydata.toByteArray(Charsets.UTF_8)
-        val saltBytes = keydata.substring(0, 8).toByteArray(Charsets.UTF_8)
-        val ivBytes = keydata.substring(0, 16).toByteArray(Charsets.UTF_8)
+    ): String = WeMoPasswordCrypto.encryptWifiPassword(
+        plainPassword = plainPassword,
+        macAddress = macAddress,
+        serialNumber = serialNumber,
+        encryptionMethod = encryptionMethod,
+        addPasswordLengths = addPasswordLengths
+    )
 
-        val md5 = MessageDigest.getInstance("MD5")
-        md5.update(keyBytes)
-        md5.update(saltBytes)
-        val derivedKey = md5.digest().copyOfRange(0, 16)
-
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(derivedKey, "AES"), IvParameterSpec(ivBytes))
-        val plainBytes = plainPassword.toByteArray(Charsets.UTF_8)
-        val encryptedBytes = cipher.doFinal(plainBytes)
-        val base64Encoded = Base64.getEncoder().encodeToString(encryptedBytes)
-
-        val shouldAddLengths = addPasswordLengths ?: (encryptionMethod != 2)
-        return if (shouldAddLengths) {
-            val encLenHex = String.format(Locale.US, "%02x", base64Encoded.length and 0xFF)
-            val origLenHex = String.format(Locale.US, "%02x", plainBytes.size and 0xFF)
-            base64Encoded + encLenHex + origLenHex
-        } else {
-            base64Encoded
-        }
-    }
-
-    /**
-     * Decrypts a WeMo encrypted Wi-Fi password payload (for unit test verification).
-     */
     fun decryptWifiPassword(
         encryptedPayload: String,
         macAddress: String,
         serialNumber: String,
         encryptionMethod: Int = 1,
         hasLengthSuffix: Boolean = (encryptionMethod != 2)
-    ): String {
-        val keydata = buildKeyData(macAddress, serialNumber, encryptionMethod).padEnd(16, '0')
-        val keyBytes = keydata.toByteArray(Charsets.UTF_8)
-        val saltBytes = keydata.substring(0, 8).toByteArray(Charsets.UTF_8)
-        val ivBytes = keydata.substring(0, 16).toByteArray(Charsets.UTF_8)
-
-        val md5 = MessageDigest.getInstance("MD5")
-        md5.update(keyBytes)
-        md5.update(saltBytes)
-        val derivedKey = md5.digest().copyOfRange(0, 16)
-
-        val base64Part = if (hasLengthSuffix && encryptedPayload.length > 4) {
-            encryptedPayload.substring(0, encryptedPayload.length - 4)
-        } else {
-            encryptedPayload
-        }
-        val cipherBytes = Base64.getDecoder().decode(base64Part)
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(derivedKey, "AES"), IvParameterSpec(ivBytes))
-        return String(cipher.doFinal(cipherBytes), Charsets.UTF_8)
-    }
+    ): String = WeMoPasswordCrypto.decryptWifiPassword(
+        encryptedPayload = encryptedPayload,
+        macAddress = macAddress,
+        serialNumber = serialNumber,
+        encryptionMethod = encryptionMethod,
+        hasLengthSuffix = hasLengthSuffix
+    )
 
     /**
      * Provisions a factory-reset Belkin WeMo switch at [apHost]:[apPort] onto the target 2.4 GHz
-     * home Wi-Fi network using pywemo's exact sequence:
-     * 1. Probe setup descriptor (`/setup.xml` / `/Lightsetup.xml` + `metainfo1#GetMetaInfo`) and auto-detect
-     *    encryption method (`0` = auto-detect from `<rtos>` / `<iot>` / `<binaryOption>`, or `1` / `2` / `3`).
-     * 2. Optionally set `<FriendlyName>` via `basicevent1#ChangeFriendlyName` if [customFriendlyName] is provided.
-     * 3. Send `WiFiSetup1#ConnectHomeNetwork` twice (`100ms` apart).
-     * 4. Poll `WiFiSetup1#GetNetworkStatus` until status is `1` (connected) or `2` (short password),
-     *    waiting extra cycles if status is `3` (handshake in progress).
-     * 5. Send `WiFiSetup1#CloseSetup` and `basicevent1#SetSetupDoneStatus`.
+     * home Wi-Fi network using `pywemo`'s exact sequence.
      */
     suspend fun provisionDeviceToHomeWifi(
         apHost: String = defaultApHost,
@@ -477,7 +350,6 @@ class WeMoProvisionerClient(
         }
         val effectiveAddLengths = addPasswordLengths ?: (effectiveMethod != 2)
 
-        // Optional: push custom FriendlyName while connected to the setup AP before closing setup
         if (!customFriendlyName.isNullOrBlank() && descriptor != null) {
             runCatching {
                 val renameBody = """
@@ -537,7 +409,6 @@ class WeMoProvisionerClient(
         val endpoint = "http://$apHost:$resolvedPort/upnp/control/WiFiSetup1"
         var httpSuccess = false
 
-        // pywemo requirement: ConnectHomeNetwork must be sent twice with a ~100ms pause
         repeat(2) { attempt ->
             try {
                 val req = Request.Builder()
@@ -553,14 +424,11 @@ class WeMoProvisionerClient(
                     }
                 }
             } catch (_: Exception) {
-                // If descriptor was null and first ConnectHomeNetwork failed, setup AP is unreachable
                 if (descriptor == null && attempt == 0) return@repeat
             }
             if (attempt == 0 && httpSuccess) delay(100L)
         }
 
-        // Poll GetNetworkStatus until status is 1 (connected) or 2 (short password),
-        // waiting extra cycles if status is 3 (WPA2 handshake in progress).
         var netStatus = if (httpSuccess) 0 else -1
         var closeStatus = ""
 
@@ -602,7 +470,6 @@ class WeMoProvisionerClient(
                     netStatus = polled
                     if (netStatus == 1 || netStatus == 2) break
                 } else if (polls > 0 && netStatus == 3) {
-                    // AP dropped after handshake status 3 -> switch joined home Wi-Fi
                     netStatus = 1
                     break
                 } else {
@@ -614,7 +481,6 @@ class WeMoProvisionerClient(
                 }
             }
 
-            // If still in status 3 (handshake), poll up to 3 extra cycles per pywemo
             var extraHandshakeLoops = 3
             while (netStatus == 3 && extraHandshakeLoops > 0) {
                 delay(statusPollDelayMs)
@@ -629,7 +495,6 @@ class WeMoProvisionerClient(
                 extraHandshakeLoops--
             }
 
-            // Always send CloseSetup per pywemo (even if status is 0 or 3)
             try {
                 val closeBody = """
                     <?xml version="1.0" encoding="utf-8"?>
@@ -657,7 +522,6 @@ class WeMoProvisionerClient(
                 closeStatus = "ap_closed"
             }
 
-            // Finalize with basicevent1#SetSetupDoneStatus per pywemo
             if (netStatus == 1 || netStatus == 3) {
                 runCatching {
                     val doneBody = """
