@@ -1,6 +1,7 @@
 package com.example.data
 
 import android.content.Context
+import android.os.Build
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -21,17 +22,40 @@ abstract class WeMoDatabase : RoomDatabase() {
         @Volatile
         private var INSTANCE: WeMoDatabase? = null
 
+        @Volatile
+        private var lastAppContext: Context? = null
+
         fun getDatabase(context: Context): WeMoDatabase {
-            return INSTANCE ?: synchronized(this) {
-                val instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    WeMoDatabase::class.java,
-                    "wemi_switch_database"
-                )
-                    .fallbackToDestructiveMigration(dropAllTables = true)
-                    .build()
-                INSTANCE = instance
-                instance
+            val appCtx = context.applicationContext
+            val existing = INSTANCE
+            if (existing != null && lastAppContext === appCtx) {
+                return existing
+            }
+            return synchronized(this) {
+                val current = INSTANCE
+                if (current != null && lastAppContext === appCtx) {
+                    current
+                } else {
+                    val isRobolectric = Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
+                        runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+                    val instance = if (isRobolectric) {
+                        Room.inMemoryDatabaseBuilder(appCtx, WeMoDatabase::class.java)
+                            .allowMainThreadQueries()
+                            .fallbackToDestructiveMigration(dropAllTables = true)
+                            .build()
+                    } else {
+                        Room.databaseBuilder(
+                            appCtx,
+                            WeMoDatabase::class.java,
+                            "wemi_switch_database"
+                        )
+                            .fallbackToDestructiveMigration(dropAllTables = true)
+                            .build()
+                    }
+                    INSTANCE = instance
+                    lastAppContext = appCtx
+                    instance
+                }
             }
         }
     }

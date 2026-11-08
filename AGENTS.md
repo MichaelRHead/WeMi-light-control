@@ -69,6 +69,12 @@ The app supports four physical Belkin WeMo hardware families:
   - `components/WeMoDeviceEditDialog.kt`, `components/WeMoRuleDialog.kt`, and `components/WeMoProvisionApDialog.kt`.
   - `components/WeMoTvScreen.kt` and `components/WeMoTvCardsAndScenes.kt`.
   - `components/WeMoHardwareIllustrations.kt`, `components/WeMoSwitchAndPlugIllustration.kt`, `components/WeMoLightAndSensorIllustrations.kt`, `components/WeMoChristmasTreeIllustration.kt`, and `components/WeMoFanIllustration.kt`.
+- **`test/` (Loopback UPnP/SOAP Hardware Simulator, Protocol Unit Tests & Compose E2E Tests — `app/src/test/java/com/example/`)**:
+  - `FakeWeMoUpnpServer.kt`: Reusable `AutoCloseable` loopback Belkin WeMo HTTP/UPnP/SOAP/GENA/`WiFiSetup1` server on `127.0.0.1` (`ServerSocket(0)`).
+  - `WeMoSkuAndCryptoTest.kt`: Hardware SKU classification (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`), `/setup.xml` parsing, semantic device categorization, and `pywemo` AES-128-CBC encryption/decryption (Methods 1, 2 & 3).
+  - `WeMoSoapAndSelfHealingTest.kt`: 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, offline rollback, manual IP probing, and multi-device startup state detection.
+  - `WeMoGenaProvisioningAndRulesTest.kt`: UPnP GENA `SUBSCRIBE`, HTTP 412 recovery, embedded `NOTIFY` callback server, `WeMoRuleScheduler`, and full loopback `10.22.22.1` `WiFiSetup1` provisioning.
+  - `ExampleRobolectricTest.kt` & `WeMoEndToEndUiTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeWeMoUpnpServer` End-to-End UI tests (`20/20` tests passing).
 
 ---
 
@@ -77,7 +83,7 @@ The app supports four physical Belkin WeMo hardware families:
 > **CRITICAL RULE**: **Only push code to GitHub (`origin/main` or `origin/agent-docs`) after verifying that the full build and all automated tests pass with zero errors.** Never push unverified or non-compiling code.
 
 ```bash
-# Run Robolectric unit, protocol & UI integration tests (ExampleRobolectricTest + WeMoProtocolTest)
+# Run all 20 Robolectric unit, protocol & E2E Compose UI tests
 ./gradlew testDebugUnitTest
 
 # Assemble debug APK

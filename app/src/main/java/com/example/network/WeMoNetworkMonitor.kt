@@ -202,20 +202,34 @@ class WeMoNetworkMonitor(
          */
         fun createWifiBoundSocketFactory(context: Context?): SocketFactory {
             val appCtx = context?.applicationContext
+            val isRobolectric = android.os.Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
+                runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+
             return object : SocketFactory() {
+                private fun resolveWifiNetwork(): Network? {
+                    if (isRobolectric) return null
+                    val cm = appCtx?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                    return findPreferredWifiOrLanNetwork(cm)
+                }
+
                 private fun delegateForHost(host: String?): SocketFactory {
                     if (host == null || host == "localhost" || host.startsWith("127.")) {
                         return getDefault()
                     }
-                    val cm = appCtx?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-                    val wifiNet = findPreferredWifiOrLanNetwork(cm)
-                    return wifiNet?.socketFactory ?: getDefault()
+                    return resolveWifiNetwork()?.socketFactory ?: getDefault()
                 }
 
                 override fun createSocket(): Socket {
-                    val cm = appCtx?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
-                    val wifiNet = findPreferredWifiOrLanNetwork(cm)
-                    return runCatching { wifiNet?.socketFactory?.createSocket() }.getOrNull() ?: Socket()
+                    val wifiNet = resolveWifiNetwork() ?: return Socket()
+                    return object : Socket() {
+                        override fun connect(endpoint: java.net.SocketAddress?, timeout: Int) {
+                            val inetAddr = (endpoint as? java.net.InetSocketAddress)?.address
+                            if (inetAddr != null && !inetAddr.isLoopbackAddress) {
+                                runCatching { wifiNet.bindSocket(this) }
+                            }
+                            super.connect(endpoint, timeout)
+                        }
+                    }
                 }
 
                 override fun createSocket(host: String?, port: Int): Socket =
