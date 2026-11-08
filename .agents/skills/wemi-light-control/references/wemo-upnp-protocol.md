@@ -150,3 +150,41 @@ To receive instant push notifications when a physical wall switch, 3-way switch,
      </e:propertyset>
      ```
    - Reply `HTTP/1.1 200 OK` and immediately update Room (`isOn`, `brightness`, `isReachable = true`, `lastCheckedTime = "Push event"`).
+
+
+---
+
+## 7. RTOS vs. OpenWrt Firmware Nuances & Reliability Safeguards
+
+### 7.1 2nd-Gen `WLS040` / `WLS0403` (3-Way) & `WDS060` RTOS Stack (`home-assistant/core#45904`, `#62224`)
+- 1st-Gen devices (`F7C030`, `F7C059`, `F7C063`) run Linux/OpenWrt (`libupnp`), while newer 2nd-Gen devices (`WLS040`, `WLS0403` 3-Way Switch, `WDS060` Dimmer V2, `WSP080` Mini V2) run an embedded RTOS (`<rtos>1</rtos>` in `setup.xml`).
+- **Critical Reliability Rules for `WLS040` / `WLS0403`**:
+  1. **Never flood a device during reconnect (`#45904`)**: Sending 7+ rapid `/setup.xml` and SCPD requests when a single poll times out can exhaust the device's tiny socket pool and wedge its UPnP server. Always serialize requests per device (`Mutex`) and cap LAN-wide concurrency (`Semaphore(3)`).
+  2. **Always close TCP sockets (`Connection: close`)**: Persistent keep-alive sockets starve the embedded HTTP listener.
+  3. **Confirm-Read Race After `SetBinaryState`**: On some firmwares, calling `GetBinaryState` within `100–1500 ms` after `SetBinaryState` returns the *pre-transition* state while the relay or dimmer fader is still ramping. Trust the HTTP 200 `SetBinaryState` result immediately and wait at least `1.5–2.0 s` before any follow-up `GetBinaryState` verification poll.
+  4. **Dimmer V2 (`WDS060`) Rules DB Limitation (`pywemo#296`)**: RTOS-based `WDS060` returns `HTTP 404` on `/rules.db` (`FetchRules`/`StoreRules` are unsupported), so schedules/timers for `WDS060` must be executed by the controller or via `basicevent1` (`ConfigureNightMode`, `SetBinaryState`).
+
+### 7.2 Post-2026 Cloud Shutdown & Blinking Amber Status LED
+- Belkin discontinued WeMo cloud servers on January 31, 2026. All local UPnP/SSDP/SOAP discovery and control operate 100% offline on the LAN without cloud authentication.
+- Devices that blink their amber/orange Wi-Fi LED due to cloud reachability checks probe `heartbeat.xwemo.com`, `heartbeat.lswf.net`, and `www.belkin.com` (plus NTP `0..3.linksys.pool.ntp.org`). Resolving `heartbeat.xwemo.com` and `heartbeat.lswf.net` to `127.0.0.1` in local router DNS (Pi-hole / dnsmasq / Unbound) silences the blinking amber indicator.
+
+---
+
+## 8. Local Wi-Fi Provisioning (`WiFiSetup1` on `10.22.22.1:49152`)
+
+Unconfigured or factory-reset WeMo devices broadcast an open 2.4 GHz setup AP (`WeMo.Light.xxx`, `WeMo.Dimmer.xxx`, `WeMo.Mini.xxx`) at `10.22.22.1` (port `49152` or `49153`, serving `/setup.xml` or `/Lightsetup.xml`).
+
+1. **Scan Visible 2.4 GHz APs**:
+   - `POST /upnp/control/WiFiSetup1` (`urn:Belkin:service:WiFiSetup:1#GetApList`) -> returns `<ApList>` lines of `SSID|Channel|SignalPercent|AuthMode/Encryption` (e.g. `MyHome24|6|88|WPA2PSK/AES`).
+2. **Fetch Device Metadata (`metainfo1#GetMetaInfo`)**:
+   - Extracts `mac` (12 hex chars) and `serial_number`.
+3. **Encrypt Wi-Fi Password (`pywemo/ouimeaux_device/api/wifi_setup.py`)**:
+   - Select keydata construction method from `setup.xml` extra tags:
+     - **Method 1 (Default / OpenWrt)**: `keydata = mac[0..5] + serial + mac[6..11]`, append 2-byte hex lengths (`%02x%02x` of encrypted length and raw password length).
+     - **Method 2 (RTOS `<rtos>1</rtos>` and `<iot>` != `1`)**: `keydata = mac[0..5] + serial + mac[6..11] + "b3{8t;80dIN{ra83eC1s?M70?683@2Yf"`, no length suffix.
+     - **Method 3 (`<binaryOption>1</binaryOption>`)**: `keydata = mac[0..2] + mac[9..11] + serial + "bVduaWFyZkllaWVAb3RjbHAkcm9uT2Jh" + mac[6..8] + mac[3..5]`, with length suffix.
+   - Derive 16-byte AES key: `MD5(keydata + keydata[0..7])`, IV = `keydata[0..15]`, encrypt UTF-8 password with `AES-128-CBC` (PKCS7 padding), Base64-encode, and append hex length suffix if applicable.
+4. **Join Home Network**:
+   - Call `WiFiSetup1#ConnectHomeNetwork(ssid, auth, password, encrypt, channel)` **twice** with a `100 ms` pause between calls (`pywemo` reliability workaround).
+   - Poll `WiFiSetup1#GetNetworkStatus` until `<NetworkStatus>` is `1` (connected; `3` = handshake in progress, `2` = password too short).
+   - Finalize with `WiFiSetup1#CloseSetup` and `basicevent1#SetSetupDoneStatus`.
