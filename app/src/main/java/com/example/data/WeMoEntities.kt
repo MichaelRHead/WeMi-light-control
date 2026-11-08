@@ -69,6 +69,9 @@ data class WeMoDeviceEntity(
         get() = runCatching { WeMoDeviceType.valueOf(deviceType) }
             .getOrDefault(WeMoDeviceType.SWITCH_PLUG)
 
+    val visualCategory: WeMoDeviceCategory
+        get() = classifyDeviceCategory(name = name, deviceType = parsedType)
+
     val connectionQuality: WeMoConnectionQuality
         get() = when {
             !isReachable || latencyMs <= 0 -> WeMoConnectionQuality.OFFLINE
@@ -131,7 +134,58 @@ data class SsdpDiscoveredDevice(
     val macAddress: String = "",
     val wifiSsid: String = "",
     val signalStrengthPercent: Int = 85
-)
+) {
+    val visualCategory: WeMoDeviceCategory
+        get() = classifyDeviceCategory(name = name, deviceType = deviceType)
+}
+
+/**
+ * Classifies a switch's visual device category based on its friendly name and UPnP device type:
+ * - Tree lights ("Christmas Tree", "Tree Lights", "Xmas Tree", "Pine Tree") -> CHRISTMAS_TREE
+ * - Fans ("Ceiling Fan", "Bedroom Fan", "Exhaust Fan", "Blower") -> FAN
+ * - Lamps & Lights ("Lamp", "Light", "Lightbulb", "Candle", "Sconce", "Floodlight", "Lantern", or Dimmer) -> LIGHT
+ * - Motion sensors -> MOTION_SENSOR
+ * - Everything else -> SWITCH_PLUG
+ */
+fun classifyDeviceCategory(
+    name: String,
+    deviceType: WeMoDeviceType = WeMoDeviceType.SWITCH_PLUG
+): WeMoDeviceCategory {
+    if (deviceType == WeMoDeviceType.MOTION_SENSOR) {
+        return WeMoDeviceCategory.MOTION_SENSOR
+    }
+    val lower = name.lowercase()
+    return when {
+        "tree" in lower || "xmas" in lower || "evergreen" in lower || "spruce" in lower || "fir " in lower ->
+            WeMoDeviceCategory.CHRISTMAS_TREE
+
+        "fan" in lower || "blower" in lower || "exhaust" in lower || "ventilat" in lower || "circulator" in lower ->
+            WeMoDeviceCategory.FAN
+
+        deviceType == WeMoDeviceType.LIGHTBULB_DIMMER ||
+            "lamp" in lower ||
+            "light" in lower ||
+            "bulb" in lower ||
+            "candle" in lower ||
+            "sconce" in lower ||
+            "chandelier" in lower ||
+            "lantern" in lower ||
+            "flood" in lower ||
+            "spot" in lower ||
+            "downlight" in lower ||
+            "uplight" in lower ||
+            "strip" in lower ||
+            "neon" in lower ||
+            "torch" in lower ||
+            "fixture" in lower ->
+            WeMoDeviceCategory.LIGHT
+
+        "motion" in lower || "sensor" in lower ->
+            WeMoDeviceCategory.MOTION_SENSOR
+
+        else -> WeMoDeviceCategory.SWITCH_PLUG
+    }
+}
 
 fun inferRoomFromName(deviceName: String): String {
     val lower = deviceName.lowercase()

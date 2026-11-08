@@ -12,7 +12,9 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.test.core.app.ApplicationProvider
+import com.example.data.WeMoDeviceCategory
 import com.example.data.WeMoDeviceType
+import com.example.data.classifyDeviceCategory
 import com.example.data.inferRoomFromName
 import com.example.network.WeMoNetworkClient
 import org.junit.Assert.assertEquals
@@ -38,7 +40,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `verify SSDP packet builder, UPnP setup xml parser, and room inference`() {
+    fun `verify SSDP packet builder, UPnP setup xml parser, room inference, and name-based category classification`() {
         val client = WeMoNetworkClient()
         val mSearch = client.buildSsdpMSearchPacket("urn:Belkin:service:basicevent:1")
         assertTrue(mSearch.contains("M-SEARCH * HTTP/1.1"))
@@ -48,6 +50,17 @@ class ExampleRobolectricTest {
         assertEquals("Kitchen", inferRoomFromName("Christmas Tree Kitchen"))
         assertEquals("Bedroom", inferRoomFromName("Lightbulb Bedroom"))
         assertEquals("Hallway & Landing", inferRoomFromName("Lightbulb Landing"))
+
+        // Verify semantic icon classification from switch name
+        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Christmas Tree Living"))
+        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Holiday Tree Lights"))
+        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Bedroom Ceiling Fan"))
+        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Attic Exhaust Fan"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Living Room Floor Lamp"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Cabin Porch Floodlight"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Christmas Candle"))
+        assertEquals(WeMoDeviceCategory.MOTION_SENSOR, classifyDeviceCategory("Bedroom Light Motion", WeMoDeviceType.MOTION_SENSOR))
+        assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Office Wall Switch"))
 
         val rawSsdpResponse = """
             HTTP/1.1 200 OK
@@ -86,6 +99,7 @@ class ExampleRobolectricTest {
         assertEquals("192.168.1.122", discovered.ipAddress)
         assertEquals(49153, discovered.port)
         assertEquals(WeMoDeviceType.SWITCH_PLUG, discovered.deviceType)
+        assertEquals(WeMoDeviceCategory.SWITCH_PLUG, discovered.visualCategory)
     }
 
     @Test

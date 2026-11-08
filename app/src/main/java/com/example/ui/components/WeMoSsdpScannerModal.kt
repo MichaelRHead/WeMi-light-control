@@ -414,23 +414,13 @@ private fun SsdpDiscoveredDeviceRow(
                 modifier = Modifier.width(52.dp),
                 contentAlignment = Alignment.Center
             ) {
-                when (item.deviceType) {
-                    WeMoDeviceType.SWITCH_PLUG -> WeMoSmartPlugIllustration(
-                        isReachable = true,
-                        isOn = item.isOn,
-                        modifier = Modifier.size(width = 44.dp, height = 56.dp)
-                    )
-                    WeMoDeviceType.MOTION_SENSOR -> WeMoMotionSensorIllustration(
-                        isReachable = true,
-                        modifier = Modifier.size(width = 44.dp, height = 56.dp)
-                    )
-                    WeMoDeviceType.LIGHTBULB_DIMMER -> WeMoLightbulbIllustration(
-                        isReachable = true,
-                        isOn = item.isOn,
-                        brightness = item.brightness,
-                        modifier = Modifier.size(width = 44.dp, height = 56.dp)
-                    )
-                }
+                WeMoDeviceCategoryIllustration(
+                    category = item.visualCategory,
+                    isReachable = true,
+                    isOn = item.isOn,
+                    brightness = item.brightness,
+                    modifier = Modifier.size(width = 44.dp, height = 56.dp)
+                )
             }
 
             Spacer(modifier = Modifier.width(10.dp))

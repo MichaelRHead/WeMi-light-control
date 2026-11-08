@@ -1395,6 +1395,23 @@ class WeMoRepository(
                 serialNumber = "94103EA2B27804",
                 sortOrder = 7
             ),
+            WeMoDeviceEntity(
+                id = 14,
+                name = "Bedroom Ceiling Fan",
+                roomName = "Bedroom",
+                networkKey = DEFAULT_MAIN_HOME_KEY,
+                wifiSsid = "WeMi-Home-5G",
+                deviceType = WeMoDeviceType.SWITCH_PLUG.name,
+                ipAddress = "192.168.1.109",
+                port = 49153,
+                isOn = false,
+                isReachable = true,
+                brightness = 100,
+                latencyMs = 13,
+                lastCheckedTime = "Just now",
+                serialNumber = "221517K01018A9",
+                sortOrder = 8
+            ),
 
             // --- Remembered Devices on Lake Cabin Wi-Fi (PineLake-Cabin-WiFi • 192.168.50.x) ---
             WeMoDeviceEntity(

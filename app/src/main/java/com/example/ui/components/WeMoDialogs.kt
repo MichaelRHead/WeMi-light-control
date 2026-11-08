@@ -8,7 +8,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -21,6 +25,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -43,6 +48,7 @@ import com.example.R
 import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
 import com.example.data.WeMoRepository
+import com.example.data.classifyDeviceCategory
 import com.example.data.inferRoomFromName
 import com.example.network.WeMoScannedAp
 import com.example.ui.theme.WemoErrorRed
@@ -86,6 +92,10 @@ fun AddOrEditWeMoDeviceDialog(
     var isOn by remember { mutableStateOf(initialDevice?.isOn ?: true) }
     var autoOffText by remember { mutableStateOf((initialDevice?.autoOffMinutes ?: 0).toString()) }
     var syncNameToHardware by remember { mutableStateOf(isEditing) }
+    val detectedCategory = classifyDeviceCategory(
+        name = name.ifBlank { "Switch" },
+        deviceType = selectedType
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -146,12 +156,45 @@ fun AddOrEditWeMoDeviceDialog(
                         }
                     },
                     label = { Text(stringResource(R.string.label_device_name)) },
-                    placeholder = { Text("e.g. Porch Light Switch") },
+                    placeholder = { Text("e.g. Christmas Tree, Ceiling Fan, Porch Light") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("device_name_input")
                 )
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = WemoGreenSoft.copy(alpha = 0.55f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        WeMoDeviceCategoryIllustration(
+                            category = detectedCategory,
+                            isReachable = isReachable,
+                            isOn = isOn,
+                            brightness = brightness.roundToInt(),
+                            modifier = Modifier.size(width = 40.dp, height = 50.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Auto-Classified Icon: ${detectedCategory.displayName}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = WemoGreenDark
+                            )
+                            Text(
+                                text = "Based on switch name (Tree Lights, Fans, Lamps/Lights, Sensors, Switches)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

@@ -147,30 +147,22 @@ fun WeMoDeviceRow(
                     .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: Hardware Illustration with live connection status dot overlay
+                // Left: Semantic Category / Hardware Illustration with live connection status badge overlay
                 Box(
                     modifier = Modifier.width(64.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    when (type) {
-                        WeMoDeviceType.SWITCH_PLUG -> WeMoSmartPlugIllustration(
-                            isReachable = device.isReachable,
-                            isOn = device.isOn
-                        )
-                        WeMoDeviceType.MOTION_SENSOR -> WeMoMotionSensorIllustration(
-                            isReachable = device.isReachable
-                        )
-                        WeMoDeviceType.LIGHTBULB_DIMMER -> WeMoLightbulbIllustration(
-                            isReachable = device.isReachable,
-                            isOn = device.isOn,
-                            brightness = device.brightness
-                        )
-                    }
+                    WeMoDeviceCategoryIllustration(
+                        category = device.visualCategory,
+                        isReachable = device.isReachable,
+                        isOn = device.isOn,
+                        brightness = device.brightness
+                    )
                 }
 
                 Spacer(modifier = Modifier.width(12.dp))
 
-                // Middle: Device Name + Room Badge + Real-Time Connection/Latency Indicator + Status
+                // Middle: Device Name + Room Badge + Category Badge + Real-Time Connection/Latency Indicator + Status
                 Column(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.Center
@@ -200,6 +192,21 @@ fun WeMoDeviceRow(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 10.sp,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                        Surface(
+                            color = Color(0xFFF1F5F9),
+                            shape = RoundedCornerShape(5.dp),
+                            border = BorderStroke(0.5.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.testTag("category_badge_${device.id}")
+                        ) {
+                            Text(
+                                text = device.visualCategory.displayName,
+                                color = Color(0xFF475569),
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 9.5.sp,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
                             )
                         }
                     }

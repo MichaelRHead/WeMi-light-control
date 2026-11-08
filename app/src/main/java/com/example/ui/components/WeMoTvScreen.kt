@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Air
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Celebration
 import androidx.compose.material.icons.filled.Close
@@ -43,6 +44,8 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.PowerOff
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Remove
@@ -81,6 +84,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.SoapLogEntry
+import com.example.data.WeMoDeviceCategory
 import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
 import com.example.ui.theme.ComfortaaFontFamily
@@ -795,9 +799,11 @@ private fun WeMoTvDeviceCard(
                         Icon(
                             imageVector = when {
                                 !device.isReachable -> Icons.Default.WifiOff
-                                type == WeMoDeviceType.MOTION_SENSOR -> Icons.Default.Sensors
-                                !device.isOn -> Icons.Default.PowerOff
-                                type == WeMoDeviceType.LIGHTBULB_DIMMER -> Icons.Default.Lightbulb
+                                !device.isOn && type != WeMoDeviceType.MOTION_SENSOR -> Icons.Default.PowerOff
+                                device.visualCategory == WeMoDeviceCategory.CHRISTMAS_TREE -> Icons.Default.Park
+                                device.visualCategory == WeMoDeviceCategory.FAN -> Icons.Default.Air
+                                device.visualCategory == WeMoDeviceCategory.LIGHT -> Icons.Default.Lightbulb
+                                device.visualCategory == WeMoDeviceCategory.MOTION_SENSOR -> Icons.Default.Sensors
                                 else -> Icons.Default.PowerSettingsNew
                             },
                             contentDescription = "Toggle ${device.name}",
@@ -812,17 +818,38 @@ private fun WeMoTvDeviceCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            Text(
-                text = device.name,
-                color = TvTextPrimary,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                WeMoDeviceCategoryIllustration(
+                    category = device.visualCategory,
+                    isReachable = device.isReachable,
+                    isOn = device.isOn,
+                    brightness = device.brightness,
+                    modifier = Modifier.size(width = 40.dp, height = 50.dp)
+                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = device.name,
+                        color = TvTextPrimary,
+                        fontFamily = WorkSansFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = device.visualCategory.displayName,
+                        color = TvCyanFocusBorder,
+                        fontFamily = WorkSansFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 11.sp
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(4.dp))
 

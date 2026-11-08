@@ -111,7 +111,7 @@ flowchart TD
 - Dispatches `WiFiSetup1#ConnectHomeNetwork` twice (`120ms` apart per `pywemo`), polls `GetNetworkStatus`, and closes the setup AP via `CloseSetup`.
 
 ### 4.4 Automated Verification (`WeMoProtocolTest.kt` & `ExampleRobolectricTest.kt`)
-- **8 automated test suites** verify SKU classification, loopback UPnP port shifting, startup `OFF` state detection (`detectStartupDeviceStates`), DHCP serial mismatch protection, `<BinaryState>Error</BinaryState>` handling, `GetMetaInfo` & `ChangeFriendlyName`, Real LAN Mode offline revert, GENA `SUBSCRIBE` / HTTP 412 / `NOTIFY` callbacks, `WeMoRuleScheduler` time parsing & Auto-Off countdowns, `WiFiSetup1` AP parsing & AES-128-CBC encryption, SSDP packet building, and multi-home room group controls.
+- **9 automated test suites** verify SKU classification, loopback UPnP port shifting, startup `OFF` state detection (`detectStartupDeviceStates` + `<binaryState>` parsing in `setup.xml`), semantic switch-name icon classification (`classifyDeviceCategory` for Christmas Trees, Fans, Lamps/Lights, Motion Sensors, and Switches), DHCP serial mismatch protection, `<BinaryState>Error</BinaryState>` handling, `GetMetaInfo` & `ChangeFriendlyName`, Real LAN Mode offline revert, GENA `SUBSCRIBE` / HTTP 412 / `NOTIFY` callbacks, `WeMoRuleScheduler` time parsing & Auto-Off countdowns, `WiFiSetup1` AP parsing & AES-128-CBC encryption, SSDP packet building, and multi-home room group controls.
 
 ### 4.5 Startup State Detection & Distinct Three-State Iconography (`ON` vs. `OFF (Accessible)` vs. `Disconnected`)
 - **Immediate Startup `GetBinaryState` Probe (`WeMoRepository.detectStartupDeviceStates`)**:
@@ -124,4 +124,15 @@ flowchart TD
      - Full `1.0f` opacity Deep Slate-Navy metallic switch bezel (or smoke-slate bulb with visible unlit filament), **Warm Amber Standby Locator LED** (`#F59E0B`), dark-slate & amber corner badge with IEC `"O"` (binary `0` = OFF) standby ring, `WeMoPowerStatePill` (`"OFF"` with amber standby ring), and tactile recessed slate `WeMoPowerRingButton` with top amber pilot dot and closed `"O"` standby symbol.
   3. **Disconnected / Offline (`!isReachable`)**:
      - Desaturated housing with dashed red outline (`#DC2626`), red `"X"` offline corner badge, red `Offline` connection badge, and inline `Retry` button.
+
+### 4.6 Semantic Switch-Name Classification & Custom Illustrations (`WeMoDeviceCategory`)
+- **Automatic Name-Based Classification (`classifyDeviceCategory` in `WeMoEntities.kt`)**:
+  - Every `WeMoDeviceEntity` and `SsdpDiscoveredDevice` exposes `visualCategory: WeMoDeviceCategory`, classified automatically from the switch name and UPnP type without requiring a Room migration:
+    - **`CHRISTMAS_TREE` (`Tree Lights`)**: Names containing `tree`, `xmas`, `evergreen`, `spruce`, or `fir` → rendered with **`WeMoChristmasTreeIllustration`** (3-tiered evergreen tree on a stand with a 5-point star topper, garland cord, and 9 multi-color fairy lights that glow when `ON`, show unlit frosted bulbs + standby amber base LED when `OFF`, and show a dashed red offline outline when `Disconnected`).
+    - **`FAN` (`Fan`)**: Names containing `fan`, `blower`, `exhaust`, `ventilat`, or `circulator` → rendered with **`WeMoFanIllustration`** (4 aerodynamic blades inside a protective shroud that spin smoothly when `ON`, stand stationary with a warm amber hub standby LED when `OFF`, and show a dashed red offline outline when `Disconnected`).
+    - **`LIGHT` (`Light`)**: Dimmers (`LIGHTBULB_DIMMER`) or switches whose names contain `lamp`, `light`, `bulb`, `candle`, `sconce`, `chandelier`, `lantern`, `flood`, `spot`, `downlight`, `uplight`, `strip`, `neon`, `torch`, or `fixture` → rendered with **`WeMoLightbulbIllustration`**.
+    - **`MOTION_SENSOR` (`Motion`)**: Motion sensors (`MOTION_SENSOR`) or names containing `motion` / `sensor` → rendered with **`WeMoMotionSensorIllustration`**.
+    - **`SWITCH_PLUG` (`Switch`)**: All other switches and outlets → rendered with **`WeMoSmartPlugIllustration`**.
+- **Integrated Across Phone, Tablet, SSDP Scanner, Dialogs, and Android TV**:
+  - `WeMoDeviceRow`, `WeMoSsdpScannerModal`, `WeMoTvScreen`, and `AddOrEditWeMoDeviceDialog` (with live as-you-type icon preview) all render `WeMoDeviceCategoryIllustration` and display the classified category badge (`Tree Lights`, `Fan`, `Light`, `Motion`, `Switch`).
 

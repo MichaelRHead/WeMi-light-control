@@ -4,10 +4,12 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.WeMoDatabase
+import com.example.data.WeMoDeviceCategory
 import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
 import com.example.data.WeMoRepository
 import com.example.data.WeMoRuleScheduler
+import com.example.data.classifyDeviceCategory
 import com.example.network.GenaEventNotification
 import com.example.network.WeMoGenaSubscriptionManager
 import com.example.network.WeMoNetworkClient
@@ -528,6 +530,69 @@ class WeMoProtocolTest {
         assertTrue(method1Enc.endsWith("15"))
         assertTrue(method2Enc.endsWith("15"))
         assertFalse(method1Enc == method2Enc)
+    }
+
+    @Test
+    fun `verify startup binaryState parsing in setup xml and semantic name classification for trees, fans, and lamps`() {
+        val client = WeMoNetworkClient()
+
+        // 1. Verify setup.xml with <binaryState>0</binaryState> parses as reachable OFF (isOn = false)
+        val offTreeXml = """
+            <?xml version="1.0"?>
+            <root xmlns="urn:Belkin:device-1-0">
+              <device>
+                <deviceType>urn:Belkin:device:controllee:1</deviceType>
+                <friendlyName>Christmas Tree Living</friendlyName>
+                <modelName>Socket</modelName>
+                <serialNumber>221517K01018A1</serialNumber>
+                <binaryState>0</binaryState>
+              </device>
+            </root>
+        """.trimIndent()
+        val offTree = client.parseSetupXmlDescriptor(
+            xml = offTreeXml,
+            locationUrl = "http://192.168.1.101:49153/setup.xml",
+            usnHeader = "uuid:Socket-1_0-221517K01018A1",
+            stHeader = "urn:Belkin:service:basicevent:1",
+            responseTimeMs = 11L,
+            isLiveUdp = true
+        )
+        assertFalse(offTree.isOn)
+        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, offTree.visualCategory)
+
+        // 2. Verify setup.xml with pipe-delimited <binaryState>1|1700000000|45</binaryState> parses as ON
+        val onFanXml = """
+            <?xml version="1.0"?>
+            <root xmlns="urn:Belkin:device-1-0">
+              <device>
+                <deviceType>urn:Belkin:device:lightswitch:1</deviceType>
+                <friendlyName>Bedroom Ceiling Fan</friendlyName>
+                <modelName>LightSwitch</modelName>
+                <serialNumber>221517K01018A9</serialNumber>
+                <binaryState>1|1700000000|45</binaryState>
+              </device>
+            </root>
+        """.trimIndent()
+        val onFan = client.parseSetupXmlDescriptor(
+            xml = onFanXml,
+            locationUrl = "http://192.168.1.109:49153/setup.xml",
+            usnHeader = "uuid:Lightswitch-1_0-221517K01018A9",
+            stHeader = "urn:Belkin:service:basicevent:1",
+            responseTimeMs = 13L,
+            isLiveUdp = true
+        )
+        assertTrue(onFan.isOn)
+        assertEquals(WeMoDeviceCategory.FAN, onFan.visualCategory)
+
+        // 3. Verify lamp, light, fan, tree, motion sensor, and generic switch classification
+        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Living Room Christmas Tree"))
+        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Front Yard Tree Lights"))
+        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Patio Misting Fan"))
+        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Bathroom Exhaust Blower"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Bedside Reading Lamp"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Kitchen Under-Cabinet Light"))
+        assertEquals(WeMoDeviceCategory.MOTION_SENSOR, classifyDeviceCategory("Hallway Motion Detector"))
+        assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Espresso Machine Plug"))
     }
 }
 
