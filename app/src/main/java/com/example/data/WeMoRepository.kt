@@ -90,24 +90,24 @@ class WeMoRepository(
         dao.getAllDevices(),
         initialSeedDone,
         _isDemoShowroomMode
-    ) { list, seeded, demoMode ->
-        if (list.isEmpty() && !seeded && demoMode) defaultClassicDevices() else list
+    ) { list, _, demoMode ->
+        if (list.isEmpty() && demoMode) defaultClassicDevices() else list
     }
 
     val allHomeNetworks: Flow<List<WeMoHomeNetworkEntity>> = combine(
         dao.getAllHomeNetworks(),
         initialSeedDone,
         _isDemoShowroomMode
-    ) { list, seeded, demoMode ->
-        if (list.isEmpty() && !seeded && demoMode) defaultHomeNetworks() else list
+    ) { list, _, demoMode ->
+        if (list.isEmpty() && demoMode) defaultHomeNetworks() else list
     }
 
     val allRules: Flow<List<WeMoRuleEntity>> = combine(
         dao.getAllRules(),
         initialSeedDone,
         _isDemoShowroomMode
-    ) { list, seeded, demoMode ->
-        if (list.isEmpty() && !seeded && demoMode) defaultClassicRules() else list
+    ) { list, _, demoMode ->
+        if (list.isEmpty() && demoMode) defaultClassicRules() else list
     }
 
     private val _soapLogs = MutableStateFlow<List<SoapLogEntry>>(emptyList())

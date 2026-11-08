@@ -659,50 +659,50 @@ private fun EmptyDevicesState(
         border = BorderStroke(1.dp, WemoDividerGray),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .testTag("empty_devices_state_card")
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(horizontal = 18.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Surface(
                 color = WemoGreenSoft.copy(alpha = 0.55f),
                 shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = 10.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     WeMoDeviceCategoryIllustration(
                         category = WeMoDeviceCategory.SWITCH_PLUG,
                         isReachable = true,
                         isOn = true,
-                        modifier = Modifier.size(width = 42.dp, height = 54.dp)
+                        modifier = Modifier.size(width = 36.dp, height = 46.dp)
                     )
                     WeMoDeviceCategoryIllustration(
                         category = WeMoDeviceCategory.LIGHT,
                         isReachable = true,
                         isOn = true,
                         brightness = 100,
-                        modifier = Modifier.size(width = 42.dp, height = 54.dp)
+                        modifier = Modifier.size(width = 36.dp, height = 46.dp)
                     )
                     WeMoDeviceCategoryIllustration(
                         category = WeMoDeviceCategory.CHRISTMAS_TREE,
                         isReachable = true,
                         isOn = true,
-                        modifier = Modifier.size(width = 42.dp, height = 54.dp)
+                        modifier = Modifier.size(width = 36.dp, height = 46.dp)
                     )
                     WeMoDeviceCategoryIllustration(
                         category = WeMoDeviceCategory.FAN,
                         isReachable = true,
                         isOn = false,
-                        modifier = Modifier.size(width = 42.dp, height = 54.dp)
+                        modifier = Modifier.size(width = 36.dp, height = 46.dp)
                     )
                 }
             }
@@ -711,19 +711,19 @@ private fun EmptyDevicesState(
                 text = "No WeMi / WeMo Switches on This Wi-Fi Home",
                 fontFamily = WorkSansFontFamily,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 19.sp,
+                fontSize = 17.sp,
                 color = WemoTextPrimary,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, provision a factory-reset switch (10.22.22.1), add a switch by IP, or restore the default preset.",
                 fontFamily = WorkSansFontFamily,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 color = WemoTextSecondary,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(12.dp))
             Button(
                 onClick = onScanSsdpClick,
                 colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
@@ -733,7 +733,7 @@ private fun EmptyDevicesState(
             ) {
                 Text("Scan Local Network (SSDP)")
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Button(
                 onClick = onOpenProvisionApClick,
                 colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
@@ -743,23 +743,27 @@ private fun EmptyDevicesState(
             ) {
                 Text("Setup Factory-Reset WeMo AP (10.22.22.1)")
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onAddClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("empty_state_add_manual_button")
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Add Switch Manually", color = WemoGreenDark)
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onRestoreClassicClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("empty_state_restore_classic_button")
-            ) {
-                Text("Restore Classic Setup", color = WemoTextSecondary)
+                OutlinedButton(
+                    onClick = onAddClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("empty_state_add_manual_button")
+                ) {
+                    Text("Add Switch Manually", color = WemoGreenDark)
+                }
+                OutlinedButton(
+                    onClick = onRestoreClassicClick,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("empty_state_restore_classic_button")
+                ) {
+                    Text("Restore Classic Setup", color = WemoTextSecondary)
+                }
             }
         }
     }

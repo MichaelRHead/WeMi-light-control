@@ -168,10 +168,24 @@ fun classifyDeviceCategory(
     }
     val lower = name.lowercase()
     return when {
-        "tree" in lower || "xmas" in lower || "evergreen" in lower || "spruce" in lower || "fir " in lower ->
+        "tree" in lower ||
+            "xmas" in lower ||
+            "evergreen" in lower ||
+            "spruce" in lower ||
+            "fir " in lower ||
+            "garland" in lower ||
+            "wreath" in lower ||
+            "tinsel" in lower ||
+            "noel" in lower ||
+            ("christmas" in lower && "candle" !in lower && "lamp" !in lower && "sconce" !in lower && "lantern" !in lower) ->
             WeMoDeviceCategory.CHRISTMAS_TREE
 
-        "fan" in lower || "blower" in lower || "exhaust" in lower || "ventilat" in lower || "circulator" in lower ->
+        "fan" in lower ||
+            "blower" in lower ||
+            "vent" in lower ||
+            "exhaust" in lower ||
+            "ventilat" in lower ||
+            "circulator" in lower ->
             WeMoDeviceCategory.FAN
 
         deviceType == WeMoDeviceType.LIGHTBULB_DIMMER ||
@@ -182,6 +196,7 @@ fun classifyDeviceCategory(
             "sconce" in lower ||
             "chandelier" in lower ||
             "lantern" in lower ||
+            "pendant" in lower ||
             "flood" in lower ||
             "spot" in lower ||
             "downlight" in lower ||
@@ -189,6 +204,8 @@ fun classifyDeviceCategory(
             "strip" in lower ||
             "neon" in lower ||
             "torch" in lower ||
+            "dimmer" in lower ||
+            "led" in lower ||
             "fixture" in lower ->
             WeMoDeviceCategory.LIGHT
 

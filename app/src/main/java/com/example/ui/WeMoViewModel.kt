@@ -819,10 +819,10 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun resetToClassicScreenshotDevices() {
+        _activeNetworkKey.value = DEFAULT_MAIN_HOME_KEY
+        _selectedRoomFilter.value = null
         viewModelScope.launch {
             repository.resetToClassicScreenshotPreset()
-            _activeNetworkKey.value = DEFAULT_MAIN_HOME_KEY
-            _selectedRoomFilter.value = null
             showTransientStatus("Restored remembered Wi-Fi Homes and classic devices")
         }
     }

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
+import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
 import com.example.data.WeMoDeviceCategory
 import com.example.data.WeMoDeviceType
@@ -56,10 +57,13 @@ class ExampleRobolectricTest {
         // Verify semantic icon classification from switch name
         assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Christmas Tree Living"))
         assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Holiday Tree Lights"))
+        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Porch Christmas Garland"))
         assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Bedroom Ceiling Fan"))
         assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Attic Exhaust Fan"))
+        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Utility Room Vent"))
         assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Living Room Floor Lamp"))
         assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Cabin Porch Floodlight"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Kitchen Island Pendant"))
         assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Christmas Candle"))
         assertEquals(WeMoDeviceCategory.MOTION_SENSOR, classifyDeviceCategory("Bedroom Light Motion", WeMoDeviceType.MOTION_SENSOR))
         assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Office Wall Switch"))
@@ -254,6 +258,8 @@ class ExampleRobolectricTest {
         composeTestRule.waitForIdle()
 
         // Verify ProvisionWeMoApDialog is displayed and shows scanned APs / status box
+        composeTestRule.onNodeWithTag("provision_ap_status_box").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("provision_status_box", useUnmergedTree = true).assertIsDisplayed()
         composeTestRule.onNodeWithTag("provision_ap_ip_input").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("scan_setup_ap_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("provision_ssid_input").performScrollTo().assertIsDisplayed()
@@ -279,6 +285,39 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasText("Porch Christmas Tree"))
         composeTestRule.onNodeWithText("Porch Christmas Tree").assertIsDisplayed()
+    }
+
+    @Test
+    fun `verify EmptyDevicesState onboarding card on empty Wi-Fi Home and Restore Classic Setup action`() {
+        composeTestRule.waitForIdle()
+
+        // Create a new empty Wi-Fi Home ("Beach House") via AddWifiHomeNetworkDialog
+        composeTestRule.onNodeWithTag("add_wifi_home_button").performScrollTo().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("wifi_home_name_input").performTextReplacement("Beach House")
+        composeTestRule.onNodeWithTag("wifi_home_ssid_input").performTextReplacement("Beach-WiFi-2.4G")
+        composeTestRule.onNodeWithTag("wifi_home_subnet_input").performTextReplacement("192.168.88")
+        composeTestRule.onNodeWithTag("save_wifi_home_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Verify the EmptyDevicesState onboarding card and its 4 actions on the new empty Wi-Fi Home
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("empty_devices_state_card"))
+        composeTestRule.onNodeWithTag("empty_devices_state_card").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("devices_list")
+            .performTouchInput { swipeUp() }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("empty_state_scan_ssdp_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("empty_state_provision_ap_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("empty_state_add_manual_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("empty_state_restore_classic_button").assertIsDisplayed()
+
+        // Restore classic showcase switches and verify they repopulate the Devices list on Main Home
+        composeTestRule.onNodeWithTag("empty_state_restore_classic_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasText("Christmas Tree Living"))
+        composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()
     }
 }
 

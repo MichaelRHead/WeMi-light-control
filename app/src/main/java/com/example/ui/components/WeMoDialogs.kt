@@ -640,42 +640,44 @@ fun ProvisionWeMoApDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                if (detectedDevice != null || !statusMessage.isNullOrBlank()) {
-                    val isWarningOrError = detectedDevice == null &&
-                        (statusMessage?.contains("No response", ignoreCase = true) == true ||
-                            statusMessage?.contains("rejected", ignoreCase = true) == true ||
-                            statusMessage?.contains("unreachable", ignoreCase = true) == true)
-                    Surface(
-                        color = if (isWarningOrError) Color(0xFFFEF2F2) else WemoGreenSoft.copy(alpha = 0.65f),
-                        shape = RoundedCornerShape(10.dp),
+                val isWarningOrError = detectedDevice == null &&
+                    (statusMessage?.contains("No response", ignoreCase = true) == true ||
+                        statusMessage?.contains("rejected", ignoreCase = true) == true ||
+                        statusMessage?.contains("unreachable", ignoreCase = true) == true)
+                Surface(
+                    color = if (isWarningOrError) Color(0xFFFEF2F2) else WemoGreenSoft.copy(alpha = 0.65f),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("provision_ap_status_box")
+                ) {
+                    Column(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("provision_ap_status_box")
+                            .padding(10.dp)
+                            .testTag("provision_status_box"),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(10.dp),
-                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            if (detectedDevice != null) {
-                                Text(
-                                    text = "Detected Hardware: ${detectedDevice.friendlyName} (${detectedDevice.modelName} • Port ${detectedDevice.port})",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = WemoGreenDark
-                                )
-                                Text(
-                                    text = "MAC ${detectedDevice.macAddress} • SN ${detectedDevice.serialNumber} • Recommended AES Method ${detectedDevice.recommendedEncryptionMethod}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            if (!statusMessage.isNullOrBlank()) {
-                                Text(
-                                    text = statusMessage,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isWarningOrError) WemoErrorRed else WemoGreenDark
-                                )
-                            }
+                        if (detectedDevice != null) {
+                            Text(
+                                text = "Detected Hardware: ${detectedDevice.friendlyName} (${detectedDevice.modelName} • Port ${detectedDevice.port})",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = WemoGreenDark
+                            )
+                            Text(
+                                text = "MAC ${detectedDevice.macAddress} • SN ${detectedDevice.serialNumber} • Recommended AES Method ${detectedDevice.recommendedEncryptionMethod}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        val displayStatus = statusMessage?.takeIf { it.isNotBlank() }
+                            ?: if (detectedDevice == null) "Ready to probe Belkin WeMo Setup AP at $apHost (ports 49151–49159)..." else null
+                        if (displayStatus != null) {
+                            Text(
+                                text = displayStatus,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isWarningOrError) WemoErrorRed else WemoGreenDark
+                            )
                         }
                     }
                 }
