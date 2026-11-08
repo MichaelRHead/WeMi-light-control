@@ -24,7 +24,9 @@ Related documentation:
 
 | Landed (PST) | Version / Commit | Feature or Improvement | Primary Files |
 | :--- | :--- | :--- | :--- |
-| **2026-11-08 07:41 PST** | `v12.0` (`HEAD`) | **Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`)** | [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md), [`AGENTS.md`](AGENTS.md), [`IMPLEMENTED.md`](IMPLEMENTED.md) |
+| **2026-11-08 07:42 PST** | `v12.0` (`ac7cd7b`) | **Expanded Semantic Category Keywords (`garland`, `wreath`, `vent`, `pendant`), Empty State Onboarding Card Layout & E2E Test** | [`WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt), [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`ExampleRobolectricTest.kt`](app/src/test/java/com/example/ExampleRobolectricTest.kt) |
+| **2026-11-08 07:41 PST** | `v12.0` (`2f97020`) | **Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`)** | [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md), [`AGENTS.md`](AGENTS.md), [`IMPLEMENTED.md`](IMPLEMENTED.md) |
+| **2026-11-08 07:35 PST** | `v12.0` (`c5ca7c4`) | **Architecture & Protocol Review Sign-Off (Section 7 of Modularization Plan)** | [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) |
 | **2026-11-08 07:25 PST** | `v12.0` (`2cfe70d`..`de14b85`) | **Reverse-Chronological Change Log (`IMPLEMENTED.md`), `UPCOMING_FEATURES.md` & `wemi-changelog-and-docs` Skill** | [`IMPLEMENTED.md`](IMPLEMENTED.md), [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md), [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) |
 | **2026-11-08 07:20–07:28 PST** | `v12.0` (`627ab38`, `a308d24`) | **Code Modularization & E2E Testing Plan + `android-code-modularization` & `android-e2e-testing` Skills** | [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md), [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) |
 | **2026-11-08 07:19 PST** | `v12.0` (`1237ecc`) | **Provisioning Status Box Error Styling, Empty State Category Showcase & `v12.0` Bump** | [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`app/build.gradle.kts`](app/build.gradle.kts) |
@@ -47,9 +49,26 @@ Related documentation:
 
 ## 2. Detailed Change Log (Newest to Oldest)
 
-### [2026-11-08 07:41 PST] — Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`, `v12.0`)
+### [2026-11-08 07:42 PST] — Expanded Semantic Category Keywords, Empty State Onboarding Card Layout & E2E Test (`ac7cd7b`, `v12.0`)
+- **Expanded Semantic Category Classification ([`WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt))**:
+  - Extended `classifyDeviceCategory()` with additional holiday (`garland`, `wreath`, `tinsel`, `noel`, and `christmas` without light-specific nouns), airflow (`vent`), and lighting (`pendant`, `dimmer`, `led`) keywords.
+- **Empty State & Provisioning Status Box Refinements ([`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`WeMoViewModel.kt`](app/src/main/java/com/example/ui/WeMoViewModel.kt))**:
+  - Compacted `EmptyDevicesState` category illustrations (`36×46 dp`) and placed `Add Switch Manually` and `Restore Classic Setup` side-by-side so all 4 onboarding buttons fit cleanly on screen.
+  - Ensured `provision_ap_status_box` (`provision_status_box`) in `ProvisionWeMoApDialog` renders a default readiness banner when idle while preserving red/green warning/error styling.
+- **Expanded E2E Robolectric Coverage ([`ExampleRobolectricTest.kt`](app/src/test/java/com/example/ExampleRobolectricTest.kt))**:
+  - Added `verify EmptyDevicesState onboarding card on empty Wi-Fi Home and Restore Classic Setup action` and assertions for `Porch Christmas Garland`, `Utility Room Vent`, and `Kitchen Island Pendant`.
+
+---
+
+### [2026-11-08 07:41 PST] — Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`, `2f97020`, `v12.0`)
 - **Added [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md)**:
   - Defines the 5-step multi-agent Git synchronization, anti-stomp audit (`git diff <your-commit>..origin/main`), additive conflict resolution, root/`docs/` mirror verification, and `.agents/skills/` ↔ persistent skill registry synchronization workflow so parallel agent conversations and AI Studio code syncs never overwrite each other's changes.
+
+---
+
+### [2026-11-08 07:35 PST] — Architecture & Protocol Review Sign-Off on Modularization Plan (`c5ca7c4`, `v12.0`)
+- **Added Section 7 to [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md)**:
+  - Recorded architecture and protocol invariants (Phase M1 `WeMoDatabase.getDatabase()` Room v5 singleton preservation, Phase M2 Android `Network.socketFactory` Wi-Fi binding and `pywemo` OpenSSL EVP_BytesToKey MD5 AES-128-CBC encryption, Phase M3 semantic 3-state category icons and manual IP 9-port hardware probing, and Phase M4 test target splits).
 
 ---
 
