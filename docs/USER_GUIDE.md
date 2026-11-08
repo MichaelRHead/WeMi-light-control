@@ -36,7 +36,7 @@ Each guide below explains one major area of the app in detail:
 ## Developer & Architecture Documentation
 
 For protocol details, architecture diagrams, and roadmap information, see:
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Completed Architecture, Protocol Engine & Automated Test Suite
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log of Implemented Features & Improvements
 - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization & End-to-End Validation Plan
-- [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) — Next-Iteration Roadmap & Future Engineering Ideas
+- [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`../AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide

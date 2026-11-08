@@ -7,7 +7,7 @@ description: Architecture, Belkin WeMo UPnP/SSDP/SOAP/GENA protocol reference, R
 
 Use this skill when working on the **WeMi Light Control** Android & Android TV application in `/home/antigravity/MichaelRHead/WeMi-light-control`.
 
-For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin WeMo switches, dimmers, and mini plugs, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md), [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (and [`../../docs/user-guide/`](../../docs/user-guide/)), [`../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), and [`../../docs/IMPLEMENTATION_PLAN.md`](../../docs/IMPLEMENTATION_PLAN.md). For human-readable code modularization and E2E testing standards, also consult [`../android-code-modularization/SKILL.md`](../android-code-modularization/SKILL.md) and [`../android-e2e-testing/SKILL.md`](../android-e2e-testing/SKILL.md). Always keep `IMPLEMENTED.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified.
+For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin WeMo switches, dimmers, and mini plugs, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md) (reverse-chronological Change Log), [`../../UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md) (upcoming features roadmap), [`../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), and [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (plus [`../../docs/user-guide/`](../../docs/user-guide/)). For human-readable code modularization, E2E testing standards, and Change Log maintenance, also consult [`../android-code-modularization/SKILL.md`](../android-code-modularization/SKILL.md), [`../android-e2e-testing/SKILL.md`](../android-e2e-testing/SKILL.md), and [`../wemi-changelog-and-docs/SKILL.md`](../wemi-changelog-and-docs/SKILL.md). Always keep `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified.
 
 ---
 
@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
   ```bash
   ./gradlew assembleDebug
   ```
-- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "12.0"`).
+- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "7.0"`).
 
 ---
 
@@ -39,7 +39,7 @@ The user's real hardware fleet consists of four Belkin WeMo device families:
 
 ---
 
-## 3. Codebase Map (v12.0 / Completed Phases 1–7)
+## 3. Codebase Map (v7.0 / Completed Phases 1–7)
 
 ### Data & Scheduling Layer (`app/src/main/java/com/example/data/`)
 - **`WeMoEntities.kt`**:
