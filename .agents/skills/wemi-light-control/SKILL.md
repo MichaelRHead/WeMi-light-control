@@ -7,7 +7,7 @@ description: Architecture, Belkin WeMo UPnP/SSDP/SOAP/GENA protocol reference, R
 
 Use this skill when working on the **WeMi Light Control** Android & Android TV application in `/home/antigravity/MichaelRHead/WeMi-light-control`.
 
-For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin WeMo switches, dimmers, and mini plugs, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md), [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (and [`../../docs/user-guide/`](../../docs/user-guide/)), and [`../../docs/IMPLEMENTATION_PLAN.md`](../../docs/IMPLEMENTATION_PLAN.md). Always keep `IMPLEMENTED.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified.
+For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin WeMo switches, dimmers, and mini plugs, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md), [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (and [`../../docs/user-guide/`](../../docs/user-guide/)), [`../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), and [`../../docs/IMPLEMENTATION_PLAN.md`](../../docs/IMPLEMENTATION_PLAN.md). For human-readable code modularization and E2E testing standards, also consult [`../android-code-modularization/SKILL.md`](../android-code-modularization/SKILL.md) and [`../android-e2e-testing/SKILL.md`](../android-e2e-testing/SKILL.md). Always keep `IMPLEMENTED.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified.
 
 ---
 
