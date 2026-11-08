@@ -68,20 +68,25 @@ The app is designed around four physical Belkin WeMo device types (`WeMoDeviceTy
 
 ---
 
-## 4. Roadmap: Converting AI Studio Skeleton Mocks to Real LAN Execution
+## 4. Production Implementation Plan (`docs/IMPLEMENTATION_PLAN.md`)
 
-The AI Studio skeleton (`v5.0` / commit `d1620ab`) includes simulated fallbacks so the UI can be previewed without physical hardware. To run against real Belkin WeMo switches, dimmers, and mini plugs on the user's LAN:
+The AI Studio skeleton (`v6.0` / commit `d323be0`) includes simulated fallbacks so the UI can be previewed without physical hardware. The full 7-phase engineering plan to make this a production-ready app is documented in [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md):
 
-1. **Honor Real SOAP Reachability in `WeMoRepository.kt`**:
-   - Stop forcing `isReachable = true` in `toggleDevicePower`, `updateDeviceBrightness`, `reconnectDevice`, `pingDeviceLatency`, and `reconnectAndRediscoverHome` when `SoapCallResult.reachableOnLan == false`.
-   - Reflect genuine offline/unreachable states (`isReachable = false`, `latencyMs = 0`) when a device fails to respond on any candidate UPnP port (`49151..49156`).
-2. **Real SSDP Multicast Discovery & Live State Probing**:
-   - Acquire Android `WifiManager.MulticastLock` during `performSsdpDiscoveryScan` so the Wi-Fi stack receives UDP unicast replies from WeMo devices.
-   - Remove the hardcoded `"Patio String Lights"` (`$subnetPrefix.118`) injection and synthetic `knownLocalDevices` loop in `WeMoNetworkClient.performSsdpDiscoveryScan`.
-   - After fetching `/setup.xml` for a discovered device, immediately query `getBinaryState` (and `GetSignalStrength` if supported) so initial `isOn`, `brightness`, and `latencyMs` reflect real hardware state instead of hardcoded `isOn = true, brightness = 100`.
-   - Add an optional fast unicast port scan fallback (`49151..49156` across the `/24` subnet) when router AP isolation or IGMP snooping blocks UDP multicast.
-3. **Accurate Hardware Model Classification & Serial Deduplication**:
-   - Refine `parseSetupXmlDescriptor` to distinguish 1st-Gen `IN_WALL_SWITCH` (`F7C030`), 2nd-Gen 3-Way `THREE_WAY_SWITCH` (`WLS040` / `WLS0403`), `IN_WALL_DIMMER` (`F7C059` / `WDS060`), and `MINI_PLUG` (`F7C063` / `WSP080`).
-   - Match discovered devices by `serialNumber` in `adoptDiscoveredDevice` so DHCP IP or port changes update existing devices in place without creating duplicates.
-4. **Live Wi-Fi Subnet Detection & Optional Demo Mode**:
-   - Auto-detect the phone/TV's current LAN subnet (`resolveLocalIpv4Address()`) to select or create the corresponding `WeMoHomeNetworkEntity`, and allow clearing or disabling the pre-seeded demo devices (`ensureSeeded()`).
+1. **Phase 1 — `pywemo`-Grade UPnP / SSDP / SOAP Engine (`WeMoNetworkClient.kt`)**:
+   - Real SSDP multicast discovery (`WifiManager.MulticastLock`, 1-second `M-SEARCH` retransmit, exact `LOCATION` fetching for `/setup.xml` & `/Lightsetup.xml`, `<manufacturer>Belkin` validation) + unicast `/24` port-sweep fallback when multicast is blocked.
+   - Smart 9-port probing (`49153, 49152, 49154, 49151, 49155..49159`) with `<UDN>`/`<serialNumber>` verification and TCP connect timeout vs. `ECONNREFUSED` vs. HTTP read timeout separation.
+   - Live state & telemetry queries (`GetBinaryState`, `metainfo1#GetMetaInfo` for exact SKU & Wi-Fi SSID, `GetSignalStrength`, `ConfigureNightMode`, `ChangeFriendlyName`) with `Connection: close` and `<BinaryState>Error</BinaryState>` handling.
+2. **Phase 2 — Real Reachability, Concurrency & Self-Healing Repository (`WeMoRepository.kt`)**:
+   - Remove all forced `isReachable = true` mock fallbacks; reflect genuine `OFFLINE` states (`isReachable = false`, `latencyMs = 0`).
+   - Protect 2nd-Gen RTOS switches (`WLS040` / `WLS0403` / `WDS060`) with a LAN-wide `Semaphore(3)` and per-device `Mutex`.
+   - Implement two-stage auto-reconnect (port re-probe on known IP → targeted SSDP scan by `serialNumber`/`UDN`) and serial-based deduplication + "Adopt All Discovered".
+3. **Phase 3 — Real-Time Local Push Events via UPnP GENA (`WeMoGenaSubscriptionManager.kt`)**:
+   - Embedded coroutine HTTP `NOTIFY` callback server (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, `HTTP 412` recovery) so physical wall-switch and 3-way traveler flips update the UI immediately.
+4. **Phase 4 — Live Wi-Fi Subnet Detection & Explicit Demo Mode (`WeMoNetworkMonitor.kt`)**:
+   - `ConnectivityManager.NetworkCallback` live subnet detection, auto-matching/creating `WeMoHomeNetworkEntity` profiles, clean startup on real LANs, and moving the 13 seeded sample devices behind an explicit Demo Mode toggle.
+5. **Phase 5 — Working Rules, Schedules & Auto-Off Timers (`WeMoRuleScheduler.kt`)**:
+   - Real countdown execution for `autoOffMinutes` / `AUTO_OFF_TIMER` and scheduled execution for `TIME_SCHEDULE` / `SUNSET_SUNRISE`.
+6. **Phase 6 — Zero-Cloud Wi-Fi Provisioning (`10.22.22.1`) & Hardware Management (`WeMoProvisionerClient.kt`)**:
+   - Provision factory-reset WeMo APs (`WeMo.Light.xxx` / `WeMo.Mini.xxx` at `10.22.22.1:49152`) via `WiFiSetup1` (`GetApList`, AES-128-CBC Methods 1/2/3, double-send `ConnectHomeNetwork`).
+7. **Phase 7 — Loopback UPnP/SOAP/GENA & Robolectric Test Suite (`WeMoProtocolTest.kt`, `ExampleRobolectricTest.kt`)**:
+   - Automated tests simulating all 4 hardware types (`F7C030`, `WLS0403`, `F7C059`/`WDS060`, `F7C063`/`WSP080`), port shifts, and GENA push notifications.
