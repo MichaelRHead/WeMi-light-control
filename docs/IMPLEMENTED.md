@@ -11,6 +11,7 @@ Related documentation:
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill
 - [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
+- [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
 - [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
 - [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) — Android End-to-End (E2E) Testing & Validation Skill
 
@@ -23,8 +24,9 @@ Related documentation:
 
 | Landed (PST) | Version / Commit | Feature or Improvement | Primary Files |
 | :--- | :--- | :--- | :--- |
-| **2026-11-08 07:25 PST** | `v12.0` (`HEAD`) | **Reverse-Chronological Change Log (`IMPLEMENTED.md`), `UPCOMING_FEATURES.md` & `wemi-changelog-and-docs` Skill** | [`IMPLEMENTED.md`](IMPLEMENTED.md), [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md), [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) |
-| **2026-11-08 07:20 PST** | `v12.0` (`627ab38`) | **Code Modularization & E2E Testing Plan + `android-code-modularization` & `android-e2e-testing` Skills** | [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md), [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) |
+| **2026-11-08 07:41 PST** | `v12.0` (`HEAD`) | **Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`)** | [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md), [`AGENTS.md`](AGENTS.md), [`IMPLEMENTED.md`](IMPLEMENTED.md) |
+| **2026-11-08 07:25 PST** | `v12.0` (`2cfe70d`..`de14b85`) | **Reverse-Chronological Change Log (`IMPLEMENTED.md`), `UPCOMING_FEATURES.md` & `wemi-changelog-and-docs` Skill** | [`IMPLEMENTED.md`](IMPLEMENTED.md), [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md), [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) |
+| **2026-11-08 07:20–07:28 PST** | `v12.0` (`627ab38`, `a308d24`) | **Code Modularization & E2E Testing Plan + `android-code-modularization` & `android-e2e-testing` Skills** | [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md), [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) |
 | **2026-11-08 07:19 PST** | `v12.0` (`1237ecc`) | **Provisioning Status Box Error Styling, Empty State Category Showcase & `v12.0` Bump** | [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`app/build.gradle.kts`](app/build.gradle.kts) |
 | **2026-11-08 07:08 PST** | `v11.0` (`cca33cd`) | **Modular User Guide Index & 8 Detailed Feature Guides** | [`USER_GUIDE.md`](USER_GUIDE.md), [`docs/user-guide/`](docs/user-guide/) |
 | **2026-11-08 01:49 PST** | `v11.0` (`fa7e744`) | **Fresh-Device `WiFiSetup1` Provisioning Fixes, `pywemo` OpenSSL AES-128-CBC (Methods 1/2/3), Android Wi-Fi Socket Binding & Manual IP Probing** | [`WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt), [`WeMoNetworkMonitor.kt`](app/src/main/java/com/example/network/WeMoNetworkMonitor.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt) |
@@ -45,7 +47,13 @@ Related documentation:
 
 ## 2. Detailed Change Log (Newest to Oldest)
 
-### [2026-11-08 07:25 PST] — Reverse-Chronological Change Log (`IMPLEMENTED.md`), `UPCOMING_FEATURES.md` & `wemi-changelog-and-docs` Skill (`v12.0`)
+### [2026-11-08 07:41 PST] — Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`, `v12.0`)
+- **Added [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md)**:
+  - Defines the 5-step multi-agent Git synchronization, anti-stomp audit (`git diff <your-commit>..origin/main`), additive conflict resolution, root/`docs/` mirror verification, and `.agents/skills/` ↔ persistent skill registry synchronization workflow so parallel agent conversations and AI Studio code syncs never overwrite each other's changes.
+
+---
+
+### [2026-11-08 07:25 PST] — Reverse-Chronological Change Log (`IMPLEMENTED.md`), `UPCOMING_FEATURES.md` & `wemi-changelog-and-docs` Skill (`2cfe70d`..`de14b85`, `v12.0`)
 - **Reframed [`IMPLEMENTED.md`](IMPLEMENTED.md) & [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md) as a Reverse-Chronological Change Log**:
   - Restructured the implementation document so every feature, bug fix, and architectural milestone is chronicled in reverse chronological order with timestamps, commit hashes, version numbers, and affected files.
 - **Renamed Implementation Plan to [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) & [`docs/UPCOMING_FEATURES.md`](docs/UPCOMING_FEATURES.md)**:

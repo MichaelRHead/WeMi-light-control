@@ -11,6 +11,7 @@ Related documents in this repository:
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill
 - [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
+- [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
 - [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
 - [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) — Android End-to-End (E2E) Testing & Validation Skill
 
@@ -18,7 +19,7 @@ Related documents in this repository:
 
 ## 1. Upcoming Features Overview
 
-With the core local UPnP/SSDP/SOAP/GENA engine, 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), and zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3`) complete in `v11.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
+With the core local UPnP/SSDP/SOAP/GENA engine, 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), and zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3`) complete in `v12.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
 
 | Track | Upcoming Feature Area | Key Deliverables |
 | :--- | :--- | :--- |

@@ -10,6 +10,7 @@ Related documents and skills:
 - [`USER_GUIDE.md`](../USER_GUIDE.md) / [`docs/USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](user-guide/))
 - [`.agents/skills/android-code-modularization/SKILL.md`](../.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
 - [`.agents/skills/android-e2e-testing/SKILL.md`](../.agents/skills/android-e2e-testing/SKILL.md) — Android End-to-End (E2E) Testing & Validation Skill
+- [`.agents/skills/multi-agent-git-sync/SKILL.md`](../.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
 - [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](../.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
 - [`.agents/skills/wemi-light-control/SKILL.md`](../.agents/skills/wemi-light-control/SKILL.md) — WeMi Light Control Domain & UPnP Protocol Skill
 

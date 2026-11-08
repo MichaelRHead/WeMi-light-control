@@ -9,6 +9,7 @@ Detailed agent instructions, user guides, protocol specs, reverse-chronological 
 - [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill
 - [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
+- [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
 - [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
 - [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) — Android End-to-End (E2E) Testing & Validation Skill
 - [`.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md`](.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md) — Complete `pywemo` & Home Assistant UPnP/SSDP/SOAP/GENA Protocol Reference
@@ -72,6 +73,7 @@ The app supports four physical Belkin WeMo hardware families:
 ```
 
 - In remote VM environments where `HTTPS_PROXY` is active, ensure `~/.gradle/gradle.properties` configures `http.proxyHost`/`https.proxyHost` and `javax.net.ssl.trustStore` with the local proxy CA, and `ANDROID_HOME` points to the Android SDK (`platforms;android-36`, `build-tools;36.0.0`).
+- **Multi-Agent Git Sync & Anti-Stomp Audit ([`multi-agent-git-sync`](.agents/skills/multi-agent-git-sync/SKILL.md))**: Before starting work or pushing commits, always run `git fetch --all`, inspect incoming commits (`git log -p HEAD..origin/main`), verify that none of your prior changes were accidentally overwritten or broken by concurrent agent commits, rebase additively (`git pull --rebase origin main`), and keep root/`docs/` mirrors in sync.
 - **Keep Change Log, Upcoming Features & User Guide Updated ([`wemi-changelog-and-docs`](.agents/skills/wemi-changelog-and-docs/SKILL.md))**: Whenever new features are implemented or existing features are adjusted, always:
   - Prepend a new timestamped entry at the **top** (reverse chronological order) of [`IMPLEMENTED.md`](IMPLEMENTED.md) and [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md).
   - Remove completed items from [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) and [`docs/UPCOMING_FEATURES.md`](docs/UPCOMING_FEATURES.md).
