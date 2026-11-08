@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
   ```bash
   ./gradlew assembleDebug
   ```
-- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "7.0"`).
+- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "12.0"`, `versionCode = 12`).
 
 ---
 
@@ -39,11 +39,12 @@ The user's real hardware fleet consists of four Belkin WeMo device families:
 
 ---
 
-## 3. Codebase Map (v7.0 / Completed Phases 1–7)
+## 3. Codebase Map (`v12.0` / Completed Phases 1–7)
 
 ### Data & Scheduling Layer (`app/src/main/java/com/example/data/`)
 - **`WeMoEntities.kt`**:
   - `WeMoDeviceType`: `SWITCH_PLUG`, `MOTION_SENSOR`, `LIGHTBULB_DIMMER`.
+  - `WeMoDeviceCategory` (`classifyDeviceCategory`): `CHRISTMAS_TREE`, `FAN`, `LIGHT`, `MOTION_SENSOR`, `SWITCH_PLUG`.
   - `WeMoConnectionQuality`: `EXCELLENT` (<= 28ms, 4 bars), `GOOD` (<= 65ms, 3 bars), `SLOW` (> 65ms, 2 bars), `OFFLINE` (0 bars).
   - `WeMoHomeNetworkEntity` (`wemo_home_networks`): Persistent multi-home Wi-Fi profiles (`networkKey`, `homeName`, `ssidLabel`, `subnetPrefix`, `gatewayIp`, `lastConnectedTime`, `autoReconnectOnArrival`, `sortOrder`).
   - `WeMoDeviceEntity` (`wemo_devices`): Persisted device state (`id`, `name`, `roomName`, `networkKey`, `wifiSsid`, `deviceType`, `ipAddress`, `port`, `isOn`, `isReachable`, `brightness`, `latencyMs`, `lastCheckedTime`, `lastMotionTime`, `serialNumber`, `firmwareVersion`, `hardwareModel`, `macAddress`, `udn`, `signalStrengthPercent`, `nightModeEnabled`, `sortOrder`, `autoOffMinutes`).
@@ -52,7 +53,7 @@ The user's real hardware fleet consists of four Belkin WeMo device families:
 - **`WeMoRepository.kt`**:
   - Coordinates `WeMoDao`, `WeMoNetworkClient`, `WeMoGenaSubscriptionManager`, and `WeMoProvisionerClient`.
   - Defaults to **Real LAN Mode** (`isDemoShowroomMode = false`) on physical Android devices and **Demo Showroom Mode** (`true`) inside Robolectric unless overridden.
-  - Enforces `Semaphore(3)` LAN concurrency + per-device `Mutex`, optimistic UI with 2-stage self-healing reconnect (9-port probe → targeted SSDP by `serialNumber`), and offline state revert (`isReachable = false, latencyMs = 0`).
+  - Enforces `Semaphore(3)` LAN concurrency + per-device `Mutex`, startup `GetBinaryState` detection (`detectStartupDeviceStates`), manual IP 9-port hardware probing (`saveDevice`), optimistic UI with 2-stage self-healing reconnect (9-port probe → targeted SSDP by `serialNumber`), and offline state revert (`isReachable = false, latencyMs = 0`).
   - Auto-populates `WeMoHomeNetworkEntity.ssidLabel` from `metainfo1#GetMetaInfo` (`AccessPointSSID`).
 - **`WeMoRuleScheduler.kt`**:
   - Manages live per-device Auto-Off countdown timers (`activeCountdownsSec`) and evaluates daily `SCHEDULE` / Sunset / Sunrise rules.
@@ -64,11 +65,11 @@ The user's real hardware fleet consists of four Belkin WeMo device families:
 - **`WeMoGenaSubscriptionManager.kt`**:
   - Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery) for `<100ms` physical switch updates.
 - **`WeMoNetworkMonitor.kt`**:
-  - Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector.
+  - Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory`.
 - **`WeMoProvisionerClient.kt`**:
-  - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` and AES-128-CBC (Methods 1 & 2) double-send `ConnectHomeNetwork` + `CloseSetup` provisioner.
+  - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` and `pywemo`-exact OpenSSL EVP_BytesToKey MD5 AES-128-CBC (Methods 1, 2 & 3) double-send `ConnectHomeNetwork` + `CloseSetup` + `SetSetupDoneStatus` provisioner.
 
 ### UI & Test Layer
-- **`WeMoViewModel.kt`** & **`MainActivity.kt`**: Combines Room flows, live `lanNetworkState` (`10.22.22.x` Setup AP banner), `activeAutoOffCountdownsSec`, GENA subscription + 30s fallback poll loop, and Android TV 10-foot UI.
-- **`WeMoProtocolTest.kt` & `ExampleRobolectricTest.kt`**: Loopback UPnP/SOAP/GENA protocol tests and Compose UI integration tests.
+- **`WeMoViewModel.kt`** & **`MainActivity.kt`**: Combines Room flows, live `lanNetworkState` (`10.22.22.x` Setup AP banner), `activeAutoOffCountdownsSec`, GENA subscription + 30s fallback poll loop, 3-state semantic category illustrations, and Android TV 10-foot UI.
+- **`WeMoProtocolTest.kt` & `ExampleRobolectricTest.kt`**: 16 automated loopback UPnP/SOAP/GENA protocol tests and Compose UI integration tests.
 
