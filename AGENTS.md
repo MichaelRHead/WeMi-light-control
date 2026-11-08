@@ -62,7 +62,13 @@ The app supports four physical Belkin WeMo hardware families:
   - `WeMoProvisionerClient.kt`: `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` / `GetNetworkList` and double-send `ConnectHomeNetwork` + `GetNetworkStatus` + `CloseSetup` + `SetSetupDoneStatus` provisioner.
   - `WeMoPasswordCrypto.kt`: Stateless `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC Wi-Fi password encryption/decryption (Methods 1, 2 & 3).
 - **`ui/` (Jetpack Compose Skeuomorphic UI)**:
-  - `WeMoViewModel.kt`, `components/WeMoWifiHomeBar.kt`, `components/WeMoDeviceRow.kt`, `components/WeMoRoomGroupCard.kt`, `components/WeMoSsdpScannerModal.kt`, `components/WeMoDialogs.kt`, `components/WeMoTvScreen.kt`, `components/WeMoHardwareIllustrations.kt`, and `screens/WeMoRulesAndMoreScreens.kt`.
+  - `WeMoViewModel.kt`: UI state holder, background health polling, and coroutine dispatchers.
+  - `screens/WeMoDevicesTabScreen.kt` (with `EmptyDevicesState`), `screens/WeMoRulesScreen.kt`, and `screens/WeMoMoreScreen.kt`.
+  - `components/WeMoWifiHomeBar.kt`, `components/WeMoRoomGroupCard.kt`, `components/WeMoSsdpScannerModal.kt`, and `components/WeMoHeaderAndNav.kt`.
+  - `components/WeMoDeviceRow.kt`, `components/WeMoDeviceStatusBadges.kt`, and `components/WeMoDeviceDiagnosticsDrawer.kt`.
+  - `components/WeMoDeviceEditDialog.kt`, `components/WeMoRuleDialog.kt`, and `components/WeMoProvisionApDialog.kt`.
+  - `components/WeMoTvScreen.kt` and `components/WeMoTvCardsAndScenes.kt`.
+  - `components/WeMoHardwareIllustrations.kt`, `components/WeMoSwitchAndPlugIllustration.kt`, `components/WeMoLightAndSensorIllustrations.kt`, `components/WeMoChristmasTreeIllustration.kt`, and `components/WeMoFanIllustration.kt`.
 
 ---
 

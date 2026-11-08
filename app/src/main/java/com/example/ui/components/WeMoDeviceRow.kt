@@ -1,18 +1,11 @@
 package com.example.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,7 +17,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
@@ -33,35 +25,17 @@ import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -70,7 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.data.WeMoConnectionQuality
 import com.example.data.WeMoDeviceEntity
 import com.example.data.WeMoDeviceType
 import com.example.ui.theme.WemoDividerGray
@@ -78,20 +51,10 @@ import com.example.ui.theme.WemoErrorRed
 import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
 import com.example.ui.theme.WemoGreenSoft
-import com.example.ui.theme.WemoRowExpandedSurface
 import com.example.ui.theme.WemoRowSurface
 import com.example.ui.theme.WemoTextPrimary
 import com.example.ui.theme.WemoTextSecondary
 import com.example.ui.theme.WorkSansFontFamily
-import kotlin.math.roundToInt
-
-private val StatusActiveEmerald = Color(0xFF059669)
-private val StatusActiveSoftBg = Color(0xFFECFDF5)
-private val StatusGoodTeal = Color(0xFF0891B2)
-private val StatusSlowAmber = Color(0xFFD97706)
-private val StatusSlowSoftBg = Color(0xFFFFFBEB)
-private val StatusOfflineRed = Color(0xFFDC2626)
-private val StatusOfflineSoftBg = Color(0xFFFEF2F2)
 
 @Composable
 fun WeMoDeviceRow(
@@ -414,398 +377,6 @@ fun WeMoDeviceRow(
                         onToggleNightMode = onToggleNightMode
                     )
                 }
-            }
-        }
-    }
-}
-
-/**
- * Real-time connection status & latency indicator pill displayed on every discovered switch.
- * Shows an animated pulsing status LED, a 4-bar UPnP signal meter, and round-trip latency (e.g., "Active • 11ms" or "Offline").
- */
-@Composable
-fun WeMoConnectionStatusBadge(
-    device: WeMoDeviceEntity,
-    isPinging: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    val quality = device.connectionQuality
-
-    val (dotColor, bgColor, textColor) = when (quality) {
-        WeMoConnectionQuality.EXCELLENT ->
-            Triple(StatusActiveEmerald, StatusActiveSoftBg, StatusActiveEmerald)
-        WeMoConnectionQuality.GOOD ->
-            Triple(StatusGoodTeal, WemoGreenSoft.copy(alpha = 0.7f), WemoGreenDark)
-        WeMoConnectionQuality.SLOW ->
-            Triple(StatusSlowAmber, StatusSlowSoftBg, StatusSlowAmber)
-        WeMoConnectionQuality.OFFLINE ->
-            Triple(StatusOfflineRed, StatusOfflineSoftBg, StatusOfflineRed)
-    }
-
-    val pulseTransition = rememberInfiniteTransition(label = "connPulse")
-    val pulseAlpha by pulseTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (quality == WeMoConnectionQuality.OFFLINE) 0.4f else 0.55f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = if (isPinging) 350 else 1100),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
-    )
-
-    Surface(
-        color = bgColor,
-        shape = RoundedCornerShape(6.dp),
-        border = BorderStroke(0.8.dp, dotColor.copy(alpha = 0.32f)),
-        modifier = modifier
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-        ) {
-            // Pulsing Connection Status Dot
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .clip(CircleShape)
-                    .background(dotColor.copy(alpha = pulseAlpha))
-            )
-
-            // 4-Bar Signal Quality Meter
-            WeMoSignalBarsIndicator(
-                activeBars = quality.signalBars,
-                activeColor = dotColor
-            )
-
-            // Status + Latency Text (e.g. "Active • 11ms" or "Offline • Timeout")
-            Text(
-                text = if (isPinging) "Pinging..." else device.connectionBadgeText,
-                color = textColor,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.sp,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-/**
- * 4-bar wireless UPnP signal quality & latency strength indicator drawn on Canvas.
- */
-@Composable
-fun WeMoSignalBarsIndicator(
-    activeBars: Int,
-    activeColor: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier = modifier.size(width = 13.dp, height = 10.dp)) {
-        val barCount = 4
-        val gap = 1.6.dp.toPx()
-        val barWidth = (size.width - gap * (barCount - 1)) / barCount
-        for (i in 0 until barCount) {
-            val fraction = (i + 1) / barCount.toFloat()
-            val barHeight = size.height * (0.32f + 0.68f * fraction)
-            val x = i * (barWidth + gap)
-            val y = size.height - barHeight
-            val color = if (i < activeBars) {
-                activeColor
-            } else {
-                activeColor.copy(alpha = 0.22f)
-            }
-            drawRoundRect(
-                color = color,
-                topLeft = Offset(x, y),
-                size = Size(barWidth, barHeight),
-                cornerRadius = CornerRadius(1.dp.toPx(), 1.dp.toPx())
-            )
-        }
-    }
-}
-
-/**
- * Distinct power state badge displayed beside the connection status pill for reachable devices:
- * - ON: Glowing emerald/cyan pill with IEC "I/O" active power icon
- * - OFF (Accessible Standby): Slate-navy & warm-amber pill with IEC "O" (Zero/Off) open circle icon
- */
-@Composable
-fun WeMoPowerStatePill(
-    isOn: Boolean,
-    label: String,
-    modifier: Modifier = Modifier
-) {
-    val bgColor = if (isOn) WemoGreenSoft else Color(0xFFF1F5F9)
-    val borderColor = if (isOn) WemoGreenPrimary.copy(alpha = 0.45f) else Color(0xFFF59E0B).copy(alpha = 0.65f)
-    val contentColor = if (isOn) WemoGreenDark else Color(0xFF334155)
-    val iconColor = if (isOn) WemoGreenDark else Color(0xFFD97706)
-
-    Surface(
-        color = bgColor,
-        shape = RoundedCornerShape(6.dp),
-        border = BorderStroke(0.9.dp, borderColor),
-        modifier = modifier
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
-        ) {
-            Canvas(modifier = Modifier.size(10.dp)) {
-                val r = size.minDimension * 0.40f
-                val c = Offset(size.width / 2f, size.height / 2f)
-                val stroke = 1.6.dp.toPx()
-                if (isOn) {
-                    drawArc(
-                        color = iconColor,
-                        startAngle = -50f,
-                        sweepAngle = 280f,
-                        useCenter = false,
-                        topLeft = Offset(c.x - r, c.y - r + 0.5.dp.toPx()),
-                        size = Size(r * 2f, r * 2f),
-                        style = Stroke(width = stroke, cap = StrokeCap.Round)
-                    )
-                    drawLine(
-                        color = iconColor,
-                        start = Offset(c.x, c.y - r - 1.dp.toPx()),
-                        end = Offset(c.x, c.y + 0.5.dp.toPx()),
-                        strokeWidth = stroke,
-                        cap = StrokeCap.Round
-                    )
-                } else {
-                    // Distinct IEC "O" (Zero = OFF) closed standby circle
-                    drawCircle(
-                        color = iconColor,
-                        radius = r,
-                        center = c,
-                        style = Stroke(width = stroke)
-                    )
-                }
-            }
-            Text(
-                text = label,
-                color = contentColor,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.sp,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-@Composable
-private fun WeMoExpandedDrawer(
-    device: WeMoDeviceEntity,
-    onBrightnessChange: (Int) -> Unit,
-    onTriggerMotion: () -> Unit,
-    onReconnect: () -> Unit,
-    onPingLatency: () -> Unit,
-    onEditDevice: () -> Unit,
-    onToggleNightMode: (() -> Unit)? = null
-) {
-    val type = device.parsedType
-    var sliderVal by remember(device.brightness) {
-        mutableFloatStateOf(device.brightness.toFloat())
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(WemoRowExpandedSurface)
-            .padding(horizontal = 18.dp, vertical = 12.dp)
-    ) {
-        // Real-Time Connection & Latency Telemetry Banner inside Expanded Drawer
-        Surface(
-            color = Color.White,
-            shape = RoundedCornerShape(10.dp),
-            border = BorderStroke(1.dp, WemoDividerGray),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 10.dp)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (device.isReachable) {
-                            "Connection: Active (${device.latencyMs}ms SOAP Round-Trip)"
-                        } else {
-                            "Connection: Offline (Unreachable on Port ${device.port})"
-                        },
-                        color = if (device.isReachable) WemoGreenDark else StatusOfflineRed,
-                        fontFamily = WorkSansFontFamily,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp
-                    )
-                    Text(
-                        text = "Last Checked: ${device.lastCheckedTime} • Endpoint: ${device.ipAddress}:${device.port}",
-                        color = WemoTextSecondary,
-                        fontFamily = WorkSansFontFamily,
-                        fontSize = 11.sp
-                    )
-                }
-
-                AssistChip(
-                    onClick = onPingLatency,
-                    label = { Text("Ping RTT", fontSize = 11.sp) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.NetworkCheck,
-                            contentDescription = "Ping ${device.name} latency",
-                            modifier = Modifier.size(15.dp)
-                        )
-                    },
-                    colors = AssistChipDefaults.assistChipColors(
-                        leadingIconContentColor = WemoGreenDark,
-                        labelColor = WemoGreenDark
-                    ),
-                    modifier = Modifier.testTag("ping_device_${device.id}")
-                )
-            }
-        }
-
-        if (type == WeMoDeviceType.LIGHTBULB_DIMMER && device.isReachable) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Brightness Level",
-                    color = WemoTextPrimary,
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = "${sliderVal.roundToInt()}%",
-                    color = WemoGreenDark,
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
-                )
-            }
-
-            Slider(
-                value = sliderVal,
-                onValueChange = { sliderVal = it },
-                onValueChangeFinished = {
-                    onBrightnessChange(sliderVal.roundToInt())
-                },
-                valueRange = 1f..100f,
-                colors = SliderDefaults.colors(
-                    thumbColor = WemoGreenPrimary,
-                    activeTrackColor = WemoGreenPrimary,
-                    inactiveTrackColor = WemoDividerGray
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("brightness_slider_${device.id}")
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(21, 50, 75, 100).forEach { preset ->
-                    FilterChip(
-                        selected = device.brightness == preset && device.isOn,
-                        onClick = {
-                            sliderVal = preset.toFloat()
-                            onBrightnessChange(preset)
-                        },
-                        label = { Text("$preset%") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = WemoGreenSoft,
-                            selectedLabelColor = WemoGreenDark
-                        )
-                    )
-                }
-                if (onToggleNightMode != null) {
-                    FilterChip(
-                        selected = device.nightModeEnabled,
-                        onClick = onToggleNightMode,
-                        label = { Text("Night Mode (20%)") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = WemoGreenSoft,
-                            selectedLabelColor = WemoGreenDark
-                        ),
-                        modifier = Modifier.testTag("night_mode_chip_${device.id}")
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "UPnP Endpoint: http://${device.ipAddress}:${device.port}",
-                    color = WemoTextSecondary,
-                    fontFamily = WorkSansFontFamily,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "SN: ${device.serialNumber} • ${device.firmwareVersion}",
-                    color = WemoTextSecondary,
-                    fontFamily = WorkSansFontFamily,
-                    fontSize = 11.sp
-                )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!device.isReachable) {
-                    AssistChip(
-                        onClick = onReconnect,
-                        label = { Text("Reconnect") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            leadingIconContentColor = WemoGreenDark,
-                            labelColor = WemoGreenDark
-                        )
-                    )
-                } else if (type == WeMoDeviceType.MOTION_SENSOR) {
-                    AssistChip(
-                        onClick = onTriggerMotion,
-                        label = { Text("Trigger Motion") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Sensors,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    )
-                }
-
-                AssistChip(
-                    onClick = onEditDevice,
-                    label = { Text("Configure IP") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (device.isReachable) Icons.Default.Edit else Icons.Default.WifiOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                )
             }
         }
     }
