@@ -13,17 +13,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -31,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,10 +53,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.data.WeMoDeviceCategory
 import com.example.ui.WeMoBottomTab
 import com.example.ui.WeMoViewModel
 import com.example.ui.components.AddOrEditWeMoDeviceDialog
@@ -59,6 +66,7 @@ import com.example.ui.components.AddWeMoRuleDialog
 import com.example.ui.components.AddWifiHomeNetworkDialog
 import com.example.ui.components.ProvisionWeMoApDialog
 import com.example.ui.components.WeMoBottomNavigationBar
+import com.example.ui.components.WeMoDeviceCategoryIllustration
 import com.example.ui.components.WeMoDeviceRow
 import com.example.ui.components.WeMoRoomFilterBar
 import com.example.ui.components.WeMoRoomGroupHeaderCard
@@ -71,8 +79,10 @@ import com.example.ui.screens.WeMoMoreScreen
 import com.example.ui.screens.WeMoRulesScreen
 import com.example.ui.theme.WeMiTheme
 import com.example.ui.theme.WemoBackgroundGray
+import com.example.ui.theme.WemoDividerGray
 import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
+import com.example.ui.theme.WemoGreenSoft
 import com.example.ui.theme.WemoRowSurface
 import com.example.ui.theme.WemoTextPrimary
 import com.example.ui.theme.WemoTextSecondary
@@ -643,55 +653,114 @@ private fun EmptyDevicesState(
     onOpenProvisionApClick: () -> Unit,
     onRestoreClassicClick: () -> Unit
 ) {
-    Column(
+    Surface(
+        color = WemoRowSurface,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, WemoDividerGray),
         modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .testTag("empty_devices_state_card")
     ) {
-        Text(
-            text = "No WeMi / WeMo Switches on This Wi-Fi Home",
-            fontFamily = WorkSansFontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = 20.sp,
-            color = WemoTextPrimary
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, provision a factory-reset switch (10.22.22.1), add a switch by IP, or restore the default preset.",
-            fontFamily = WorkSansFontFamily,
-            fontSize = 14.sp,
-            color = WemoTextSecondary
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = onScanSsdpClick,
-            colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Text("Scan Local Network (SSDP)")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onOpenProvisionApClick,
-            colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
-            modifier = Modifier.testTag("empty_state_provision_ap_button")
-        ) {
-            Text("Setup Factory-Reset WeMo AP (10.22.22.1)")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onAddClick,
-            colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark)
-        ) {
-            Text("Add Switch Manually")
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(
-            onClick = onRestoreClassicClick,
-            colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark)
-        ) {
-            Text("Restore Classic Setup")
+            Surface(
+                color = WemoGreenSoft.copy(alpha = 0.55f),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.padding(bottom = 16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    WeMoDeviceCategoryIllustration(
+                        category = WeMoDeviceCategory.SWITCH_PLUG,
+                        isReachable = true,
+                        isOn = true,
+                        modifier = Modifier.size(width = 42.dp, height = 54.dp)
+                    )
+                    WeMoDeviceCategoryIllustration(
+                        category = WeMoDeviceCategory.LIGHT,
+                        isReachable = true,
+                        isOn = true,
+                        brightness = 100,
+                        modifier = Modifier.size(width = 42.dp, height = 54.dp)
+                    )
+                    WeMoDeviceCategoryIllustration(
+                        category = WeMoDeviceCategory.CHRISTMAS_TREE,
+                        isReachable = true,
+                        isOn = true,
+                        modifier = Modifier.size(width = 42.dp, height = 54.dp)
+                    )
+                    WeMoDeviceCategoryIllustration(
+                        category = WeMoDeviceCategory.FAN,
+                        isReachable = true,
+                        isOn = false,
+                        modifier = Modifier.size(width = 42.dp, height = 54.dp)
+                    )
+                }
+            }
+
+            Text(
+                text = "No WeMi / WeMo Switches on This Wi-Fi Home",
+                fontFamily = WorkSansFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 19.sp,
+                color = WemoTextPrimary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, provision a factory-reset switch (10.22.22.1), add a switch by IP, or restore the default preset.",
+                fontFamily = WorkSansFontFamily,
+                fontSize = 14.sp,
+                color = WemoTextSecondary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(18.dp))
+            Button(
+                onClick = onScanSsdpClick,
+                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("empty_state_scan_ssdp_button")
+            ) {
+                Text("Scan Local Network (SSDP)")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onOpenProvisionApClick,
+                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("empty_state_provision_ap_button")
+            ) {
+                Text("Setup Factory-Reset WeMo AP (10.22.22.1)")
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onAddClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("empty_state_add_manual_button")
+            ) {
+                Text("Add Switch Manually", color = WemoGreenDark)
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onRestoreClassicClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("empty_state_restore_classic_button")
+            ) {
+                Text("Restore Classic Setup", color = WemoTextSecondary)
+            }
         }
     }
 }

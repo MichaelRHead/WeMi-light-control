@@ -40,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -640,8 +641,12 @@ fun ProvisionWeMoApDialog(
                 )
 
                 if (detectedDevice != null || !statusMessage.isNullOrBlank()) {
+                    val isWarningOrError = detectedDevice == null &&
+                        (statusMessage?.contains("No response", ignoreCase = true) == true ||
+                            statusMessage?.contains("rejected", ignoreCase = true) == true ||
+                            statusMessage?.contains("unreachable", ignoreCase = true) == true)
                     Surface(
-                        color = WemoGreenSoft.copy(alpha = 0.65f),
+                        color = if (isWarningOrError) Color(0xFFFEF2F2) else WemoGreenSoft.copy(alpha = 0.65f),
                         shape = RoundedCornerShape(10.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -668,7 +673,7 @@ fun ProvisionWeMoApDialog(
                                 Text(
                                     text = statusMessage,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = WemoGreenDark
+                                    color = if (isWarningOrError) WemoErrorRed else WemoGreenDark
                                 )
                             }
                         }
@@ -795,6 +800,23 @@ fun ProvisionWeMoApDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    }
+                }
+
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    WeMoRepository.DEFAULT_ROOMS.forEach { presetRoom ->
+                        FilterChip(
+                            selected = selectedRoom.equals(presetRoom, ignoreCase = true),
+                            onClick = { selectedRoom = presetRoom },
+                            label = { Text(presetRoom) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = WemoGreenSoft,
+                                selectedLabelColor = WemoGreenDark
+                            )
+                        )
                     }
                 }
 
