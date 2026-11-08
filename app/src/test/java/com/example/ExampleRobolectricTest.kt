@@ -143,14 +143,26 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("room_power_toggle_Living Room").performClick()
         composeTestRule.waitForIdle()
 
-        // Verify Living Room devices and their real-time connection/latency indicators are displayed
+        // Verify Living Room devices and their real-time connection, power-state, and semantic category badges
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasText("Christmas Tree Living"))
         composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()
         composeTestRule.onNodeWithTag("connection_status_badge_1", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("category_badge_1", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_state_badge_1", useUnmergedTree = true).assertIsDisplayed()
+
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasText("Christmas Candle"))
         composeTestRule.onNodeWithText("Christmas Candle").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("category_badge_2", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_state_badge_2", useUnmergedTree = true).assertIsDisplayed()
+
+        // Scroll to Bedroom Ceiling Fan and verify its Fan category badge and OFF power state badge
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasText("Bedroom Ceiling Fan"))
+        composeTestRule.onNodeWithText("Bedroom Ceiling Fan").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("category_badge_14", useUnmergedTree = true).assertIsDisplayed()
+        composeTestRule.onNodeWithTag("power_state_badge_14", useUnmergedTree = true).assertIsDisplayed()
 
         // Trigger pull-to-refresh swipeDown gesture on the devices list
         composeTestRule.onNodeWithTag("devices_pull_to_refresh")
@@ -161,6 +173,7 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasText("Christmas Tree Kitchen"))
         composeTestRule.onNodeWithText("Christmas Tree Kitchen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("category_badge_4", useUnmergedTree = true).assertIsDisplayed()
 
         // Switch to Rules tab and verify rules load
         composeTestRule.onNodeWithTag("nav_tab_rules").performClick()

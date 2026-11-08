@@ -248,6 +248,17 @@ class WeMoNetworkClient(
             isRtos = isRtos
         )
 
+        val rawBinaryState = Regex("<binaryState>([^<]+)</binaryState>", RegexOption.IGNORE_CASE)
+            .find(xml)?.groupValues?.getOrNull(1)?.trim()
+        val parsedIsOn = if (rawBinaryState != null) {
+            val firstToken = rawBinaryState.substringBefore("|").trim()
+            firstToken == "1" || firstToken == "8" || firstToken.equals("true", ignoreCase = true)
+        } else {
+            true
+        }
+        val parsedBrightness = Regex("<brightness>\\s*(\\d+)\\s*</brightness>", RegexOption.IGNORE_CASE)
+            .find(xml)?.groupValues?.getOrNull(1)?.toIntOrNull()?.coerceIn(1, 100) ?: 100
+
         return SsdpDiscoveredDevice(
             name = friendlyName,
             ipAddress = ip,
@@ -260,8 +271,8 @@ class WeMoNetworkClient(
             searchTarget = stHeader.ifEmpty { "urn:Belkin:service:basicevent:1" },
             locationUrl = locationUrl,
             responseTimeMs = responseTimeMs,
-            isOn = true,
-            brightness = 100,
+            isOn = parsedIsOn,
+            brightness = parsedBrightness,
             isLiveUdpResponse = isLiveUdp,
             hardwareSku = sku,
             macAddress = macAddress

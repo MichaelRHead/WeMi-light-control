@@ -13,6 +13,9 @@ import com.example.network.WeMoScannedAp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -249,12 +252,59 @@ class WeMoRepository(
     }
 
     /**
+     * Immediately probes all remembered switches on [networkKey] in parallel (bounded by [lanSemaphore])
+     * via SOAP GetBinaryState on app startup or home network switch so that each device's live
+     * ON, OFF (Accessible Standby), or Disconnected state is reflected in the UI right away.
+     */
+    suspend fun detectStartupDeviceStates(networkKey: String): List<WeMoDeviceEntity> = coroutineScope {
+        val demoMode = _isDemoShowroomMode.value
+        val allDevs = dao.getAllDevices().first().let {
+            if (it.isEmpty() && demoMode) defaultClassicDevices() else it
+        }
+        val homeDevices = allDevs.filter { it.networkKey == networkKey }
+        if (homeDevices.isEmpty()) return@coroutineScope emptyList()
+
+        val checkedAt = nowFormatted()
+        homeDevices.map { device ->
+            async {
+                mutexFor(device).withLock {
+                    val probe = lanSemaphore.withPermit {
+                        networkClient.getBinaryState(device)
+                    }
+                    appendLog(probe.logEntry)
+                    val updated = when {
+                        probe.reachableOnLan -> device.copy(
+                            isReachable = true,
+                            port = probe.resolvedPort,
+                            isOn = probe.binaryStateOn ?: device.isOn,
+                            brightness = probe.brightness ?: device.brightness,
+                            latencyMs = probe.latencyMs.coerceAtLeast(1),
+                            lastCheckedTime = checkedAt
+                        )
+                        demoMode -> device
+                        else -> device.copy(
+                            isReachable = false,
+                            latencyMs = 0,
+                            lastCheckedTime = "Offline • Timeout"
+                        )
+                    }
+                    dao.updateDevice(updated)
+                    updated
+                }
+            }
+        }.awaitAll()
+    }
+
+    /**
      * Reconnects and rediscovers all remembered switches belonging to [networkKey] when
      * the user connects or returns to that Wi-Fi network ("Home").
-     * Probes each remembered switch via SOAP GetBinaryState AND runs an SSDP multicast
-     * M-SEARCH discovery pass to update ports/IPs and restore offline switches.
+     * First runs [detectStartupDeviceStates] to immediately probe each switch's live ON/OFF state,
+     * then runs an SSDP multicast M-SEARCH discovery pass to update ports/IPs and restore offline switches.
      */
     suspend fun reconnectAndRediscoverHome(networkKey: String): HomeReconnectSummary {
+        // Immediate parallel GetBinaryState probe for fast startup ON/OFF state detection
+        detectStartupDeviceStates(networkKey)
+
         val demoMode = _isDemoShowroomMode.value
         val networks = dao.getAllHomeNetworks().first().let {
             if (it.isEmpty() && demoMode) defaultHomeNetworks() else it

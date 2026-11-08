@@ -13,6 +13,18 @@ enum class WeMoDeviceType {
     LIGHTBULB_DIMMER
 }
 
+/**
+ * Semantic device category derived from the switch's friendly name (or hardware type),
+ * used to render specialized icons in the app (Christmas trees, fans, lamps/lights, motion sensors, or generic switches).
+ */
+enum class WeMoDeviceCategory(val displayName: String) {
+    CHRISTMAS_TREE("Tree Lights"),
+    FAN("Fan"),
+    LIGHT("Light"),
+    MOTION_SENSOR("Motion"),
+    SWITCH_PLUG("Switch")
+}
+
 enum class WeMoConnectionQuality(
     val statusTitle: String,
     val signalBars: Int

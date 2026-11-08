@@ -587,12 +587,235 @@ class WeMoProtocolTest {
         // 3. Verify lamp, light, fan, tree, motion sensor, and generic switch classification
         assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Living Room Christmas Tree"))
         assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Front Yard Tree Lights"))
+        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Xmas Garland Plug"))
+        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Blue Spruce Porch"))
         assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Patio Misting Fan"))
         assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Bathroom Exhaust Blower"))
+        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Whole House Ventilator"))
+        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Workshop Air Circulator"))
         assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Bedside Reading Lamp"))
         assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Kitchen Under-Cabinet Light"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Dining Chandelier"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Hallway Wall Sconce"))
+        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Any Name On Dimmer", WeMoDeviceType.LIGHTBULB_DIMMER))
         assertEquals(WeMoDeviceCategory.MOTION_SENSOR, classifyDeviceCategory("Hallway Motion Detector"))
+        assertEquals(WeMoDeviceCategory.MOTION_SENSOR, classifyDeviceCategory("Driveway Sensor"))
         assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Espresso Machine Plug"))
+        assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Office Wall Switch"))
+    }
+
+    @Test
+    fun `verify multi-device startup state detection across ON, OFF accessible standby, and Disconnected devices plus Night Mode and SignalStrength`() = runBlocking {
+        val nightModeConfigured = AtomicBoolean(false)
+        val running = AtomicBoolean(true)
+
+        // Server A: Accessible OFF Christmas Tree switch (<BinaryState>0</BinaryState>)
+        val serverA = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
+        val portA = serverA.localPort
+        val threadA = thread(start = true, isDaemon = true) {
+            while (running.get() && !serverA.isClosed) {
+                try {
+                    serverA.accept().use { sock ->
+                        val reader = BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.UTF_8))
+                        reader.readLine() ?: return@use
+                        var contentLen = 0
+                        while (true) {
+                            val h = reader.readLine() ?: break
+                            if (h.isEmpty()) break
+                            if (h.startsWith("Content-Length:", ignoreCase = true)) {
+                                contentLen = h.substringAfter(":").trim().toIntOrNull() ?: 0
+                            }
+                        }
+                        if (contentLen > 0) reader.skip(contentLen.toLong())
+                        val xml = """
+                            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                              <s:Body>
+                                <u:GetBinaryStateResponse xmlns:u="urn:Belkin:service:basicevent:1">
+                                  <BinaryState>0</BinaryState>
+                                </u:GetBinaryStateResponse>
+                              </s:Body>
+                            </s:Envelope>
+                        """.trimIndent()
+                        val bytes = xml.toByteArray(Charsets.UTF_8)
+                        val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
+                        writer.write("HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n$xml")
+                        writer.flush()
+                    }
+                } catch (_: Exception) {
+                    if (!running.get()) break
+                }
+            }
+        }
+
+        // Server B: Accessible ON Smart Dimmer Lamp (<BinaryState>1</BinaryState><brightness>55</brightness>) + NightMode + SignalStrength
+        val serverB = ServerSocket(0, 8, InetAddress.getByName("127.0.0.1"))
+        val portB = serverB.localPort
+        val threadB = thread(start = true, isDaemon = true) {
+            while (running.get() && !serverB.isClosed) {
+                try {
+                    serverB.accept().use { sock ->
+                        val reader = BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.UTF_8))
+                        reader.readLine() ?: return@use
+                        var contentLen = 0
+                        var soapAction = ""
+                        while (true) {
+                            val h = reader.readLine() ?: break
+                            if (h.isEmpty()) break
+                            if (h.startsWith("Content-Length:", ignoreCase = true)) {
+                                contentLen = h.substringAfter(":").trim().toIntOrNull() ?: 0
+                            } else if (h.startsWith("SOAPACTION:", ignoreCase = true)) {
+                                soapAction = h.substringAfter(":").trim()
+                            }
+                        }
+                        val buf = CharArray(contentLen)
+                        var read = 0
+                        while (read < contentLen) {
+                            val n = reader.read(buf, read, contentLen - read)
+                            if (n == -1) break
+                            read += n
+                        }
+                        val body = String(buf, 0, read)
+                        val xml = when {
+                            soapAction.contains("ConfigureNightMode") -> {
+                                nightModeConfigured.set(body.contains("<NightMode>1</NightMode>"))
+                                """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:ConfigureNightModeResponse xmlns:u="urn:Belkin:service:basicevent:1">
+                                      <NightMode>${if (nightModeConfigured.get()) 1 else 0}</NightMode>
+                                    </u:ConfigureNightModeResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                                """.trimIndent()
+                            }
+                            soapAction.contains("GetSignalStrength") -> """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:GetSignalStrengthResponse xmlns:u="urn:Belkin:service:basicevent:1">
+                                      <SignalStrength>92</SignalStrength>
+                                    </u:GetSignalStrengthResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                            """.trimIndent()
+                            else -> """
+                                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                                  <s:Body>
+                                    <u:GetBinaryStateResponse xmlns:u="urn:Belkin:service:basicevent:1">
+                                      <BinaryState>1</BinaryState>
+                                      <brightness>55</brightness>
+                                    </u:GetBinaryStateResponse>
+                                  </s:Body>
+                                </s:Envelope>
+                            """.trimIndent()
+                        }
+                        val bytes = xml.toByteArray(Charsets.UTF_8)
+                        val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
+                        writer.write("HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n$xml")
+                        writer.flush()
+                    }
+                } catch (_: Exception) {
+                    if (!running.get()) break
+                }
+            }
+        }
+
+        // Closed port C: Disconnected Fan switch
+        val tempSock = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))
+        val closedPortC = tempSock.localPort
+        tempSock.close()
+
+        try {
+            val client = WeMoNetworkClient()
+            val repo = WeMoRepository(
+                dao = database.wemoDao(),
+                networkClient = client,
+                initialDemoModeOverride = false
+            )
+            repo.ensureSeeded()
+
+            // Insert 3 switches with stale cached states so detectStartupDeviceStates must reconcile all 3
+            val idTree = database.wemoDao().insertDevice(
+                WeMoDeviceEntity(
+                    name = "Christmas Tree Living",
+                    roomName = "Living Room",
+                    ipAddress = "127.0.0.1",
+                    port = portA,
+                    isOn = true, // Stale ON; real switch is OFF (0)
+                    isReachable = true,
+                    serialNumber = "TREE001"
+                )
+            ).toInt()
+            val idLamp = database.wemoDao().insertDevice(
+                WeMoDeviceEntity(
+                    name = "Bedroom Dimmer Lamp",
+                    roomName = "Bedroom",
+                    deviceType = WeMoDeviceType.LIGHTBULB_DIMMER.name,
+                    ipAddress = "127.0.0.1",
+                    port = portB,
+                    isOn = false, // Stale OFF; real dimmer is ON (1) at 55%
+                    brightness = 100,
+                    isReachable = false,
+                    serialNumber = "LAMP002"
+                )
+            ).toInt()
+            val idFan = database.wemoDao().insertDevice(
+                WeMoDeviceEntity(
+                    name = "Garage Exhaust Fan",
+                    roomName = "Garage",
+                    ipAddress = "127.0.0.1",
+                    port = closedPortC,
+                    isOn = true,
+                    isReachable = true, // Stale Reachable; real switch is offline
+                    serialNumber = "FAN003"
+                )
+            ).toInt()
+
+            val updatedList = repo.detectStartupDeviceStates("wifi_home_192_168_1")
+            val treeAfter = updatedList.single { it.id == idTree }
+            val lampAfter = updatedList.single { it.id == idLamp }
+            val fanAfter = updatedList.single { it.id == idFan }
+
+            // 1. Tree switch is Reachable & OFF (Accessible Standby) with CHRISTMAS_TREE category
+            assertTrue(treeAfter.isReachable)
+            assertFalse(treeAfter.isOn)
+            assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, treeAfter.visualCategory)
+
+            // 2. Dimmer Lamp is Reachable & ON at 55% brightness with LIGHT category
+            assertTrue(lampAfter.isReachable)
+            assertTrue(lampAfter.isOn)
+            assertEquals(55, lampAfter.brightness)
+            assertEquals(WeMoDeviceCategory.LIGHT, lampAfter.visualCategory)
+
+            // 3. Garage Fan on closed port is marked Disconnected (isReachable = false, latencyMs = 0) with FAN category
+            assertFalse(fanAfter.isReachable)
+            assertEquals(0, fanAfter.latencyMs)
+            assertEquals(WeMoDeviceCategory.FAN, fanAfter.visualCategory)
+
+            // 4. Verify dimmer Night Mode SOAP action and SignalStrength query
+            val nightResult = repo.toggleDimmerNightMode(lampAfter)
+            assertTrue(nightResult.nightModeEnabled)
+            assertTrue(nightModeConfigured.get())
+
+            val rssi = client.getSignalStrength("127.0.0.1", portB)
+            assertEquals(92, rssi)
+
+            // 5. Verify room brightness update and Auto-Off turnOffDeviceById
+            val updatedBulbs = repo.updateRoomBrightness(
+                roomName = "Bedroom",
+                newBrightness = 35,
+                networkKey = "wifi_home_192_168_1"
+            )
+            assertEquals(1, updatedBulbs)
+
+            val autoOffResult = repo.turnOffDeviceById(idLamp)
+            assertNotNull(autoOffResult)
+        } finally {
+            running.set(false)
+            runCatching { serverA.close() }
+            runCatching { serverB.close() }
+            threadA.join(500)
+            threadB.join(500)
+        }
     }
 }
 
