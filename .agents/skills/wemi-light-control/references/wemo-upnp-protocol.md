@@ -1,154 +1,152 @@
-# Belkin WeMo Local UPnP / SSDP / SOAP Protocol Reference
+# Belkin WeMo Local UPnP / SSDP / SOAP Protocol Reference (`pywemo` & Home Assistant Spec)
 
-This document details the local LAN protocol used by Belkin WeMo hardware (no cloud dependency required).
+This document details the local LAN protocol used by Belkin WeMo hardware, incorporating the exact discovery, port-probing, SOAP, MetaInfo, and GENA push-subscription mechanisms used by [`pywemo`](https://github.com/pywemo/pywemo) and Home Assistant's `wemo` integration.
 
 ---
 
-## 1. Supported Hardware Models & Identification
+## 1. Supported Hardware Models & UDN / SKU Classification
 
-| Hardware Device | Model Numbers | `<modelName>` in `setup.xml` | `<deviceType>` URN in `setup.xml` | Serial / UDN Prefix |
+| Hardware Device | Model SKUs | `<modelName>` in `setup.xml` | `<deviceType>` URN in `setup.xml` | `<UDN>` Prefix (`discovery.py`) |
 | :--- | :--- | :--- | :--- | :--- |
 | **WeMo Light Switch (1st Gen)** | `F7C030` | `LightSwitch` | `urn:Belkin:device:lightswitch:1` | `uuid:Lightswitch-1_0-...` |
-| **WeMo Light Switch (2nd Gen / 3-Way)** | `WLS040`, `WLS0403` | `LightSwitch` or `WLS040` / `WLS0403` | `urn:Belkin:device:lightswitch:1` | `uuid:Lightswitch-1_0-...` or `uuid:Lightswitch-2_0-...` |
-| **WeMo Wi-Fi Smart Dimmer** | `F7C059` (Gen 1), `WDS060` (Gen 2) | `Dimmer` or `WDS060` | `urn:Belkin:device:dimmer:1` | `uuid:Dimmer-1_0-...` or `uuid:Dimmer-2_0-...` |
-| **WeMo Mini Smart Plug** | `F7C063` (Gen 1), `WSP080` (Gen 2) | `Socket` or `WSP080` | `urn:Belkin:device:controllee:1` | `uuid:Socket-1_0-...` |
+| **WeMo Light Switch (2nd Gen / 3-Way)** | `WLS040`, `WLS0403` | `LightSwitch` / `WLS040` / `WLS0403` | `urn:Belkin:device:lightswitch:1` | `uuid:Lightswitch-2_0-...`, `uuid:Lightswitch-3_0-...`, or SKU `WLS040`/`WLS0403` |
+| **WeMo Wi-Fi Smart Dimmer** | `F7C059` (Gen 1), `WDS060` (Gen 2 RTOS) | `Dimmer` / `WDS060` | `urn:Belkin:device:dimmer:1` | `uuid:Dimmer-1_0-...` (`F7C059`), `uuid:Dimmer-2_0-...` (`WDS060`) |
+| **WeMo Mini Smart Plug** | `F7C063` (Gen 1), `WSP080` (Gen 2) | `Socket` / `WSP080` | `urn:Belkin:device:controllee:1` | `uuid:Socket-1_0-...` |
 
-### Heuristic Classification Rules
-When parsing `/setup.xml`:
-1. **`IN_WALL_DIMMER`**: `<deviceType>` contains `dimmer` OR `<modelName>` contains `Dimmer` or `WDS` OR `<UDN>` starts with `uuid:Dimmer`.
-2. **`THREE_WAY_SWITCH`**: `<modelName>` / `<modelDescription>` / `<friendlyName>` / `<serialNumber>` contains `WLS0403`, `WLS040`, `3-Way`, `3Way`, or `Lightswitch-2_0`.
-3. **`IN_WALL_SWITCH`**: `<deviceType>` contains `lightswitch` OR `<modelName>` contains `LightSwitch` OR `<UDN>` starts with `uuid:Lightswitch`.
-4. **`MINI_PLUG`**: `<deviceType>` contains `controllee` or `socket` OR `<modelName>` contains `Socket`, `Mini`, or `WSP080` OR `<UDN>` starts with `uuid:Socket`.
+### `pywemo` Classification & Validation Rules
+1. **Manufacturer Check**: In `setup.xml` (or `/Lightsetup.xml` on certain `F7C030` firmwares), `<manufacturer>` is `Belkin International Inc.`. Validate this tag (or `urn:Belkin:` service/device URNs) so non-WeMo UPnP devices on the LAN (routers, TVs, Hue bridges, Sonos) are never misclassified as WeMo switches.
+2. **Exact Hardware SKU & Wi-Fi SSID via `metainfo1#GetMetaInfo`**:
+   - Calling `GetMetaInfo` on `/upnp/control/metainfo1` (`urn:Belkin:service:metainfo:1#GetMetaInfo`) returns `<MetaInfo>` formatted as 6 pipe-delimited fields:
+     ```
+     MAC|SerialNumber|DeviceSKU|FirmwareVersion|AccessPointSSID|ModelName
+     ```
+   - `DeviceSKU` (`values[2]`) identifies `F7C030` (Gen 1 Switch) vs `WLS040`/`WLS0403` (Gen 2 3-Way Switch) vs `F7C059`/`WDS060` (Dimmer) vs `F7C063`/`WSP080` (Mini Plug).
+   - `AccessPointSSID` (`values[4]`) reports the exact 2.4 GHz Wi-Fi SSID the WeMo device is joined to, even if Android OS permissions restrict reading the phone's current SSID.
 
 ---
 
-## 2. SSDP Multicast Discovery (`239.255.255.250:1900`)
+## 2. SSDP Multicast Discovery (`pywemo/ssdp.py`)
 
-### Android Requirements
-- Must hold `WifiManager.MulticastLock` (`wifiManager.createMulticastLock("wemi_ssdp").acquire()`) during discovery so the Wi-Fi interface forwards UDP packets from WeMo devices.
-- Bind an ephemeral UDP `DatagramSocket` and send `M-SEARCH` datagrams to `239.255.255.250:1900`.
+### Android & Socket Requirements
+- Acquire `WifiManager.MulticastLock` (`wifiManager.createMulticastLock("wemi_ssdp").apply { setReferenceCounted(false); acquire() }`) before scanning and release it in `finally`.
+- Bind the UDP `DatagramSocket` to the local IPv4 LAN interface address (`InetAddress.getByName(localIp)`) on an ephemeral port (`0`) so multicast packets route out the Wi-Fi interface rather than cellular/VPN.
+- **Periodic Retransmission During Scan Window**:
+  - UDP multicast packets are unacknowledged and frequently dropped on Wi-Fi.
+  - `pywemo/ssdp.py` sets a `1000 ms` receive poll interval inside a `5000 ms` total discovery window: whenever a `1000 ms` slice finishes without exhausting the total timeout, re-send the `M-SEARCH` datagram to `239.255.255.250:1900`.
+- **Deduplication Key**: Deduplicate SSDP responses by `(udn, location)` where `udn = usn.substringBefore("::")`.
+- **Follow `LOCATION` Path Literally**: Always fetch the exact URL in the `LOCATION:` header (some `F7C030` firmwares return `http://<ip>:<port>/Lightsetup.xml` rather than `/setup.xml`).
 
 ### `M-SEARCH` Request Packet
 ```http
 M-SEARCH * HTTP/1.1
-HOST: 239.255.255.250:1900
+ST: urn:Belkin:service:basicevent:1
+MX: 1
 MAN: "ssdp:discover"
-MX: 2
-ST: urn:Belkin:service:basicevent:1
+HOST: 239.255.255.250:1900
+
 
 ```
-*(Note: Each line must end with `\r\n`, followed by a trailing `\r\n`. Sending a second packet with `ST: upnp:rootdevice` maximizes compatibility across firmware versions.)*
-
-### `M-SEARCH` Response Example
-```http
-HTTP/1.1 200 OK
-CACHE-CONTROL: max-age=86400
-DATE: Sat, 07 Nov 2026 23:00:00 GMT
-EXT:
-LOCATION: http://192.168.1.104:49153/setup.xml
-OPT: "http://schemas.upnp.org/upnp/1/0/"; ns=01
-01-NLS: 905bfa3c-1dd2-11b2-8928-fd8585e43e32
-SERVER: Unspecified, UPnP/1.0, Unspecified
-X-User-Agent: redsonic
-ST: urn:Belkin:service:basicevent:1
-USN: uuid:Dimmer-1_0-221739K1300410::urn:Belkin:service:basicevent:1
-
-```
+*(Each line ends with `\r\n`, terminated by an empty line `\r\n`.)*
 
 ---
 
-## 3. UPnP Device Descriptor (`GET /setup.xml`)
+## 3. Port Probing & Two-Stage Reconnection (`pywemo/ouimeaux_device/__init__.py`)
 
-- **Ports**: WeMo devices dynamically bind an HTTP server on one of ports **`49151` through `49156`** (most commonly `49153` or `49152`). Always use the port advertised in the SSDP `LOCATION` header first, and fall back to scanning `[49153, 49152, 49154, 49155, 49151, 49156]` if a device rebooted and switched ports.
-- **Key XML Tags in `/setup.xml`**:
-  - `<friendlyName>`: User-configured device name (e.g. `Dining Chandelier`).
-  - `<modelName>`: `LightSwitch`, `Dimmer`, `Socket`, etc.
-  - `<modelDescription>`: e.g. `Belkin Plugin Socket 1.0`, `Belkin WeMo Dimmer`.
-  - `<serialNumber>`: Unique hardware serial (stable across IP/port changes).
-  - `<UDN>`: Unique Device Name, e.g. `uuid:Lightswitch-1_0-221512K13008A2`.
-  - `<firmwareVersion>`: e.g. `WeMo_WW_2.00.11532.PVT-OWRT-LS`.
-  - `<macAddress>`: Device MAC (sometimes without colons, e.g. `6038E0AA382A`).
-  - `<binaryState>`: Sometimes included in `setup.xml`, but **not reliable** for live state—always follow up with a `GetBinaryState` SOAP call.
+### Full WeMo Port Range (`PROBE_PORTS`)
+WeMo devices dynamically bind an HTTP server on one of 9 ports, ordered by frequency in `pywemo`:
+```kotlin
+val PROBE_PORTS = listOf(49153, 49152, 49154, 49151, 49155, 49156, 49157, 49158, 49159)
+```
+
+### Smart Port Probing (`probe_wemo`)
+When probing `http://<host>:<port>/setup.xml` across `ports` (with the device's last-known `port` moved to index `0`):
+1. **UDN Verification (`matchUdn`)**: Parse `<UDN>` (or `<serialNumber>`) from `setup.xml`. If `matchUdn != null && device.udn != matchUdn`, skip and continue! This prevents toggling the wrong device if DHCP reassigned the IP address to another WeMo unit.
+2. **Distinguish `ConnectTimeoutException` vs. `ConnectException` vs. `SocketTimeoutException`**:
+   - **`SocketTimeoutException` during TCP `connect()`**: The IP address itself is not reachable on the LAN (ARP/Wi-Fi timeout). Break early rather than waiting for 9 full timeouts on a dead IP.
+   - **`ConnectException` (`ECONNREFUSED`)**: The host IP is alive and immediately sent a TCP `RST` on that port. Continue immediately to the next port in `PROBE_PORTS`.
+   - **`SocketTimeoutException` during HTTP `read()`**: As noted in `pywemo`, WeMo firmware occasionally gets into a wedged state where an old port still accepts TCP connections (`SYN/ACK`) but never responds to HTTP requests while a newly bound port works. Continue probing the next port!
+
+### Two-Stage Reconnect (`reconnect_with_device`)
+When a SOAP request to a known device fails:
+1. **Stage 1 — Port Re-Probing (`_reconnect_with_device_by_probing`)**: Probe `PROBE_PORTS` on the device's current IP address (verifying `serialNumber` / `UDN`).
+2. **Stage 2 — Targeted SSDP Rediscovery (`_reconnect_with_device_by_discovery`)**: If port probing fails (e.g., router DHCP assigned a new IP), run an SSDP scan matching the device's `UDN` / `serialNumber` (`matchUdn`) to discover its new `ipAddress` and `port`.
 
 ---
 
-## 4. SOAP Control Endpoint (`POST /upnp/control/basicevent1`)
+## 4. HTTP / TCP Session & Concurrency Constraints (`pywemo/ouimeaux_device/api/service.py`)
 
-All four device types support the `urn:Belkin:service:basicevent:1` service at `/upnp/control/basicevent1`.
+- **Disable HTTP Keep-Alive (`Connection: close`)**:
+  - WeMo embedded HTTP servers (OpenWrt `libupnp` and RTOS) have a very small thread pool and do not properly handle persistent HTTP keep-alive connections. Always send `Connection: close` and disconnect `HttpURLConnection` in `finally` to avoid exhausting TCP sockets on the switch.
+- **Limit Concurrency (`MAX_CONCURRENCY = 3`) & Per-Device Mutex**:
+  - Never flood a single WeMo device with parallel requests, and cap concurrent LAN-wide device initialization/polling to `3` coroutines (`Semaphore(3)`) with a per-device `Mutex`.
 
-### HTTP Headers
-```http
-POST /upnp/control/basicevent1 HTTP/1.1
-Host: <ip>:<port>
-Content-Type: text/xml; charset="utf-8"
-SOAPACTION: "urn:Belkin:service:basicevent:1#<ActionName>"
-Content-Length: <bytes>
-Connection: close
-```
+---
 
-### 4.1 `GetBinaryState`
-**Request Body**:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-  <s:Body>
-    <u:GetBinaryState xmlns:u="urn:Belkin:service:basicevent:1"></u:GetBinaryState>
-  </s:Body>
-</s:Envelope>
-```
+## 5. SOAP Services & Actions
 
-**Response Body (Switch / Mini Plug)**:
-```xml
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-  <s:Body>
-    <u:GetBinaryStateResponse xmlns:u="urn:Belkin:service:basicevent:1">
-      <BinaryState>1</BinaryState>
-    </u:GetBinaryStateResponse>
-  </s:Body>
-</s:Envelope>
-```
-*(Note: Some firmware returns pipe-delimited telemetry in `<BinaryState>`, e.g. `1|1490000000|...`—always parse `binaryState.trim().split("|").first()` where `1` or `8` means ON and `0` means OFF.)*
+### 5.1 `basicevent1` (`/upnp/control/basicevent1`, `urn:Belkin:service:basicevent:1`)
 
-**Response Body (WeMo Dimmer)**:
-```xml
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-  <s:Body>
-    <u:GetBinaryStateResponse xmlns:u="urn:Belkin:service:basicevent:1">
-      <BinaryState>1</BinaryState>
-      <brightness>78</brightness>
-      <fader>300:-1:1:0:78</fader>
-    </u:GetBinaryStateResponse>
-  </s:Body>
-</s:Envelope>
-```
-
-### 4.2 `SetBinaryState`
-**Request Body (Switch / Mini Plug ON/OFF)**:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-  <s:Body>
-    <u:SetBinaryState xmlns:u="urn:Belkin:service:basicevent:1">
-      <BinaryState>1</BinaryState>
-    </u:SetBinaryState>
-  </s:Body>
-</s:Envelope>
-```
-
-**Request Body (WeMo Dimmer Brightness + State)**:
-For WeMo Dimmer (`IN_WALL_DIMMER`), include `<brightness>` (1–100) alongside `<BinaryState>` when turning on or adjusting brightness:
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-  <s:Body>
-    <u:SetBinaryState xmlns:u="urn:Belkin:service:basicevent:1">
+- **`GetBinaryState`**:
+  - Returns `<BinaryState>` (`0` or `1`, or pipe-delimited `1|1492338954|...` — always take `.substringBefore("|").trim()`).
+  - On WeMo Dimmers (`IN_WALL_DIMMER`), also returns `<brightness>` (`1..100`) and `<fader>`.
+- **`SetBinaryState`**:
+  - For Switches / Mini Plugs: `<BinaryState>0</BinaryState>` or `<BinaryState>1</BinaryState>`.
+  - **Already-in-State `"Error"` Quirks (`pywemo/ouimeaux_device/switch.py`)**:
+    - If a switch is *already* ON and receives `SetBinaryState(1)` (or already OFF and receives `SetBinaryState(0)`), WeMo firmware returns HTTP 200 with `<BinaryState>Error</BinaryState>`. Treat HTTP 200 with `<BinaryState>Error</BinaryState>` as confirming the requested state (or verify via `GetBinaryState`), NOT as a failure!
+  - For Dimmers (`pywemo/ouimeaux_device/dimmer.py`):
+    - WeMo ignores `<brightness>0</brightness>`. To set brightness `1..100`, send:
+      ```xml
       <BinaryState>1</BinaryState>
       <brightness>75</brightness>
-    </u:SetBinaryState>
-  </s:Body>
-</s:Envelope>
-```
-*(Note: In `GetBinaryStateResponse` / `SetBinaryStateResponse`, if the device is currently transitioning or returns `<BinaryState>Error</BinaryState>`, check HTTP 200 status and re-query or inspect `<brightness>`.)*
+      ```
+    - If brightness `0` is requested, send `<BinaryState>0</BinaryState>`.
+- **`GetSignalStrength`**:
+  - Returns `<SignalStrength>` (`0..100` percentage). `pywemo` converts this to RSSI dBm via:
+    - `>= 100` -> `-50 dBm`
+    - `24..99` -> `round((percent - 24) * 10.0 / 26.0 - 80)`
+    - `1..23` -> `round(percent * 10.0 / 26.0 - 90)`
+    - `<= 0` -> `-90 dBm`
+- **`GetNightModeConfiguration` / `ConfigureNightMode` (Dimmer)**:
+  - Controls Dimmer Night Mode (`nightMode`, `startTime`, `endTime`, `nightModeBrightness`).
+- **`GetFriendlyName` / `ChangeFriendlyName`**:
+  - Reads or updates the hardware's internal `<FriendlyName>`.
 
-### 4.3 `GetSignalStrength` (Optional Telemetry)
-WeMo devices also support `SOAPACTION: "urn:Belkin:service:basicevent:1#GetSignalStrength"` at `/upnp/control/basicevent1`, which returns `<SignalStrength>` (0–100%).
+### 5.2 `metainfo1` (`/upnp/control/metainfo1`, `urn:Belkin:service:metainfo:1`)
+- **`GetMetaInfo`**:
+  - Returns `<MetaInfo>MAC|SerialNumber|DeviceSKU|FirmwareVersion|AccessPointSSID|ModelName</MetaInfo>`.
+
+---
+
+## 6. Local Push Event Subscriptions (`pywemo/subscribe.py` — UPnP GENA)
+
+To receive instant push notifications when a physical wall switch, 3-way switch, dimmer, or mini plug button is pressed:
+
+1. **Local HTTP Callback Server**:
+   - Bind a lightweight `ServerSocket` on the Android device's Wi-Fi IP (e.g., port `8989` or ephemeral port).
+2. **`SUBSCRIBE` Request**:
+   ```http
+   SUBSCRIBE /upnp/event/basicevent1 HTTP/1.1
+   HOST: <device_ip>:<device_port>
+   CALLBACK: <http://<android_ip>:<callback_port>/sub/basicevent/<device_serial>>
+   NT: upnp:event
+   TIMEOUT: Second-300
+   Connection: close
+
+   ```
+   - Response headers contain `SID: uuid:...` and `TIMEOUT: Second-300`.
+3. **Renewal & `412 Precondition Failed` Recovery**:
+   - Before `TIMEOUT` expires (e.g. every `240s`), send `SUBSCRIBE` with `SID: <subscription_id>` and `TIMEOUT: Second-300` (no `CALLBACK` or `NT` header).
+   - If the device responds with `HTTP/1.1 412 Precondition Failed` (e.g., after a reboot), send `UNSUBSCRIBE` with `SID`, clear `subscription_id`, and issue a fresh `SUBSCRIBE` with `CALLBACK` and `NT: upnp:event`.
+4. **Incoming `NOTIFY` Callback**:
+   - When state changes, the WeMo device sends an HTTP `NOTIFY` request to the callback path with XML body:
+     ```xml
+     <e:propertyset xmlns:e="urn:schemas-upnp-org:event-1-0">
+       <e:property>
+         <BinaryState>1</BinaryState>
+       </e:property>
+       <e:property>
+         <Brightness>80</Brightness>
+       </e:property>
+     </e:propertyset>
+     ```
+   - Reply `HTTP/1.1 200 OK` and immediately update Room (`isOn`, `brightness`, `isReachable = true`, `lastCheckedTime = "Push event"`).

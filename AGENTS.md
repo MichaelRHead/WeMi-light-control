@@ -2,7 +2,10 @@
 
 **WeMi Light Control** (`com.example.wemi`, v6.0 / `d323be0`) is an Android & Android TV local-LAN controller for Belkin WeMo smart switches, dimmers, and mini plugs. It pairs a 2013-era skeuomorphic Belkin WeMo interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with direct local UPnP / SSDP / SOAP networking and Room persistence.
 
-Detailed agent instructions and protocol specs are also packaged as a repository skill in [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) and [`.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md`](.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md).
+Detailed agent instructions, protocol specs, and the `pywemo`-to-Kotlin implementation plan are packaged in:
+- [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Agent Skill Definition
+- [`.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md`](.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md) — Complete `pywemo` & Home Assistant UPnP/SSDP/SOAP/GENA Protocol Reference
+- [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — Phased Kotlin Implementation Plan
 
 ---
 
