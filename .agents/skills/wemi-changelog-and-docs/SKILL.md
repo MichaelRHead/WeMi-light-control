@@ -18,13 +18,14 @@ Use this skill whenever you land a feature, bug fix, UI change, or architectural
 >   - [`UX_DESIGN.md`](../../UX_DESIGN.md) *(Owned Exclusively by the Google AI Studio Agent — Read-Only for other agents)*
 >   - [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md) *(Owned Exclusively by the Google AI Studio Agent — Read-Only for other agents)*
 >   - [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) *(Owned Exclusively by the Antigravity Debugging & Support Agent — Read-Only for other agents)*
+>   - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../DISCOVERY_AND_ROOM_GROUPING.md) *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — Read-Only for other agents)*
 >   - [`IMPLEMENTED.md`](../../IMPLEMENTED.md)
 >   - [`RELEASE_NOTES.md`](../../RELEASE_NOTES.md)
 >   - [`UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md)
 >   - [`USER_GUIDE.md`](../../USER_GUIDE.md)
 >   - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../../CODE_QUALITY_AND_MODULARIZATION_PLAN.md)
 > - **The `docs/` folder is dedicated EXCLUSIVELY to the human-focused user guide** ([`docs/README.md`](../../docs/README.md) and [`docs/user-guide/*.md`](../../docs/user-guide/), where [`docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md) is owned exclusively by the Antigravity Debugging & Support Agent).
-> - **Do NOT copy or mirror `ALL_CAPS.md` files into `docs/`** (never create `docs/IMPLEMENTED.md`, `docs/RELEASE_NOTES.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`).
+> - **Do NOT copy or mirror `ALL_CAPS.md` files into `docs/`** (never create `docs/IMPLEMENTED.md`, `docs/RELEASE_NOTES.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, `docs/DISCOVERY_AND_ROOM_GROUPING.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`).
 
 | File Path | Role & Format |
 | :--- | :--- |

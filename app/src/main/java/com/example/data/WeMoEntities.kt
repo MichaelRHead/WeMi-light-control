@@ -216,66 +216,216 @@ fun classifyDeviceCategory(
     }
 }
 
+private val CAMEL_CASE_BOUNDARY_REGEX = Regex("([a-z])([A-Z])")
+private val DELIMITER_NORMALIZE_REGEX = Regex("[_\\-/.]+")
+private val MULTI_SPACE_REGEX = Regex("\\s+")
+private val WORD_BED_REGEX = Regex("\\bbed\\b")
+private val WORD_GIRL_REGEX = Regex("\\bgirl\\b")
+private val WORD_BOY_REGEX = Regex("\\bboy\\b")
+private val WORD_KID_REGEX = Regex("\\bkid\\b")
+private val WORD_HALL_REGEX = Regex("\\bhall\\b")
+private val WORD_DEN_REGEX = Regex("\\bden\\b")
+private val WORD_WC_REGEX = Regex("\\bwc\\b")
+
+/**
+ * Normalizes a hardware `<friendlyName>` or user-supplied switch name for room/category inference
+ * by splitting CamelCase boundaries (`"StairwayLight"` -> `"stairway light"`,
+ * `"MasterBathVanity"` -> `"master bath vanity"`) and converting `_`, `-`, `/`, `.` to spaces.
+ */
+fun normalizeDeviceNameForInference(deviceName: String): String {
+    if (deviceName.isBlank()) return ""
+    return deviceName
+        .replace(CAMEL_CASE_BOUNDARY_REGEX, "$1 $2")
+        .replace(DELIMITER_NORMALIZE_REGEX, " ")
+        .lowercase()
+        .replace(MULTI_SPACE_REGEX, " ")
+        .trim()
+}
+
+/**
+ * Infers the best household room assignment from a switch's [deviceName] (`<friendlyName>`).
+ *
+ * Precedence Order:
+ * 1. Specific functional rooms (`"Kitchen"`, `"Dining Room"`, `"Ensuite"`) are evaluated **before**
+ *    broad modifiers (`"master"`, `"primary"`, `"guest"`, `"kids"`) so compound names like
+ *    `"Master Bath Vanity"`, `"Guest Bathroom Light"`, or `"Kids Bath Fan"` resolve to `"Ensuite"`
+ *    rather than `"Bedroom"`.
+ * 2. Circulation & entry spaces (`"Hallway & Landing"`) match `"stair"` (`"stair"`, `"stairs"`,
+ *    `"stairway"`, `"staircase"`, `"upstairs"`, `"downstairs"`), `"landing"`, `"foyer"`, `"entry"`,
+ *    `"mudroom"`, `"corridor"`, and word-bounded `"hall"`.
+ * 3. Sleeping spaces (`"Bedroom"`) match `"bedroom"`, `"bedside"`, `"nightstand"`, word-bounded `"bed"`,
+ *    `"girls"`/`"girl"`, `"boys"`/`"boy"`, `"kids"`/`"kid"`, `"master"`, `"primary"`, `"guest"`, `"nursery"`, etc.
+ * 4. Exterior, utility, workspace, and living spaces (`"Outdoor"`, `"Garage"`, `"Basement"`, `"Office"`,
+ *    `"Living Room"` with word-bounded `"den"`).
+ * 5. Unrecognized names default to `"Unassigned"` (never `"Living Room"`).
+ */
 fun inferRoomFromName(deviceName: String): String {
-    val lower = deviceName.lowercase()
+    val normalized = normalizeDeviceNameForInference(deviceName)
+    if (normalized.isEmpty()) return "Unassigned"
     return when {
-        "kitchen" in lower || "pantry" in lower || "island" in lower || "breakfast" in lower || "nook" in lower -> "Kitchen"
-        "dining" in lower -> "Dining Room"
-        "bedroom" in lower ||
-            "bedside" in lower ||
-            "nightstand" in lower ||
-            Regex("\\bbed\\b").containsMatchIn(lower) ||
-            "loft" in lower ||
-            "master" in lower ||
-            "primary" in lower ||
-            "nursery" in lower ||
-            "guest" in lower ||
-            "bunk" in lower ||
-            "girls" in lower ||
-            Regex("\\bgirl\\b").containsMatchIn(lower) ||
-            "boys" in lower ||
-            Regex("\\bboy\\b").containsMatchIn(lower) ||
-            "kids" in lower ||
-            Regex("\\bkid\\b").containsMatchIn(lower) -> "Bedroom"
-        "ensuite" in lower || "bath" in lower || "powder" in lower || "vanity" in lower || "restroom" in lower || "shower" in lower -> "Ensuite"
-        "hallway" in lower ||
-            Regex("\\bhall\\b").containsMatchIn(lower) ||
-            "landing" in lower ||
-            "stair" in lower ||
-            "foyer" in lower ||
-            "entry" in lower ||
-            "mudroom" in lower ||
-            "corridor" in lower -> "Hallway & Landing"
-        "patio" in lower ||
-            "porch" in lower ||
-            "outdoor" in lower ||
-            "outside" in lower ||
-            "exterior" in lower ||
-            "garden" in lower ||
-            "dock" in lower ||
-            "yard" in lower ||
-            "deck" in lower ||
-            "flood" in lower ||
-            "walkway" in lower ||
-            "pathway" in lower ||
-            "balcony" in lower ||
-            "terrace" in lower ||
-            "gazebo" in lower -> "Outdoor"
-        "garage" in lower || "workshop" in lower || "driveway" in lower || "carport" in lower || "shed" in lower -> "Garage"
-        "basement" in lower || "cellar" in lower || "laundry" in lower || "utility" in lower -> "Basement"
-        "office" in lower || "study" in lower || "desk" in lower || "studio" in lower || "library" in lower -> "Office"
-        "living" in lower ||
-            "family" in lower ||
-            Regex("\\bden\\b").containsMatchIn(lower) ||
-            "lounge" in lower ||
-            "great room" in lower ||
-            "parlor" in lower ||
-            "sitting" in lower ||
-            "mantel" in lower ||
-            "hearth" in lower ||
-            "fireplace" in lower ||
-            "couch" in lower ||
-            "sofa" in lower -> "Living Room"
+        "kitchen" in normalized ||
+            "pantry" in normalized ||
+            "island" in normalized ||
+            "breakfast" in normalized ||
+            "nook" in normalized ||
+            "undercabinet" in normalized ||
+            "under cabinet" in normalized ||
+            "countertop" in normalized -> "Kitchen"
+
+        "dining" in normalized ||
+            "buffet" in normalized ||
+            "hutch" in normalized ||
+            "china cabinet" in normalized -> "Dining Room"
+
+        "ensuite" in normalized ||
+            "en suite" in normalized ||
+            "bath" in normalized ||
+            "powder" in normalized ||
+            "vanity" in normalized ||
+            "restroom" in normalized ||
+            "lavatory" in normalized ||
+            "shower" in normalized ||
+            WORD_WC_REGEX.containsMatchIn(normalized) -> "Ensuite"
+
+        "hallway" in normalized ||
+            WORD_HALL_REGEX.containsMatchIn(normalized) ||
+            "landing" in normalized ||
+            "stair" in normalized ||
+            "foyer" in normalized ||
+            "entry" in normalized ||
+            "vestibule" in normalized ||
+            "mudroom" in normalized ||
+            "mud room" in normalized ||
+            "corridor" in normalized ||
+            "breezeway" in normalized -> "Hallway & Landing"
+
+        "bedroom" in normalized ||
+            "bedside" in normalized ||
+            "nightstand" in normalized ||
+            "night stand" in normalized ||
+            "headboard" in normalized ||
+            "dresser" in normalized ||
+            "wardrobe" in normalized ||
+            WORD_BED_REGEX.containsMatchIn(normalized) ||
+            "crib" in normalized ||
+            "cradle" in normalized ||
+            "loft" in normalized ||
+            "master" in normalized ||
+            "primary" in normalized ||
+            "nursery" in normalized ||
+            "guest" in normalized ||
+            "bunk" in normalized ||
+            "dorm" in normalized ||
+            "girls" in normalized ||
+            WORD_GIRL_REGEX.containsMatchIn(normalized) ||
+            "boys" in normalized ||
+            WORD_BOY_REGEX.containsMatchIn(normalized) ||
+            "kids" in normalized ||
+            WORD_KID_REGEX.containsMatchIn(normalized) ||
+            "children" in normalized -> "Bedroom"
+
+        "patio" in normalized ||
+            "porch" in normalized ||
+            "veranda" in normalized ||
+            "lanai" in normalized ||
+            "outdoor" in normalized ||
+            "outside" in normalized ||
+            "exterior" in normalized ||
+            "garden" in normalized ||
+            "dock" in normalized ||
+            "pier" in normalized ||
+            "yard" in normalized ||
+            "deck" in normalized ||
+            "flood" in normalized ||
+            "walkway" in normalized ||
+            "sidewalk" in normalized ||
+            "pathway" in normalized ||
+            "balcony" in normalized ||
+            "terrace" in normalized ||
+            "gazebo" in normalized ||
+            "pergola" in normalized ||
+            "trellis" in normalized ||
+            "pool" in normalized ||
+            "fountain" in normalized ||
+            "landscape" in normalized -> "Outdoor"
+
+        "garage" in normalized ||
+            "workshop" in normalized ||
+            "workbench" in normalized ||
+            "driveway" in normalized ||
+            "carport" in normalized ||
+            "shed" in normalized ||
+            "barn" in normalized -> "Garage"
+
+        "basement" in normalized ||
+            "cellar" in normalized ||
+            "laundry" in normalized ||
+            "utility" in normalized ||
+            "boiler" in normalized ||
+            "furnace" in normalized ||
+            "sump" in normalized ||
+            "crawlspace" in normalized ||
+            "rec room" in normalized ||
+            "game room" in normalized ||
+            "media room" in normalized ||
+            "theater" in normalized ||
+            "theatre" in normalized -> "Basement"
+
+        "office" in normalized ||
+            "study" in normalized ||
+            "desk" in normalized ||
+            "workstation" in normalized ||
+            "studio" in normalized ||
+            "library" in normalized -> "Office"
+
+        "living" in normalized ||
+            "family" in normalized ||
+            WORD_DEN_REGEX.containsMatchIn(normalized) ||
+            "lounge" in normalized ||
+            "great room" in normalized ||
+            "parlor" in normalized ||
+            "parlour" in normalized ||
+            "sitting" in normalized ||
+            "sunroom" in normalized ||
+            "sun room" in normalized ||
+            "solarium" in normalized ||
+            "mantel" in normalized ||
+            "hearth" in normalized ||
+            "fireplace" in normalized ||
+            "couch" in normalized ||
+            "sofa" in normalized -> "Living Room"
+
         else -> "Unassigned"
     }
 }
+
+/**
+ * Resolves the room assignment for an existing or newly discovered device:
+ * - Preserves intentional user-assigned rooms (e.g., `"Porch & Entryway"` or `"Kids Suite"`).
+ * - In Real LAN mode (`!isDemoMode`), automatically migrates devices whose `existingRoomName`
+ *   is blank, `"Unassigned"`, or stuck in legacy `"Living Room"` (when `inferredRoom != "Living Room"`).
+ */
+fun resolveDeviceRoomAssignment(
+    existingRoomName: String,
+    deviceName: String,
+    discoveredRoomName: String = "",
+    isDemoMode: Boolean = false
+): String {
+    val inferredRoom = discoveredRoomName.takeIf {
+        it.isNotBlank() && !it.equals("Unassigned", ignoreCase = true)
+    } ?: inferRoomFromName(deviceName)
+
+    if (existingRoomName.isBlank()) return inferredRoom
+    if (isDemoMode) return existingRoomName
+
+    val isUnassignedPlaceholder = existingRoomName.equals("Unassigned", ignoreCase = true)
+    val isLegacyLivingRoomFallback = existingRoomName.equals("Living Room", ignoreCase = true) &&
+        inferredRoom != "Living Room"
+
+    return if (isUnassignedPlaceholder || isLegacyLivingRoomFallback) {
+        inferredRoom
+    } else {
+        existingRoomName
+    }
+}
+

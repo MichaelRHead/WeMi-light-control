@@ -1,6 +1,6 @@
 # Room Grouping & Master Room Controls
 
-[← Back to User Guide Index](../../USER_GUIDE.md)
+[← Back to User Guide Index](../../USER_GUIDE.md) • [Discovery & Room Grouping Architecture (`DISCOVERY_AND_ROOM_GROUPING.md`)](../../DISCOVERY_AND_ROOM_GROUPING.md)
 
 **WeMi Light Control** organizes your switches by room so you can toggle an entire room's lights or adjust every dimmer in a room with a single tap.
 
@@ -45,20 +45,20 @@ When a room contains dimmable switches (`F7C059` / `WDS060` Smart Dimmers), tapp
 
 ## 4. How Switches Are Assigned to Rooms
 
-1. **Automatic Room Inference (`inferRoomFromName`)**:
-   When a switch is discovered via SSDP or added by name, **WeMi Light Control** automatically infers its initial room from keywords in its `<friendlyName>`:
-   - `Bedroom`, `Bed`, `Bedside`, `Nightstand`, `Loft`, `Master`, `Primary`, `Nursery`, `Guest`, `Bunk`, `Girls`/`Girl`, `Boys`/`Boy`, `Kids`/`Kid` → **`Bedroom`**
-   - `Kitchen`, `Pantry`, `Island`, `Breakfast`, `Nook` → **`Kitchen`**
-   - `Dining` → **`Dining Room`**
-   - `Hall`, `Hallway`, `Landing`, `Stair` (`Stairs`, `Stairway`, `Staircase`, `Upstairs`, `Downstairs`), `Foyer`, `Entry`, `Mudroom`, `Corridor` → **`Hallway & Landing`**
-   - `Ensuite`, `Bath`, `Powder`, `Vanity`, `Restroom`, `Shower` → **`Ensuite`**
-   - `Patio`, `Porch`, `Outdoor`, `Outside`, `Exterior`, `Garden`, `Dock`, `Yard`, `Deck`, `Flood`, `Walkway`, `Pathway`, `Balcony`, `Terrace`, `Gazebo` → **`Outdoor`**
-   - `Garage`, `Workshop`, `Driveway`, `Carport`, `Shed` → **`Garage`**
-   - `Basement`, `Cellar`, `Laundry`, `Utility` → **`Basement`**
-   - `Office`, `Study`, `Desk`, `Studio`, `Library` → **`Office`**
-   - `Living`, `Family`, `Den`, `Lounge`, `Great Room`, `Parlor`, `Sitting`, `Mantel`, `Hearth`, `Fireplace`, `Couch`, `Sofa` → **`Living Room`**
+1. **Automatic Room Inference (`normalizeDeviceNameForInference` & `inferRoomFromName`)**:
+   When a switch is discovered via SSDP or added by name, **WeMi Light Control** normalizes CamelCase, underscores, and hyphens (`"StairwayLight"` → `"stairway light"`, `"MasterBathVanity"` → `"master bath vanity"`) and infers its initial room in specificity order (so compound names like `"Master Bath Vanity"` or `"Guest Bathroom Light"` resolve to **`Ensuite`** before broad modifiers like `"Master"` or `"Guest"`):
+   - `Kitchen`, `Pantry`, `Island`, `Breakfast`, `Nook`, `Under-Cabinet`, `Countertop` → **`Kitchen`**
+   - `Dining`, `Buffet`, `Hutch`, `China Cabinet` → **`Dining Room`**
+   - `Ensuite`, `En-Suite`, `Bath`, `Bathroom`, `Powder`, `Vanity`, `Restroom`, `Lavatory`, `Shower`, `WC` → **`Ensuite`**
+   - `Hall`, `Hallway`, `Landing`, `Stair` (`Stairs`, `Stairway`, `Staircase`, `Upstairs`, `Downstairs`), `Foyer`, `Entry`, `Vestibule`, `Mudroom`, `Corridor`, `Breezeway` → **`Hallway & Landing`**
+   - `Bedroom`, `Bed`, `Bedside`, `Nightstand`, `Headboard`, `Dresser`, `Wardrobe`, `Crib`, `Loft`, `Master`, `Primary`, `Nursery`, `Guest`, `Bunk`, `Dorm`, `Girls`/`Girl`, `Boys`/`Boy`, `Kids`/`Kid`, `Children` → **`Bedroom`**
+   - `Patio`, `Porch`, `Veranda`, `Lanai`, `Outdoor`, `Outside`, `Exterior`, `Garden`, `Dock`, `Pier`, `Yard`, `Deck`, `Flood`, `Walkway`, `Sidewalk`, `Pathway`, `Balcony`, `Terrace`, `Gazebo`, `Pergola`, `Pool`, `Fountain`, `Landscape` → **`Outdoor`**
+   - `Garage`, `Workshop`, `Workbench`, `Driveway`, `Carport`, `Shed`, `Barn` → **`Garage`**
+   - `Basement`, `Cellar`, `Laundry`, `Utility`, `Boiler`, `Furnace`, `Sump`, `Rec Room`, `Game Room`, `Media Room`, `Theater` → **`Basement`**
+   - `Office`, `Study`, `Desk`, `Workstation`, `Studio`, `Library` → **`Office`**
+   - `Living`, `Family`, `Den`, `Lounge`, `Great Room`, `Parlor`, `Sitting`, `Sunroom`, `Solarium`, `Mantel`, `Hearth`, `Fireplace`, `Couch`, `Sofa` → **`Living Room`**
    - All other unrecognized names default to **`Unassigned`** (displayed at the bottom of your room groups) instead of crowding **`Living Room`**.
-2. **Automatic Migration of Switches Previously Stuck in `Living Room`**:
-   On app startup and during SSDP network scans in Real LAN Mode, any switch previously saved in **`Living Room`** whose name does not match a Living Room keyword (for example, `Shprese Bed Lamp`, `Stairway Light`, `Girls Light`, `Mike Bed Light`) is automatically moved to its inferred room (`Bedroom`, `Hallway & Landing`, or `Unassigned`).
+2. **Automatic Migration of Switches Previously Stuck in `Living Room` (`resolveDeviceRoomAssignment`)**:
+   On app startup, during SSDP network scans, and on home reconnection in Real LAN Mode, any switch previously saved in **`Living Room`** whose name does not match a Living Room keyword (for example, `Shprese Bed Lamp`, `Stairway Light`, `Girls Light`, `Mike Bed Light`) is automatically moved to its inferred room (`Bedroom`, `Hallway & Landing`, `Ensuite`, or `Unassigned`).
 3. **Customizing a Switch's Room**:
    You can move any switch to a preset room or type any custom room name (e.g., `Kids' Playroom`, `Workshop`, `Sunroom`) in the **Add / Edit Device** dialog (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). Once saved to a custom room, your assignment is preserved across future SSDP network scans.

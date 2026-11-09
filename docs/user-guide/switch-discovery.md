@@ -1,6 +1,6 @@
 # Switch Discovery & Network Scanning
 
-[← Back to User Guide Index](../../USER_GUIDE.md)
+[← Back to User Guide Index](../../USER_GUIDE.md) • [Discovery & Room Grouping Architecture (`DISCOVERY_AND_ROOM_GROUPING.md`)](../../DISCOVERY_AND_ROOM_GROUPING.md)
 
 **WeMi Light Control** discovers Belkin WeMo switches, dimmers, and mini plugs directly over your local Wi-Fi network using standard **UPnP / SSDP multicast discovery** backed by an automatic **unicast `/24` port-sweep fallback** and **self-healing port/IP reconnection**.
 

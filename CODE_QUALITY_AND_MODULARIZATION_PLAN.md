@@ -8,6 +8,7 @@ Related documents and skills:
 - [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines *(Owned Exclusively by the Google AI Studio Agent)*
 - [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & CUJs *(Owned Exclusively by the Google AI Studio Agent)*
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
+- [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`RELEASE_NOTES.md`](RELEASE_NOTES.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v20.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v20.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
@@ -17,6 +18,7 @@ Related documents and skills:
 - [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
 - [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
 - [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md) — On-Device Screenshot & Recorded Telemetry File Debugging Skill *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
+- [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md) — Device Discovery Logic, 3-Tier Identity Resolution & Automatic Room Grouping Skill *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — WeMi Light Control Domain & UPnP Protocol Skill
 
 ---

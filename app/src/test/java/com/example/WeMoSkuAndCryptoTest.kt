@@ -265,17 +265,51 @@ class WeMoSkuAndCryptoTest {
             assertEquals(routerSsid, parsedRouterMeta?.accessPointSsid)
         }
 
-        // 5. Verify inferRoomFromName handles "Bed", "Stairway", "Girls"/"Kids", word-bounded "Den"/"Hall", and "Unassigned" fallback
+        // 5. Verify inferRoomFromName handles "Bed", "Stairway", "Girls"/"Kids", CamelCase/delimiters, Ensuite-over-Bedroom precedence, word-bounded "Den"/"Hall", and "Unassigned" fallback
         assertEquals("Bedroom", com.example.data.inferRoomFromName("Shprese Bed Lamp"))
         assertEquals("Bedroom", com.example.data.inferRoomFromName("Mike Bed Light"))
         assertEquals("Bedroom", com.example.data.inferRoomFromName("Girls Light"))
         assertEquals("Bedroom", com.example.data.inferRoomFromName("Kids Nightstand Lamp"))
+        assertEquals("Bedroom", com.example.data.inferRoomFromName("ShpreseBedLamp"))
+        assertEquals("Bedroom", com.example.data.inferRoomFromName("Mike_Bed-Light"))
+        assertEquals("Ensuite", com.example.data.inferRoomFromName("Master Bath Vanity"))
+        assertEquals("Ensuite", com.example.data.inferRoomFromName("Guest Bathroom Light"))
+        assertEquals("Ensuite", com.example.data.inferRoomFromName("Kids Bath Fan"))
+        assertEquals("Ensuite", com.example.data.inferRoomFromName("PrimaryBathMirror"))
         assertEquals("Hallway & Landing", com.example.data.inferRoomFromName("Stairway Light"))
+        assertEquals("Hallway & Landing", com.example.data.inferRoomFromName("StairwayLight"))
         assertEquals("Hallway & Landing", com.example.data.inferRoomFromName("Upstairs Hall Sconce"))
         assertEquals("Living Room", com.example.data.inferRoomFromName("Living Room Floor Lamp"))
         assertEquals("Living Room", com.example.data.inferRoomFromName("Family Den Switch"))
         assertEquals("Unassigned", com.example.data.inferRoomFromName("Wooden Accent Lamp"))
         assertEquals("Unassigned", com.example.data.inferRoomFromName("Marshall Amp Plug"))
         assertEquals("Unassigned", com.example.data.inferRoomFromName("Espresso Machine"))
+
+        // 6. Verify resolveDeviceRoomAssignment migrates switches stuck in "Living Room" or "Unassigned" while preserving custom user rooms
+        assertEquals(
+            "Bedroom",
+            com.example.data.resolveDeviceRoomAssignment(
+                existingRoomName = "Living Room",
+                deviceName = "Shprese Bed Lamp",
+                isDemoMode = false
+            )
+        )
+        assertEquals(
+            "Porch & Entryway",
+            com.example.data.resolveDeviceRoomAssignment(
+                existingRoomName = "Porch & Entryway",
+                deviceName = "Porch Switch",
+                isDemoMode = false
+            )
+        )
+        assertEquals(
+            "Living Room",
+            com.example.data.resolveDeviceRoomAssignment(
+                existingRoomName = "Living Room",
+                deviceName = "Shprese Bed Lamp",
+                isDemoMode = true
+            )
+        )
     }
 }
+

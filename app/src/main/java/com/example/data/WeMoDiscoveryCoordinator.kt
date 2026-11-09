@@ -40,6 +40,57 @@ internal class WeMoDiscoveryCoordinator(
     }
 
     /**
+     * 3-tier hardware identity matcher between a persisted [existing] device and a newly
+     * discovered [discovered] SSDP/unicast device:
+     * 1. **Tier 1 (Hardware Serial Identity)**: If both devices carry a non-blank `<serialNumber>`,
+     *    they match if and only if the serial numbers are equal (case-insensitive). This prevents
+     *    DHCP IP swaps or multi-port loopback simulators from cross-matching different switches.
+     * 2. **Tier 2 (UPnP UDN / USN Identity)**: If serial numbers are not both present and both
+     *    carry a UDN/USN, matches if `discovered.usn` contains `existing.udn`.
+     * 3. **Tier 3 (Endpoint / Friendly Name Fallback)**: When at least one serial number is blank
+     *    (e.g., an unprobed manual IP entry), matches by `(ipAddress, port)` (or `ipAddress` when
+     *    [requireSamePortWhenBlankSerial] is false) or case-insensitive `<friendlyName>`.
+     */
+    internal fun matchesDiscoveredDevice(
+        existing: WeMoDeviceEntity,
+        discovered: SsdpDiscoveredDevice,
+        requireSamePortWhenBlankSerial: Boolean = true
+    ): Boolean {
+        if (existing.serialNumber.isNotBlank() && discovered.serialNumber.isNotBlank()) {
+            return existing.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
+        }
+        if (existing.udn.isNotBlank() && discovered.usn.isNotBlank() &&
+            discovered.usn.contains(existing.udn, ignoreCase = true)
+        ) {
+            return true
+        }
+        val endpointMatch = existing.ipAddress == discovered.ipAddress &&
+            (!requireSamePortWhenBlankSerial || existing.port == discovered.port)
+        return endpointMatch || existing.name.equals(discovered.name, ignoreCase = true)
+    }
+
+    internal fun findMatchingExistingDevice(
+        existingDevices: List<WeMoDeviceEntity>,
+        discovered: SsdpDiscoveredDevice,
+        activeNetworkKey: String
+    ): WeMoDeviceEntity? {
+        if (discovered.serialNumber.isNotBlank()) {
+            existingDevices.find {
+                it.serialNumber.isNotBlank() &&
+                    it.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
+            }?.let { return it }
+        }
+        return existingDevices.find {
+            it.networkKey == activeNetworkKey &&
+                matchesDiscoveredDevice(
+                    existing = it,
+                    discovered = discovered,
+                    requireSamePortWhenBlankSerial = true
+                )
+        }
+    }
+
+    /**
      * Two-stage self-healing reconnect for a device whose primary SOAP call failed:
      * - Stage 1: Re-probe all 9 Belkin UPnP ports on the device's current IP address (verifying serialNumber/UDN).
      * - Stage 2: If Stage 1 returns null (device moved to a new DHCP IP), run a fast SSDP scan and match by serialNumber.
@@ -62,9 +113,11 @@ internal class WeMoDiscoveryCoordinator(
         )
         onSsdpReport(scanReport)
         val match = scanReport.discoveredDevices.find { discovered ->
-            (device.serialNumber.isNotBlank() && discovered.serialNumber.equals(device.serialNumber, ignoreCase = true)) ||
-                (device.udn.isNotBlank() && discovered.usn.contains(device.udn, ignoreCase = true)) ||
-                discovered.name.equals(device.name, ignoreCase = true)
+            matchesDiscoveredDevice(
+                existing = device,
+                discovered = discovered,
+                requireSamePortWhenBlankSerial = false
+            )
         }
         return if (match != null) {
             device.copy(
@@ -241,10 +294,12 @@ internal class WeMoDiscoveryCoordinator(
         var reconnectedCount = 0
 
         rememberedForHome.forEachIndexed { idx, device ->
-            val ssdpMatch = report.discoveredDevices.find {
-                (device.serialNumber.isNotBlank() && it.serialNumber.equals(device.serialNumber, ignoreCase = true)) ||
-                    it.name.equals(device.name, ignoreCase = true) ||
-                    it.ipAddress == device.ipAddress
+            val ssdpMatch = report.discoveredDevices.find { discovered ->
+                matchesDiscoveredDevice(
+                    existing = device,
+                    discovered = discovered,
+                    requireSamePortWhenBlankSerial = false
+                )
             }
             val candidateDevice = if (ssdpMatch != null) {
                 device.copy(ipAddress = ssdpMatch.ipAddress, port = ssdpMatch.port)
@@ -269,9 +324,16 @@ internal class WeMoDiscoveryCoordinator(
 
                 val recentSetMs = lastSetStateTimestampMs[device.id] ?: 0L
                 val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
+                val resolvedRoom = resolveDeviceRoomAssignment(
+                    existingRoomName = device.roomName,
+                    deviceName = device.name,
+                    discoveredRoomName = ssdpMatch?.roomName.orEmpty(),
+                    isDemoMode = demoMode
+                )
 
                 dao.updateDevice(
                     candidateDevice.copy(
+                        roomName = resolvedRoom,
                         port = if (probe.reachableOnLan) probe.resolvedPort else candidateDevice.port,
                         isOn = if (allowStateOverwrite && probe.binaryStateOn != null) probe.binaryStateOn else device.isOn,
                         brightness = if (allowStateOverwrite && probe.brightness != null) probe.brightness else device.brightness,
@@ -333,27 +395,23 @@ internal class WeMoDiscoveryCoordinator(
 
         val checkedAt = nowFormatted()
         currentDevicesForHome.forEach { existing ->
-            val match = report.discoveredDevices.find {
-                (existing.serialNumber.isNotBlank() && it.serialNumber.equals(existing.serialNumber, ignoreCase = true)) ||
-                    ((existing.serialNumber.isBlank() || it.serialNumber.isBlank()) &&
-                        ((it.ipAddress == existing.ipAddress && it.port == existing.port) ||
-                            it.name.equals(existing.name, ignoreCase = true)))
+            val match = report.discoveredDevices.find { discovered ->
+                matchesDiscoveredDevice(
+                    existing = existing,
+                    discovered = discovered,
+                    requireSamePortWhenBlankSerial = true
+                )
             }
             if (match != null) {
                 val recentSetMs = lastSetStateTimestampMs[existing.id] ?: 0L
                 val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
                 val resolvedName = existing.name.ifBlank { match.name }
-                val inferredRoom = inferRoomFromName(resolvedName)
-                val resolvedRoom = if (!demoMode && (
-                        existing.roomName.isBlank() ||
-                            existing.roomName.equals("Unassigned", ignoreCase = true) ||
-                            (existing.roomName.equals("Living Room", ignoreCase = true) && inferredRoom != "Living Room")
-                        )
-                ) {
-                    inferredRoom
-                } else {
-                    existing.roomName
-                }
+                val resolvedRoom = resolveDeviceRoomAssignment(
+                    existingRoomName = existing.roomName,
+                    deviceName = resolvedName,
+                    discoveredRoomName = match.roomName,
+                    isDemoMode = demoMode
+                )
                 dao.updateDevice(
                     existing.copy(
                         roomName = resolvedRoom,
@@ -391,15 +449,11 @@ internal class WeMoDiscoveryCoordinator(
         activeWifiSsid: String = "WeMi-Home-5G"
     ): WeMoDeviceEntity = adoptMutex.withLock {
         val currentDevices = dao.getAllDevices().first()
-        val existing = currentDevices.find {
-            discovered.serialNumber.isNotBlank() &&
-                it.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
-        } ?: currentDevices.find {
-            it.networkKey == activeNetworkKey &&
-                (it.serialNumber.isBlank() || discovered.serialNumber.isBlank()) &&
-                ((it.ipAddress == discovered.ipAddress && it.port == discovered.port) ||
-                    it.name.equals(discovered.name, ignoreCase = true))
-        }
+        val existing = findMatchingExistingDevice(
+            existingDevices = currentDevices,
+            discovered = discovered,
+            activeNetworkKey = activeNetworkKey
+        )
 
         val rawDeviceSsid = discovered.wifiSsid.trim()
         val validRouterSsid = rawDeviceSsid.takeIf { it.isNotEmpty() && !isWemoDeviceSetupSsid(it) }
@@ -434,17 +488,12 @@ internal class WeMoDiscoveryCoordinator(
             newEntity.copy(id = newId)
         } else {
             val resolvedName = discovered.name.ifBlank { existing.name }
-            val inferredRoom = discovered.roomName.ifBlank { inferRoomFromName(resolvedName) }
-            val resolvedRoom = if (!isDemoShowroomMode() && (
-                    existing.roomName.isBlank() ||
-                        existing.roomName.equals("Unassigned", ignoreCase = true) ||
-                        (existing.roomName.equals("Living Room", ignoreCase = true) && inferredRoom != "Living Room")
-                    )
-            ) {
-                inferredRoom
-            } else {
-                existing.roomName
-            }
+            val resolvedRoom = resolveDeviceRoomAssignment(
+                existingRoomName = existing.roomName,
+                deviceName = resolvedName,
+                discoveredRoomName = discovered.roomName,
+                isDemoMode = isDemoShowroomMode()
+            )
             val updated = existing.copy(
                 name = resolvedName,
                 roomName = resolvedRoom,
@@ -477,13 +526,11 @@ internal class WeMoDiscoveryCoordinator(
         var newlyAdded = 0
         for (item in discoveredList) {
             val currentDevices = dao.getAllDevices().first()
-            val existedBefore = currentDevices.any {
-                (item.serialNumber.isNotBlank() && it.serialNumber.equals(item.serialNumber, ignoreCase = true)) ||
-                    (it.networkKey == activeNetworkKey &&
-                        (it.serialNumber.isBlank() || item.serialNumber.isBlank()) &&
-                        ((it.ipAddress == item.ipAddress && it.port == item.port) ||
-                            it.name.equals(item.name, ignoreCase = true)))
-            }
+            val existedBefore = findMatchingExistingDevice(
+                existingDevices = currentDevices,
+                discovered = item,
+                activeNetworkKey = activeNetworkKey
+            ) != null
             adoptDiscoveredDevice(
                 discovered = item,
                 activeNetworkKey = activeNetworkKey,
@@ -532,15 +579,11 @@ internal class WeMoDiscoveryCoordinator(
             } else {
                 dev.wifiSsid
             }
-            val inferredRoom = inferRoomFromName(dev.name)
-            val cleanRoom = if (dev.roomName.isBlank() ||
-                dev.roomName.equals("Unassigned", ignoreCase = true) ||
-                (dev.roomName.equals("Living Room", ignoreCase = true) && inferredRoom != "Living Room")
-            ) {
-                inferredRoom
-            } else {
-                dev.roomName
-            }
+            val cleanRoom = resolveDeviceRoomAssignment(
+                existingRoomName = dev.roomName,
+                deviceName = dev.name,
+                isDemoMode = false
+            )
             if (cleanSsid != dev.wifiSsid || cleanRoom != dev.roomName) {
                 dao.updateDevice(dev.copy(wifiSsid = cleanSsid, roomName = cleanRoom))
             }
