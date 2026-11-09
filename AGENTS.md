@@ -1,10 +1,10 @@
 # WeMi Light Control — Architecture & Agent Guide (`AGENTS.md`)
 
-**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v15.0`) is an Android & Android TV local-LAN controller for Belkin WeMo smart switches, dimmers, and mini plugs. It pairs a 2013-era skeuomorphic Belkin WeMo interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with `pywemo`-grade local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
+**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v16.0`) is an Android & Android TV local-LAN controller for Belkin WeMo smart switches, dimmers, and mini plugs. It pairs a 2013-era skeuomorphic Belkin WeMo interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with `pywemo`-grade local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
 
 Detailed agent instructions, user guides, protocol specs, reverse-chronological change log, modularization plan, and upcoming features roadmap are packaged in:
 - [`USER_GUIDE.md`](USER_GUIDE.md) / [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v15.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v16.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) / [`docs/UPCOMING_FEATURES.md`](docs/UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill
@@ -45,9 +45,9 @@ The app supports four physical Belkin WeMo hardware families:
     - `WeMoHomeNetworkEntity` (`wemo_home_networks`): Persistent multi-home Wi-Fi profiles (`networkKey`, `homeName`, `ssidLabel`, `subnetPrefix`, `gatewayIp`, `lastConnectedTime`, `autoReconnectOnArrival`, `sortOrder`).
     - `WeMoDeviceEntity` (`wemo_devices`): Device state, network address (`ipAddress`, `port`, `networkKey`, `wifiSsid`), hardware telemetry (`serialNumber`, `firmwareVersion`, `hardwareModel`, `macAddress`, `udn`, `signalStrengthPercent`, `nightModeEnabled`), and live connection status (`isReachable`, `latencyMs`, `lastCheckedTime`, `isOn`, `brightness`, `autoOffMinutes`).
     - `WeMoRuleEntity` (`wemo_rules`): Local schedules and timers (`SCHEDULE`, `MOTION_TRIGGER`, `AUTO_OFF`).
-  - `WeMoDao.kt` & `WeMoDatabase.kt`: Room database (`wemo_control_database.db`, schema `version = 5`).
-  - `WeMoRepository.kt`: Public repository facade (~625 lines) holding `Semaphore(3)` RTOS protection, per-device `Mutex`, unified `executeOptimisticDeviceCommand` (optimistic UI write, `lastSetStateTimestampMs` GENA echo suppression, 2-stage reconnect, and offline revert), UPnP GENA push handling, and Room CRUD.
-  - `WeMoDiscoveryCoordinator.kt`: Startup `GetBinaryState` detection (`detectStartupDeviceStates`), 2-stage self-healing reconnect (`attemptTwoStageReconnect`), SSDP scan & auto-adoption (`executeSsdpScan`, `adoptDiscoveredDevice`), and zero-permission subnet/SSID home sync.
+  - `WeMoDao.kt` & `WeMoDatabase.kt`: Room database (`wemo_control_database.db`, schema `version = 5`, per-`Application` in-memory isolation under Robolectric).
+  - `WeMoRepository.kt`: Public repository facade holding `Semaphore(3)` RTOS protection, per-device `Mutex`, unified `executeOptimisticDeviceCommand` (optimistic UI write, `lastSetStateTimestampMs` GENA echo suppression, 2-stage reconnect, and offline revert), startup `GetMetaInfo` soft-AP SSID sanitization (`ensureSeeded`), one-tap `resetLanHomesSwitchesAndRooms()`, UPnP GENA push handling, and Room CRUD.
+  - `WeMoDiscoveryCoordinator.kt`: Startup `GetBinaryState` detection (`detectStartupDeviceStates`), 2-stage self-healing reconnect (`attemptTwoStageReconnect`), SSDP scan & auto-adoption (`executeSsdpScan`, `adoptDiscoveredDevice`), and zero-permission subnet/SSID home sync with `isWemoDeviceSetupSsid` filtering.
   - `WeMoProvisioningCoordinator.kt`: `10.22.22.1` Setup AP probing (`probeSetupApDevice`), 2.4 GHz AP scanning (`scanSetupApNetworks`), `WiFiSetup1#ConnectHomeNetwork` provisioning (`provisionSetupApDevice`), Demo Showroom AP simulation, and post-provisioning Room registration.
   - `WeMoDemoFixtures.kt`: Showcase Demo Showroom fixtures (`DEFAULT_ROOMS`, `defaultHomeNetworks`, `defaultClassicDevices`, `defaultClassicRules`).
   - `WeMoRuleScheduler.kt`: Coroutine engine for per-device/rule Auto-Off countdowns (`activeCountdownsSec`) and daily `SCHEDULE` / Sunset / Sunrise rule execution.
@@ -55,24 +55,24 @@ The app supports four physical Belkin WeMo hardware families:
   - `WeMoNetworkClient.kt`:
     - 9-port `probeWemoPort` (`49153, 49152, 49154, 49151, 49155..49159`) with TCP connect timeout vs. `ECONNREFUSED` vs. read timeout separation and `<serialNumber>`/`<UDN>` verification.
     - `setBinaryState` (with `<BinaryState>Error</BinaryState>` handling), `getBinaryState`, `getMetaInfo`, `getSignalStrength`, `changeFriendlyName`, `configureNightMode`, and companion delegations to `WeMoXmlAndSkuParser` and `WeMoSsdpDiscoveryEngine`.
-  - `WeMoXmlAndSkuParser.kt`: Stateless UPnP/SSDP/SOAP parsers (`buildSsdpMSearchPacket`, `parseSsdpHeaders`, `classifyHardwareSku`, `parseSetupXmlDescriptor`, `parseMetaInfoSoapResponse`, `parseSignalStrengthSoapResponse`, `parseApListXml`).
+  - `WeMoXmlAndSkuParser.kt`: Stateless UPnP/SSDP/SOAP parsers (`buildSsdpMSearchPacket`, `parseSsdpHeaders`, `classifyHardwareSku`, `parseSetupXmlDescriptor`, `parseMetaInfoSoapResponse` with Belkin soft-AP `WeMo.*` / `Wemo.LS3W.*` SSID filtering, `parseSignalStrengthSoapResponse`, `parseApListXml`).
   - `WeMoSsdpDiscoveryEngine.kt`: UDP `239.255.255.250:1900` `M-SEARCH` scanner (`performSsdpDiscoveryScan` with `MulticastLock` + 1s retransmit) and `/24` `Semaphore(24)` unicast sweep (`scanSubnetUnicast`).
   - `WeMoGenaSubscriptionManager.kt`: Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery) for `<100ms` physical switch updates.
-  - `WeMoNetworkMonitor.kt`: Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory`.
+  - `WeMoNetworkMonitor.kt`: Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory` (loopback `127.0.0.1` & Robolectric aware).
   - `WeMoProvisionerClient.kt`: `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` / `GetNetworkList` and double-send `ConnectHomeNetwork` + `GetNetworkStatus` + `CloseSetup` + `SetSetupDoneStatus` provisioner.
   - `WeMoPasswordCrypto.kt`: Stateless `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC Wi-Fi password encryption/decryption (Methods 1, 2 & 3).
 - **`ui/` (Jetpack Compose Skeuomorphic UI)**:
-  - `WeMoViewModel.kt`: UI state holder, background health polling, and coroutine dispatchers.
+  - `WeMoViewModel.kt`: UI state holder, background health polling, synchronous modal dismissal, and coroutine dispatchers.
   - `screens/WeMoDevicesTabScreen.kt` (with `EmptyDevicesState`), `screens/WeMoRulesScreen.kt`, and `screens/WeMoMoreScreen.kt`.
   - `components/WeMoWifiHomeBar.kt`, `components/WeMoRoomGroupCard.kt`, `components/WeMoSsdpScannerModal.kt`, and `components/WeMoHeaderAndNav.kt`.
-  - `components/WeMoDeviceRow.kt`, `components/WeMoDeviceStatusBadges.kt`, and `components/WeMoDeviceDiagnosticsDrawer.kt`.
+  - `components/WeMoDeviceRow.kt` (with `AutoResizingDeviceNameText`), `components/WeMoDeviceStatusBadges.kt` (with `WeMoPowerStatePill`), and `components/WeMoDeviceDiagnosticsDrawer.kt`.
   - `components/WeMoDeviceEditDialog.kt`, `components/WeMoRuleDialog.kt`, and `components/WeMoProvisionApDialog.kt`.
   - `components/WeMoTvScreen.kt` and `components/WeMoTvCardsAndScenes.kt`.
-  - `components/WeMoHardwareIllustrations.kt`, `components/WeMoSwitchAndPlugIllustration.kt`, `components/WeMoLightAndSensorIllustrations.kt`, `components/WeMoChristmasTreeIllustration.kt`, and `components/WeMoFanIllustration.kt`.
+  - `components/WeMoHardwareIllustrations.kt` (`drawIecPowerSymbol`, `drawDisconnectedSymbol`, `WeMoPowerRingButton`, `WeMoDisconnectedRingButton`), `components/WeMoSwitchAndPlugIllustration.kt`, `components/WeMoLightAndSensorIllustrations.kt`, `components/WeMoChristmasTreeIllustration.kt`, and `components/WeMoFanIllustration.kt`.
 - **`test/` (Loopback UPnP/SOAP Hardware Simulator, Protocol Unit Tests & Compose E2E Tests — `app/src/test/java/com/example/`)**:
   - `FakeWeMoUpnpServer.kt`: Reusable `AutoCloseable` loopback Belkin WeMo HTTP/UPnP/SOAP/GENA/`WiFiSetup1` server on `127.0.0.1` (`ServerSocket(0)`).
-  - `WeMoSkuAndCryptoTest.kt`: Hardware SKU classification (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`), `/setup.xml` parsing, semantic device categorization, and `pywemo` AES-128-CBC encryption/decryption (Methods 1, 2 & 3).
-  - `WeMoSoapAndSelfHealingTest.kt`: 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, offline rollback, manual IP probing, and multi-device startup state detection.
+  - `WeMoSkuAndCryptoTest.kt`: Hardware SKU classification (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`), `/setup.xml` parsing, `GetMetaInfo` soft-AP SSID filtering, semantic device categorization, and `pywemo` AES-128-CBC encryption/decryption (Methods 1, 2 & 3).
+  - `WeMoSoapAndSelfHealingTest.kt`: 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, offline rollback, manual IP probing, `resetLanHomesSwitchesAndRooms`, and multi-device startup state detection.
   - `WeMoGenaProvisioningAndRulesTest.kt`: UPnP GENA `SUBSCRIBE`, HTTP 412 recovery, embedded `NOTIFY` callback server, `WeMoRuleScheduler`, and full loopback `10.22.22.1` `WiFiSetup1` provisioning.
   - `ExampleRobolectricTest.kt` & `WeMoEndToEndUiTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeWeMoUpnpServer` End-to-End UI tests (`20/20` tests passing).
 
@@ -83,8 +83,8 @@ The app supports four physical Belkin WeMo hardware families:
 > **CRITICAL RULE**: **Only push code to GitHub (`origin/main` or `origin/agent-docs`) after verifying that the full build and all automated tests pass with zero errors.** Never push unverified or non-compiling code.
 
 ```bash
-# Run all 20 Robolectric unit, protocol & E2E Compose UI tests
-./gradlew testDebugUnitTest
+# Force-execute all 20 Robolectric unit, protocol & E2E Compose UI tests
+./gradlew testDebugUnitTest --rerun-tasks
 
 # Assemble debug APK
 ./gradlew assembleDebug

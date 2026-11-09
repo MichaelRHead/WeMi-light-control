@@ -28,6 +28,7 @@ Inside the **Offline Local UPnP / SOAP Engine** card on the **More** tab:
 Other quick settings in this card:
 - **Header Logo Wordmark Switch**: Toggles the top header logo between **`wemi`** and classic **`wemo`**.
 - **`Scan LAN (SSDP)`**: Opens the SSDP network discovery sheet.
+- **`Reset Homes, Discovered Switches & Rooms`**: Clears all remembered Wi-Fi Homes, discovered switches, and room assignments in Real LAN Mode, resets your primary LAN profile back to a clean **`My Home`**, and triggers a fresh SSDP discovery scan.
 - **`Provision New WeMo AP (10.22.22.1)`**: Opens the zero-cloud Wi-Fi setup wizard.
 
 ---

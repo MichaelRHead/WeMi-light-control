@@ -27,16 +27,16 @@ Whenever you launch the app, pull down to refresh, or switch Wi-Fi Homes, **WeMi
 ```mermaid
 flowchart LR
     Startup["App Startup / Pull-to-Refresh"] --> Probe["Local SOAP Probe\n(GetBinaryState)"]
-    Probe -->|Switch Relay = 1| StateOn["1. Accessible & ON\n• Glowing Icon & Aura\n• Emerald 'I' Badge\n• Glowing Cyan Power Ring"]
-    Probe -->|Switch Relay = 0| StateOff["2. Accessible & OFF (Standby)\n• Crisp Slate-Navy Housing\n• Warm Amber Standby LED\n• Amber 'O' Standby Badge"]
-    Probe -->|Unreachable / Timeout| StateOffline["3. Disconnected / Offline\n• Muted Gray + Dashed Red Outline\n• Red 'X' Corner Badge\n• 'Retry' Reconnect Button"]
+    Probe -->|Switch Relay = 1| StateOn["1. Accessible & ON\n• Glowing Icon & Aura\n• Emerald 'I/O' Power Badge\n• Glowing Cyan Power Ring"]
+    Probe -->|Switch Relay = 0| StateOff["2. Accessible & OFF (Standby)\n• Crisp Slate-Gray Housing\n• Dark-Gray 'I/O' Power Badge\n• Dark-Gray 'I/O' Power Ring"]
+    Probe -->|Unreachable / Timeout| StateOffline["3. Disconnected / Offline\n• Muted Gray + Dashed Red Outline\n• Red Disconnected Corner Badge\n• Red Disconnected Ring Button"]
 ```
 
 | Device State | Hardware Illustration | Corner Badge | Status Pill | Right-Side Action |
 | :--- | :--- | :--- | :--- | :--- |
-| **1. Accessible & ON** | Lit hardware bezel, glowing LEDs, spinning fan blades, or glowing multi-color tree lights | Emerald circle with vertical **`I`** power bar | Green **`ON`** pill (or **`ON • 75%`** for dimmers) | Glowing cyan-green **Power Ring (`I`)** |
-| **2. Accessible & OFF (Standby)** | Full-contrast dark slate-navy housing with a **warm amber standby locator LED** (or unlit filament/bulbs) | Dark-slate circle with warm amber **`O`** standby ring | Slate & amber **`OFF`** pill (or **`OFF • 75%`**) | Recessed slate **Power Ring (`O`)** with amber top pilot dot — ready to turn ON |
-| **3. Disconnected / Offline** | Faded silhouette surrounded by a **dashed red outline** | Red circle with white **`X`** | **`Not Detected`** label | Red **`Retry`** button to trigger self-healing reconnection |
+| **1. Accessible & ON** | Lit hardware bezel, glowing LEDs, spinning fan blades, or glowing multi-color tree lights | Emerald circle with white IEC **`I/O`** power symbol | Green **`ON`** pill (or **`ON • 75%`** for dimmers) | Glowing cyan-green **Power Ring (`I/O`)** |
+| **2. Accessible & OFF (Standby)** | Full-contrast dark slate housing with unlit slate indicators/filaments/bulbs | Very dark gray (`#23272F`) circle with white IEC **`I/O`** power symbol | Crisp light-gray & dark-gray **`OFF`** pill (or **`OFF • 75%`**) | Very dark gray (`#23272F`) **Power Ring (`I/O`)** — ready to turn ON |
+| **3. Disconnected / Offline** | Faded silhouette surrounded by a **dashed red outline** | Red circle with white **broken-link slash** icon | **`Not Detected`** label | Red **Disconnected Ring Button** to trigger self-healing reconnection |
 
 ---
 

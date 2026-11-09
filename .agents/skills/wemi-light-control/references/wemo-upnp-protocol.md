@@ -21,7 +21,7 @@ This document details the local LAN protocol used by Belkin WeMo hardware, incor
      MAC|SerialNumber|DeviceSKU|FirmwareVersion|AccessPointSSID|ModelName
      ```
    - `DeviceSKU` (`values[2]`) identifies `F7C030` (Gen 1 Switch) vs `WLS040`/`WLS0403` (Gen 2 3-Way Switch) vs `F7C059`/`WDS060` (Dimmer) vs `F7C063`/`WSP080` (Mini Plug).
-   - `AccessPointSSID` (`values[4]`) reports the exact 2.4 GHz Wi-Fi SSID the WeMo device is joined to, even if Android OS permissions restrict reading the phone's current SSID.
+   - `AccessPointSSID` (`values[4]`) reports the 2.4 GHz Wi-Fi SSID on some firmwares, **HOWEVER on many physical Belkin WeMo firmwares (including 2nd-Gen RTOS 3-Way switches `WLS040`/`WLS0403` reporting `Wemo.LS3W.xxx` and 1st-Gen switches reporting `WeMo.Switch.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`) `values[4]` returns the switch's own factory setup soft-AP SSID instead of the home router SSID!** Always filter out any SSID matching `wemo.*`, `wemo_*`, `wemo-*`, or `belkin.*` (`isWemoDeviceSetupSsid`) in `parseMetaInfoSoapResponse` and never overwrite a user's `homeName` with a device-reported SSID.
 
 ---
 
