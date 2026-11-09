@@ -1,14 +1,15 @@
 # WeMi Light Control — Implemented Features & Change Log (`IMPLEMENTED.md`)
 
 **Repository**: `MichaelRHead/WeMi-light-control` (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
-**Current Version**: `v17.0` (`versionCode = 17`)  
+**Current Version**: `v18.0` (`versionCode = 18`)  
 **Target Platforms**: Android Phones, Tablets, and Android TV (`UI_MODE_TYPE_TELEVISION` 10-foot D-Pad interface)
 
 Related documentation:
-- [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) / [`docs/UX_DESIGN_AND_EXPERIENCE.md`](docs/UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & Critical User Journeys *(Owned Exclusively by the Google AI Studio Agent)*
-- [`USER_GUIDE.md`](USER_GUIDE.md) / [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
-- [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) / [`docs/UPCOMING_FEATURES.md`](docs/UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
-- [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
+- [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
+- [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & Critical User Journeys *(Owned Exclusively by the Google AI Studio Agent)*
+- [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
+- [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
+- [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
 - [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md) — UX Design, Behavioral Modeling & CUJ Skill *(Owned Exclusively by the Google AI Studio Agent)*
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill
@@ -27,7 +28,7 @@ Related documentation:
 
 | Landed (PST) | Version / Commit | Feature or Improvement | Primary Files |
 | :--- | :--- | :--- | :--- |
-| **2026-11-09 08:52 PST** | `v17.0` (`HEAD`) | **AI Studio Agent-Owned UX Design, Behavioral Modeling & Critical User Journeys Documentation (`UX_DESIGN_AND_EXPERIENCE.md`) & Skill (`wemi-ux-design-and-experience`)** | [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md), [`docs/UX_DESIGN_AND_EXPERIENCE.md`](docs/UX_DESIGN_AND_EXPERIENCE.md), [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md), [`AGENTS.md`](AGENTS.md) |
+| **2026-11-09 09:18 PST** | `v18.0` (`HEAD`) | **AI Studio Agent-Owned Android UX Design Guidelines (`UX_DESIGN.md`), Behavioral Modeling (`UX_DESIGN_AND_EXPERIENCE.md`), Skill (`wemi-ux-design-and-experience`) & Single-Source Root `ALL_CAPS.md` Documentation Layout** | [`UX_DESIGN.md`](UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md), [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md), [`docs/README.md`](docs/README.md), [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md), [`AGENTS.md`](AGENTS.md) |
 | **2026-11-09 00:05 PST** | `v17.0` (`HEAD`) | **Full-Stack E2E CUJ Test (`Reset` → `SSDP UDP Discovery` → `Adopt Switch & Dimmer` → `Toggle Switch` → `Toggle & Scale Dimmer Brightness`), Loopback UDP `M-SEARCH` Responder, Top-First Dimmer Drawer & Pass-Through Status Toast (`25/25` Passing)** | [`WeMoEndToEndUiTest.kt`](app/src/test/java/com/example/WeMoEndToEndUiTest.kt), [`FakeWeMoUpnpServer.kt`](app/src/test/java/com/example/FakeWeMoUpnpServer.kt), [`WeMoSsdpDiscoveryEngine.kt`](app/src/main/java/com/example/network/WeMoSsdpDiscoveryEngine.kt), [`WeMoDiscoveryCoordinator.kt`](app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt), [`WeMoDeviceDiagnosticsDrawer.kt`](app/src/main/java/com/example/ui/components/WeMoDeviceDiagnosticsDrawer.kt), [`WeMoSsdpScannerModal.kt`](app/src/main/java/com/example/ui/components/WeMoSsdpScannerModal.kt), [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt) |
 | **2026-11-09 00:02 PST** | `v17.0` (`a8f7f38`) | **Expanded Room Inference (`"bed"`, `"stair"`, `"girls"`/`"kids"`), `"Unassigned"` Fallback Instead of `"Living Room"`, and Automatic Migration of Switches Stuck in `"Living Room"`** | [`WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt), [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt), [`WeMoDiscoveryCoordinator.kt`](app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt), [`WeMoDemoFixtures.kt`](app/src/main/java/com/example/data/WeMoDemoFixtures.kt), [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoRoomGroupCard.kt`](app/src/main/java/com/example/ui/components/WeMoRoomGroupCard.kt), [`WeMoSkuAndCryptoTest.kt`](app/src/test/java/com/example/WeMoSkuAndCryptoTest.kt), [`WeMoSoapAndSelfHealingTest.kt`](app/src/test/java/com/example/WeMoSoapAndSelfHealingTest.kt) |
 | **2026-11-08 23:42 PST** | `v17.0` (`db7a65f`) | **Fresh-Device `10.22.22.1` `WiFiSetup1` Provisioning Bug Fixes, On-Screen Screenshot Debug Panel (`WeMoProvisionDebugPanel`), Telemetry File Exporter (`WeMoTelemetryFileExporter`) & `wemi-device-telemetry-debug` Agent Skill** | [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md), [`WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt), [`WeMoSetupDiagnostics.kt`](app/src/main/java/com/example/network/WeMoSetupDiagnostics.kt), [`WeMoProvisionApDialog.kt`](app/src/main/java/com/example/ui/components/WeMoProvisionApDialog.kt), [`WeMoMoreScreen.kt`](app/src/main/java/com/example/ui/screens/WeMoMoreScreen.kt), [`WeMoNetworkMonitor.kt`](app/src/main/java/com/example/network/WeMoNetworkMonitor.kt), [`WeMoGenaProvisioningAndRulesTest.kt`](app/src/test/java/com/example/WeMoGenaProvisioningAndRulesTest.kt), [`WeMoEndToEndUiTest.kt`](app/src/test/java/com/example/WeMoEndToEndUiTest.kt) |
@@ -40,9 +41,9 @@ Related documentation:
 | **2026-11-08 14:30 PST** | `v12.0` (`bace660`) | **Phase M1 Data Layer Modularization: `WeMoDemoFixtures`, `WeMoDiscoveryCoordinator`, `WeMoProvisioningCoordinator` & Unified `executeOptimisticDeviceCommand`** | [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt), [`WeMoDiscoveryCoordinator.kt`](app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt), [`WeMoProvisioningCoordinator.kt`](app/src/main/java/com/example/data/WeMoProvisioningCoordinator.kt), [`WeMoDemoFixtures.kt`](app/src/main/java/com/example/data/WeMoDemoFixtures.kt) |
 | **2026-11-08 07:42 PST** | `v12.0` (`ac7cd7b`) | **Expanded Semantic Category Keywords (`garland`, `wreath`, `vent`, `pendant`), Empty State Onboarding Card Layout & E2E Test** | [`WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt), [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`ExampleRobolectricTest.kt`](app/src/test/java/com/example/ExampleRobolectricTest.kt) |
 | **2026-11-08 07:41 PST** | `v12.0` (`2f97020`) | **Multi-Agent Git Sync & Anti-Stomp Integration Skill (`multi-agent-git-sync`)** | [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md), [`AGENTS.md`](AGENTS.md), [`IMPLEMENTED.md`](IMPLEMENTED.md) |
-| **2026-11-08 07:35 PST** | `v12.0` (`c5ca7c4`) | **Architecture & Protocol Review Sign-Off (Section 7 of Modularization Plan)** | [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) |
+| **2026-11-08 07:35 PST** | `v12.0` (`c5ca7c4`) | **Architecture & Protocol Review Sign-Off (Section 7 of Modularization Plan)** | [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) |
 | **2026-11-08 07:25 PST** | `v12.0` (`2cfe70d`..`de14b85`) | **Reverse-Chronological Change Log (`IMPLEMENTED.md`), `UPCOMING_FEATURES.md` & `wemi-changelog-and-docs` Skill** | [`IMPLEMENTED.md`](IMPLEMENTED.md), [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md), [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) |
-| **2026-11-08 07:20–07:28 PST** | `v12.0` (`627ab38`, `a308d24`) | **Code Modularization & E2E Testing Plan + `android-code-modularization` & `android-e2e-testing` Skills** | [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md), [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) |
+| **2026-11-08 07:20–07:28 PST** | `v12.0` (`627ab38`, `a308d24`) | **Code Modularization & E2E Testing Plan + `android-code-modularization` & `android-e2e-testing` Skills** | [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md), [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md), [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) |
 | **2026-11-08 07:19 PST** | `v12.0` (`1237ecc`) | **Provisioning Status Box Error Styling, Empty State Category Showcase & `v12.0` Bump** | [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`app/build.gradle.kts`](app/build.gradle.kts) |
 | **2026-11-08 07:08 PST** | `v11.0` (`cca33cd`) | **Modular User Guide Index & 8 Detailed Feature Guides** | [`USER_GUIDE.md`](USER_GUIDE.md), [`docs/user-guide/`](docs/user-guide/) |
 | **2026-11-08 01:49 PST** | `v11.0` (`fa7e744`) | **Fresh-Device `WiFiSetup1` Provisioning Fixes, `pywemo` OpenSSL AES-128-CBC (Methods 1/2/3), Android Wi-Fi Socket Binding & Manual IP Probing** | [`WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt), [`WeMoNetworkMonitor.kt`](app/src/main/java/com/example/network/WeMoNetworkMonitor.kt), [`WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt), [`WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt) |
@@ -63,10 +64,13 @@ Related documentation:
 
 ## 2. Detailed Change Log (Newest to Oldest)
 
-### [2026-11-09 08:52 PST] — AI Studio Agent-Owned UX Design, Behavioral Modeling & Critical User Journeys Documentation (`UX_DESIGN_AND_EXPERIENCE.md`) & Skill (`wemi-ux-design-and-experience`) (`v17.0`)
-- **Exclusive AI Studio Agent UX Architecture Specification & Skill ([`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md), [`docs/UX_DESIGN_AND_EXPERIENCE.md`](docs/UX_DESIGN_AND_EXPERIENCE.md), [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md), [`AGENTS.md`](AGENTS.md), [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md))**:
-  - Created `UX_DESIGN_AND_EXPERIENCE.md` (and `docs/UX_DESIGN_AND_EXPERIENCE.md`) along with the companion `.agents/skills/wemi-ux-design-and-experience/SKILL.md` skill, establishing an explicit governance rule that **only the Google AI Studio Agent may modify these files** while all other agents must read and respect them as the canonical UX specification.
-  - Documented the 5 core user behavioral mental models (3-State Hardware Truth `ON` vs. `OFF Accessible Standby` vs. `Disconnected`; Semantic Appliance Categorization; Spatial Room Inference & `"Unassigned"` Fallback; Zero-Permission Subnet Memory & Soft-AP SSID Shielding; and `<16ms` Optimistic Feedback with GENA Echo Suppression & Honest Rollback), the 5 non-negotiable Jetpack Compose layout invariants, and all 7 Critical User Journeys (CUJs).
+### [2026-11-09 09:18 PST] — AI Studio Agent-Owned Android UX Design Guidelines (`UX_DESIGN.md`), Behavioral Modeling (`UX_DESIGN_AND_EXPERIENCE.md`), Skill (`wemi-ux-design-and-experience`) & Single-Source Root `ALL_CAPS.md` Documentation Layout (`v18.0`)
+- **Exclusive AI Studio Agent UX Guidelines (`UX_DESIGN.md`), Behavioral Architecture (`UX_DESIGN_AND_EXPERIENCE.md`) & Skill ([`UX_DESIGN.md`](UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md), [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md), [`AGENTS.md`](AGENTS.md), [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md))**:
+  - Created `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, and the companion `.agents/skills/wemi-ux-design-and-experience/SKILL.md` skill, establishing an explicit governance rule that **only the Google AI Studio Agent may modify these files** while all other agents must read and respect them as the canonical UX specification.
+  - Documented navigation patterns (3-tab `NavigationBar`, `Grouped by Room` vs. `Flat List`, inline `WeMoExpandedDrawer` vs. modal dialogs, `BackHandler` priority stack, and 10-foot Android TV `UI_MODE_TYPE_TELEVISION` D-Pad ergonomics), accessibility standards for smart home controls (`48dp`–`64dp` touch targets, `TalkBack` `Role.Switch`/`Role.Button` semantics, 3-state color/icon/border redundancy, and `AutoResizingDeviceNameText`), and end-to-end user interaction flows.
+- **Consolidated Single-Source Documentation Layout (`ALL_CAPS.md` at Root, Human User Guides in `docs/user-guide/`) ([`docs/README.md`](docs/README.md), [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md), [`AGENTS.md`](AGENTS.md), [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md), [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md))**:
+  - Eliminated duplicate `ALL_CAPS.md` mirrors from `docs/` (`docs/IMPLEMENTED.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`) and moved `CODE_QUALITY_AND_MODULARIZATION_PLAN.md` to the repository root (`/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`).
+  - Added [`docs/README.md`](docs/README.md) and updated all agent skills so all agents know that top-level `ALL_CAPS.md` files live exclusively at the repository root (`/`) while `docs/` is dedicated exclusively to the human-focused user guides under `docs/user-guide/`.
 
 ---
 
@@ -217,23 +221,23 @@ Related documentation:
 ---
 
 ### [2026-11-08 07:35 PST] — Architecture & Protocol Review Sign-Off on Modularization Plan (`c5ca7c4`, `v12.0`)
-- **Added Section 7 to [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md)**:
+- **Added Section 7 to [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md)**:
   - Recorded architecture and protocol invariants (Phase M1 `WeMoDatabase.getDatabase()` Room v5 singleton preservation, Phase M2 Android `Network.socketFactory` Wi-Fi binding and `pywemo` OpenSSL EVP_BytesToKey MD5 AES-128-CBC encryption, Phase M3 semantic 3-state category icons and manual IP 9-port hardware probing, and Phase M4 test target splits).
 
 ---
 
 ### [2026-11-08 07:25 PST] — Reverse-Chronological Change Log (`IMPLEMENTED.md`), `UPCOMING_FEATURES.md` & `wemi-changelog-and-docs` Skill (`2cfe70d`..`de14b85`, `v12.0`)
-- **Reframed [`IMPLEMENTED.md`](IMPLEMENTED.md) & [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md) as a Reverse-Chronological Change Log**:
+- **Reframed [`IMPLEMENTED.md`](IMPLEMENTED.md) as a Reverse-Chronological Change Log**:
   - Restructured the implementation document so every feature, bug fix, and architectural milestone is chronicled in reverse chronological order with timestamps, commit hashes, version numbers, and affected files.
-- **Renamed Implementation Plan to [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) & [`docs/UPCOMING_FEATURES.md`](docs/UPCOMING_FEATURES.md)**:
-  - Replaced `docs/IMPLEMENTATION_PLAN.md` with `UPCOMING_FEATURES.md` (and `docs/UPCOMING_FEATURES.md`) focused strictly on upcoming roadmap items.
+- **Renamed Implementation Plan to [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md)**:
+  - Replaced `docs/IMPLEMENTATION_PLAN.md` with `UPCOMING_FEATURES.md` focused strictly on upcoming roadmap items.
 - **Added [`wemi-changelog-and-docs`](.agents/skills/wemi-changelog-and-docs/SKILL.md) Agent Skill**:
   - Created a dedicated workspace and registered skill instructing all agents working in this repository to prepend new entries to `IMPLEMENTED.md` in reverse chronological order, keep `USER_GUIDE.md` / `docs/user-guide/` in sync, and update `UPCOMING_FEATURES.md` whenever features land.
 
 ---
 
 ### [2026-11-08 07:20 PST] — Code Modularization & E2E Validation Plan + Modularization & Testing Skills (`627ab38`, `v12.0`)
-- **Added [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md)**:
+- **Added [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md)**:
   - Defined a 4-phase plan (Phases M1–M4) to decompose large Repository, Network, UI, and Test files into focused single-responsibility Kotlin modules while preserving all package imports and `pywemo` protocol guarantees.
 - **Added [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md) & [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md)**:
   - Packaged reusable engineering skills for file-size/cohesion boundaries and loopback E2E Robolectric/Compose validation.
@@ -249,7 +253,7 @@ Related documentation:
 ---
 
 ### [2026-11-08 07:08 PST] — Modular User Guide Index & 8 Detailed Feature Guides (`cca33cd`, `v11.0`)
-- **Created Top-Level User Guide Index ([`USER_GUIDE.md`](USER_GUIDE.md) & [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md))**:
+- **Created Top-Level User Guide Index ([`USER_GUIDE.md`](USER_GUIDE.md))**:
   - Summarizes every major user-facing feature in a quick-reference table and links to 8 dedicated feature guides under [`docs/user-guide/`](docs/user-guide/):
     1. [`docs/user-guide/main-screen.md`](docs/user-guide/main-screen.md) — Main Screen & Device Controls (3-state startup icons, semantic switch-name icons, latency badges, inline dimming, Night Mode, GENA push sync)
     2. [`docs/user-guide/switch-discovery.md`](docs/user-guide/switch-discovery.md) — Switch Discovery & Network Scanning (SSDP multicast, unicast `/24` fallback, auto-adoption & `Adopt All`, self-healing reconnect)

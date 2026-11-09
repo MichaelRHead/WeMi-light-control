@@ -1,19 +1,21 @@
 # WeMi Light Control — Code Quality, Human-Readable Modularization & End-to-End Validation Plan
 
-**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v17.0`)  
-**Status**: **Completed & Verified — All 4 Phases (M1, M2, M3 & M4) + `v13.0–v17.0` Enhancements Landed (`25/25` Unit, Protocol & E2E Compose UI Tests Passing)**
+**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v18.0`)  
+**Status**: **Completed & Verified — All 4 Phases (M1, M2, M3 & M4) + `v13.0–v18.0` Enhancements Landed (`25/25` Unit, Protocol & E2E Compose UI Tests Passing)**
 
 Related documents and skills:
-- [`AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v17.0`)
-- [`UPCOMING_FEATURES.md`](../UPCOMING_FEATURES.md) / [`docs/UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
-- [`USER_GUIDE.md`](../USER_GUIDE.md) / [`docs/USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](user-guide/))
-- [`.agents/skills/android-code-modularization/SKILL.md`](../.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
-- [`.agents/skills/android-e2e-testing/SKILL.md`](../.agents/skills/android-e2e-testing/SKILL.md) — Android End-to-End (E2E) Testing & Validation Skill
-- [`.agents/skills/multi-agent-git-sync/SKILL.md`](../.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
-- [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](../.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
-- [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](../.agents/skills/wemi-device-telemetry-debug/SKILL.md) — On-Device Screenshot & Recorded Telemetry File Debugging Skill
-- [`.agents/skills/wemi-light-control/SKILL.md`](../.agents/skills/wemi-light-control/SKILL.md) — WeMi Light Control Domain & UPnP Protocol Skill
+- [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
+- [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines *(Owned Exclusively by the Google AI Studio Agent)*
+- [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & CUJs *(Owned Exclusively by the Google AI Studio Agent)*
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v18.0`)
+- [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
+- [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
+- [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
+- [`.agents/skills/android-e2e-testing/SKILL.md`](.agents/skills/android-e2e-testing/SKILL.md) — Android End-to-End (E2E) Testing & Validation Skill
+- [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
+- [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
+- [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md) — On-Device Screenshot & Recorded Telemetry File Debugging Skill
+- [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — WeMi Light Control Domain & UPnP Protocol Skill
 
 ---
 
@@ -42,33 +44,33 @@ The goal of this plan is to make the **WeMi Light Control** codebase effortlessl
 
 | File | Current Lines | Assessment | Underlying Subtlety vs. Accidental Bundling |
 | :--- | ---: | :--- | :--- |
-| [`data/WeMoRepository.kt`](../app/src/main/java/com/example/data/WeMoRepository.kt) | **828** (was 1,898) | **Completed (Phase M1)** | **Subtlety**: Concurrency (`Semaphore(3)` + per-device `Mutex`), unified `executeOptimisticDeviceCommand` with 2-stage self-healing reconnect & offline rollback, GENA push handling, and Room CRUD. |
-| [`data/WeMoDiscoveryCoordinator.kt`](../app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt) | **512** (new) | **Completed (Phase M1)** | Extracted startup `GetBinaryState` detection (`detectStartupDeviceStates`), 2-stage reconnect (`attemptTwoStageReconnect`), SSDP scan & auto-adoption, and subnet/SSID home sync. |
-| [`data/WeMoDemoFixtures.kt`](../app/src/main/java/com/example/data/WeMoDemoFixtures.kt) | **353** (new) | **Completed (Phase M1)** | Extracted static Demo Showroom seed fixtures (`DEFAULT_ROOMS`, `defaultHomeNetworks`, `defaultClassicDevices`, `defaultClassicRules`). |
-| [`data/WeMoProvisioningCoordinator.kt`](../app/src/main/java/com/example/data/WeMoProvisioningCoordinator.kt) | **291** (new) | **Completed (Phase M1)** | Extracted `10.22.22.1` Setup AP probing, 2.4 GHz AP scanning, `WiFiSetup1` provisioning, Demo Showroom AP simulation, and post-provisioning Room registration. |
-| [`network/WeMoNetworkClient.kt`](../app/src/main/java/com/example/network/WeMoNetworkClient.kt) | **856** (was 1,268) | **Completed (Phase M2)** | **Subtlety**: 9-port `probeWemoPort` & SOAP retry/quirk handling (`<BinaryState>Error</BinaryState>`) with companion delegations to `WeMoXmlAndSkuParser` and `WeMoSsdpDiscoveryEngine`. |
-| [`network/WeMoSsdpDiscoveryEngine.kt`](../app/src/main/java/com/example/network/WeMoSsdpDiscoveryEngine.kt) | **308** (new) | **Completed (Phase M2)** | Extracted UDP `239.255.255.250:1900` `M-SEARCH` scanner (`performSsdpDiscoveryScan`) and `/24` `Semaphore(24)` unicast sweep (`scanSubnetUnicast`). |
-| [`network/WeMoXmlAndSkuParser.kt`](../app/src/main/java/com/example/network/WeMoXmlAndSkuParser.kt) | **239** (new) | **Completed (Phase M2)** | Extracted stateless UPnP/SSDP/SOAP XML parsers and SKU classification (`classifyHardwareSku`, `parseSetupXmlDescriptor`, `parseSsdpHeaders`). |
-| [`network/WeMoProvisionerClient.kt`](../app/src/main/java/com/example/network/WeMoProvisionerClient.kt) | **586** (was 722) | **Completed (Phase M2)** | **Subtlety**: Multi-step `10.22.22.1` `WiFiSetup1` provisioning state machine delegating cipher math to `WeMoPasswordCrypto`. |
-| [`network/WeMoPasswordCrypto.kt`](../app/src/main/java/com/example/network/WeMoPasswordCrypto.kt) | **98** (new) | **Completed (Phase M2)** | Extracted `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC encryption/decryption (Methods 1, 2 & 3). |
-| [`ui/components/WeMoHardwareIllustrations.kt`](../app/src/main/java/com/example/ui/components/WeMoHardwareIllustrations.kt) | **388** (was 1,374) | **Completed (Phase M3)** | Split into `WeMoHardwareIllustrations.kt` (`388`), `WeMoSwitchAndPlugIllustration.kt` (`249`), `WeMoLightAndSensorIllustrations.kt` (`328`), `WeMoChristmasTreeIllustration.kt` (`286`), and `WeMoFanIllustration.kt` (`194`). |
-| [`ui/components/WeMoDialogs.kt`](../app/src/main/java/com/example/ui/components/WeMoDialogs.kt) | **9** (was 906) | **Completed (Phase M3)** | Split into `WeMoDeviceEditDialog.kt` (`387`), `WeMoRuleDialog.kt` (`208`), and `WeMoProvisionApDialog.kt` (`395`). |
-| [`ui/components/WeMoDeviceRow.kt`](../app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt) | **383** (was 813) | **Completed (Phase M3)** | Split into `WeMoDeviceRow.kt` (`383`), `WeMoDeviceStatusBadges.kt` (`222`), and `WeMoDeviceDiagnosticsDrawer.kt` (`268`). |
-| [`ui/components/WeMoTvScreen.kt`](../app/src/main/java/com/example/ui/components/WeMoTvScreen.kt) | **640** (was 1,011) | **Completed (Phase M3)** | Split into `WeMoTvScreen.kt` (`640`) and `WeMoTvCardsAndScenes.kt` (`407`). |
-| [`MainActivity.kt`](../app/src/main/java/com/example/MainActivity.kt) | **459** (was 772) | **Completed (Phase M3)** | Extracted `ui/screens/WeMoDevicesTabScreen.kt` (`399`) and split `ui/screens/WeMoRulesScreen.kt` (`204`) + `ui/screens/WeMoMoreScreen.kt` (`417`). |
-| [`test/.../WeMoProtocolTest.kt`](../app/src/test/java/com/example/WeMoProtocolTest.kt) | **10** (was 1,228) | **Completed (Phase M4)** | Extracted `FakeWeMoUpnpServer.kt` (`369`), split into `WeMoSkuAndCryptoTest.kt` (`213`), `WeMoSoapAndSelfHealingTest.kt` (`336`), `WeMoGenaProvisioningAndRulesTest.kt` (`208`), and added `WeMoEndToEndUiTest.kt` (`224`). |
-| [`ui/WeMoViewModel.kt`](../app/src/main/java/com/example/ui/WeMoViewModel.kt) | **858** | **Keep (Cohesive State Holder)** | Coordinates reactive Room `Flow`s, UI dialog states, and coroutine dispatchers. |
-| [`ui/components/WeMoSsdpScannerModal.kt`](../app/src/main/java/com/example/ui/components/WeMoSsdpScannerModal.kt) | **525** | **Keep / Minor Polish** | Cohesive single feature (SSDP discovery banner + live scanner bottom sheet). |
-| [`ui/components/WeMoHeaderAndNav.kt`](../app/src/main/java/com/example/ui/components/WeMoHeaderAndNav.kt) | **481** | **Keep** | Clean, cohesive top lime-green skeuomorphic header + bottom navigation bar. |
-| [`ui/components/WeMoRoomGroupCard.kt`](../app/src/main/java/com/example/ui/components/WeMoRoomGroupCard.kt) | **447** | **Keep** | Cohesive room filter bar + collapsible room group card with master power & dimmer slider. |
-| [`ui/components/WeMoWifiHomeBar.kt`](../app/src/main/java/com/example/ui/components/WeMoWifiHomeBar.kt) | **358** | **Keep** | Cohesive multi-home Wi-Fi bar & `AddWifiHomeNetworkDialog`. |
-| [`network/WeMoGenaSubscriptionManager.kt`](../app/src/main/java/com/example/network/WeMoGenaSubscriptionManager.kt) | **357** | **Keep (Justified Subtlety)** | Self-contained UPnP GENA `SUBSCRIBE` client + embedded `ServerSocket` `NOTIFY` push listener & HTTP 412 recovery. |
-| [`test/.../ExampleRobolectricTest.kt`](../app/src/test/java/com/example/ExampleRobolectricTest.kt) | **324** | **Expand E2E Suite** | Clean, readable Robolectric + Compose UI E2E test suite (6 tests). |
-| [`network/WeMoNetworkMonitor.kt`](../app/src/main/java/com/example/network/WeMoNetworkMonitor.kt) | **235** | **Keep (Justified Subtlety)** | Focused zero-permission `/24` subnet & `10.22.22.x` Setup AP detector + `createWifiBoundSocketFactory`. |
-| [`data/WeMoEntities.kt`](../app/src/main/java/com/example/data/WeMoEntities.kt) | **234** | **Keep** | Clean Room v5 entities, enums, `inferRoomFromName`, and `classifyDeviceCategory`. |
-| [`data/WeMoRuleScheduler.kt`](../app/src/main/java/com/example/data/WeMoRuleScheduler.kt) | **179** | **Keep** | Focused coroutine engine for `AUTO_OFF` countdowns and daily `SCHEDULE` evaluation. |
-| [`data/WeMoDao.kt`](../app/src/main/java/com/example/data/WeMoDao.kt) & [`WeMoDatabase.kt`](../app/src/main/java/com/example/data/WeMoDatabase.kt) | **86 / 38** | **Keep** | Crisp Room v5 DAO and database singleton. |
-| [`ui/theme/Color.kt`](../app/src/main/java/com/example/ui/theme/Color.kt), [`Theme.kt`](../app/src/main/java/com/example/ui/theme/Theme.kt), [`Type.kt`](../app/src/main/java/com/example/ui/theme/Type.kt) | **22 / 34 / 62** | **Keep** | Clean theme definitions. |
+| [`data/WeMoRepository.kt`](app/src/main/java/com/example/data/WeMoRepository.kt) | **828** (was 1,898) | **Completed (Phase M1)** | **Subtlety**: Concurrency (`Semaphore(3)` + per-device `Mutex`), unified `executeOptimisticDeviceCommand` with 2-stage self-healing reconnect & offline rollback, GENA push handling, and Room CRUD. |
+| [`data/WeMoDiscoveryCoordinator.kt`](app/src/main/java/com/example/data/WeMoDiscoveryCoordinator.kt) | **512** (new) | **Completed (Phase M1)** | Extracted startup `GetBinaryState` detection (`detectStartupDeviceStates`), 2-stage reconnect (`attemptTwoStageReconnect`), SSDP scan & auto-adoption, and subnet/SSID home sync. |
+| [`data/WeMoDemoFixtures.kt`](app/src/main/java/com/example/data/WeMoDemoFixtures.kt) | **353** (new) | **Completed (Phase M1)** | Extracted static Demo Showroom seed fixtures (`DEFAULT_ROOMS`, `defaultHomeNetworks`, `defaultClassicDevices`, `defaultClassicRules`). |
+| [`data/WeMoProvisioningCoordinator.kt`](app/src/main/java/com/example/data/WeMoProvisioningCoordinator.kt) | **291** (new) | **Completed (Phase M1)** | Extracted `10.22.22.1` Setup AP probing, 2.4 GHz AP scanning, `WiFiSetup1` provisioning, Demo Showroom AP simulation, and post-provisioning Room registration. |
+| [`network/WeMoNetworkClient.kt`](app/src/main/java/com/example/network/WeMoNetworkClient.kt) | **856** (was 1,268) | **Completed (Phase M2)** | **Subtlety**: 9-port `probeWemoPort` & SOAP retry/quirk handling (`<BinaryState>Error</BinaryState>`) with companion delegations to `WeMoXmlAndSkuParser` and `WeMoSsdpDiscoveryEngine`. |
+| [`network/WeMoSsdpDiscoveryEngine.kt`](app/src/main/java/com/example/network/WeMoSsdpDiscoveryEngine.kt) | **308** (new) | **Completed (Phase M2)** | Extracted UDP `239.255.255.250:1900` `M-SEARCH` scanner (`performSsdpDiscoveryScan`) and `/24` `Semaphore(24)` unicast sweep (`scanSubnetUnicast`). |
+| [`network/WeMoXmlAndSkuParser.kt`](app/src/main/java/com/example/network/WeMoXmlAndSkuParser.kt) | **239** (new) | **Completed (Phase M2)** | Extracted stateless UPnP/SSDP/SOAP XML parsers and SKU classification (`classifyHardwareSku`, `parseSetupXmlDescriptor`, `parseSsdpHeaders`). |
+| [`network/WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt) | **586** (was 722) | **Completed (Phase M2)** | **Subtlety**: Multi-step `10.22.22.1` `WiFiSetup1` provisioning state machine delegating cipher math to `WeMoPasswordCrypto`. |
+| [`network/WeMoPasswordCrypto.kt`](app/src/main/java/com/example/network/WeMoPasswordCrypto.kt) | **98** (new) | **Completed (Phase M2)** | Extracted `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC encryption/decryption (Methods 1, 2 & 3). |
+| [`ui/components/WeMoHardwareIllustrations.kt`](app/src/main/java/com/example/ui/components/WeMoHardwareIllustrations.kt) | **388** (was 1,374) | **Completed (Phase M3)** | Split into `WeMoHardwareIllustrations.kt` (`388`), `WeMoSwitchAndPlugIllustration.kt` (`249`), `WeMoLightAndSensorIllustrations.kt` (`328`), `WeMoChristmasTreeIllustration.kt` (`286`), and `WeMoFanIllustration.kt` (`194`). |
+| [`ui/components/WeMoDialogs.kt`](app/src/main/java/com/example/ui/components/WeMoDialogs.kt) | **9** (was 906) | **Completed (Phase M3)** | Split into `WeMoDeviceEditDialog.kt` (`387`), `WeMoRuleDialog.kt` (`208`), and `WeMoProvisionApDialog.kt` (`395`). |
+| [`ui/components/WeMoDeviceRow.kt`](app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt) | **383** (was 813) | **Completed (Phase M3)** | Split into `WeMoDeviceRow.kt` (`383`), `WeMoDeviceStatusBadges.kt` (`222`), and `WeMoDeviceDiagnosticsDrawer.kt` (`268`). |
+| [`ui/components/WeMoTvScreen.kt`](app/src/main/java/com/example/ui/components/WeMoTvScreen.kt) | **640** (was 1,011) | **Completed (Phase M3)** | Split into `WeMoTvScreen.kt` (`640`) and `WeMoTvCardsAndScenes.kt` (`407`). |
+| [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt) | **459** (was 772) | **Completed (Phase M3)** | Extracted `ui/screens/WeMoDevicesTabScreen.kt` (`399`) and split `ui/screens/WeMoRulesScreen.kt` (`204`) + `ui/screens/WeMoMoreScreen.kt` (`417`). |
+| [`test/.../WeMoProtocolTest.kt`](app/src/test/java/com/example/WeMoProtocolTest.kt) | **10** (was 1,228) | **Completed (Phase M4)** | Extracted `FakeWeMoUpnpServer.kt` (`369`), split into `WeMoSkuAndCryptoTest.kt` (`213`), `WeMoSoapAndSelfHealingTest.kt` (`336`), `WeMoGenaProvisioningAndRulesTest.kt` (`208`), and added `WeMoEndToEndUiTest.kt` (`224`). |
+| [`ui/WeMoViewModel.kt`](app/src/main/java/com/example/ui/WeMoViewModel.kt) | **858** | **Keep (Cohesive State Holder)** | Coordinates reactive Room `Flow`s, UI dialog states, and coroutine dispatchers. |
+| [`ui/components/WeMoSsdpScannerModal.kt`](app/src/main/java/com/example/ui/components/WeMoSsdpScannerModal.kt) | **525** | **Keep / Minor Polish** | Cohesive single feature (SSDP discovery banner + live scanner bottom sheet). |
+| [`ui/components/WeMoHeaderAndNav.kt`](app/src/main/java/com/example/ui/components/WeMoHeaderAndNav.kt) | **481** | **Keep** | Clean, cohesive top lime-green skeuomorphic header + bottom navigation bar. |
+| [`ui/components/WeMoRoomGroupCard.kt`](app/src/main/java/com/example/ui/components/WeMoRoomGroupCard.kt) | **447** | **Keep** | Cohesive room filter bar + collapsible room group card with master power & dimmer slider. |
+| [`ui/components/WeMoWifiHomeBar.kt`](app/src/main/java/com/example/ui/components/WeMoWifiHomeBar.kt) | **358** | **Keep** | Cohesive multi-home Wi-Fi bar & `AddWifiHomeNetworkDialog`. |
+| [`network/WeMoGenaSubscriptionManager.kt`](app/src/main/java/com/example/network/WeMoGenaSubscriptionManager.kt) | **357** | **Keep (Justified Subtlety)** | Self-contained UPnP GENA `SUBSCRIBE` client + embedded `ServerSocket` `NOTIFY` push listener & HTTP 412 recovery. |
+| [`test/.../ExampleRobolectricTest.kt`](app/src/test/java/com/example/ExampleRobolectricTest.kt) | **324** | **Expand E2E Suite** | Clean, readable Robolectric + Compose UI E2E test suite (6 tests). |
+| [`network/WeMoNetworkMonitor.kt`](app/src/main/java/com/example/network/WeMoNetworkMonitor.kt) | **235** | **Keep (Justified Subtlety)** | Focused zero-permission `/24` subnet & `10.22.22.x` Setup AP detector + `createWifiBoundSocketFactory`. |
+| [`data/WeMoEntities.kt`](app/src/main/java/com/example/data/WeMoEntities.kt) | **234** | **Keep** | Clean Room v5 entities, enums, `inferRoomFromName`, and `classifyDeviceCategory`. |
+| [`data/WeMoRuleScheduler.kt`](app/src/main/java/com/example/data/WeMoRuleScheduler.kt) | **179** | **Keep** | Focused coroutine engine for `AUTO_OFF` countdowns and daily `SCHEDULE` evaluation. |
+| [`data/WeMoDao.kt`](app/src/main/java/com/example/data/WeMoDao.kt) & [`WeMoDatabase.kt`](app/src/main/java/com/example/data/WeMoDatabase.kt) | **86 / 38** | **Keep** | Crisp Room v5 DAO and database singleton. |
+| [`ui/theme/Color.kt`](app/src/main/java/com/example/ui/theme/Color.kt), [`Theme.kt`](app/src/main/java/com/example/ui/theme/Theme.kt), [`Type.kt`](app/src/main/java/com/example/ui/theme/Type.kt) | **22 / 34 / 62** | **Keep** | Clean theme definitions. |
 
 ---
 
@@ -250,5 +252,5 @@ When executing Phases M1–M4, preserve the following four subtle protocol and U
 3. **Preserved Package Namespaces & Semantic `testTag`s (`Step M3`)**:
    - Keep extracted UI files in `package com.example.ui.components` or `package com.example.ui.screens` and preserve all `Modifier.testTag(...)` strings (`device_row_${id}`, `power_button_${id}`, `reconnect_button_${id}`, `connection_status_badge_${id}`, `power_state_badge_${id}`, `category_badge_${id}`, `provision_ap_status_box`, `provision_status_box`, `empty_devices_state_card`, etc.).
 4. **Change Log Maintenance (`Step M1–M4`)**:
-   - Follow [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](../.agents/skills/wemi-changelog-and-docs/SKILL.md) and [`.agents/skills/multi-agent-git-sync/SKILL.md`](../.agents/skills/multi-agent-git-sync/SKILL.md) to prepend completed modularization and E2E testing milestones at the top of [`IMPLEMENTED.md`](../IMPLEMENTED.md) and [`docs/IMPLEMENTED.md`](IMPLEMENTED.md).
+   - Follow [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) and [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) to prepend completed modularization and E2E testing milestones at the top of [`IMPLEMENTED.md`](IMPLEMENTED.md).
 

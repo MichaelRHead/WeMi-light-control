@@ -19,9 +19,12 @@ Use this skill whenever multiple agent conversations or external tools (such as 
    - Always diff your recent commits against the latest `origin/main` to verify that none of your features, test tags, documentation sections, or links were lost.
 3. **Keep Code, Tests, User Guides, Change Log, and Skills Coherent**:
    - After integrating incoming commits, verify that version numbers (`versionCode` / `versionName` in `app/build.gradle.kts`), file line counts, `Modifier.testTag(...)` identifiers, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `AGENTS.md`, and `.agents/skills/*/SKILL.md` all agree with each other.
-4. **Respect Exclusive Ownership of `UX_DESIGN_AND_EXPERIENCE.md` & `wemi-ux-design-and-experience`**:
-   - [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md), [`docs/UX_DESIGN_AND_EXPERIENCE.md`](../../docs/UX_DESIGN_AND_EXPERIENCE.md), and [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md) are **owned exclusively by the Google AI Studio Agent**.
-   - Other agents must read and follow those files to understand the app's UX architecture, behavioral modeling, layout invariants, and CUJs, **but must never edit, overwrite, or reformat them**.
+4. **Respect Exclusive Ownership of `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md` & `wemi-ux-design-and-experience`**:
+   - [`UX_DESIGN.md`](../../UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md), and [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md) are **owned exclusively by the Google AI Studio Agent**.
+   - Other agents must read and follow those files to understand the app's UX guidelines, navigation patterns, accessibility standards, behavioral modeling, layout invariants, and CUJs, **but must never edit, overwrite, or reformat them**.
+5. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
+   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) live **exclusively at the repository root (`/`)**.
+   - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`.
 
 ---
 
@@ -67,17 +70,16 @@ git pull --rebase origin main
 If Git reports a conflict in any file:
 1. Open the conflicting file and inspect both `<<<<<<< HEAD` (incoming `origin/main`) and `>>>>>>> <commit>` (your change).
 2. **Merge both sides additively**:
-   - In `IMPLEMENTED.md` / `docs/IMPLEMENTED.md`: keep both reverse-chronological table rows and both detailed sections ordered newest-first by timestamp.
+   - In `IMPLEMENTED.md`: keep both reverse-chronological table rows and both detailed sections ordered newest-first by timestamp.
    - In `AGENTS.md` / `SKILL.md` / `USER_GUIDE.md`: keep all document and skill links from both commits.
    - In Kotlin source/test files: preserve both agents' methods, parameters, imports, and `Modifier.testTag(...)` attributes.
 3. Stage the resolved files (`git add <file>`) and run `git rebase --continue`.
 
-### Step 4: Verify Mirror Files & Skill Synchronization
+### Step 4: Verify Documentation Organization & Skill Synchronization
 Before committing or pushing your integrated changes:
-1. **Sync Root & `docs/` Mirrors**:
-   - Ensure `IMPLEMENTED.md` and `docs/IMPLEMENTED.md` match (`cp IMPLEMENTED.md docs/IMPLEMENTED.md`).
-   - Ensure `UPCOMING_FEATURES.md` and `docs/UPCOMING_FEATURES.md` match (`cp UPCOMING_FEATURES.md docs/UPCOMING_FEATURES.md`).
-   - Ensure `USER_GUIDE.md` and `docs/USER_GUIDE.md` have matching feature rows and links.
+1. **Verify Single-Source Root `ALL_CAPS.md` Layout**:
+   - Confirm that all `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) exist only at the repository root (`/`) and are **not** duplicated inside `docs/`.
+   - Do not modify `UX_DESIGN.md` or `UX_DESIGN_AND_EXPERIENCE.md` unless you are the Google AI Studio Agent.
 2. **Sync Repository Skills (`.agents/skills/`) with Persistent Agent Skills**:
    - Whenever any `.agents/skills/<skill-name>/SKILL.md` is added or updated in the repository, also call `save_skill(overwrite = true, skill_dir = "/home/antigravity/MichaelRHead/WeMi-light-control/.agents/skills/<skill-name>")` so the persistent skill registry stays in lockstep with GitHub.
 

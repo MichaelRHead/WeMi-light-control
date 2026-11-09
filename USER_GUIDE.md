@@ -36,8 +36,9 @@ Each guide below explains one major area of the app in detail:
 ## Developer & Architecture Documentation
 
 For UX architecture, protocol details, architecture diagrams, and roadmap information, see:
+- [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
 - [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & Critical User Journeys *(Owned Exclusively by the Google AI Studio Agent)*
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log of Implemented Features & Improvements
-- [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization & End-to-End Validation Plan
+- [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization & End-to-End Validation Plan
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide

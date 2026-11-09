@@ -1,13 +1,14 @@
 # WeMi Light Control — Architecture & Agent Guide (`AGENTS.md`)
 
-**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v17.0`) is an Android & Android TV local-LAN controller for Belkin WeMo smart switches, dimmers, and mini plugs. It pairs a 2013-era skeuomorphic Belkin WeMo interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with `pywemo`-grade local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
+**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v18.0`) is an Android & Android TV local-LAN controller for Belkin WeMo smart switches, dimmers, and mini plugs. It pairs a 2013-era skeuomorphic Belkin WeMo interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with `pywemo`-grade local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
 
 Detailed agent instructions, UX design architecture, user guides, protocol specs, reverse-chronological change log, modularization plan, and upcoming features roadmap are packaged in:
-- [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) / [`docs/UX_DESIGN_AND_EXPERIENCE.md`](docs/UX_DESIGN_AND_EXPERIENCE.md) — **Android & Android TV UX Design, Behavioral Model & Critical User Journeys** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
-- [`USER_GUIDE.md`](USER_GUIDE.md) / [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v17.0`)
-- [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) / [`docs/UPCOMING_FEATURES.md`](docs/UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
-- [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
+- [`UX_DESIGN.md`](UX_DESIGN.md) — **Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
+- [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — **Android & Android TV UX Design, Behavioral Model & Critical User Journeys** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
+- [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v18.0`)
+- [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
+- [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
 - [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md) — **UX Design, Behavioral Modeling & CUJ Skill** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill
 - [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md) — On-Device Screenshot & Recorded Telemetry File Debugging Skill
@@ -95,12 +96,12 @@ The app supports four physical Belkin WeMo hardware families:
 ```
 
 - In remote VM environments where `HTTPS_PROXY` is active, ensure `~/.gradle/gradle.properties` configures `http.proxyHost`/`https.proxyHost` and `javax.net.ssl.trustStore` with the local proxy CA, and `ANDROID_HOME` points to the Android SDK (`platforms;android-36`, `build-tools;36.0.0`).
-- **AI Studio Agent Exclusive UX Ownership ([`wemi-ux-design-and-experience`](.agents/skills/wemi-ux-design-and-experience/SKILL.md))**: [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md), [`docs/UX_DESIGN_AND_EXPERIENCE.md`](docs/UX_DESIGN_AND_EXPERIENCE.md), and [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md) are **owned exclusively by the Google AI Studio Agent**. All other agents must read and follow them when implementing UI/UX features or tests, but **must not modify or overwrite them**.
-- **Multi-Agent Git Sync & Anti-Stomp Audit ([`multi-agent-git-sync`](.agents/skills/multi-agent-git-sync/SKILL.md))**: Before starting work or pushing commits, always run `git fetch --all`, inspect incoming commits (`git log -p HEAD..origin/main`), verify that none of your prior changes were accidentally overwritten or broken by concurrent agent commits, rebase additively (`git pull --rebase origin main`), and keep root/`docs/` mirrors in sync.
+- **AI Studio Agent Exclusive UX Ownership ([`wemi-ux-design-and-experience`](.agents/skills/wemi-ux-design-and-experience/SKILL.md))**: [`UX_DESIGN.md`](UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md), and [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md) are **owned exclusively by the Google AI Studio Agent**. All other agents must read and follow them when implementing UI/UX features or tests, but **must not modify or overwrite them**.
+- **Multi-Agent Git Sync & Anti-Stomp Audit ([`multi-agent-git-sync`](.agents/skills/multi-agent-git-sync/SKILL.md))**: Before starting work or pushing commits, always run `git fetch --all`, inspect incoming commits (`git log -p HEAD..origin/main`), verify that none of your prior changes were accidentally overwritten or broken by concurrent agent commits, and rebase additively (`git pull --rebase origin main`). Keep all `ALL_CAPS.md` documentation files at the repository root and human-focused user guides in `docs/user-guide/`.
 - **Keep Change Log, Upcoming Features & User Guide Updated ([`wemi-changelog-and-docs`](.agents/skills/wemi-changelog-and-docs/SKILL.md))**: Whenever new features are implemented or existing features are adjusted, always:
-  - Prepend a new timestamped entry at the **top** (reverse chronological order) of [`IMPLEMENTED.md`](IMPLEMENTED.md) and [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md).
-  - Remove completed items from [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) and [`docs/UPCOMING_FEATURES.md`](docs/UPCOMING_FEATURES.md).
-  - Update [`USER_GUIDE.md`](USER_GUIDE.md), [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md), and the relevant feature guides under [`docs/user-guide/`](docs/user-guide/).
+  - Prepend a new timestamped entry at the **top** (reverse chronological order) of [`IMPLEMENTED.md`](IMPLEMENTED.md).
+  - Remove completed items from [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md).
+  - Update [`USER_GUIDE.md`](USER_GUIDE.md) and the relevant feature guides under [`docs/user-guide/`](docs/user-guide/).
 
 
 

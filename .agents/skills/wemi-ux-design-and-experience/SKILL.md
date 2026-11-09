@@ -1,6 +1,6 @@
 ---
 name: wemi-ux-design-and-experience
-description: Android & Android TV UX design architecture, user behavioral mental models, strict layout/typography invariants, and Critical User Journeys (CUJs) for WeMi Light Control. EXCLUSIVELY OWNED by the Google AI Studio Agent (other agents MUST read and follow this skill when modifying UI or UX flows, but MUST NOT edit this skill or UX_DESIGN_AND_EXPERIENCE.md).
+description: Android & Android TV UX design architecture, navigation patterns, accessibility standards, user behavioral mental models, strict layout/typography invariants, and Critical User Journeys (CUJs) for WeMi Light Control. EXCLUSIVELY OWNED by the Google AI Studio Agent (other agents MUST read and follow this skill when modifying UI or UX flows, but MUST NOT edit this skill, UX_DESIGN.md, or UX_DESIGN_AND_EXPERIENCE.md).
 ---
 
 # WeMi UX Design, Behavioral Modeling & Critical User Journeys Skill (`wemi-ux-design-and-experience`)
@@ -8,10 +8,10 @@ description: Android & Android TV UX design architecture, user behavioral mental
 > [!CAUTION]
 > **EXCLUSIVE OWNERSHIP & READ-ONLY RULE FOR PEER AGENTS**:
 > - **Owner**: **Google AI Studio Agent (`AI Studio Build`) — SOLE AUTHOR & MAINTAINER**.
-> - **Policy**: **ONLY the Google AI Studio Agent may modify `.agents/skills/wemi-ux-design-and-experience/SKILL.md`, [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md), or [`docs/UX_DESIGN_AND_EXPERIENCE.md`](../../docs/UX_DESIGN_AND_EXPERIENCE.md).**
-> - **All other agents** (CLI agents, background sync agents, test runners, and external coding assistants) **MUST read, understand, and obey** the UX behavioral models, visual state rules, and layout invariants documented here when implementing features or writing tests, **but MUST NOT edit, overwrite, or reformat these files.**
+> - **Policy**: **ONLY the Google AI Studio Agent may modify `.agents/skills/wemi-ux-design-and-experience/SKILL.md`, [`UX_DESIGN.md`](../../UX_DESIGN.md), or [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md).**
+> - **All other agents** (CLI agents, background sync agents, test runners, and external coding assistants) **MUST read, understand, and obey** the UX guidelines, navigation patterns, accessibility standards, behavioral models, visual state rules, and layout invariants documented here when implementing features or writing tests, **but MUST NOT edit, overwrite, or reformat these files.**
 
-For the complete UX architecture narrative, diagrams, and Critical User Journeys, read [`../../UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md) (mirrored at [`../../docs/UX_DESIGN_AND_EXPERIENCE.md`](../../docs/UX_DESIGN_AND_EXPERIENCE.md)).
+For the complete Android UX guidelines (navigation patterns, accessibility standards for smart home controls, and user interaction flows) and behavioral architecture, read [`../../UX_DESIGN.md`](../../UX_DESIGN.md) and [`../../UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md).
 
 ---
 

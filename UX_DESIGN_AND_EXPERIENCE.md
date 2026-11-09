@@ -1,21 +1,22 @@
 # WeMi Light Control — Android & Android TV UX Design, Behavioral Model & Critical User Journeys (`UX_DESIGN_AND_EXPERIENCE.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v17.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v18.0`)  
 **Document & Skill Owner**: **Google AI Studio Agent (`AI Studio Build`) — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md)
 
 > [!CAUTION]
 > **EXCLUSIVE OWNERSHIP & READ-ONLY GOVERNANCE RULE FOR OTHER AGENTS**:
-> - **This document (`UX_DESIGN_AND_EXPERIENCE.md` and `docs/UX_DESIGN_AND_EXPERIENCE.md`) and its companion skill (`.agents/skills/wemi-ux-design-and-experience/SKILL.md`) are owned exclusively by the Google AI Studio Agent.**
+> - **This document (`UX_DESIGN_AND_EXPERIENCE.md`), [`UX_DESIGN.md`](UX_DESIGN.md), and their companion skill (`.agents/skills/wemi-ux-design-and-experience/SKILL.md`) are owned exclusively by the Google AI Studio Agent.**
 > - **ONLY the Google AI Studio Agent is permitted to author, edit, or modify these files.**
 > - **All other agents** (CLI coding agents, background sync agents, test runners, and external assistants) **MUST read, understand, and strictly adhere to** the UX principles, layout invariants, behavioral models, and Critical User Journeys (CUJs) defined here when writing code or tests, **but MUST NOT modify, overwrite, or reformat these files.**
 
 Related documentation:
+- [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](docs/IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v17.0`)
-- [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) / [`docs/UPCOMING_FEATURES.md`](docs/UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
-- [`USER_GUIDE.md`](USER_GUIDE.md) / [`docs/USER_GUIDE.md`](docs/USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
-- [`docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Code Modularization & E2E Validation Plan
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v18.0`)
+- [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
+- [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
+- [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Code Modularization & E2E Validation Plan
 
 ---
 
