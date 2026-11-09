@@ -40,3 +40,4 @@ The `docs/` directory is dedicated **exclusively** to human-readable end-user gu
 - [`user-guide/rules-and-timers.md`](user-guide/rules-and-timers.md) — Schedules, Auto-Off Timers & Sunset/Sunrise Rules
 - [`user-guide/more-and-tv-mode.md`](user-guide/more-and-tv-mode.md) — Android TV 10-Foot Remote Mode (`wemi TV`) & Demo Showroom
 - [`user-guide/telemetry-and-troubleshooting.md`](user-guide/telemetry-and-troubleshooting.md) — Troubleshooting, Diagnostic Screenshots & Sharing Telemetry Logs (`wemi-telemetry-latest.txt`) *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
+- [`user-guide/release-notes.md`](user-guide/release-notes.md) — User-Facing Release Notes & Version History (`v1.0` → `v20.0`)

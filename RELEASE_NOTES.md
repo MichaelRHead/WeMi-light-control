@@ -40,6 +40,8 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 ### Version 20.0 (`versionCode = 20`) — November 9, 2026
 - **Unified 9-Port Wi-Fi-Bound Self-Healing Reconnect**: Belkin WeMo switches occasionally shift their internal control port (`49151–49159`) after a power blink or router reboot. Every switch command—turning power ON/OFF, sliding dimmer brightness, renaming a switch, or toggling Night Mode—now automatically checks all 9 ports over your Wi-Fi connection (even when mobile cellular data is turned on) and heals the connection without interruption.
+- **Cellular-Safe Wi-Fi Binding Across Discovery & Wall-Switch Push Events**: All local network discovery sweeps (`/24` unicast scanner), port-healing probes, and real-time UPnP GENA wall-switch event subscriptions now bind directly to your phone's Wi-Fi network handle so Android never routes smart-switch traffic over mobile cellular data.
+- **Instant Recovery After Offline Toggles**: Fixed an issue where tapping an unreachable switch could briefly delay state updates if you tapped the red **Reconnect Ring** or flipped the physical wall switch within 1.5 seconds.
 - **Smarter Automatic Room Grouping & 3-Tier Switch Identity Matching**:
   - Splits `CamelCase`, underscore, and hyphenated switch names (`"StairwayLight"` → **Hallway & Landing**, `"MasterBathVanity"` → **Ensuite**, `"ShpreseBedLamp"` → **Bedroom**) so switches are grouped into the right room even when named without spaces.
   - Prioritizes specific bathroom keywords (**Ensuite**) before general suite modifiers (`"Master"`, `"Guest"`, `"Kids"`) so `"Master Bath Vanity"` and `"Guest Bathroom Light"` land in **Ensuite** instead of **Bedroom**.
