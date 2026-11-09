@@ -1,6 +1,6 @@
 <en-US>
-What's new in WeMi Switch Control v2.0 (Phone, Tablet & Android TV):
-• Android TV Support: Control your switches from the couch with your TV remote (D-Pad navigation, OK toggle, Left/Right dimmer, and Movie Mode scene).
-• Room Grouping System: Organize switches by room with Master Room Power & Brightness controls to toggle multiple lights at once.
-• Pull-to-Refresh SSDP Scan: Swipe down to broadcast a live UDP multicast (239.255.255.250:1900) discovery scan.
+What's new in WeMi Switch Control v19.0 (Phone, Tablet & Android TV):
+• Zero-cloud 10.22.22.1 setup for factory-reset WeMo switches & dimmers with on-screen debug details and one-tap telemetry export.
+• Expanded smart room grouping (Bedroom, Hallway & Landing, Kitchen, Unassigned) with one-tap LAN Reset & Rescan.
+• Distinct 3-state ON, OFF Standby, and Disconnected icons plus top-first dimmer brightness presets (1%–100%) and Night Mode (20%).
 </en-US>

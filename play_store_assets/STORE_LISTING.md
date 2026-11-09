@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v2.0 — Phone, Tablet & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v19.0 — Phone, Tablet & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `2.0` (`versionCode = 2`)
+- **Version:** `19.0` (`versionCode = 19`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,11 +17,11 @@ WeMi Switch Control brings reliable, instant local-network control back to your 
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
-### What's New in Version 2.0
+### What's New in Version 19.0
+- **Zero-Cloud `10.22.22.1` Switch Provisioning & Screenshot Diagnostics:** Set up factory-reset Belkin WeMo switches (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`) directly over local Wi-Fi with automatic OpenWrt/RTOS AES-128-CBC encryption, non-destructive retry, and one-tap `wemi-telemetry-latest.txt` export.
+- **Expanded Smart Room Inference & One-Tap LAN Reset:** Automatically organizes switches into Bedroom (`"bed"`, `"bedside"`, `"girls"`, `"kids"`), Hallway & Landing (`"stair"`, `"stairway"`), Kitchen, Living Room, or `Unassigned`, with a one-tap **Reset & Rescan LAN** action.
+- **3-State Appliance Icons & Top-First Dimmer Controls:** Distinct `ON`, `OFF (Accessible Standby)`, and `Disconnected` icons for Christmas Trees, Fans, Lights, Motion Sensors, and Switches, plus top-first brightness sliders (`1%–100%`) and hardware Night Mode (`20%`).
 - **Android TV 10-Foot Remote Interface:** Control your living room, bedroom, and kitchen lights right from your couch using your Android TV remote (D-Pad navigation, OK/Select power toggle, Left/Right `-10% / +10%` dimmer control, Play/Pause Master Room toggle, and one-click Movie Mode / Holiday / Bedtime TV scenes).
-- **Room Grouping System & Master Room Toggle:** Organize switches into rooms (Living Room, Bedroom, Kitchen, Hallway & Landing, Ensuite, Office, Outdoor) and toggle every light in a room ON or OFF simultaneously with one tap on the Master Room Power Ring.
-- **Master Room Brightness Control:** Smoothly adjust the brightness of all dimmable smart bulbs in a room at once (`1%–100%`).
-- **Pull-to-Refresh SSDP Network Scan:** Swipe down on the Devices list at any time to broadcast a live UDP multicast `M-SEARCH` scan (`239.255.255.250:1900`) and sync newly discovered switches into their assigned rooms.
 
 ### Key Features
 - **Instant One-Tap Cyan Power Ring Toggles:** Turn individual switches or entire room groups ON or OFF directly over your local Wi-Fi network.
