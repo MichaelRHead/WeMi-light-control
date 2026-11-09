@@ -12,7 +12,7 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
-| **[`v20.0`](#version-200-versioncode--20--november-9-2026)** | `20` | Nov 9, 2026 | Unified 9-port Wi-Fi-bound self-healing reconnect across all switch/dimmer commands & streamlined setup debug panel |
+| **[`v20.0`](#version-200-versioncode--20--november-9-2026)** | `20` | Nov 9, 2026 | Unified 9-port Wi-Fi-bound self-healing reconnect, 3-tier hardware identity matching, CamelCase/`Ensuite` room grouping & streamlined setup debug panel |
 | **[`v19.0`](#version-190-versioncode--19--november-9-2026)** | `19` | Nov 9, 2026 | Dedicated Troubleshooting & Telemetry Sharing Guide (`wemi-telemetry-latest.txt`) for 1-tap support diagnostics |
 | **[`v18.0`](#version-180-versioncode--18--november-9-2026)** | `18` | Nov 9, 2026 | Accessibility & navigation polish: 48dp+ touch targets, TalkBack switch labels, and predictable Back-button flows |
 | **[`v17.0`](#version-170-versioncode--17--november-89-2026)** | `17` | Nov 8–9, 2026 | Major `10.22.22.1` factory-reset setup reliability upgrade, on-screen screenshot debug card, smart room matching & top-first dimmer slider |
@@ -40,6 +40,10 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 ### Version 20.0 (`versionCode = 20`) — November 9, 2026
 - **Unified 9-Port Wi-Fi-Bound Self-Healing Reconnect**: Belkin WeMo switches occasionally shift their internal control port (`49151–49159`) after a power blink or router reboot. Every switch command—turning power ON/OFF, sliding dimmer brightness, renaming a switch, or toggling Night Mode—now automatically checks all 9 ports over your Wi-Fi connection (even when mobile cellular data is turned on) and heals the connection without interruption.
+- **Smarter Automatic Room Grouping & 3-Tier Switch Identity Matching**:
+  - Splits `CamelCase`, underscore, and hyphenated switch names (`"StairwayLight"` → **Hallway & Landing**, `"MasterBathVanity"` → **Ensuite**, `"ShpreseBedLamp"` → **Bedroom**) so switches are grouped into the right room even when named without spaces.
+  - Prioritizes specific bathroom keywords (**Ensuite**) before general suite modifiers (`"Master"`, `"Guest"`, `"Kids"`) so `"Master Bath Vanity"` and `"Guest Bathroom Light"` land in **Ensuite** instead of **Bedroom**.
+  - Matches discovered switches by hardware `<serialNumber>` first so router DHCP IP swaps never mix up two switches.
 - **Streamlined Setup Diagnostic Panel**: Separated and polished the on-screen **`SETUP DEBUG DETAILS (SCREENSHOT)`** card inside the `10.22.22.1` setup wizard for cleaner single-screenshot troubleshooting and one-tap telemetry file export.
 
 ---

@@ -84,12 +84,12 @@ flowchart TD
 ### 3.1 Multi-Path Discovery Pipeline (`WeMoSsdpDiscoveryEngine.kt`)
 When `executeSsdpScan` or `reconnectAndRediscoverHome` runs:
 1. **Stage A — UDP Multicast `M-SEARCH` (`239.255.255.250:1900`)**:
-   - Acquires `WifiManager.MulticastLock("wemi_ssdp_multicast_lock")`, binds an ephemeral UDP socket on the active Wi-Fi IPv4 interface, and transmits two `M-SEARCH` bursts separated by a `1000ms` retransmit interval to defeat Wi-Fi multicast packet loss.
+   - Acquires `WifiManager.MulticastLock("wemi_ssdp_multicast_lock")`, binds an ephemeral UDP socket on the active Wi-Fi IPv4 interface, and transmits two `M-SEARCH` bursts separated by a `550ms` retransmit interval (`90ms` in `fastMode` under Robolectric/loopback) to defeat Wi-Fi multicast packet loss.
    - Simultaneously mirrors `M-SEARCH` datagrams to any registered loopback `FakeWeMoUpnpServer` UDP ports (`127.0.0.1`) for deterministic E2E testing.
 2. **Stage B — Known-Device Unicast Verification**:
    - Probes all remembered switches for the active home across the 9 Belkin UPnP ports (`49153, 49152, 49154, 49151, 49155..49159`) so switches on APs that drop UDP multicast are still discovered immediately.
 3. **Stage C — `/24` Subnet Unicast Sweep (`scanSubnetUnicast`)**:
-   - If UDP multicast returns zero devices on a real LAN, sweeps all 254 hosts on the active `/24` subnet (`Semaphore(24)`, `180ms` TCP connect timeout) across primary Belkin ports (`49153`, `49152`, `49154`, `49151`).
+   - If UDP multicast returns zero devices on a real LAN, sweeps all 254 hosts on the active `/24` subnet (`Semaphore(24)`, `180ms` TCP connect timeout via Wi-Fi-bound `wifiSocketFactory.createSocket()`) across primary Belkin ports (`49153`, `49152`, `49154`, `49151`).
 4. **Stage D — Live State & Metadata Enrichment**:
    - For each discovered `/setup.xml` endpoint, queries `basicevent1#GetBinaryState`, `metainfo1#GetMetaInfo` (filtering out soft-AP SSIDs via `isWemoDeviceSetupSsid`), and `WiFiSetup1#GetSignalStrength`.
 
