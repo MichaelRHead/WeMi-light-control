@@ -213,6 +213,7 @@ class WeMoSkuAndCryptoTest {
         // 4. Verify isWemoDeviceSetupSsid and parseMetaInfoSoapResponse filter all Belkin WeMo soft-AP SSIDs while keeping real router SSIDs
         val softApSsids = listOf(
             "WeMo.Switch.998",
+            "Wemo.LS3W.220",
             "WeMo.Light.204",
             "WeMo.Mini.711",
             "WeMo.Dimmer.503",
