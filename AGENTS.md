@@ -8,10 +8,12 @@ Detailed agent instructions, UX design architecture, debugging & support archite
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — **On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture** (**Owned Exclusively by the Antigravity Debugging & Support Agent** — read-only for all other agents)
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — **Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture** (**Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent** — read-only for all other agents)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
+- [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — **4-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine** (`ai_studio_ux_cuj` → `discovery_and_grouping` → `telemetry_and_debugging` → `code_quality_and_testing` → `ai_studio_ux_cuj`)
 - [`RELEASE_NOTES.md`](RELEASE_NOTES.md) & [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v20.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v20.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
+- [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — **4-Agent Autonomous Round-Robin Release Review & Sign-Off Coordinator Skill**
 - [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md) — **UX Design, Behavioral Modeling & CUJ Skill** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
 - [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md) — **On-Device Screenshot & Recorded Telemetry File Debugging Skill** (**Owned Exclusively by the Antigravity Debugging & Support Agent** — read-only for all other agents)
 - [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md) — **Device Discovery Logic, 3-Tier Identity Resolution & Automatic Room Grouping Skill** (**Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent** — read-only for all other agents)
@@ -108,6 +110,15 @@ The app supports four physical Belkin WeMo hardware families:
   - Prepend a new timestamped entry at the **top** (reverse chronological order) of [`IMPLEMENTED.md`](IMPLEMENTED.md).
   - Remove completed items from [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md).
   - Update [`USER_GUIDE.md`](USER_GUIDE.md) and the relevant feature guides under [`docs/user-guide/`](docs/user-guide/).
+- **4-Agent Autonomous Round-Robin Release Review ([`wemi-release-coordinator`](.agents/skills/wemi-release-coordinator/SKILL.md), [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md), [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md))**:
+  - Releases follow a 5-stage round-robin ring synchronized via [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) on `origin/main`:
+    1. **Stage 1 (Initiate)**: `ai_studio_ux_cuj` (Google AI Studio Agent) initiates the release, signs off UX/CUJs, and sets `CURRENT_TURN: discovery_and_grouping`.
+    2. **Stage 2 (Review 1)**: `discovery_and_grouping` (Antigravity Discovery & Room Grouping Agent) audits discovery/identity/room bundling, runs tests, signs off, and advances `CURRENT_TURN: telemetry_and_debugging` via `bash scripts/advance_release_turn.sh sign_off discovery_and_grouping "<summary>"`.
+    3. **Stage 3 (Review 2)**: `telemetry_and_debugging` (Antigravity Telemetry & Debugging Agent) audits `10.22.22.1` setup telemetry & SOAP log export, runs tests, signs off, and advances `CURRENT_TURN: code_quality_and_testing` via `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<summary>"`.
+    4. **Stage 4 (Review 3)**: `code_quality_and_testing` (Antigravity Code Quality & E2E Testing Agent) audits modularity/lifecycle/executable `gradlew` (`100755`), runs `./gradlew testDebugUnitTest --rerun-tasks assembleDebug`, signs off, and advances `CURRENT_TURN: ai_studio_ux_cuj` (`RELEASE_STATUS: AWAITING_FINAL_CONCLUSION`) via `bash scripts/advance_release_turn.sh sign_off code_quality_and_testing "<summary>"`.
+    5. **Stage 5 (Conclude)**: `ai_studio_ux_cuj` (Google AI Studio Agent) verifies all 4 agents signed off and concludes the release (`RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `CURRENT_TURN: NONE`).
+  - Each Antigravity agent keeps `bash scripts/await_release_turn.sh <role_id>` running as an async background task (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`) so Antigravity's Reactive Wakeup automatically resumes the agent when its turn arrives on `origin/main`.
+
 
 
 

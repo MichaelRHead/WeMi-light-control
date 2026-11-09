@@ -19,17 +19,19 @@ Use this skill whenever you land a feature, bug fix, UI change, or architectural
 >   - [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md) *(Owned Exclusively by the Google AI Studio Agent — Read-Only for other agents)*
 >   - [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) *(Owned Exclusively by the Antigravity Debugging & Support Agent — Read-Only for other agents)*
 >   - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../DISCOVERY_AND_ROOM_GROUPING.md) *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — Read-Only for other agents)*
+>   - [`RELEASE_PROCESS.md`](../../RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md)
 >   - [`IMPLEMENTED.md`](../../IMPLEMENTED.md)
 >   - [`RELEASE_NOTES.md`](../../RELEASE_NOTES.md)
 >   - [`UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md)
 >   - [`USER_GUIDE.md`](../../USER_GUIDE.md)
 >   - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../../CODE_QUALITY_AND_MODULARIZATION_PLAN.md)
 > - **The `docs/` folder is dedicated EXCLUSIVELY to the human-focused user guide** ([`docs/README.md`](../../docs/README.md) and [`docs/user-guide/*.md`](../../docs/user-guide/), where [`docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md) is owned exclusively by the Antigravity Debugging & Support Agent).
-> - **Do NOT copy or mirror `ALL_CAPS.md` files into `docs/`** (never create `docs/IMPLEMENTED.md`, `docs/RELEASE_NOTES.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, `docs/DISCOVERY_AND_ROOM_GROUPING.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`).
+> - **Do NOT copy or mirror `ALL_CAPS.md` files into `docs/`** (never create `docs/IMPLEMENTED.md`, `docs/RELEASE_NOTES.md`, `docs/RELEASE_PROCESS.md`, `docs/RELEASE_SIGN_OFF.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, `docs/DISCOVERY_AND_ROOM_GROUPING.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`).
 
 | File Path | Role & Format |
 | :--- | :--- |
 | [`IMPLEMENTED.md`](../../IMPLEMENTED.md) | **Reverse-Chronological Feature Change Log**: Records every completed feature, bug fix, and improvement from **newest at the top to oldest at the bottom**, including the PST timestamp, version/commit reference, summary table row, and detailed bullet points. |
+| [`RELEASE_PROCESS.md`](../../RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md) | **4-Agent Round-Robin Release Process & Sign-Off Ledger**: Coordinates autonomous release reviews (`ai_studio_ux_cuj` → `discovery_and_grouping` → `telemetry_and_debugging` → `code_quality_and_testing` → `ai_studio_ux_cuj`). |
 | [`RELEASE_NOTES.md`](../../RELEASE_NOTES.md) & [`docs/user-guide/release-notes.md`](../../docs/user-guide/release-notes.md) | **User-Facing Google Play Store Release Notes**: High-level, non-technical summary of major user-facing features and improvements introduced in each Play Store release version (`v1.0` → `v20.0+`). |
 | [`UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md) | **Upcoming Features Roadmap**: Lists planned/unimplemented features and engineering tracks. When an upcoming feature is implemented, remove it from `UPCOMING_FEATURES.md` and prepend it to `IMPLEMENTED.md`. |
 | [`USER_GUIDE.md`](../../USER_GUIDE.md) | **User Guide Index**: Summarizes each user-facing feature in a table and links to detailed guides under [`docs/user-guide/`](../../docs/user-guide/). |
