@@ -64,12 +64,32 @@ Separate **stateless wire parsing / cryptography** from **stateful socket & HTTP
 
 ---
 
-## 3. Safe Refactoring Checklist (Zero-Regression Protocol)
+## 3. Critical Anti-Breakage Invariants During Refactoring
+
+Whenever refactoring ViewModels, Compose dialogs, network clients, or Room persistence, enforce these three invariants to prevent subtle UI hangs and E2E test breakages:
+
+1. **Never Block Synchronous Modal/Dialog Dismissal on Background `Dispatchers.IO` Network Probes (`WeMoViewModel.saveDevice` Pattern)**:
+   - When a user taps **Save** or **Confirm** in a standard CRUD dialog (`AddOrEditWeMoDeviceDialog`, `AddWeMoRuleDialog`), always update the dialog visibility state synchronously (`_showAddDeviceDialog.value = false`, `_editingDevice.value = null`) **before** launching `viewModelScope.launch` / `Dispatchers.IO` background work (`repository.saveDevice` 9-port `probeWemoPort` or `ChangeFriendlyName` SOAP calls).
+   - Keeping modal dismissal inside `viewModelScope.launch` *after* a suspending network call leaves the `Dialog` covering the screen while TCP connect timeouts run against unreachable or demo IPs (`192.168.1.x`). This makes the **Save** button feel frozen in production and causes Compose UI tests (`createAndroidComposeRule`) to click into the modal scrim instead of the underlying screen.
+   - *Exception*: Multi-step interactive wizards with an explicit in-dialog progress state machine (`ProvisionWeMoApDialog`) intentionally remain open while showing step-by-step progress and only auto-dismiss upon completion or Cancel.
+2. **Preserve `0`-Arg `SocketFactory.createSocket()` Loopback & Test Guards (`WeMoNetworkMonitor.createWifiBoundSocketFactory` Pattern)**:
+   - `OkHttpClient` invokes the **zero-argument** `SocketFactory.createSocket()` and subsequently calls `socket.connect(endpoint, timeout)`.
+   - Never bind a socket to a Wi-Fi `Network` unconditionally inside `createSocket()`. Wrap `Socket` and override `connect(endpoint, timeout)` so `wifiNet.bindSocket(this)` is **skipped** when `inetAddr.isLoopbackAddress` (`127.0.0.1` loopback test servers) or when running under Robolectric (`Build.FINGERPRINT == "robolectric"`).
+3. **Scope Singleton Room Databases Per `Application` Instance Under Robolectric (`WeMoDatabase.getDatabase` Pattern)**:
+   - Robolectric creates a fresh `Application` instance for every `@Test` method while static singletons (`WeMoDatabase.INSTANCE`) persist across tests in the same JVM process.
+   - Always track `lastAppContext` in `WeMoDatabase.getDatabase(context)` and rebuild with `Room.inMemoryDatabaseBuilder(...).allowMainThreadQueries()` under Robolectric whenever `context.applicationContext !== lastAppContext`, preventing stale SQLite connection errors and cross-test state leakage.
+
+---
+
+## 4. Safe Refactoring Checklist (Zero-Regression Protocol)
 
 When modularizing an existing Android codebase:
 1. **Preserve Package & Public Signatures First**:
    - Keep extracted top-level functions or internal delegates in the same package (or provide typealiases / delegating methods) so existing callers, Compose previews, and tests compile without churn.
 2. **Verify Line Counts & Responsibility Boundaries**:
    - Run `wc -l $(find app/src -name "*.kt" | sort)` before and after refactoring to confirm no file exceeds its complexity budget without justification.
-3. **Mandatory Build & Test Gate**:
-   - Run `./gradlew testDebugUnitTest assembleDebug` after every modularization step and verify 100% test pass rate and zero compiler warnings before committing.
+3. **Audit Synchronous vs. Asynchronous UI State Transitions**:
+   - Verify that extracting or reorganizing ViewModel / Repository methods never moves synchronous UI state updates (`_show*Dialog`, `_editing*`) behind suspending network I/O.
+4. **Mandatory Non-Cached Build & Test Gate (`--rerun-tasks`)**:
+   - Run `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` after every modularization stage and after syncing remote commits, and inspect `app/build/test-results/testDebugUnitTest/TEST-*.xml` to verify 100% test pass rate, zero compiler warnings, and sub-second loopback E2E test durations before committing.
+
