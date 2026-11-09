@@ -540,8 +540,10 @@ private fun WeMoProvisionDebugPanel(
     keepOpenOnSuccess: Boolean,
     onToggleKeepOpen: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     var copiedFeedback by remember { mutableStateOf(false) }
+    var sharedFeedback by remember { mutableStateOf(false) }
     val displayLines = remember(debugSnapshot, selectedSsid) {
         debugSnapshot.toDisplayLines(selectedSsid)
     }
@@ -567,25 +569,54 @@ private fun WeMoProvisionDebugPanel(
                     text = "SETUP DEBUG DETAILS (SCREENSHOT)",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 10.5.sp,
-                    color = Color(0xFF8BE836)
+                    fontSize = 10.sp,
+                    color = Color(0xFF8BE836),
+                    modifier = Modifier.weight(1f)
                 )
-                OutlinedButton(
-                    onClick = {
-                        clipboardManager.setText(AnnotatedString(debugSnapshot.toClipboardText(selectedSsid)))
-                        copiedFeedback = true
-                    },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                    border = BorderStroke(1.dp, Color(0xFF475569)),
-                    modifier = Modifier
-                        .height(24.dp)
-                        .testTag("copy_provision_debug_button")
-                ) {
-                    Text(
-                        text = if (copiedFeedback) "Copied" else "Copy",
-                        fontSize = 10.sp,
-                        color = Color(0xFFE2E8F0)
-                    )
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            val reportText = debugSnapshot.toClipboardText(selectedSsid)
+                            clipboardManager.setText(AnnotatedString(reportText))
+                            runCatching {
+                                com.example.network.WeMoTelemetryFileExporter.saveTelemetryReportToFile(context, reportText)
+                            }
+                            copiedFeedback = true
+                        },
+                        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp),
+                        border = BorderStroke(1.dp, Color(0xFF475569)),
+                        modifier = Modifier
+                            .height(24.dp)
+                            .testTag("copy_provision_debug_button")
+                    ) {
+                        Text(
+                            text = if (copiedFeedback) "Copied" else "Copy",
+                            fontSize = 10.sp,
+                            color = Color(0xFFE2E8F0)
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val reportText = debugSnapshot.toClipboardText(selectedSsid)
+                            com.example.network.WeMoTelemetryFileExporter.copyAndShareTelemetryReport(
+                                context = context,
+                                reportText = reportText,
+                                subject = "WeMi Setup AP Diagnostic Report"
+                            )
+                            sharedFeedback = true
+                        },
+                        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp),
+                        border = BorderStroke(1.dp, Color(0xFF475569)),
+                        modifier = Modifier
+                            .height(24.dp)
+                            .testTag("share_provision_debug_button")
+                    ) {
+                        Text(
+                            text = if (sharedFeedback) "Saved" else "Save/Share",
+                            fontSize = 10.sp,
+                            color = Color(0xFFE2E8F0)
+                        )
+                    }
                 }
             }
 

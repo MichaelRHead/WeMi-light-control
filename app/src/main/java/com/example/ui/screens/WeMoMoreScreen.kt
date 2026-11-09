@@ -32,6 +32,10 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -355,8 +359,10 @@ fun WeMoMoreScreen(
             }
         }
 
-        // Live SOAP / UPnP Network Inspector
+        // Live SOAP / UPnP Network Inspector & Telemetry Exporter
         item {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var exportedFeedback by remember { mutableStateOf(false) }
             Card(
                 colors = CardDefaults.cardColors(containerColor = WemoRowSurface),
                 shape = RoundedCornerShape(12.dp),
@@ -372,12 +378,39 @@ fun WeMoMoreScreen(
                             text = "UPnP / SOAP Packet Log (${soapLogs.size})",
                             fontFamily = WorkSansFontFamily,
                             fontWeight = FontWeight.Medium,
-                            fontSize = 17.sp,
-                            color = WemoTextPrimary
+                            fontSize = 16.sp,
+                            color = WemoTextPrimary,
+                            modifier = Modifier.weight(1f)
                         )
-                        if (soapLogs.isNotEmpty()) {
-                            TextButton(onClick = onClearLogs) {
-                                Text("Clear", color = WemoErrorRed)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(
+                                onClick = {
+                                    val reportText = com.example.network.WeMoTelemetryFileExporter.buildFullTelemetryReport(
+                                        setupSnapshot = com.example.network.WeMoSetupDebugSnapshot(
+                                            timestamp = "MoreTabExport",
+                                            isDemoMode = isDemoShowroomMode
+                                        ),
+                                        devices = devices,
+                                        soapLogs = soapLogs
+                                    )
+                                    com.example.network.WeMoTelemetryFileExporter.copyAndShareTelemetryReport(
+                                        context = context,
+                                        reportText = reportText
+                                    )
+                                    exportedFeedback = true
+                                },
+                                modifier = Modifier.testTag("export_telemetry_file_button")
+                            ) {
+                                Text(
+                                    text = if (exportedFeedback) "Saved File" else "Save/Share Log",
+                                    color = WemoGreenDark,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            if (soapLogs.isNotEmpty()) {
+                                TextButton(onClick = onClearLogs) {
+                                    Text("Clear", color = WemoErrorRed, fontSize = 12.sp)
+                                }
                             }
                         }
                     }

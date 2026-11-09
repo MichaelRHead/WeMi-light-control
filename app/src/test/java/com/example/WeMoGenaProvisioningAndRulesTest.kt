@@ -289,6 +289,22 @@ class WeMoGenaProvisioningAndRulesTest {
             assertTrue(displayLines.any { it.contains("[ID] mac=EC1A59CC7788 sn=221517K01018F7 (src=GetMetaInfo)") })
             assertTrue(displayLines.any { it.contains("[TARGET AP] \"HeadFamily-2.4G\" found in ApList: Ch=6") })
 
+            // Verify WeMoTelemetryFileExporter builds and saves wemi-telemetry-latest.txt cleanly
+            val appContext = ApplicationProvider.getApplicationContext<Context>()
+            val fullReport = com.example.network.WeMoTelemetryFileExporter.buildFullTelemetryReport(
+                setupSnapshot = snapshot,
+                selectedSsid = "HeadFamily-2.4G",
+                homes = database.wemoDao().getAllHomeNetworks().first(),
+                devices = database.wemoDao().getAllDevices().first(),
+                soapLogs = repo.soapLogs.value
+            )
+            assertTrue(fullReport.contains("=== WeMi Light Control Device & Network Telemetry Report ==="))
+            assertTrue(fullReport.contains("--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---"))
+            assertTrue(fullReport.contains("--- [4. UPNP / SOAP PACKET LOG"))
+            val savedFile = com.example.network.WeMoTelemetryFileExporter.saveTelemetryReportToFile(appContext, fullReport)
+            assertTrue(savedFile.exists())
+            assertEquals(fullReport, savedFile.readText())
+
             // Failed setup must not insert a phantom device row into Room
             val savedDevices = database.wemoDao().getAllDevices().first()
             assertEquals(0, savedDevices.size)
