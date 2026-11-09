@@ -293,7 +293,10 @@ fun WeMiSwitchApp(
                                 onDeleteDevice = { viewModel.deleteDevice(it) },
                                 onMoveDevice = { dev, moveUp -> viewModel.moveDevice(dev, moveUp) },
                                 onPingDeviceLatency = { viewModel.pingDeviceLatency(it) },
-                                onToggleNightMode = { viewModel.toggleDimmerNightMode(it) }
+                                onToggleNightMode = { viewModel.toggleDimmerNightMode(it) },
+                                onResetHomesAndSwitches = { rescan ->
+                                    viewModel.resetLanHomesSwitchesAndRooms(rescan)
+                                }
                             )
                         }
 
@@ -317,6 +320,9 @@ fun WeMiSwitchApp(
                                 onTurnAllOff = { viewModel.turnAllSwitches(false) },
                                 onScanNetwork = { viewModel.openSsdpScannerAndScan() },
                                 onResetClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
+                                onResetLanHomesAndSwitches = {
+                                    viewModel.resetLanHomesSwitchesAndRooms(rediscoverAfterReset = true)
+                                },
                                 onToggleDemoShowroomMode = { viewModel.toggleDemoShowroomMode(it) },
                                 onOpenProvisionApWizard = { viewModel.openProvisionApDialog() },
                                 onToggleBrandWordmark = { viewModel.toggleBrandWordmark() },

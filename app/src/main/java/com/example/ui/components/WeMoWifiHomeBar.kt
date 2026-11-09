@@ -81,6 +81,7 @@ fun WeMoWifiHomeBar(
     onSelectHomeNetwork: (String) -> Unit,
     onReconnectCurrentHome: () -> Unit,
     onOpenAddHomeDialog: () -> Unit,
+    onResetHomesAndSwitches: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val activeHome = homeNetworks.find { it.networkKey == activeNetworkKey }
@@ -90,23 +91,24 @@ fun WeMoWifiHomeBar(
     }
     val onlineCount = homeDevices.count { it.isReachable }
     val offlineCount = homeDevices.size - onlineCount
+    var showResetConfirmDialog by remember { mutableStateOf(false) }
 
     Surface(
         color = WemoRowSurface,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, WemoGreenPrimary.copy(alpha = 0.35f)),
         shadowElevation = 1.dp,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 4.dp)
+            .padding(horizontal = 10.dp, vertical = 3.dp)
             .testTag("wifi_home_selector_bar")
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp)
+                .padding(horizontal = 10.dp, vertical = 7.dp)
         ) {
-            // Top Row: Active Wi-Fi Home summary + "Reconnect Home" button
+            // Top Row: Compact Active Wi-Fi Home summary + "Reconnect" button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -119,52 +121,33 @@ fun WeMoWifiHomeBar(
                     Surface(
                         shape = CircleShape,
                         color = WemoGreenSoft,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(30.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Wifi,
                                 contentDescription = null,
                                 tint = WemoGreenDark,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Text(
-                                text = activeHome?.homeName ?: "Main Home",
-                                color = WemoTextPrimary,
-                                fontFamily = WorkSansFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Surface(
-                                color = WemoGreenSoft.copy(alpha = 0.8f),
-                                shape = RoundedCornerShape(5.dp)
-                            ) {
-                                Text(
-                                    text = activeHome?.ssidLabel ?: "WeMi-Home-5G",
-                                    color = WemoGreenDark,
-                                    fontFamily = FontFamily.Monospace,
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 10.sp,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
+                        AutoResizingDeviceNameText(
+                            text = activeHome?.homeName ?: "My Home",
+                            color = WemoTextPrimary,
+                            initialFontSizeSp = 15f,
+                            minFontSizeSp = 11.5f,
+                            singleLineOnly = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
                         Text(
                             text = buildString {
-                                append("$onlineCount/${homeDevices.size} Remembered Active")
+                                append("$onlineCount/${homeDevices.size} Active")
                                 if (offlineCount > 0) {
                                     append(" • $offlineCount Offline")
                                 }
@@ -176,12 +159,13 @@ fun WeMoWifiHomeBar(
                             fontFamily = WorkSansFontFamily,
                             fontSize = 11.sp,
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(6.dp))
 
                 // One-Tap Reconnect / Rediscover Remembered Devices on this Wi-Fi Network
                 Button(
@@ -190,33 +174,37 @@ fun WeMoWifiHomeBar(
                         containerColor = if (offlineCount > 0) WemoGreenPrimary else WemoGreenDark,
                         contentColor = Color.White
                     ),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 11.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag("reconnect_home_wifi_button")
+                    shape = RoundedCornerShape(9.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier
+                        .height(32.dp)
+                        .testTag("reconnect_home_wifi_button")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Sync,
                         contentDescription = "Reconnect and rediscover switches on this Wi-Fi home",
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(5.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isReconnectingHome) "Reconnecting..." else "Reconnect",
+                        text = if (isReconnectingHome) "Syncing..." else "Reconnect",
                         fontFamily = WorkSansFontFamily,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp
+                        fontSize = 11.5.sp,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
-            // Bottom Row: Remembered Wi-Fi Network Home Chips + Add Home Chip
+            // Bottom Row: Remembered Wi-Fi Network Home Chips + Add Home + Reset
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 homeNetworks.forEach { network ->
@@ -229,7 +217,7 @@ fun WeMoWifiHomeBar(
                             Icon(
                                 imageVector = iconForHomeNetwork(network.networkKey),
                                 contentDescription = null,
-                                modifier = Modifier.size(15.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                         },
                         label = {
@@ -237,7 +225,9 @@ fun WeMoWifiHomeBar(
                                 text = "${network.homeName} ($rememberedCount)",
                                 fontFamily = WorkSansFontFamily,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
-                                fontSize = 12.sp
+                                fontSize = 11.5.sp,
+                                maxLines = 1,
+                                softWrap = false
                             )
                         },
                         colors = FilterChipDefaults.filterChipColors(
@@ -245,7 +235,9 @@ fun WeMoWifiHomeBar(
                             selectedLabelColor = Color.White,
                             selectedLeadingIconColor = Color.White
                         ),
-                        modifier = Modifier.testTag("home_chip_${network.networkKey}")
+                        modifier = Modifier
+                            .height(28.dp)
+                            .testTag("home_chip_${network.networkKey}")
                     )
                 }
 
@@ -256,20 +248,97 @@ fun WeMoWifiHomeBar(
                         Icon(
                             imageVector = Icons.Default.AddHome,
                             contentDescription = "Add Wi-Fi Home Network",
-                            modifier = Modifier.size(15.dp)
+                            modifier = Modifier.size(14.dp)
                         )
                     },
                     label = {
                         Text(
-                            text = "Add Wi-Fi Home",
+                            text = "Add Home",
                             fontFamily = WorkSansFontFamily,
-                            fontSize = 12.sp
+                            fontSize = 11.5.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     },
-                    modifier = Modifier.testTag("add_wifi_home_button")
+                    modifier = Modifier
+                        .height(28.dp)
+                        .testTag("add_wifi_home_button")
+                )
+
+                FilterChip(
+                    selected = false,
+                    onClick = { showResetConfirmDialog = true },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = "Reset Homes, Switches, and Rooms",
+                            modifier = Modifier.size(14.dp)
+                        )
+                    },
+                    label = {
+                        Text(
+                            text = "Reset",
+                            fontFamily = WorkSansFontFamily,
+                            fontSize = 11.5.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    },
+                    modifier = Modifier
+                        .height(28.dp)
+                        .testTag("reset_lan_data_chip")
                 )
             }
         }
+    }
+
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            title = {
+                Text(
+                    text = "Reset Homes, Switches & Rooms?",
+                    fontFamily = WorkSansFontFamily,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = "This clears all remembered Wi-Fi Homes, discovered switches, and room assignments, then resets your primary LAN profile back to a clean 'My Home'.",
+                    color = WemoTextSecondary,
+                    fontFamily = WorkSansFontFamily,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetConfirmDialog = false
+                        onResetHomesAndSwitches(true)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                    modifier = Modifier.testTag("confirm_reset_and_rescan_button")
+                ) {
+                    Text("Reset & Rescan LAN")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            showResetConfirmDialog = false
+                            onResetHomesAndSwitches(false)
+                        },
+                        modifier = Modifier.testTag("confirm_reset_empty_button")
+                    ) {
+                        Text("Reset Empty", color = WemoGreenDark)
+                    }
+                    TextButton(onClick = { showResetConfirmDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            }
+        )
     }
 }
 

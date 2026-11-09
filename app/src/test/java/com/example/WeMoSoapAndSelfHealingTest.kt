@@ -328,6 +328,14 @@ class WeMoSoapAndSelfHealingTest {
 
             val autoOffResult = repo.turnOffDeviceById(idLamp)
             assertNotNull(autoOffResult)
+
+            // 6. Verify resetLanHomesSwitchesAndRooms clears all discovered switches/rooms and re-seeds clean 'My Home'
+            repo.resetLanHomesSwitchesAndRooms()
+            assertEquals(0, database.wemoDao().getDeviceCount())
+            val resetHomes = database.wemoDao().getAllHomeNetworks().first()
+            assertEquals(1, resetHomes.size)
+            assertEquals("My Home", resetHomes.single().homeName)
+            assertFalse(resetHomes.single().ssidLabel.startsWith("WeMo.", ignoreCase = true))
         } finally {
             serverA.close()
             serverB.close()

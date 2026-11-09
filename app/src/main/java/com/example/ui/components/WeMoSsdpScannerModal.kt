@@ -77,18 +77,18 @@ fun WeMoSsdpDiscoveryBanner(
 ) {
     Surface(
         color = WemoRowSurface,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, WemoGreenPrimary.copy(alpha = 0.35f)),
         shadowElevation = 1.dp,
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .padding(horizontal = 10.dp, vertical = 3.dp)
             .testTag("ssdp_discovery_banner")
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 7.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -97,35 +97,38 @@ fun WeMoSsdpDiscoveryBanner(
                 modifier = Modifier.weight(1f)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
+                    shape = RoundedCornerShape(9.dp),
                     color = WemoGreenSoft,
-                    modifier = Modifier.size(40.dp)
+                    modifier = Modifier.size(32.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         if (isScanning) {
                             CircularProgressIndicator(
-                                strokeWidth = 2.5.dp,
+                                strokeWidth = 2.dp,
                                 color = WemoGreenPrimary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(16.dp)
                             )
                         } else {
                             Icon(
                                 imageVector = Icons.Default.Radar,
                                 contentDescription = null,
                                 tint = WemoGreenDark,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                Column {
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "SSDP Local Network Discovery",
                         color = WemoTextPrimary,
                         fontFamily = WorkSansFontFamily,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp
+                        fontSize = 14.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = if (latestReport != null) {
@@ -135,8 +138,9 @@ fun WeMoSsdpDiscoveryBanner(
                         },
                         color = WemoTextSecondary,
                         fontFamily = WorkSansFontFamily,
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         maxLines = 1,
+                        softWrap = false,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -147,21 +151,25 @@ fun WeMoSsdpDiscoveryBanner(
             Button(
                 onClick = onOpenScannerClick,
                 colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.testTag("open_ssdp_scanner_button")
+                contentPadding = PaddingValues(horizontal = 11.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(9.dp),
+                modifier = Modifier
+                    .height(32.dp)
+                    .testTag("open_ssdp_scanner_button")
             ) {
                 Icon(
                     imageVector = Icons.Default.WifiFind,
                     contentDescription = null,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(15.dp)
                 )
-                Spacer(modifier = Modifier.width(6.dp))
+                Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = "SSDP Scan",
                     fontFamily = WorkSansFontFamily,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
         }

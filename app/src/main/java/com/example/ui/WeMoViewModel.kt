@@ -283,6 +283,47 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateWifiHomeNetwork(
+        networkKey: String,
+        homeName: String,
+        ssidLabel: String,
+        subnetPrefix: String
+    ) {
+        viewModelScope.launch {
+            val updated = repository.saveOrUpdateHomeNetwork(
+                existingKey = networkKey,
+                homeName = homeName,
+                ssidLabel = ssidLabel,
+                subnetPrefix = subnetPrefix
+            )
+            _activeNetworkKey.value = updated.networkKey
+            showTransientStatus(
+                "Updated Home '${updated.homeName}' (${updated.ssidLabel} • ${updated.subnetPrefix}.0/24)"
+            )
+        }
+    }
+
+    /**
+     * Resets all remembered Wi-Fi Homes, discovered switches, and room groupings in Real LAN Mode,
+     * re-seeding a clean 'My Home' on the current local subnet.
+     */
+    fun resetLanHomesSwitchesAndRooms(rediscoverAfterReset: Boolean = true) {
+        _selectedRoomFilter.value = null
+        _collapsedRooms.value = emptySet()
+        _expandedDeviceIds.value = emptySet()
+        _isEditMode.value = false
+        viewModelScope.launch {
+            val freshKey = repository.resetLanHomesSwitchesAndRooms()
+            _activeNetworkKey.value = freshKey
+            if (rediscoverAfterReset) {
+                showTransientStatus("Reset Wi-Fi Homes, switches & rooms • Scanning local LAN...")
+                refreshDevicesFromNetwork()
+            } else {
+                showTransientStatus("Reset all Wi-Fi Homes, discovered switches, and rooms")
+            }
+        }
+    }
+
     fun detectCurrentLanIp(): String {
         return repository.detectCurrentLanIp()
     }

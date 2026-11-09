@@ -65,6 +65,7 @@ fun WeMoMoreScreen(
     onTurnAllOff: () -> Unit,
     onScanNetwork: () -> Unit,
     onResetClassicDevices: () -> Unit,
+    onResetLanHomesAndSwitches: () -> Unit = {},
     onToggleDemoShowroomMode: (Boolean) -> Unit = {},
     onOpenProvisionApWizard: () -> Unit = {},
     onToggleBrandWordmark: () -> Unit,
@@ -256,6 +257,24 @@ fun WeMoMoreScreen(
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Reset Preset", color = WemoTextPrimary)
                         }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = onResetLanHomesAndSwitches,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("more_reset_lan_homes_switches_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Restore,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = WemoErrorRed
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Reset Homes, Discovered Switches & Rooms", color = WemoErrorRed)
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))

@@ -100,6 +100,7 @@ fun WeMoDevicesTabScreen(
     onMoveDevice: (WeMoDeviceEntity, Boolean) -> Unit,
     onPingDeviceLatency: (WeMoDeviceEntity) -> Unit,
     onToggleNightMode: (WeMoDeviceEntity) -> Unit,
+    onResetHomesAndSwitches: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
@@ -166,7 +167,8 @@ fun WeMoDevicesTabScreen(
                     isReconnectingHome = isReconnectingHome,
                     onSelectHomeNetwork = onSelectHomeNetwork,
                     onReconnectCurrentHome = onReconnectCurrentHome,
-                    onOpenAddHomeDialog = onOpenAddHomeDialog
+                    onOpenAddHomeDialog = onOpenAddHomeDialog,
+                    onResetHomesAndSwitches = onResetHomesAndSwitches
                 )
             }
 

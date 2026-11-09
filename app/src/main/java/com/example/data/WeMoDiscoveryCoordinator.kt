@@ -156,7 +156,9 @@ internal class WeMoDiscoveryCoordinator(
                         brightness = probe.brightness ?: activeDevice.brightness,
                         firmwareVersion = meta?.firmwareVersion?.takeIf { it.isNotBlank() } ?: activeDevice.firmwareVersion,
                         macAddress = meta?.macAddress?.takeIf { it.isNotBlank() } ?: activeDevice.macAddress,
-                        wifiSsid = meta?.accessPointSsid?.takeIf { it.isNotBlank() } ?: activeDevice.wifiSsid,
+                        wifiSsid = meta?.accessPointSsid?.takeIf { it.isNotBlank() && !isWemoDeviceSetupSsid(it) }
+                            ?: activeDevice.wifiSsid.takeUnless { isWemoDeviceSetupSsid(it) }
+                            ?: "Local LAN",
                         signalStrengthPercent = rssi ?: activeDevice.signalStrengthPercent
                     )
                 }
@@ -381,9 +383,11 @@ internal class WeMoDiscoveryCoordinator(
                 (it.ipAddress == discovered.ipAddress || it.name.equals(discovered.name, ignoreCase = true))
         }
 
-        val resolvedSsid = discovered.wifiSsid.ifBlank { activeWifiSsid }
-        if (discovered.wifiSsid.isNotBlank()) {
-            syncHomeSsidFromDeviceSsid(activeNetworkKey, discovered.wifiSsid)
+        val rawDeviceSsid = discovered.wifiSsid.trim()
+        val validRouterSsid = rawDeviceSsid.takeIf { it.isNotEmpty() && !isWemoDeviceSetupSsid(it) }
+        val resolvedSsid = validRouterSsid ?: activeWifiSsid.takeIf { !isWemoDeviceSetupSsid(it) } ?: "Local LAN"
+        if (validRouterSsid != null) {
+            syncHomeSsidFromDeviceSsid(activeNetworkKey, validRouterSsid)
         }
         val checkedAt = nowFormatted()
         return if (existing == null) {
@@ -459,7 +463,7 @@ internal class WeMoDiscoveryCoordinator(
     }
 
     /**
-     * Zero-Permission Subnet + WeMo GetMetaInfo SSID matching:
+     * Zero-Permission Subnet matching:
      * finds or creates a [WeMoHomeNetworkEntity] for [subnetPrefix] when on a real LAN.
      */
     suspend fun resolveOrCreateHomeForSubnet(
@@ -473,10 +477,11 @@ internal class WeMoDiscoveryCoordinator(
         if (matched != null) return matched
 
         val key = "wifi_lan_${cleanPrefix.replace('.', '_')}"
+        val defaultName = if (existingHomes.isEmpty()) "My Home" else "Home ($cleanPrefix.x)"
         val newHome = WeMoHomeNetworkEntity(
             networkKey = key,
-            homeName = "Home Wi-Fi ($cleanPrefix.x)",
-            ssidLabel = "Local LAN ($cleanPrefix.0/24)",
+            homeName = defaultName,
+            ssidLabel = "LAN $cleanPrefix.0/24",
             subnetPrefix = cleanPrefix,
             gatewayIp = gatewayIp,
             lastConnectedTime = "Connected now",
@@ -488,25 +493,46 @@ internal class WeMoDiscoveryCoordinator(
     }
 
     /**
-     * Updates the active Wi-Fi Home's ssidLabel from a Belkin WeMo switch's
-     * `metainfo1#GetMetaInfo` (`AccessPointSSID`) response so the real 2.4 GHz SSID is shown
-     * without requiring Android Location permission.
+     * Updates the active Wi-Fi Home's ssidLabel only when a real router SSID is reported
+     * (never a Belkin WeMo soft-AP SSID like `WeMo.Switch.xxx` / `WeMo.Light.xxx`), and never
+     * overwrites the Home Name with a WeMo device SSID.
      */
     private suspend fun syncHomeSsidFromDeviceSsid(networkKey: String, reportedSsid: String) {
         val cleanSsid = reportedSsid.trim()
-        if (cleanSsid.isEmpty()) return
+        if (cleanSsid.isEmpty() || isWemoDeviceSetupSsid(cleanSsid)) return
         val homes = dao.getAllHomeNetworks().first()
         val home = homes.find { it.networkKey == networkKey } ?: return
         val isGenericSsid = home.ssidLabel.startsWith("Local LAN", ignoreCase = true) ||
+            home.ssidLabel.startsWith("LAN ", ignoreCase = true) ||
             home.ssidLabel.startsWith("Local Wi-Fi", ignoreCase = true)
         if (isGenericSsid && home.ssidLabel != cleanSsid) {
-            val updatedName = if (home.homeName.startsWith("Home Wi-Fi (")) "$cleanSsid Home" else home.homeName
             dao.updateHomeNetwork(
                 home.copy(
-                    homeName = updatedName,
                     ssidLabel = cleanSsid
                 )
             )
+        }
+    }
+
+    companion object {
+        /**
+         * Returns true if [ssid] is a Belkin WeMo hardware soft-AP or device identifier
+         * (e.g. `WeMo.Switch.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`, `WeMo.Dimmer.xxx`),
+         * which `metainfo1#GetMetaInfo` often returns in field 4 instead of the router SSID.
+         */
+        fun isWemoDeviceSetupSsid(ssid: String): Boolean {
+            val s = ssid.trim().lowercase()
+            if (s.isEmpty()) return false
+            return s.startsWith("wemo.") ||
+                s.startsWith("wemo_") ||
+                s.startsWith("wemo-") ||
+                s.contains("wemo.switch") ||
+                s.contains("wemo.light") ||
+                s.contains("wemo.mini") ||
+                s.contains("wemo.dimmer") ||
+                s.contains("wemo.insight") ||
+                s.contains("wemo.motion") ||
+                s.startsWith("belkin.")
         }
     }
 }

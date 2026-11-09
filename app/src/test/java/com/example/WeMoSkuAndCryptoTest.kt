@@ -209,5 +209,30 @@ class WeMoSkuAndCryptoTest {
         assertEquals(WeMoDeviceCategory.MOTION_SENSOR, classifyDeviceCategory("Driveway Sensor"))
         assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Espresso Machine Plug"))
         assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Office Wall Switch"))
+
+        // 4. Verify parseMetaInfoSoapResponse ignores Belkin WeMo soft-AP SSIDs (e.g., WeMo.Switch.xxx) in field 4
+        val softApMetaXml = """
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+              <s:Body>
+                <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
+                  <MetaInfo>EC1A59AA1122|221517K01018AB|LightSwitch|WeMo_WW_2.00.11532.PVT|WeMo.Switch.998|LightSwitch</MetaInfo>
+                </u:GetMetaInfoResponse>
+              </s:Body>
+            </s:Envelope>
+        """.trimIndent()
+        val parsedSoftApMeta = com.example.network.WeMoXmlAndSkuParser.parseMetaInfoSoapResponse(softApMetaXml)
+        assertEquals("", parsedSoftApMeta?.accessPointSsid)
+
+        val routerSsidMetaXml = """
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+              <s:Body>
+                <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
+                  <MetaInfo>EC1A59AA1122|221517K01018AB|LightSwitch|WeMo_WW_2.00.11532.PVT|HeadFamily-2.4G|LightSwitch</MetaInfo>
+                </u:GetMetaInfoResponse>
+              </s:Body>
+            </s:Envelope>
+        """.trimIndent()
+        val parsedRouterMeta = com.example.network.WeMoXmlAndSkuParser.parseMetaInfoSoapResponse(routerSsidMetaXml)
+        assertEquals("HeadFamily-2.4G", parsedRouterMeta?.accessPointSsid)
     }
 }
