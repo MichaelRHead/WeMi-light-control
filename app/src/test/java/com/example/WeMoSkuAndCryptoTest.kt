@@ -210,29 +210,58 @@ class WeMoSkuAndCryptoTest {
         assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Espresso Machine Plug"))
         assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Office Wall Switch"))
 
-        // 4. Verify parseMetaInfoSoapResponse ignores Belkin WeMo soft-AP SSIDs (e.g., WeMo.Switch.xxx) in field 4
-        val softApMetaXml = """
-            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-              <s:Body>
-                <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
-                  <MetaInfo>EC1A59AA1122|221517K01018AB|LightSwitch|WeMo_WW_2.00.11532.PVT|WeMo.Switch.998|LightSwitch</MetaInfo>
-                </u:GetMetaInfoResponse>
-              </s:Body>
-            </s:Envelope>
-        """.trimIndent()
-        val parsedSoftApMeta = com.example.network.WeMoXmlAndSkuParser.parseMetaInfoSoapResponse(softApMetaXml)
-        assertEquals("", parsedSoftApMeta?.accessPointSsid)
+        // 4. Verify isWemoDeviceSetupSsid and parseMetaInfoSoapResponse filter all Belkin WeMo soft-AP SSIDs while keeping real router SSIDs
+        val softApSsids = listOf(
+            "WeMo.Switch.998",
+            "WeMo.Light.204",
+            "WeMo.Mini.711",
+            "WeMo.Dimmer.503",
+            "WeMo.Insight.119",
+            "WeMo.Motion.882",
+            "wemo_ap_123",
+            "wemo-setup-01",
+            "Belkin.Setup.44"
+        )
+        softApSsids.forEach { softSsid ->
+            assertTrue(
+                "Expected $softSsid to be recognized as a WeMo soft-AP SSID",
+                com.example.data.WeMoDiscoveryCoordinator.isWemoDeviceSetupSsid(softSsid)
+            )
+            val metaXml = """
+                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                  <s:Body>
+                    <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
+                      <MetaInfo>EC1A59AA1122|221517K01018AB|LightSwitch|WeMo_WW_2.00.11532.PVT|$softSsid|LightSwitch</MetaInfo>
+                    </u:GetMetaInfoResponse>
+                  </s:Body>
+                </s:Envelope>
+            """.trimIndent()
+            val parsedMeta = com.example.network.WeMoXmlAndSkuParser.parseMetaInfoSoapResponse(metaXml)
+            assertEquals("", parsedMeta?.accessPointSsid)
+        }
 
-        val routerSsidMetaXml = """
-            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
-              <s:Body>
-                <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
-                  <MetaInfo>EC1A59AA1122|221517K01018AB|LightSwitch|WeMo_WW_2.00.11532.PVT|HeadFamily-2.4G|LightSwitch</MetaInfo>
-                </u:GetMetaInfoResponse>
-              </s:Body>
-            </s:Envelope>
-        """.trimIndent()
-        val parsedRouterMeta = com.example.network.WeMoXmlAndSkuParser.parseMetaInfoSoapResponse(routerSsidMetaXml)
-        assertEquals("HeadFamily-2.4G", parsedRouterMeta?.accessPointSsid)
+        val validRouterSsids = listOf(
+            "HeadFamily-2.4G",
+            "WeMi-Home-5G",
+            "PineLake-Cabin-WiFi",
+            "Studio-IoT-VLAN"
+        )
+        validRouterSsids.forEach { routerSsid ->
+            org.junit.Assert.assertFalse(
+                "Expected $routerSsid to be accepted as a valid home router SSID",
+                com.example.data.WeMoDiscoveryCoordinator.isWemoDeviceSetupSsid(routerSsid)
+            )
+            val routerSsidMetaXml = """
+                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+                  <s:Body>
+                    <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
+                      <MetaInfo>EC1A59AA1122|221517K01018AB|LightSwitch|WeMo_WW_2.00.11532.PVT|$routerSsid|LightSwitch</MetaInfo>
+                    </u:GetMetaInfoResponse>
+                  </s:Body>
+                </s:Envelope>
+            """.trimIndent()
+            val parsedRouterMeta = com.example.network.WeMoXmlAndSkuParser.parseMetaInfoSoapResponse(routerSsidMetaXml)
+            assertEquals(routerSsid, parsedRouterMeta?.accessPointSsid)
+        }
     }
 }

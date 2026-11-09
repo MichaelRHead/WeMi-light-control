@@ -341,4 +341,127 @@ class WeMoSoapAndSelfHealingTest {
             serverB.close()
         }
     }
+
+    @Test
+    fun `verify ensureSeeded sanitizes polluted WeMo soft-AP home names and SSIDs and adoptDiscoveredDevice preserves My Home`() = runBlocking {
+        val repo = WeMoRepository(
+            dao = database.wemoDao(),
+            networkClient = WeMoNetworkClient(),
+            initialDemoModeOverride = false
+        )
+
+        // 1. Seed Room with a polluted Home Network row ("WeMo.Switch.998 Home" / "WeMo.Switch.998") and polluted device wifiSsid
+        database.wemoDao().insertHomeNetwork(
+            com.example.data.WeMoHomeNetworkEntity(
+                networkKey = "wifi_lan_192_168_1",
+                homeName = "WeMo.Switch.998 Home",
+                ssidLabel = "WeMo.Switch.998",
+                subnetPrefix = "192.168.1",
+                gatewayIp = "192.168.1.1",
+                lastConnectedTime = "Connected now",
+                autoReconnectOnArrival = true,
+                sortOrder = 0
+            )
+        )
+        database.wemoDao().insertHomeNetwork(
+            com.example.data.WeMoHomeNetworkEntity(
+                networkKey = "wifi_lan_192_168_50",
+                homeName = "Home Wi-Fi (192.168.50.x)",
+                ssidLabel = "WeMo.Light.332",
+                subnetPrefix = "192.168.50",
+                gatewayIp = "192.168.50.1",
+                lastConnectedTime = "Yesterday",
+                autoReconnectOnArrival = true,
+                sortOrder = 1
+            )
+        )
+        val pollutedDeviceId = database.wemoDao().insertDevice(
+            WeMoDeviceEntity(
+                name = "Porch Switch",
+                roomName = "Porch & Entryway",
+                networkKey = "wifi_lan_192_168_1",
+                wifiSsid = "WeMo.Mini.551",
+                ipAddress = "192.168.1.140",
+                port = 49153,
+                isOn = false,
+                isReachable = true,
+                serialNumber = "PORCH551"
+            )
+        ).toInt()
+
+        // 2. Calling ensureSeeded() in Real LAN Mode must automatically sanitize both homes and the device's wifiSsid
+        repo.ensureSeeded()
+        val sanitizedHomes = database.wemoDao().getAllHomeNetworks().first()
+        val primaryHome = sanitizedHomes.first { it.networkKey == "wifi_lan_192_168_1" }
+        val secondaryHome = sanitizedHomes.first { it.networkKey == "wifi_lan_192_168_50" }
+        assertEquals("My Home", primaryHome.homeName)
+        assertEquals("LAN 192.168.1.0/24", primaryHome.ssidLabel)
+        assertEquals("Home (192.168.50.x)", secondaryHome.homeName)
+        assertEquals("LAN 192.168.50.0/24", secondaryHome.ssidLabel)
+
+        val sanitizedDevice = database.wemoDao().getDeviceById(pollutedDeviceId)!!
+        assertEquals("LAN 192.168.1.0/24", sanitizedDevice.wifiSsid)
+
+        // 3. Adopting a device that reports a soft-AP SSID ("WeMo.Switch.777") must NOT pollute the device or home SSID
+        val adoptedSoftAp = repo.adoptDiscoveredDevice(
+            discovered = com.example.data.SsdpDiscoveredDevice(
+                usn = "uuid:Lightswitch-1_0-SOFT777",
+                name = "Garage Overhead Light",
+                roomName = "Garage",
+                ipAddress = "192.168.1.141",
+                port = 49153,
+                locationUrl = "http://192.168.1.141:49153/setup.xml",
+                deviceType = WeMoDeviceType.SWITCH_PLUG,
+                modelName = "LightSwitch",
+                hardwareSku = "F7C030",
+                serialNumber = "SOFT777",
+                firmwareVersion = "WeMo_WW_2.00.11532.PVT",
+                macAddress = "EC1A59000777",
+                wifiSsid = "WeMo.Switch.777",
+                signalStrengthPercent = 88,
+                isOn = true,
+                brightness = 100,
+                responseTimeMs = 14L,
+                searchTarget = "urn:Belkin:service:basicevent:1",
+                isLiveUdpResponse = true
+            ),
+            activeNetworkKey = "wifi_lan_192_168_1",
+            activeWifiSsid = "LAN 192.168.1.0/24"
+        )
+        assertEquals("LAN 192.168.1.0/24", adoptedSoftAp.wifiSsid)
+        val homeAfterSoftAp = database.wemoDao().getAllHomeNetworks().first().first { it.networkKey == "wifi_lan_192_168_1" }
+        assertEquals("My Home", homeAfterSoftAp.homeName)
+        assertEquals("LAN 192.168.1.0/24", homeAfterSoftAp.ssidLabel)
+
+        // 4. Adopting a device that reports a real router SSID ("HeadFamily-2.4G") updates generic ssidLabel while keeping homeName = "My Home"
+        val adoptedRealRouter = repo.adoptDiscoveredDevice(
+            discovered = com.example.data.SsdpDiscoveredDevice(
+                usn = "uuid:Lightswitch-1_0-REAL888",
+                name = "Kitchen Under-Cabinet Light",
+                roomName = "Kitchen",
+                ipAddress = "192.168.1.142",
+                port = 49153,
+                locationUrl = "http://192.168.1.142:49153/setup.xml",
+                deviceType = WeMoDeviceType.SWITCH_PLUG,
+                modelName = "LightSwitch",
+                hardwareSku = "F7C030",
+                serialNumber = "REAL888",
+                firmwareVersion = "WeMo_WW_2.00.11532.PVT",
+                macAddress = "EC1A59000888",
+                wifiSsid = "HeadFamily-2.4G",
+                signalStrengthPercent = 91,
+                isOn = false,
+                brightness = 100,
+                responseTimeMs = 11L,
+                searchTarget = "urn:Belkin:service:basicevent:1",
+                isLiveUdpResponse = true
+            ),
+            activeNetworkKey = "wifi_lan_192_168_1",
+            activeWifiSsid = "LAN 192.168.1.0/24"
+        )
+        assertEquals("HeadFamily-2.4G", adoptedRealRouter.wifiSsid)
+        val homeAfterRealRouter = database.wemoDao().getAllHomeNetworks().first().first { it.networkKey == "wifi_lan_192_168_1" }
+        assertEquals("My Home", homeAfterRealRouter.homeName)
+        assertEquals("HeadFamily-2.4G", homeAfterRealRouter.ssidLabel)
+    }
 }

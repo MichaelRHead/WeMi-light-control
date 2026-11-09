@@ -163,6 +163,27 @@ object WeMoXmlAndSkuParser {
     }
 
     /**
+     * Returns true if [ssid] is a Belkin WeMo hardware soft-AP or device identifier
+     * (e.g. `WeMo.Switch.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`, `WeMo.Dimmer.xxx`,
+     * `WeMo.Insight.xxx`, `WeMo.Motion.xxx`), which `metainfo1#GetMetaInfo` often returns
+     * in field 4 instead of the home router SSID.
+     */
+    fun isWemoDeviceSetupSsid(ssid: String): Boolean {
+        val s = ssid.trim().lowercase(Locale.US)
+        if (s.isEmpty()) return false
+        return s.startsWith("wemo.") ||
+            s.startsWith("wemo_") ||
+            s.startsWith("wemo-") ||
+            s.contains("wemo.switch") ||
+            s.contains("wemo.light") ||
+            s.contains("wemo.mini") ||
+            s.contains("wemo.dimmer") ||
+            s.contains("wemo.insight") ||
+            s.contains("wemo.motion") ||
+            s.startsWith("belkin.")
+    }
+
+    /**
      * Parses pipe-delimited `metainfo1#GetMetaInfo` SOAP response XML:
      * `MAC|SerialNumber|DeviceSKU|FirmwareVersion|AccessPointSSID|ModelName`.
      * Note: On many Belkin WeMo firmwares, field 4 (`AccessPointSSID`) is the switch's own
@@ -175,18 +196,7 @@ object WeMoXmlAndSkuParser {
         val parts = rawMeta.split("|")
         if (parts.size < 2) return null
         val rawSsid = parts.getOrNull(4)?.trim().orEmpty()
-        val routerSsid = rawSsid.takeUnless {
-            val lower = it.lowercase(Locale.US)
-            lower.startsWith("wemo.") ||
-                lower.startsWith("wemo_") ||
-                lower.startsWith("wemo-") ||
-                lower.contains("wemo.switch") ||
-                lower.contains("wemo.light") ||
-                lower.contains("wemo.mini") ||
-                lower.contains("wemo.dimmer") ||
-                lower.contains("wemo.insight") ||
-                lower.startsWith("belkin.")
-        }.orEmpty()
+        val routerSsid = rawSsid.takeUnless { isWemoDeviceSetupSsid(it) }.orEmpty()
         return WeMoMetaInfo(
             macAddress = parts.getOrNull(0)?.trim().orEmpty(),
             serialNumber = parts.getOrNull(1)?.trim().orEmpty(),

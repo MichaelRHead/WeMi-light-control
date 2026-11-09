@@ -246,4 +246,89 @@ class WeMoEndToEndUiTest {
         composeTestRule.onNodeWithTag("toggle_rule_1").performClick()
         composeTestRule.waitForIdle()
     }
+
+    @Test
+    fun `verify E2E Reset Homes Switches and Rooms dialog, More tab reset button, Disconnected ring button, and long switch name auto-resizing`() {
+        composeTestRule.waitForIdle()
+
+        // 1. Verify Disconnected ring button ("Reconnect Hall Lightbulb") on unreachable device 5
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("device_row_5"))
+        composeTestRule.onNodeWithTag("reconnect_button_5").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("Reconnect Hall Lightbulb").assertIsDisplayed()
+
+        // 2. Enter Edit Mode, rename device 1 to a 58-character name, and verify AutoResizingDeviceNameText layout
+        val longName = "Upstairs Master Bedroom Recessed Ceiling Chandelier Switch"
+        composeTestRule.onNodeWithTag("edit_devices_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("device_row_1"))
+        composeTestRule.onNodeWithTag("edit_device_1").performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("device_name_input")
+            .performScrollTo()
+            .performTextReplacement(longName)
+        composeTestRule.onNodeWithTag("save_device_button").performClick()
+        composeTestRule.waitForIdle()
+
+        // Exit Edit Mode and verify the long name is visible on its own line above the status and category badges
+        composeTestRule.onNodeWithTag("edit_devices_button").performClick()
+        awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("devices_list")
+                    .performScrollToNode(hasText(longName))
+                true
+            }.getOrDefault(false)
+        }
+        composeTestRule.onNodeWithText(longName).assertIsDisplayed()
+        val longNameBounds = composeTestRule.onNodeWithTag("device_name_1", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val connBounds = composeTestRule.onNodeWithTag("connection_status_badge_1", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected long auto-resized name above connection badge (longNameBounds=$longNameBounds, connBounds=$connBounds)",
+            longNameBounds.bottom <= connBounds.top + 4f
+        )
+
+        // 3. Scroll back to top Wi-Fi Home Bar, click Reset chip, and verify confirmation dialog
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("wifi_home_selector_bar"))
+        composeTestRule.onNodeWithTag("reset_lan_data_chip")
+            .performScrollTo()
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithText("Reset Homes, Switches & Rooms?").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("confirm_reset_and_rescan_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("confirm_reset_empty_button").assertIsDisplayed()
+
+        // 4. Confirm 'Reset Empty' and verify switches & extra homes are cleared into a clean 'My Home (0)' with EmptyDevicesState
+        composeTestRule.onNodeWithTag("confirm_reset_empty_button").performClick()
+        awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("devices_list")
+                    .performScrollToNode(hasTestTag("empty_devices_state_card"))
+                true
+            }.getOrDefault(false)
+        }
+        composeTestRule.onNodeWithTag("empty_devices_state_card").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("wifi_home_selector_bar"))
+        composeTestRule.onNodeWithText("My Home (0)")
+            .performScrollTo()
+            .assertIsDisplayed()
+
+        // 5. Navigate to More tab, verify 'Reset Homes, Discovered Switches & Rooms' button is present, and restore preset
+        composeTestRule.onNodeWithTag("nav_tab_more").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("more_reset_lan_homes_switches_button")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("restore_screenshot_preset_button")
+            .performScrollTo()
+            .performClick()
+        composeTestRule.waitForIdle()
+    }
 }

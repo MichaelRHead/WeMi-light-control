@@ -267,6 +267,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addWifiHomeNetwork(homeName: String, ssidLabel: String, subnetPrefix: String) {
+        _showAddHomeDialog.value = false
         viewModelScope.launch {
             val created = repository.saveOrUpdateHomeNetwork(
                 existingKey = null,
@@ -276,7 +277,6 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             )
             _activeNetworkKey.value = created.networkKey
             _selectedRoomFilter.value = null
-            _showAddHomeDialog.value = false
             showTransientStatus(
                 "Remembered Wi-Fi Home '${created.homeName}' (${created.ssidLabel} • ${created.subnetPrefix}.0/24)"
             )
@@ -656,9 +656,9 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun deleteDevice(device: WeMoDeviceEntity) {
+        _editingDevice.value = null
         viewModelScope.launch {
             repository.deleteDevice(device.id)
-            _editingDevice.value = null
             showTransientStatus("Removed ${device.name}")
         }
     }
@@ -717,6 +717,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         targetStateOn: Boolean,
         targetBrightness: Int
     ) {
+        _showAddRuleDialog.value = false
         viewModelScope.launch {
             val actionSummary = buildString {
                 append(if (targetStateOn) "Turn ON " else "Turn OFF ")
@@ -738,7 +739,6 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
                     isEnabled = true
                 )
             )
-            _showAddRuleDialog.value = false
             showTransientStatus("Created rule: $name")
         }
     }

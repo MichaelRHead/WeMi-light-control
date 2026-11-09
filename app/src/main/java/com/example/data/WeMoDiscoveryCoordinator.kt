@@ -520,19 +520,7 @@ internal class WeMoDiscoveryCoordinator(
          * (e.g. `WeMo.Switch.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`, `WeMo.Dimmer.xxx`),
          * which `metainfo1#GetMetaInfo` often returns in field 4 instead of the router SSID.
          */
-        fun isWemoDeviceSetupSsid(ssid: String): Boolean {
-            val s = ssid.trim().lowercase()
-            if (s.isEmpty()) return false
-            return s.startsWith("wemo.") ||
-                s.startsWith("wemo_") ||
-                s.startsWith("wemo-") ||
-                s.contains("wemo.switch") ||
-                s.contains("wemo.light") ||
-                s.contains("wemo.mini") ||
-                s.contains("wemo.dimmer") ||
-                s.contains("wemo.insight") ||
-                s.contains("wemo.motion") ||
-                s.startsWith("belkin.")
-        }
+        fun isWemoDeviceSetupSsid(ssid: String): Boolean =
+            com.example.network.WeMoXmlAndSkuParser.isWemoDeviceSetupSsid(ssid)
     }
 }
