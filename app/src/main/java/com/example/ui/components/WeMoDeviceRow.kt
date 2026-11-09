@@ -346,35 +346,11 @@ fun WeMoDeviceRow(
                 } else {
                     when {
                         !device.isReachable -> {
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = StatusOfflineSoftBg,
-                                border = BorderStroke(1.dp, StatusOfflineRed.copy(alpha = 0.35f)),
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .clickable(onClick = onReconnect)
-                                    .testTag("reconnect_button_${device.id}")
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Refresh,
-                                        contentDescription = "Reconnect ${device.name}",
-                                        tint = StatusOfflineRed,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Retry",
-                                        color = StatusOfflineRed,
-                                        fontFamily = WorkSansFontFamily,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                            }
+                            WeMoDisconnectedRingButton(
+                                deviceName = device.name,
+                                onClick = onReconnect,
+                                modifier = Modifier.testTag("reconnect_button_${device.id}")
+                            )
                         }
                         type == WeMoDeviceType.MOTION_SENSOR -> {
                             Spacer(modifier = Modifier.width(64.dp))

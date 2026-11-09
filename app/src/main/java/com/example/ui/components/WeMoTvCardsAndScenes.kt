@@ -211,21 +211,21 @@ internal fun WeMoTvDeviceCard(
                     )
                 }
 
-                // Distinct Power / Connection Status Ring (ON vs OFF-Standby vs Disconnected)
+                // Distinct Power / Connection Status Ring (ON vs OFF dark-gray vs Disconnected)
                 Surface(
                     shape = CircleShape,
                     color = when {
                         !device.isReachable -> Color(0xFF450A0A)
                         type == WeMoDeviceType.MOTION_SENSOR -> WemoGreenPrimary.copy(alpha = 0.25f)
                         device.isOn -> WemoGreenTop
-                        else -> Color(0xFF1E293B)
+                        else -> PowerOffDarkGray
                     },
                     border = BorderStroke(
                         width = 2.dp,
                         color = when {
                             !device.isReachable -> Color(0xFFEF4444)
                             device.isOn -> Color.White
-                            else -> Color(0xFFF59E0B)
+                            else -> Color(0xFF475569)
                         }
                     ),
                     modifier = Modifier.size(42.dp)
@@ -234,18 +234,14 @@ internal fun WeMoTvDeviceCard(
                         Icon(
                             imageVector = when {
                                 !device.isReachable -> Icons.Default.WifiOff
-                                !device.isOn && type != WeMoDeviceType.MOTION_SENSOR -> Icons.Default.PowerOff
-                                device.visualCategory == WeMoDeviceCategory.CHRISTMAS_TREE -> Icons.Default.Park
-                                device.visualCategory == WeMoDeviceCategory.FAN -> Icons.Default.Air
-                                device.visualCategory == WeMoDeviceCategory.LIGHT -> Icons.Default.Lightbulb
-                                device.visualCategory == WeMoDeviceCategory.MOTION_SENSOR -> Icons.Default.Sensors
+                                type == WeMoDeviceType.MOTION_SENSOR -> Icons.Default.Sensors
                                 else -> Icons.Default.PowerSettingsNew
                             },
                             contentDescription = "Toggle ${device.name}",
                             tint = when {
                                 !device.isReachable -> Color(0xFFFCA5A5)
                                 device.isOn -> TvDeepBackground
-                                else -> Color(0xFFFBBF24)
+                                else -> Color(0xFF94A3B8)
                             },
                             modifier = Modifier.size(22.dp)
                         )

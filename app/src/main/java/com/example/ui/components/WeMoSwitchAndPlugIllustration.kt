@@ -120,23 +120,13 @@ fun WeMoSmartPlugIllustration(
             }
 
             isReachable && !isOn -> {
-                // Warm amber standby pilot LED glow (shows switch has power & Wi-Fi, load is OFF)
+                // Dark gray OFF indicator bar
                 drawLine(
-                    color = Color(0xFFCBD5E1),
+                    color = PowerOffDarkGray,
                     start = Offset(w * 0.33f, h * 0.24f),
                     end = Offset(w * 0.67f, h * 0.24f),
-                    strokeWidth = w * 0.04f,
+                    strokeWidth = w * 0.045f,
                     cap = StrokeCap.Round
-                )
-                drawCircle(
-                    color = StandbyAmberGlow,
-                    radius = w * 0.09f,
-                    center = Offset(w * 0.50f, h * 0.24f)
-                )
-                drawCircle(
-                    color = StandbyAmber,
-                    radius = w * 0.042f,
-                    center = Offset(w * 0.50f, h * 0.24f)
                 )
             }
 
@@ -152,9 +142,9 @@ fun WeMoSmartPlugIllustration(
         }
 
         // Center touch emblem on the switch face:
-        // - ON: Cyan ring + vertical "I" bar
-        // - OFF (Accessible): Crisp Slate-Navy IEC "O" closed circle (binary 0 = OFF)
-        // - Disconnected: Muted gray broken ring with diagonal slash
+        // - ON: Cyan IEC power symbol
+        // - OFF: Very dark gray IEC power symbol
+        // - Disconnected: Broken ring with diagonal disconnect slash
         val touchCenter = Offset(w * 0.50f, h * 0.46f)
         when {
             isReachable && isOn -> {
@@ -163,49 +153,35 @@ fun WeMoSmartPlugIllustration(
                     radius = w * 0.16f,
                     center = touchCenter
                 )
-                drawCircle(
+                drawIecPowerSymbol(
                     color = Color(0xFF06B6D4),
-                    radius = w * 0.12f,
                     center = touchCenter,
-                    style = Stroke(width = w * 0.032f)
-                )
-                drawLine(
-                    color = Color(0xFF06B6D4),
-                    start = Offset(touchCenter.x, touchCenter.y - w * 0.06f),
-                    end = Offset(touchCenter.x, touchCenter.y + w * 0.02f),
-                    strokeWidth = w * 0.032f,
-                    cap = StrokeCap.Round
+                    radius = w * 0.115f,
+                    strokeWidth = w * 0.032f
                 )
             }
 
             isReachable && !isOn -> {
-                // Standby OFF: Soft amber-slate tint + complete IEC "O" circle (no vertical "I" stem)
                 drawCircle(
-                    color = Color(0x18334155),
+                    color = Color(0x181F232B),
                     radius = w * 0.16f,
                     center = touchCenter
                 )
-                drawCircle(
-                    color = StandbySlateMid,
-                    radius = w * 0.115f,
+                drawIecPowerSymbol(
+                    color = PowerOffIconDarkGray,
                     center = touchCenter,
-                    style = Stroke(width = w * 0.036f)
+                    radius = w * 0.115f,
+                    strokeWidth = w * 0.032f
                 )
             }
 
             else -> {
-                drawCircle(
+                drawDisconnectedSymbol(
                     color = Color(0xFF94A3B8),
-                    radius = w * 0.115f,
+                    slashColor = DisconnectedRed,
                     center = touchCenter,
-                    style = Stroke(width = w * 0.028f)
-                )
-                drawLine(
-                    color = DisconnectedRed,
-                    start = Offset(touchCenter.x - w * 0.09f, touchCenter.y - w * 0.09f),
-                    end = Offset(touchCenter.x + w * 0.09f, touchCenter.y + w * 0.09f),
-                    strokeWidth = w * 0.032f,
-                    cap = StrokeCap.Round
+                    radius = w * 0.115f,
+                    strokeWidth = w * 0.030f
                 )
             }
         }

@@ -213,9 +213,9 @@ fun WeMoSignalBarsIndicator(
 }
 
 /**
- * Distinct power state badge displayed beside the connection status pill for reachable devices:
+ * Power state badge displayed beside the connection status pill for reachable devices:
  * - ON: Glowing emerald/cyan pill with IEC "I/O" active power icon
- * - OFF (Accessible Standby): Slate-navy & warm-amber pill with IEC "O" (Zero/Off) open circle icon
+ * - OFF: Crisp light-gray pill with very dark gray border, text, and the same IEC "I/O" power icon
  */
 @Composable
 fun WeMoPowerStatePill(
@@ -223,10 +223,10 @@ fun WeMoPowerStatePill(
     label: String,
     modifier: Modifier = Modifier
 ) {
-    val bgColor = if (isOn) WemoGreenSoft else Color(0xFFF1F5F9)
-    val borderColor = if (isOn) WemoGreenPrimary.copy(alpha = 0.45f) else Color(0xFFF59E0B).copy(alpha = 0.65f)
-    val contentColor = if (isOn) WemoGreenDark else Color(0xFF334155)
-    val iconColor = if (isOn) WemoGreenDark else Color(0xFFD97706)
+    val bgColor = if (isOn) WemoGreenSoft else Color(0xFFE5E7EB)
+    val borderColor = if (isOn) WemoGreenPrimary.copy(alpha = 0.45f) else PowerOffDarkGray.copy(alpha = 0.55f)
+    val contentColor = if (isOn) WemoGreenDark else PowerOffIconDarkGray
+    val iconColor = if (isOn) WemoGreenDark else PowerOffIconDarkGray
 
     Surface(
         color = bgColor,
@@ -240,35 +240,12 @@ fun WeMoPowerStatePill(
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
         ) {
             Canvas(modifier = Modifier.size(10.dp)) {
-                val r = size.minDimension * 0.40f
-                val c = Offset(size.width / 2f, size.height / 2f)
-                val stroke = 1.6.dp.toPx()
-                if (isOn) {
-                    drawArc(
-                        color = iconColor,
-                        startAngle = -50f,
-                        sweepAngle = 280f,
-                        useCenter = false,
-                        topLeft = Offset(c.x - r, c.y - r + 0.5.dp.toPx()),
-                        size = Size(r * 2f, r * 2f),
-                        style = Stroke(width = stroke, cap = StrokeCap.Round)
-                    )
-                    drawLine(
-                        color = iconColor,
-                        start = Offset(c.x, c.y - r - 1.dp.toPx()),
-                        end = Offset(c.x, c.y + 0.5.dp.toPx()),
-                        strokeWidth = stroke,
-                        cap = StrokeCap.Round
-                    )
-                } else {
-                    // Distinct IEC "O" (Zero = OFF) closed standby circle
-                    drawCircle(
-                        color = iconColor,
-                        radius = r,
-                        center = c,
-                        style = Stroke(width = stroke)
-                    )
-                }
+                drawIecPowerSymbol(
+                    color = iconColor,
+                    center = Offset(size.width / 2f, size.height / 2f),
+                    radius = size.minDimension * 0.40f,
+                    strokeWidth = 1.6.dp.toPx()
+                )
             }
             Text(
                 text = label,

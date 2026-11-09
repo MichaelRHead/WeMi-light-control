@@ -162,14 +162,8 @@ fun WeMoFanIllustration(
                 )
             }
             isReachable -> {
-                // Warm amber standby pilot LED in center hub when fan is OFF (Accessible Standby)
                 drawCircle(
-                    color = StandbyAmberGlow,
-                    radius = w * 0.068f,
-                    center = fanCenter
-                )
-                drawCircle(
-                    color = StandbyAmber,
+                    color = StandbySlateLight,
                     radius = w * 0.036f,
                     center = fanCenter
                 )

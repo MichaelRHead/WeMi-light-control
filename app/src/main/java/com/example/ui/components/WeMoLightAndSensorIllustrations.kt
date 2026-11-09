@@ -218,13 +218,13 @@ fun WeMoLightbulbIllustration(
 
         // Collar stripe on the bulb neck:
         // - ON: Electric Cyan
-        // - OFF (Accessible): Warm Amber Standby
+        // - OFF: Very Dark Gray
         // - Disconnected: Muted Gray
         drawLine(
             color = when {
                 !isReachable -> Color(0xFF94A3B8)
                 glowFactor > 0f -> Color(0xFF06B6D4)
-                else -> StandbyAmber
+                else -> PowerOffDarkGray
             },
             start = Offset(w * 0.27f, h * 0.52f),
             end = Offset(w * 0.73f, h * 0.52f),

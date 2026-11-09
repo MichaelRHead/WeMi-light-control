@@ -94,14 +94,8 @@ fun WeMoChristmasTreeIllustration(
             cornerRadius = CornerRadius(w * 0.04f, w * 0.04f)
         )
         if (isReachable && !isOn) {
-            // Standby amber pilot LED on the tree switch base
             drawCircle(
-                color = StandbyAmberGlow,
-                radius = w * 0.055f,
-                center = Offset(w * 0.50f, h * 0.87f)
-            )
-            drawCircle(
-                color = StandbyAmber,
+                color = StandbySlateLight,
                 radius = w * 0.026f,
                 center = Offset(w * 0.50f, h * 0.87f)
             )

@@ -41,19 +41,87 @@ import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
 import com.example.ui.theme.WemoGreenTop
 
-internal val StandbySlateDark = Color(0xFF1E293B)
-internal val StandbySlateMid = Color(0xFF334155)
-internal val StandbySlateLight = Color(0xFF64748B)
-internal val StandbyAmber = Color(0xFFF59E0B)
-internal val StandbyAmberGlow = Color(0x38F59E0B)
+internal val StandbySlateDark = Color(0xFF1F232B)
+internal val StandbySlateMid = Color(0xFF2D333F)
+internal val StandbySlateLight = Color(0xFF3E4656)
+internal val PowerOffDarkGray = Color(0xFF23272F)
+internal val PowerOffIconDarkGray = Color(0xFF181B20)
 internal val DisconnectedRed = Color(0xFFDC2626)
 internal val OnlineGreenBadge = Color(0xFF059669)
 
 /**
+ * Draws the classic IEC "I/O" power symbol (broken circle arc + top vertical stem)
+ * used for both Power ON and Power OFF states (distinguished by color).
+ */
+internal fun DrawScope.drawIecPowerSymbol(
+    color: Color,
+    center: Offset,
+    radius: Float,
+    strokeWidth: Float
+) {
+    drawArc(
+        color = color,
+        startAngle = -52f,
+        sweepAngle = 284f,
+        useCenter = false,
+        topLeft = Offset(center.x - radius, center.y - radius + radius * 0.08f),
+        size = Size(radius * 2f, radius * 2f),
+        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+    )
+    drawLine(
+        color = color,
+        start = Offset(center.x, center.y - radius - radius * 0.16f),
+        end = Offset(center.x, center.y + radius * 0.06f),
+        strokeWidth = strokeWidth,
+        cap = StrokeCap.Round
+    )
+}
+
+/**
+ * Draws a disconnected / unavailable symbol (broken link / signal arc with diagonal disconnect slash).
+ */
+internal fun DrawScope.drawDisconnectedSymbol(
+    color: Color,
+    slashColor: Color,
+    center: Offset,
+    radius: Float,
+    strokeWidth: Float
+) {
+    // Upper and lower broken connection arcs
+    drawArc(
+        color = color,
+        startAngle = 200f,
+        sweepAngle = 140f,
+        useCenter = false,
+        topLeft = Offset(center.x - radius, center.y - radius),
+        size = Size(radius * 2f, radius * 2f),
+        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+    )
+    drawArc(
+        color = color,
+        startAngle = 20f,
+        sweepAngle = 140f,
+        useCenter = false,
+        topLeft = Offset(center.x - radius, center.y - radius),
+        size = Size(radius * 2f, radius * 2f),
+        style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+    )
+    // Diagonal disconnect slash across the center
+    val d = radius * 0.92f
+    drawLine(
+        color = slashColor,
+        start = Offset(center.x - d, center.y - d),
+        end = Offset(center.x + d, center.y + d),
+        strokeWidth = strokeWidth * 1.05f,
+        cap = StrokeCap.Round
+    )
+}
+
+/**
  * Draws a distinct corner badge on hardware illustrations so the user can immediately distinguish:
- * 1) Reachable & ON: Emerald/Cyan circle with vertical "I" power-on bar
- * 2) Reachable & OFF (Standby): Dark Slate circle with Warm Amber ring and open "O" standby symbol
- * 3) Disconnected / Offline: Red circle with white "X" offline cross
+ * 1) Reachable & ON: Emerald/Cyan circle with white IEC power symbol
+ * 2) Reachable & OFF: Very dark gray circle with the same white IEC power symbol
+ * 3) Disconnected / Unavailable: Red circle with white disconnected slash icon
  */
 internal fun DrawScope.drawDeviceStateCornerBadge(
     isReachable: Boolean,
@@ -70,76 +138,48 @@ internal fun DrawScope.drawDeviceStateCornerBadge(
 
     when {
         !isReachable -> {
-            // Disconnected: Red circle with crisp white "X"
+            // Unavailable / Disconnected: Red circle with white disconnected slash icon
             drawCircle(
                 color = DisconnectedRed,
                 radius = badgeRadius,
                 center = badgeCenter
             )
-            val d = badgeRadius * 0.42f
-            val stroke = badgeRadius * 0.24f
-            drawLine(
+            drawDisconnectedSymbol(
                 color = Color.White,
-                start = Offset(badgeCenter.x - d, badgeCenter.y - d),
-                end = Offset(badgeCenter.x + d, badgeCenter.y + d),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round
-            )
-            drawLine(
-                color = Color.White,
-                start = Offset(badgeCenter.x + d, badgeCenter.y - d),
-                end = Offset(badgeCenter.x - d, badgeCenter.y + d),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round
+                slashColor = Color.White,
+                center = badgeCenter,
+                radius = badgeRadius * 0.48f,
+                strokeWidth = badgeRadius * 0.20f
             )
         }
 
         isOn -> {
-            // Reachable & ON: Emerald-Teal badge with active IEC "I" power stem + arc
+            // Reachable & ON: Emerald-Teal badge with white IEC power symbol
             drawCircle(
                 color = OnlineGreenBadge,
                 radius = badgeRadius,
                 center = badgeCenter
             )
-            val r = badgeRadius * 0.48f
-            val stroke = badgeRadius * 0.22f
-            drawArc(
+            drawIecPowerSymbol(
                 color = Color.White,
-                startAngle = -50f,
-                sweepAngle = 280f,
-                useCenter = false,
-                topLeft = Offset(badgeCenter.x - r, badgeCenter.y - r + badgeRadius * 0.06f),
-                size = Size(r * 2f, r * 2f),
-                style = Stroke(width = stroke, cap = StrokeCap.Round)
-            )
-            drawLine(
-                color = Color.White,
-                start = Offset(badgeCenter.x, badgeCenter.y - r - badgeRadius * 0.10f),
-                end = Offset(badgeCenter.x, badgeCenter.y + badgeRadius * 0.04f),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round
+                center = badgeCenter,
+                radius = badgeRadius * 0.48f,
+                strokeWidth = badgeRadius * 0.22f
             )
         }
 
         else -> {
-            // Reachable & OFF (Standby): Dark Slate badge with Warm Amber border & IEC "O" (Zero/Off) circle
+            // Reachable & OFF: Very dark gray badge with the same white IEC power symbol
             drawCircle(
-                color = StandbySlateDark,
+                color = PowerOffDarkGray,
                 radius = badgeRadius,
                 center = badgeCenter
             )
-            drawCircle(
-                color = StandbyAmber,
-                radius = badgeRadius * 0.92f,
+            drawIecPowerSymbol(
+                color = Color.White.copy(alpha = 0.92f),
                 center = badgeCenter,
-                style = Stroke(width = badgeRadius * 0.16f)
-            )
-            // Crisp IEC "O" (binary 0 = OFF) open standby ring in center
-            drawCircle(
-                color = Color.White,
-                radius = badgeRadius * 0.40f,
-                center = badgeCenter,
-                style = Stroke(width = badgeRadius * 0.22f)
+                radius = badgeRadius * 0.48f,
+                strokeWidth = badgeRadius * 0.22f
             )
         }
     }
@@ -193,10 +233,10 @@ fun WeMoDeviceCategoryIllustration(
 }
 
 /**
- * WeMi Power Ring Toggle Button with distinct visual iconography for ON vs OFF (Accessible Standby):
- * - When ON: Electric Cyan -> Deep Sapphire gradient ring, soft radial luminescence, and IEC "I/O" icon with active top vertical stem.
- * - When OFF (Accessible): Crisp Slate-Metallic ring with a subtle recessed fill, a Warm Amber Standby pilot dot at the top,
- *   and a clean IEC "O" (binary 0 = OFF) closed standby circle in the center.
+ * WeMi Power Ring Toggle Button:
+ * - Both ON and OFF states use the classic IEC power symbol (broken circle arc + top vertical stem).
+ * - When ON: Electric Cyan -> Deep Sapphire gradient ring, soft radial glow, and teal-green power symbol.
+ * - When OFF: Very dark gray ring (`PowerOffDarkGray`) and very dark gray power symbol (`PowerOffIconDarkGray`).
  */
 @Composable
 fun WeMoPowerRingButton(
@@ -207,7 +247,7 @@ fun WeMoPowerRingButton(
     modifier: Modifier = Modifier
 ) {
     val ringColor by animateColorAsState(
-        targetValue = if (isOn) WemoGreenPrimary else StandbySlateLight,
+        targetValue = if (isOn) WemoGreenPrimary else PowerOffDarkGray,
         animationSpec = tween(durationMillis = 220),
         label = "powerRingColor"
     )
@@ -269,9 +309,9 @@ fun WeMoPowerRingButton(
                     style = Stroke(width = strokeW)
                 )
             } else {
-                // Accessible OFF Standby state: crisp recessed slate fill + metallic outer ring
+                // Power OFF state: subtle neutral surface + very dark gray outer ring (same layout as ON)
                 drawCircle(
-                    color = Color(0xFFF1F5F9),
+                    color = Color(0xFFEAEEF4),
                     radius = radius,
                     center = center
                 )
@@ -280,18 +320,6 @@ fun WeMoPowerRingButton(
                     radius = radius,
                     center = center,
                     style = Stroke(width = strokeW)
-                )
-                // Warm amber standby locator dot at top of ring (indicates switch is powered & reachable, currently OFF)
-                val topDotCenter = Offset(center.x, center.y - radius + strokeW * 1.45f)
-                drawCircle(
-                    color = StandbyAmberGlow,
-                    radius = 4.5.dp.toPx(),
-                    center = topDotCenter
-                )
-                drawCircle(
-                    color = StandbyAmber,
-                    radius = 2.4.dp.toPx(),
-                    center = topDotCenter
                 )
             }
 
@@ -307,35 +335,73 @@ fun WeMoPowerRingButton(
                 )
             }
 
-            val innerRadius = radius * 0.40f
-            val innerStroke = 3.0.dp.toPx()
-            if (isOn) {
-                // ON glyph: IEC broken circle arc + active vertical "I" stem
-                drawArc(
-                    color = WemoGreenDark,
-                    startAngle = -52f,
-                    sweepAngle = 284f,
-                    useCenter = false,
-                    topLeft = Offset(center.x - innerRadius, center.y - innerRadius + 1.5.dp.toPx()),
-                    size = Size(innerRadius * 2f, innerRadius * 2f),
-                    style = Stroke(width = innerStroke, cap = StrokeCap.Round)
-                )
-                drawLine(
-                    color = WemoGreenDark,
-                    start = Offset(center.x, center.y - innerRadius - 2.5.dp.toPx()),
-                    end = Offset(center.x, center.y + 1.dp.toPx()),
-                    strokeWidth = innerStroke,
-                    cap = StrokeCap.Round
-                )
-            } else {
-                // OFF (Accessible Standby) glyph: Complete IEC "O" circle (binary 0 = OFF) in crisp dark slate
-                drawCircle(
-                    color = StandbySlateMid,
-                    radius = innerRadius * 0.92f,
-                    center = Offset(center.x, center.y + 1.dp.toPx()),
-                    style = Stroke(width = innerStroke)
-                )
+            // Same IEC power symbol for both ON and OFF, differentiated by color (Teal vs Very Dark Gray)
+            drawIecPowerSymbol(
+                color = if (isOn) WemoGreenDark else PowerOffIconDarkGray,
+                center = center,
+                radius = radius * 0.40f,
+                strokeWidth = 3.0.dp.toPx()
+            )
+        }
+    }
+}
+
+/**
+ * 64dp circular Disconnected / Unavailable button displayed in place of the Power Ring when a switch
+ * is unreachable on the LAN (`!device.isReachable`). Tapping triggers a 2-stage reconnect probe.
+ */
+@Composable
+fun WeMoDisconnectedRingButton(
+    deviceName: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+
+    Box(
+        modifier = modifier
+            .minimumInteractiveComponentSize()
+            .size(64.dp)
+            .semantics {
+                role = Role.Button
+                contentDescription = "Reconnect $deviceName"
             }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = ripple(bounded = false, radius = 32.dp),
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.size(58.dp)) {
+            val strokeW = 3.0.dp.toPx()
+            val radius = (size.minDimension - strokeW) / 2f
+            val center = Offset(size.width / 2f, size.height / 2f)
+
+            drawCircle(
+                color = Color(0xFFFEF2F2),
+                radius = radius,
+                center = center
+            )
+            drawCircle(
+                color = DisconnectedRed.copy(alpha = 0.65f),
+                radius = radius,
+                center = center,
+                style = Stroke(
+                    width = strokeW,
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(
+                        floatArrayOf(6.dp.toPx(), 4.dp.toPx()),
+                        0f
+                    )
+                )
+            )
+            drawDisconnectedSymbol(
+                color = Color(0xFF64748B),
+                slashColor = DisconnectedRed,
+                center = center,
+                radius = radius * 0.40f,
+                strokeWidth = 2.8.dp.toPx()
+            )
         }
     }
 }
