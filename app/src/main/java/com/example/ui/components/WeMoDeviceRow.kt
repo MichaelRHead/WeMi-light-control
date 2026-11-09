@@ -73,7 +73,8 @@ fun AutoResizingDeviceNameText(
     modifier: Modifier = Modifier,
     initialFontSizeSp: Float = 18f,
     minFontSizeSp: Float = 11f,
-    fontWeight: FontWeight = FontWeight.SemiBold
+    fontWeight: FontWeight = FontWeight.SemiBold,
+    singleLineOnly: Boolean = false
 ) {
     var fontSizeSp by remember(text, initialFontSizeSp) { mutableFloatStateOf(initialFontSizeSp) }
     var allowWrapAtMinSize by remember(text, initialFontSizeSp) { mutableStateOf(false) }
@@ -85,14 +86,14 @@ fun AutoResizingDeviceNameText(
         fontWeight = fontWeight,
         fontSize = fontSizeSp.sp,
         lineHeight = (fontSizeSp * 1.2f).sp,
-        softWrap = allowWrapAtMinSize,
-        maxLines = if (allowWrapAtMinSize) 2 else 1,
-        overflow = TextOverflow.Visible,
+        softWrap = !singleLineOnly && allowWrapAtMinSize,
+        maxLines = if (!singleLineOnly && allowWrapAtMinSize) 2 else 1,
+        overflow = if (singleLineOnly) TextOverflow.Ellipsis else TextOverflow.Visible,
         onTextLayout = { layoutResult ->
             if (!allowWrapAtMinSize && layoutResult.didOverflowWidth) {
                 if (fontSizeSp > minFontSizeSp) {
                     fontSizeSp = (fontSizeSp * 0.90f).coerceAtLeast(minFontSizeSp)
-                } else {
+                } else if (!singleLineOnly) {
                     allowWrapAtMinSize = true
                 }
             }

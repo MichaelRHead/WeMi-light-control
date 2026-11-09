@@ -180,6 +180,20 @@ class WeMoEndToEndUiTest {
             "Expected switch name on line above category badge (nameBounds=$nameBounds, catBadgeBounds=$catBadgeBounds)",
             nameBounds.bottom <= catBadgeBounds.top + 4f
         )
+
+        // 5. Verify 'Living Room' and 'Hallway & Landing' room cards have the exact same rendered height
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("room_header_Living Room"))
+        val livingRoomHeight = composeTestRule.onNodeWithTag("room_header_Living Room")
+            .fetchSemanticsNode().boundsInRoot.height
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("room_header_Hallway & Landing"))
+        val hallwayHeight = composeTestRule.onNodeWithTag("room_header_Hallway & Landing")
+            .fetchSemanticsNode().boundsInRoot.height
+        assertTrue(
+            "Expected 'Hallway & Landing' room card height ($hallwayHeight) to match 'Living Room' ($livingRoomHeight)",
+            kotlin.math.abs(hallwayHeight - livingRoomHeight) <= 2f
+        )
     }
 
     @Test

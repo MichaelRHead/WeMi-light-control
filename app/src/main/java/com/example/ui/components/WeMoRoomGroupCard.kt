@@ -247,56 +247,35 @@ fun WeMoRoomGroupHeaderCard(
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = if (isAnySwitchOn) WemoGreenPrimary else Color(0xFFCBD5E1),
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(42.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = iconForRoom(roomName),
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(10.dp))
 
-                // Room Name + Active Lights Status Badge
+                // Room Name (Top Line) + Active Lights Badge & Telemetry (Second Line)
                 Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = roomName,
-                            color = WemoTextPrimary,
-                            fontFamily = WorkSansFontFamily,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 18.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    AutoResizingDeviceNameText(
+                        text = roomName,
+                        color = WemoTextPrimary,
+                        initialFontSizeSp = 17.5f,
+                        minFontSizeSp = 11.5f,
+                        fontWeight = FontWeight.SemiBold,
+                        singleLineOnly = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("room_title_$roomName")
+                    )
 
-                        Surface(
-                            color = if (isAnySwitchOn) WemoGreenDark else Color(0xFFE2E8F0),
-                            shape = RoundedCornerShape(6.dp)
-                        ) {
-                            Text(
-                                text = if (totalControllable > 0) {
-                                    "$activeCount/$totalControllable ON"
-                                } else {
-                                    "${roomDevices.size} Device(s)"
-                                },
-                                color = if (isAnySwitchOn) Color.White else WemoTextSecondary,
-                                fontFamily = WorkSansFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(2.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
                     val onlineDevices = roomDevices.filter { it.isReachable && it.latencyMs > 0 }
                     val avgLatency = if (onlineDevices.isNotEmpty()) {
@@ -311,18 +290,45 @@ fun WeMoRoomGroupHeaderCard(
                         }
                         if (dimmableBulbs.isNotEmpty()) {
                             append(" • ${avgBrightness}% dim")
-                        } else if (totalControllable > 0) {
-                            append(" • Tap ring to toggle all")
                         }
                     }
-                    Text(
-                        text = roomSubtitle,
-                        color = WemoTextSecondary,
-                        fontFamily = WorkSansFontFamily,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Surface(
+                            color = if (isAnySwitchOn) WemoGreenDark else Color(0xFFE2E8F0),
+                            shape = RoundedCornerShape(6.dp)
+                        ) {
+                            Text(
+                                text = if (totalControllable > 0) {
+                                    "$activeCount/$totalControllable ON"
+                                } else {
+                                    "${roomDevices.size} Device(s)"
+                                },
+                                color = if (isAnySwitchOn) Color.White else WemoTextSecondary,
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Text(
+                            text = roomSubtitle,
+                            color = WemoTextSecondary,
+                            fontFamily = WorkSansFontFamily,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
 
                 // Optional Room Dimmer button if the room has dimmable lightbulbs
@@ -330,14 +336,14 @@ fun WeMoRoomGroupHeaderCard(
                     IconButton(
                         onClick = { showRoomDimmer = !showRoomDimmer },
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(34.dp)
                             .testTag("room_dimmer_button_$roomName")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Tune,
                             contentDescription = "Adjust room brightness for $roomName",
                             tint = if (showRoomDimmer) WemoGreenPrimary else WemoTextSecondary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
@@ -345,7 +351,7 @@ fun WeMoRoomGroupHeaderCard(
                 IconButton(
                     onClick = onToggleCollapse,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(32.dp)
                         .testTag("room_collapse_button_$roomName")
                 ) {
                     Icon(
@@ -368,6 +374,8 @@ fun WeMoRoomGroupHeaderCard(
                         onClick = onToggleRoomPower,
                         modifier = Modifier.testTag("room_power_toggle_$roomName")
                     )
+                } else {
+                    Spacer(modifier = Modifier.size(64.dp))
                 }
             }
 
