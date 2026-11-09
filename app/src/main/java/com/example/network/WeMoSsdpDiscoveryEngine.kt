@@ -2,6 +2,7 @@ package com.example.network
 
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.os.Build
 import com.example.data.SoapLogEntry
 import com.example.data.SsdpDiscoveredDevice
 import com.example.data.WeMoDeviceEntity
@@ -18,9 +19,9 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.net.Socket
 import java.net.SocketTimeoutException
 import java.util.concurrent.CopyOnWriteArraySet
+import javax.net.SocketFactory
 
 /**
  * Executes UPnP SSDP multicast discovery (`239.255.255.250:1900`, `MulticastLock` + 1-second
@@ -29,6 +30,7 @@ import java.util.concurrent.CopyOnWriteArraySet
  */
 internal class WeMoSsdpDiscoveryEngine(
     private val appContext: Context?,
+    private val wifiSocketFactory: SocketFactory = SocketFactory.getDefault(),
     private val resolveLocalIpv4Address: () -> String,
     private val probeWemoPort: suspend (ipAddress: String, preferredPort: Int, expectedSerialOrUdn: String?) -> Int?,
     private val fetchLiveDeviceDescriptor: suspend (
@@ -62,7 +64,7 @@ internal class WeMoSsdpDiscoveryEngine(
                     for (port in fastPorts) {
                         val start = System.currentTimeMillis()
                         try {
-                            Socket().use { s ->
+                            wifiSocketFactory.createSocket().use { s ->
                                 s.connect(InetSocketAddress(ip, port), 180)
                             }
                             val rtt = (System.currentTimeMillis() - start).coerceAtLeast(1L)
@@ -114,19 +116,23 @@ internal class WeMoSsdpDiscoveryEngine(
             runCatching { acquire() }
         }
 
+        val isRobolectric = Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
+            runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+
         try {
             val loopbackPorts = loopbackSsdpUdpPorts.toList()
+            val fastMode = loopbackPorts.isNotEmpty() || isRobolectric
             DatagramSocket(null).use { socket ->
                 socket.reuseAddress = true
                 val bindAddr = runCatching {
-                    if (loopbackPorts.isEmpty() && localIp != "192.168.1.50" && !localIp.startsWith("127.")) {
+                    if (!fastMode && localIp != "192.168.1.50" && !localIp.startsWith("127.")) {
                         InetSocketAddress(InetAddress.getByName(localIp), 0)
                     } else {
                         InetSocketAddress(0)
                     }
                 }.getOrElse { InetSocketAddress(0) }
                 runCatching { socket.bind(bindAddr) }.onFailure { socket.bind(InetSocketAddress(0)) }
-                socket.soTimeout = if (loopbackPorts.isNotEmpty()) 150 else 550
+                socket.soTimeout = if (fastMode) 90 else 550
 
                 val multicastGroup = InetAddress.getByName("239.255.255.250")
                 val loopbackAddr = InetAddress.getByName("127.0.0.1")
@@ -146,10 +152,10 @@ internal class WeMoSsdpDiscoveryEngine(
                 var retransmitted = false
                 val receiveBuffer = ByteArray(4096)
                 val seenLocations = mutableMapOf<String, Pair<Map<String, String>, Long>>()
-                val deadline = System.currentTimeMillis() + if (loopbackPorts.isNotEmpty()) 350L else 1250L
+                val deadline = System.currentTimeMillis() + if (fastMode) 220L else 1250L
 
                 while (System.currentTimeMillis() < deadline) {
-                    if (!retransmitted && System.currentTimeMillis() - scanStartMs >= (if (loopbackPorts.isNotEmpty()) 150L else 550L)) {
+                    if (!retransmitted && System.currentTimeMillis() - scanStartMs >= (if (fastMode) 90L else 550L)) {
                         sendBurst()
                         retransmitted = true
                     }

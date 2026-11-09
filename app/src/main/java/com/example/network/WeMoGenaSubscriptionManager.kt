@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -24,6 +25,7 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.net.SocketFactory
 
 data class GenaEventNotification(
     val deviceKey: String,
@@ -57,9 +59,11 @@ data class GenaSubscriptionRecord(
 class WeMoGenaSubscriptionManager(
     private val localIpProvider: () -> String,
     private val preferredListenPort: Int = 8989,
+    wifiSocketFactory: SocketFactory = SocketFactory.getDefault(),
     private val onNotification: (GenaEventNotification) -> Unit
 ) {
     private val httpClient = OkHttpClient.Builder()
+        .socketFactory(wifiSocketFactory)
         .connectTimeout(900, TimeUnit.MILLISECONDS)
         .readTimeout(1200, TimeUnit.MILLISECONDS)
         .writeTimeout(900, TimeUnit.MILLISECONDS)
@@ -134,6 +138,12 @@ class WeMoGenaSubscriptionManager(
         serverSocket = null
         subscriptionsByDeviceKey.clear()
         deviceKeyBySid.clear()
+    }
+
+    @Synchronized
+    fun close() {
+        stopServer()
+        scope.cancel()
     }
 
     private fun handleNotifyClient(clientSocket: Socket) {

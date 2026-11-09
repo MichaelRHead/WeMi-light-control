@@ -27,34 +27,44 @@ abstract class WeMoDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): WeMoDatabase {
             val appCtx = context.applicationContext
-            val isRobolectric = Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
-                runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
-            if (isRobolectric) {
-                return Room.inMemoryDatabaseBuilder(appCtx, WeMoDatabase::class.java)
-                    .allowMainThreadQueries()
-                    .fallbackToDestructiveMigration(dropAllTables = true)
-                    .build()
-            }
             val existing = INSTANCE
-            if (existing != null && lastAppContext === appCtx) {
+            if (existing != null && lastAppContext === appCtx && existing.isOpen) {
                 return existing
             }
             return synchronized(this) {
                 val current = INSTANCE
-                if (current != null && lastAppContext === appCtx) {
+                if (current != null && lastAppContext === appCtx && current.isOpen) {
                     current
                 } else {
-                    val instance = Room.databaseBuilder(
-                        appCtx,
-                        WeMoDatabase::class.java,
-                        "wemi_switch_database"
-                    )
-                        .fallbackToDestructiveMigration(dropAllTables = true)
-                        .build()
+                    runCatching { current?.close() }
+                    val isRobolectric = Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
+                        runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+                    val instance = if (isRobolectric) {
+                        Room.inMemoryDatabaseBuilder(appCtx, WeMoDatabase::class.java)
+                            .allowMainThreadQueries()
+                            .fallbackToDestructiveMigration(dropAllTables = true)
+                            .build()
+                    } else {
+                        Room.databaseBuilder(
+                            appCtx,
+                            WeMoDatabase::class.java,
+                            "wemi_switch_database"
+                        )
+                            .fallbackToDestructiveMigration(dropAllTables = true)
+                            .build()
+                    }
                     INSTANCE = instance
                     lastAppContext = appCtx
                     instance
                 }
+            }
+        }
+
+        fun closeCurrentInstance() {
+            synchronized(this) {
+                runCatching { INSTANCE?.close() }
+                INSTANCE = null
+                lastAppContext = null
             }
         }
     }

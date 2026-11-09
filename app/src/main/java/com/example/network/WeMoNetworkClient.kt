@@ -85,7 +85,8 @@ class WeMoNetworkClient(
         resolveLocalIpv4Address = ::resolveLocalIpv4Address,
         probeWemoPort = { ip, port, serial -> probeWemoPort(ip, port, serial) },
         fetchLiveDeviceDescriptor = ::fetchLiveDeviceDescriptor,
-        nowTime = ::nowTime
+        nowTime = ::nowTime,
+        wifiSocketFactory = wifiSocketFactory
     )
 
     companion object {

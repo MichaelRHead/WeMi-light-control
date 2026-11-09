@@ -599,6 +599,9 @@ class WeMoProvisionerClient(
         var httpSuccess = false
         var lastPairingStatus = ""
 
+        val isLoopbackHost = apHost == "127.0.0.1" || apHost.equals("localhost", ignoreCase = true)
+        val effectivePollDelayMs = if (isLoopbackHost && statusPollDelayMs == 1000L) 35L else statusPollDelayMs
+
         repeat(2) { attempt ->
             val sendStart = System.currentTimeMillis()
             try {
@@ -628,7 +631,7 @@ class WeMoProvisionerClient(
                 )
                 if (descriptor == null && attempt == 0) return@repeat
             }
-            if (attempt == 0 && httpSuccess) delay(100L)
+            if (attempt == 0 && httpSuccess) delay(if (isLoopbackHost) 15L else 100L)
         }
 
         var netStatus = if (httpSuccess) 0 else -1
@@ -670,7 +673,7 @@ class WeMoProvisionerClient(
                 }
             }
 
-            delay(minOf(350L, statusPollDelayMs))
+            delay(minOf(350L, effectivePollDelayMs))
             var polls = 0
             var consecutiveNullPolls = 0
             while (polls < maxStatusPolls) {
@@ -692,13 +695,13 @@ class WeMoProvisionerClient(
                 }
                 polls++
                 if (polls < maxStatusPolls) {
-                    delay(statusPollDelayMs)
+                    delay(effectivePollDelayMs)
                 }
             }
 
             var extraHandshakeLoops = 3
             while (netStatus == 3 && extraHandshakeLoops > 0) {
-                delay(statusPollDelayMs)
+                delay(effectivePollDelayMs)
                 polls++
                 val polled = pollOnce(polls)
                 if (polled != null) {

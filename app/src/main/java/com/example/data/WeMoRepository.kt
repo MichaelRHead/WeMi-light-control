@@ -7,6 +7,7 @@ import com.example.network.SoapCallResult
 import com.example.network.SsdpScanReport
 import com.example.network.WeMoGenaSubscriptionManager
 import com.example.network.WeMoNetworkClient
+import com.example.network.WeMoNetworkMonitor
 import com.example.network.WeMoProvisionResult
 import com.example.network.WeMoProvisionerClient
 import com.example.network.WeMoScannedAp
@@ -14,6 +15,7 @@ import com.example.network.WeMoSetupDeviceDescriptor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -126,6 +128,7 @@ class WeMoRepository(
      */
     val genaManager = WeMoGenaSubscriptionManager(
         localIpProvider = { detectCurrentLanIp() },
+        wifiSocketFactory = WeMoNetworkMonitor.createWifiBoundSocketFactory(context),
         onNotification = { notification ->
             repoScope.launch {
                 handleGenaNotification(notification)
@@ -373,7 +376,11 @@ class WeMoRepository(
             }
 
             appendLog(result.logEntry)
-            lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+            if (result.reachableOnLan || _isDemoShowroomMode.value) {
+                lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+            } else {
+                lastSetStateTimestampMs.remove(device.id)
+            }
 
             val finalEntity = when {
                 result.reachableOnLan -> activeDevice.copy(
@@ -807,6 +814,11 @@ class WeMoRepository(
 
     fun clearLogs() {
         _soapLogs.value = emptyList()
+    }
+
+    fun close() {
+        genaManager.close()
+        repoScope.cancel()
     }
 
     companion object {

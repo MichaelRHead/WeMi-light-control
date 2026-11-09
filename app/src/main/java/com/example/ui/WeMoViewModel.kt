@@ -973,7 +973,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         super.onCleared()
         networkMonitor.stopMonitoring()
         ruleScheduler.stopAll()
-        repository.genaManager.stopServer()
+        repository.close()
     }
 
     private fun showTransientStatus(message: String) {
