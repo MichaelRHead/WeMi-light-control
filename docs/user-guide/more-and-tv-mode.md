@@ -41,7 +41,7 @@ At the bottom of the **More** tab, the **UPnP / SOAP Packet Log** card records t
   - **Timestamp** (`HH:mm:ss.SSS`)
   - **Target UPnP Endpoint** (`POST http://192.168.1.104:49153/upnp/control/basicevent1`)
   - **Response Status & Round-Trip Latency** (`HTTP/1.1 200 OK • <BinaryState>1</BinaryState> (12ms)`)
-- Tap **`Save/Share Log`** (`export_telemetry_file_button`) to save a complete telemetry report (`files/wemi-telemetry-latest.txt` combining your latest `10.22.22.1` setup snapshot, device inventory, and SOAP packet log), copy it to the clipboard, and open Android's share sheet.
+- Tap **`Save/Share Log`** (`export_telemetry_file_button`) to save a complete telemetry report (`files/wemi-telemetry-latest.txt` combining your latest `10.22.22.1` setup snapshot, device inventory, and SOAP packet log), copy it to the clipboard, and open Android's share sheet (see **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)** for full details).
 - Tap **`Clear`** to reset the packet log buffer.
 
 ---

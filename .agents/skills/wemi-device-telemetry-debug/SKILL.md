@@ -7,7 +7,7 @@ description: Capture, parse, and diagnose on-device Belkin WeMo setup, discovery
 
 Use this skill whenever a user reports an issue with physical Belkin WeMo hardware (`F7C030`, `WLS040`/`WLS0403`, `F7C059`/`WDS060`, `F7C063`/`WSP080`) on their Android phone, tablet, or Android TV — especially during **`10.22.22.1` zero-cloud Wi-Fi setup**, **LAN SSDP discovery**, or **UPnP/SOAP control**.
 
-Because physical Belkin WeMo switches sit on the user's private local Wi-Fi (`192.168.x.x/24`) or isolated soft-AP (`10.22.22.1/24`), the fastest way to close the diagnostic loop is to inspect **structured on-screen screenshots** or **exported telemetry files (`wemi-telemetry-latest.txt`)** captured directly on the user's device.
+Because physical Belkin WeMo switches sit on the user's private local Wi-Fi (`192.168.x.x/24`) or isolated soft-AP (`10.22.22.1/24`), the fastest way to close the diagnostic loop is to inspect **structured on-screen screenshots** or **exported telemetry files (`wemi-telemetry-latest.txt`)** captured directly on the user's device (see the end-user instructions in [`../../docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md)).
 
 ---
 

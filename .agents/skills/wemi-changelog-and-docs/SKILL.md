@@ -29,7 +29,7 @@ Use this skill whenever you land a feature, bug fix, UI change, or architectural
 | [`IMPLEMENTED.md`](../../IMPLEMENTED.md) | **Reverse-Chronological Feature Change Log**: Records every completed feature, bug fix, and improvement from **newest at the top to oldest at the bottom**, including the PST timestamp, version/commit reference, summary table row, and detailed bullet points. |
 | [`UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md) | **Upcoming Features Roadmap**: Lists planned/unimplemented features and engineering tracks. When an upcoming feature is implemented, remove it from `UPCOMING_FEATURES.md` and prepend it to `IMPLEMENTED.md`. |
 | [`USER_GUIDE.md`](../../USER_GUIDE.md) | **User Guide Index**: Summarizes each user-facing feature in a table and links to detailed guides under [`docs/user-guide/`](../../docs/user-guide/). |
-| [`docs/user-guide/*.md`](../../docs/user-guide/) | **Detailed Human-Focused Feature Guides**: Individual user-facing guides (`main-screen.md`, `switch-discovery.md`, `fresh-device-setup.md`, `room-grouping.md`, `editing-and-managing-devices.md`, `wifi-homes.md`, `rules-and-timers.md`, `more-and-tv-mode.md`). |
+| [`docs/user-guide/*.md`](../../docs/user-guide/) | **Detailed Human-Focused Feature Guides**: Individual user-facing guides (`main-screen.md`, `switch-discovery.md`, `fresh-device-setup.md`, `room-grouping.md`, `editing-and-managing-devices.md`, `wifi-homes.md`, `rules-and-timers.md`, `more-and-tv-mode.md`, `telemetry-and-troubleshooting.md`). |
 
 ---
 

@@ -94,3 +94,5 @@ At the bottom of the **Provision New WeMo AP (`10.22.22.1`)** dialog, a high-con
 - **Live `[STEP 1..5]` Provisioning Trace**: Each step of `ChangeFriendlyName`, AES-128-CBC encryption (`Method 1/2/3`, `lenSuffix`, ciphertext hex length — **never** your plaintext password), `ConnectHomeNetwork` (`PairingStatus`), `GetNetworkStatus` polls (`1..18`), and `CloseSetup` (`kept_open_for_retry` on failure).
 - **`Keep Dialog Open on Success` Chip**: Toggle this chip ON before tapping **`Provision Switch`** if you want the dialog to remain open after a successful setup so you can screenshot or export the final trace.
 
+For a complete line-by-line guide to capturing screenshots, exporting `wemi-telemetry-latest.txt`, and interpreting setup status codes, see **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)**.
+
