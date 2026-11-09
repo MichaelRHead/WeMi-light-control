@@ -568,12 +568,16 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         autoOffMinutes: Int,
         syncFriendlyNameToHardware: Boolean = false
     ) {
+        val existing = devices.value.find { it.id == id }
+        val resolvedName = name.trim().ifEmpty { "WeMi Light Switch" }
+        val resolvedRoom = roomName.trim().ifEmpty { inferRoomFromName(resolvedName) }
+        val activeKey = existing?.networkKey ?: _activeNetworkKey.value
+        val activeSsid = existing?.wifiSsid ?: currentWifiSsid()
+        val sortOrder = existing?.sortOrder ?: devices.value.size
+        _showAddDeviceDialog.value = false
+        _editingDevice.value = null
+
         viewModelScope.launch {
-            val existing = devices.value.find { it.id == id }
-            val resolvedName = name.trim().ifEmpty { "WeMi Light Switch" }
-            val resolvedRoom = roomName.trim().ifEmpty { inferRoomFromName(resolvedName) }
-            val activeKey = existing?.networkKey ?: _activeNetworkKey.value
-            val activeSsid = existing?.wifiSsid ?: currentWifiSsid()
             val entity = WeMoDeviceEntity(
                 id = id,
                 name = resolvedName,
@@ -596,12 +600,10 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
                 udn = existing?.udn.orEmpty(),
                 signalStrengthPercent = existing?.signalStrengthPercent ?: 85,
                 nightModeEnabled = existing?.nightModeEnabled ?: false,
-                sortOrder = existing?.sortOrder ?: devices.value.size,
+                sortOrder = sortOrder,
                 autoOffMinutes = autoOffMinutes.coerceIn(0, 240)
             )
             repository.saveDevice(entity, syncFriendlyNameToHardware = syncFriendlyNameToHardware)
-            _showAddDeviceDialog.value = false
-            _editingDevice.value = null
             showTransientStatus(
                 if (syncFriendlyNameToHardware) {
                     "Saved ${entity.name} in ${entity.roomName} & synced hardware FriendlyName"
