@@ -101,6 +101,12 @@ class WeMoNetworkClient(
             "221517K01018LAN",
             "221517K01018NEW"
         )
+
+        fun registerLoopbackSsdpPort(udpPort: Int) =
+            WeMoSsdpDiscoveryEngine.registerLoopbackSsdpPort(udpPort)
+
+        fun unregisterLoopbackSsdpPort(udpPort: Int) =
+            WeMoSsdpDiscoveryEngine.unregisterLoopbackSsdpPort(udpPort)
     }
 
     private fun nowTime(): String {

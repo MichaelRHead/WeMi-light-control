@@ -1,7 +1,7 @@
 # WeMi Light Control — Code Quality, Human-Readable Modularization & End-to-End Validation Plan
 
 **Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v16.0`)  
-**Status**: **Completed & Verified — All 4 Phases (M1, M2, M3 & M4) + `v13.0–v16.0` Enhancements Landed (`22/22` Unit, Protocol & E2E Compose UI Tests Passing)**
+**Status**: **Completed & Verified — All 4 Phases (M1, M2, M3 & M4) + `v13.0–v16.0` Enhancements Landed (`23/23` Unit, Protocol & E2E Compose UI Tests Passing)**
 
 Related documents and skills:
 - [`AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide

@@ -27,6 +27,14 @@ abstract class WeMoDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): WeMoDatabase {
             val appCtx = context.applicationContext
+            val isRobolectric = Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
+                runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+            if (isRobolectric) {
+                return Room.inMemoryDatabaseBuilder(appCtx, WeMoDatabase::class.java)
+                    .allowMainThreadQueries()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    .build()
+            }
             val existing = INSTANCE
             if (existing != null && lastAppContext === appCtx) {
                 return existing
@@ -36,22 +44,13 @@ abstract class WeMoDatabase : RoomDatabase() {
                 if (current != null && lastAppContext === appCtx) {
                     current
                 } else {
-                    val isRobolectric = Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
-                        runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
-                    val instance = if (isRobolectric) {
-                        Room.inMemoryDatabaseBuilder(appCtx, WeMoDatabase::class.java)
-                            .allowMainThreadQueries()
-                            .fallbackToDestructiveMigration(dropAllTables = true)
-                            .build()
-                    } else {
-                        Room.databaseBuilder(
-                            appCtx,
-                            WeMoDatabase::class.java,
-                            "wemi_switch_database"
-                        )
-                            .fallbackToDestructiveMigration(dropAllTables = true)
-                            .build()
-                    }
+                    val instance = Room.databaseBuilder(
+                        appCtx,
+                        WeMoDatabase::class.java,
+                        "wemi_switch_database"
+                    )
+                        .fallbackToDestructiveMigration(dropAllTables = true)
+                        .build()
                     INSTANCE = instance
                     lastAppContext = appCtx
                     instance

@@ -4,6 +4,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,6 +52,7 @@ import com.example.ui.theme.WemoTextSecondary
 import com.example.ui.theme.WorkSansFontFamily
 import kotlin.math.roundToInt
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun WeMoExpandedDrawer(
     device: WeMoDeviceEntity,
@@ -69,8 +72,88 @@ internal fun WeMoExpandedDrawer(
         modifier = Modifier
             .fillMaxWidth()
             .background(WemoRowExpandedSurface)
-            .padding(horizontal = 18.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
+        if (type == WeMoDeviceType.LIGHTBULB_DIMMER && device.isReachable) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Brightness Level",
+                    color = WemoTextPrimary,
+                    fontFamily = WorkSansFontFamily,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 14.sp
+                )
+                Text(
+                    text = "${sliderVal.roundToInt()}%",
+                    color = WemoGreenDark,
+                    fontFamily = WorkSansFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    modifier = Modifier.testTag("brightness_value_label_${device.id}")
+                )
+            }
+
+            Slider(
+                value = sliderVal,
+                onValueChange = { sliderVal = it },
+                onValueChangeFinished = {
+                    onBrightnessChange(sliderVal.roundToInt())
+                },
+                valueRange = 1f..100f,
+                colors = SliderDefaults.colors(
+                    thumbColor = WemoGreenPrimary,
+                    activeTrackColor = WemoGreenPrimary,
+                    inactiveTrackColor = WemoDividerGray
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("brightness_slider_${device.id}")
+            )
+
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf(21, 50, 75, 100).forEach { preset ->
+                    FilterChip(
+                        selected = device.brightness == preset && device.isOn,
+                        onClick = {
+                            sliderVal = preset.toFloat()
+                            onBrightnessChange(preset)
+                        },
+                        label = { Text("$preset%", fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WemoGreenSoft,
+                            selectedLabelColor = WemoGreenDark
+                        ),
+                        modifier = Modifier
+                            .height(28.dp)
+                            .testTag("brightness_preset_${device.id}_$preset")
+                    )
+                }
+                if (onToggleNightMode != null) {
+                    FilterChip(
+                        selected = device.nightModeEnabled,
+                        onClick = onToggleNightMode,
+                        label = { Text("Night Mode (20%)", fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WemoGreenSoft,
+                            selectedLabelColor = WemoGreenDark
+                        ),
+                        modifier = Modifier
+                            .height(28.dp)
+                            .testTag("night_mode_chip_${device.id}")
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+        }
+
         // Real-Time Connection & Latency Telemetry Banner inside Expanded Drawer
         Surface(
             color = Color.White,
@@ -78,12 +161,12 @@ internal fun WeMoExpandedDrawer(
             border = BorderStroke(1.dp, WemoDividerGray),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 10.dp)
+                .padding(bottom = 8.dp)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -124,79 +207,6 @@ internal fun WeMoExpandedDrawer(
                     modifier = Modifier.testTag("ping_device_${device.id}")
                 )
             }
-        }
-
-        if (type == WeMoDeviceType.LIGHTBULB_DIMMER && device.isReachable) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Brightness Level",
-                    color = WemoTextPrimary,
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 14.sp
-                )
-                Text(
-                    text = "${sliderVal.roundToInt()}%",
-                    color = WemoGreenDark,
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 15.sp
-                )
-            }
-
-            Slider(
-                value = sliderVal,
-                onValueChange = { sliderVal = it },
-                onValueChangeFinished = {
-                    onBrightnessChange(sliderVal.roundToInt())
-                },
-                valueRange = 1f..100f,
-                colors = SliderDefaults.colors(
-                    thumbColor = WemoGreenPrimary,
-                    activeTrackColor = WemoGreenPrimary,
-                    inactiveTrackColor = WemoDividerGray
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("brightness_slider_${device.id}")
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                listOf(21, 50, 75, 100).forEach { preset ->
-                    FilterChip(
-                        selected = device.brightness == preset && device.isOn,
-                        onClick = {
-                            sliderVal = preset.toFloat()
-                            onBrightnessChange(preset)
-                        },
-                        label = { Text("$preset%") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = WemoGreenSoft,
-                            selectedLabelColor = WemoGreenDark
-                        )
-                    )
-                }
-                if (onToggleNightMode != null) {
-                    FilterChip(
-                        selected = device.nightModeEnabled,
-                        onClick = onToggleNightMode,
-                        label = { Text("Night Mode (20%)") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = WemoGreenSoft,
-                            selectedLabelColor = WemoGreenDark
-                        ),
-                        modifier = Modifier.testTag("night_mode_chip_${device.id}")
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(6.dp))
         }
 
         Row(

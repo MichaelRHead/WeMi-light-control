@@ -32,6 +32,8 @@ internal class WeMoDiscoveryCoordinator(
     private val appendLog: (SoapLogEntry) -> Unit,
     private val nowFormatted: () -> String
 ) {
+    private val adoptMutex = Mutex()
+
     private fun mutexFor(device: WeMoDeviceEntity): Mutex {
         val key = device.serialNumber.takeIf { it.isNotBlank() } ?: "${device.ipAddress}:${device.port}"
         return deviceMutexes.getOrPut(key) { Mutex() }
@@ -327,15 +329,15 @@ internal class WeMoDiscoveryCoordinator(
             knownLocalDevices = currentDevicesForHome,
             includeDemoFallbacks = demoMode
         )
-        onSsdpReport(report)
         appendLog(report.logEntry)
 
         val checkedAt = nowFormatted()
         currentDevicesForHome.forEach { existing ->
             val match = report.discoveredDevices.find {
                 (existing.serialNumber.isNotBlank() && it.serialNumber.equals(existing.serialNumber, ignoreCase = true)) ||
-                    it.ipAddress == existing.ipAddress ||
-                    it.name.equals(existing.name, ignoreCase = true)
+                    ((existing.serialNumber.isBlank() || it.serialNumber.isBlank()) &&
+                        ((it.ipAddress == existing.ipAddress && it.port == existing.port) ||
+                            it.name.equals(existing.name, ignoreCase = true)))
             }
             if (match != null) {
                 val recentSetMs = lastSetStateTimestampMs[existing.id] ?: 0L
@@ -379,6 +381,7 @@ internal class WeMoDiscoveryCoordinator(
                 activeWifiSsid = activeWifiSsid
             )
         }
+        onSsdpReport(report)
         return report
     }
 
@@ -386,14 +389,16 @@ internal class WeMoDiscoveryCoordinator(
         discovered: SsdpDiscoveredDevice,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
-    ): WeMoDeviceEntity {
+    ): WeMoDeviceEntity = adoptMutex.withLock {
         val currentDevices = dao.getAllDevices().first()
         val existing = currentDevices.find {
             discovered.serialNumber.isNotBlank() &&
                 it.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
         } ?: currentDevices.find {
             it.networkKey == activeNetworkKey &&
-                (it.ipAddress == discovered.ipAddress || it.name.equals(discovered.name, ignoreCase = true))
+                (it.serialNumber.isBlank() || discovered.serialNumber.isBlank()) &&
+                ((it.ipAddress == discovered.ipAddress && it.port == discovered.port) ||
+                    it.name.equals(discovered.name, ignoreCase = true))
         }
 
         val rawDeviceSsid = discovered.wifiSsid.trim()
@@ -403,7 +408,7 @@ internal class WeMoDiscoveryCoordinator(
             syncHomeSsidFromDeviceSsid(activeNetworkKey, validRouterSsid)
         }
         val checkedAt = nowFormatted()
-        return if (existing == null) {
+        if (existing == null) {
             val newEntity = WeMoDeviceEntity(
                 name = discovered.name,
                 roomName = discovered.roomName.ifBlank { inferRoomFromName(discovered.name) },
@@ -474,7 +479,10 @@ internal class WeMoDiscoveryCoordinator(
             val currentDevices = dao.getAllDevices().first()
             val existedBefore = currentDevices.any {
                 (item.serialNumber.isNotBlank() && it.serialNumber.equals(item.serialNumber, ignoreCase = true)) ||
-                    (it.networkKey == activeNetworkKey && (it.ipAddress == item.ipAddress || it.name.equals(item.name, ignoreCase = true)))
+                    (it.networkKey == activeNetworkKey &&
+                        (it.serialNumber.isBlank() || item.serialNumber.isBlank()) &&
+                        ((it.ipAddress == item.ipAddress && it.port == item.port) ||
+                            it.name.equals(item.name, ignoreCase = true)))
             }
             adoptDiscoveredDevice(
                 discovered = item,

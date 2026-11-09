@@ -20,6 +20,7 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.util.concurrent.CopyOnWriteArraySet
 
 /**
  * Executes UPnP SSDP multicast discovery (`239.255.255.250:1900`, `MulticastLock` + 1-second
@@ -114,24 +115,30 @@ internal class WeMoSsdpDiscoveryEngine(
         }
 
         try {
+            val loopbackPorts = loopbackSsdpUdpPorts.toList()
             DatagramSocket(null).use { socket ->
                 socket.reuseAddress = true
                 val bindAddr = runCatching {
-                    if (localIp != "192.168.1.50" && !localIp.startsWith("127.")) {
+                    if (loopbackPorts.isEmpty() && localIp != "192.168.1.50" && !localIp.startsWith("127.")) {
                         InetSocketAddress(InetAddress.getByName(localIp), 0)
                     } else {
                         InetSocketAddress(0)
                     }
                 }.getOrElse { InetSocketAddress(0) }
                 runCatching { socket.bind(bindAddr) }.onFailure { socket.bind(InetSocketAddress(0)) }
-                socket.soTimeout = 550
+                socket.soTimeout = if (loopbackPorts.isNotEmpty()) 150 else 550
 
                 val multicastGroup = InetAddress.getByName("239.255.255.250")
+                val loopbackAddr = InetAddress.getByName("127.0.0.1")
                 fun sendBurst() {
                     for (st in searchTargets) {
                         val payloadBytes = WeMoXmlAndSkuParser.buildSsdpMSearchPacket(st).toByteArray(Charsets.UTF_8)
                         val packet = DatagramPacket(payloadBytes, payloadBytes.size, multicastGroup, 1900)
                         runCatching { socket.send(packet) }
+                        for (udpPort in loopbackPorts) {
+                            val localPacket = DatagramPacket(payloadBytes, payloadBytes.size, loopbackAddr, udpPort)
+                            runCatching { socket.send(localPacket) }
+                        }
                     }
                 }
 
@@ -139,10 +146,10 @@ internal class WeMoSsdpDiscoveryEngine(
                 var retransmitted = false
                 val receiveBuffer = ByteArray(4096)
                 val seenLocations = mutableMapOf<String, Pair<Map<String, String>, Long>>()
-                val deadline = System.currentTimeMillis() + 1250L
+                val deadline = System.currentTimeMillis() + if (loopbackPorts.isNotEmpty()) 350L else 1250L
 
                 while (System.currentTimeMillis() < deadline) {
-                    if (!retransmitted && System.currentTimeMillis() - scanStartMs >= 550L) {
+                    if (!retransmitted && System.currentTimeMillis() - scanStartMs >= (if (loopbackPorts.isNotEmpty()) 150L else 550L)) {
                         sendBurst()
                         retransmitted = true
                     }
@@ -155,6 +162,9 @@ internal class WeMoSsdpDiscoveryEngine(
                         val loc = headers["LOCATION"]
                         if (!loc.isNullOrEmpty() && !seenLocations.containsKey(loc)) {
                             seenLocations[loc] = Pair(headers, elapsed)
+                            if (loopbackPorts.isNotEmpty() && seenLocations.size >= loopbackPorts.size) {
+                                break
+                            }
                         }
                     } catch (_: SocketTimeoutException) {
                         if (retransmitted) break
@@ -172,7 +182,11 @@ internal class WeMoSsdpDiscoveryEngine(
                         latencyMs,
                         true
                     )
-                    if (desc != null && liveDiscovered.none { it.serialNumber.equals(desc.serialNumber, ignoreCase = true) && it.ipAddress == desc.ipAddress }) {
+                    if (desc != null && liveDiscovered.none {
+                            (it.serialNumber.isNotBlank() && it.serialNumber.equals(desc.serialNumber, ignoreCase = true)) ||
+                                (it.ipAddress == desc.ipAddress && it.port == desc.port)
+                        }
+                    ) {
                         liveDiscovered.add(desc)
                     }
                 }
@@ -189,7 +203,7 @@ internal class WeMoSsdpDiscoveryEngine(
 
         for (known in knownLocalDevices) {
             val alreadySeen = liveDiscovered.any {
-                it.ipAddress == known.ipAddress ||
+                (it.ipAddress == known.ipAddress && it.port == known.port) ||
                     (known.serialNumber.isNotBlank() && it.serialNumber.equals(known.serialNumber, ignoreCase = true))
             }
             if (!alreadySeen) {
@@ -304,5 +318,17 @@ internal class WeMoSsdpDiscoveryEngine(
             scanDurationMs = totalMs,
             logEntry = log
         )
+    }
+
+    companion object {
+        private val loopbackSsdpUdpPorts = CopyOnWriteArraySet<Int>()
+
+        fun registerLoopbackSsdpPort(udpPort: Int) {
+            loopbackSsdpUdpPorts.add(udpPort)
+        }
+
+        fun unregisterLoopbackSsdpPort(udpPort: Int) {
+            loopbackSsdpUdpPorts.remove(udpPort)
+        }
     }
 }

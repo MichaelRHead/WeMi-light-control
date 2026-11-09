@@ -18,7 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.CheckCircle
@@ -202,187 +204,185 @@ fun WeMoSsdpScannerModal(
         containerColor = WemoRowSurface,
         modifier = Modifier.testTag("ssdp_scanner_sheet")
     ) {
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 18.dp)
-                .padding(bottom = 24.dp)
+                .padding(bottom = 16.dp)
+                .testTag("ssdp_discovered_list"),
+            contentPadding = PaddingValues(vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Header row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Radar,
-                        contentDescription = null,
-                        tint = WemoGreenPrimary,
-                        modifier = Modifier.size(26.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "SSDP Network Discovery Scan",
-                            color = WemoTextPrimary,
-                            fontFamily = WorkSansFontFamily,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 19.sp
-                        )
-                        Text(
-                            text = "Multicast M-SEARCH • 239.255.255.250:1900",
-                            color = WemoTextSecondary,
-                            fontFamily = WorkSansFontFamily,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-
-                IconButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.testTag("close_ssdp_scanner_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Close SSDP Scanner",
-                        tint = WemoTextSecondary
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Search Target (ST) filter chips
-            Text(
-                text = "SSDP Search Target (ST Header):",
-                color = WemoTextSecondary,
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 12.sp
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val targets = listOf(
-                    "urn:Belkin:service:basicevent:1" to "Belkin BasicEvent",
-                    "urn:Belkin:device:**" to "All WeMi/WeMo Devices",
-                    "upnp:rootdevice" to "UPnP Root Devices"
-                )
-                targets.forEach { (stValue, label) ->
-                    FilterChip(
-                        selected = selectedSearchTarget == stValue,
-                        onClick = { onSelectSearchTarget(stValue) },
-                        label = { Text(label, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = WemoGreenSoft,
-                            selectedLabelColor = WemoGreenDark
-                        )
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // M-SEARCH Request & Interface summary box
-            Surface(
-                color = Color(0xFFF1F5F9),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+            item(key = "ssdp_scanner_controls_header") {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    // Header row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Radar,
+                                contentDescription = null,
+                                tint = WemoGreenPrimary,
+                                modifier = Modifier.size(26.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "SSDP Network Discovery Scan",
+                                    color = WemoTextPrimary,
+                                    fontFamily = WorkSansFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 19.sp
+                                )
+                                Text(
+                                    text = "Multicast M-SEARCH • 239.255.255.250:1900",
+                                    color = WemoTextSecondary,
+                                    fontFamily = WorkSansFontFamily,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.testTag("close_ssdp_scanner_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close SSDP Scanner",
+                                tint = WemoTextSecondary
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                        // Search Target (ST) filter chips
                         Text(
-                            text = "Local Interface: ${scanReport?.localInterfaceIp ?: "192.168.1.50"}",
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 11.sp,
-                            color = WemoGreenBottom
+                            text = "SSDP Search Target (ST Header):",
+                            color = WemoTextSecondary,
+                            fontFamily = WorkSansFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp
                         )
-                        Text(
-                            text = if (isScanning) "Broadcasting M-SEARCH..." else "Scan Time: ${scanReport?.scanDurationMs ?: 18}ms",
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            color = WemoGreenDark
-                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            val targets = listOf(
+                                "urn:Belkin:service:basicevent:1" to "Belkin BasicEvent",
+                                "urn:Belkin:device:**" to "All WeMi/WeMo Devices",
+                                "upnp:rootdevice" to "UPnP Root Devices"
+                            )
+                            targets.forEach { (stValue, label) ->
+                                FilterChip(
+                                    selected = selectedSearchTarget == stValue,
+                                    onClick = { onSelectSearchTarget(stValue) },
+                                    label = { Text(label, fontSize = 12.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = WemoGreenSoft,
+                                        selectedLabelColor = WemoGreenDark
+                                    )
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // M-SEARCH Request & Interface summary box
+                        Surface(
+                            color = Color(0xFFF1F5F9),
+                            shape = RoundedCornerShape(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "Local Interface: ${scanReport?.localInterfaceIp ?: "192.168.1.50"}",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 11.sp,
+                                        color = WemoGreenBottom
+                                    )
+                                    Text(
+                                        text = if (isScanning) "Broadcasting M-SEARCH..." else "Scan Time: ${scanReport?.scanDurationMs ?: 18}ms",
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        color = WemoGreenDark
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "M-SEARCH * HTTP/1.1 | HOST: 239.255.255.250:1900 | ST: $selectedSearchTarget",
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    color = WemoTextSecondary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Action row: Rescan & Adopt All
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Discovered Devices (${discoveredList.size})",
+                                color = WemoTextPrimary,
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp
+                            )
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = onRescan,
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.testTag("trigger_ssdp_scan_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Refresh,
+                                        contentDescription = null,
+                                        tint = WemoGreenDark,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("Rescan", color = WemoGreenDark, fontSize = 13.sp)
+                                }
+
+                                Button(
+                                    onClick = onAdoptAll,
+                                    colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                                    modifier = Modifier.testTag("sync_all_ssdp_button")
+                                ) {
+                                    Text("Adopt All", fontSize = 13.sp)
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+                        HorizontalDivider(thickness = 1.dp, color = WemoDividerGray)
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = "M-SEARCH * HTTP/1.1 | HOST: 239.255.255.250:1900 | ST: $selectedSearchTarget",
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        color = WemoTextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Action row: Rescan & Sync All
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Discovered Devices (${discoveredList.size})",
-                    color = WemoTextPrimary,
-                    fontFamily = WorkSansFontFamily,
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = 16.sp
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        onClick = onRescan,
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.testTag("trigger_ssdp_scan_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            tint = WemoGreenDark,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Rescan", color = WemoGreenDark, fontSize = 13.sp)
-                    }
-
-                    Button(
-                        onClick = onAdoptAll,
-                        colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-                        modifier = Modifier.testTag("sync_all_ssdp_button")
-                    ) {
-                        Text("Adopt All", fontSize = 13.sp)
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            HorizontalDivider(thickness = 1.dp, color = WemoDividerGray)
-
-            // Discovered devices list
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 200.dp, max = 380.dp)
-                    .testTag("ssdp_discovered_list"),
-                contentPadding = PaddingValues(vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
                 items(discoveredList, key = { "${it.ipAddress}:${it.port}_${it.serialNumber}_${it.name}" }) { item ->
                     val alreadySaved = existingDevices.any {
                         ((item.serialNumber.isNotBlank() && it.serialNumber.equals(item.serialNumber, ignoreCase = true)) ||
-                            it.ipAddress == item.ipAddress ||
-                            it.name.equals(item.name, ignoreCase = true)) && it.isReachable
+                            ((it.serialNumber.isBlank() || item.serialNumber.isBlank()) &&
+                                ((it.ipAddress == item.ipAddress && it.port == item.port) ||
+                                    it.name.equals(item.name, ignoreCase = true)))) && it.isReachable
                     }
                     SsdpDiscoveredDeviceRow(
                         item = item,
@@ -391,7 +391,6 @@ fun WeMoSsdpScannerModal(
                     )
                 }
             }
-        }
     }
 }
 
@@ -500,7 +499,7 @@ private fun SsdpDiscoveredDeviceRow(
                     onClick = onAdopt,
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("adopt_ssdp_device_${item.ipAddress}")
+                    modifier = Modifier.testTag("adopt_ssdp_device_${item.name}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.CheckCircle,
@@ -517,7 +516,7 @@ private fun SsdpDiscoveredDeviceRow(
                     colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                     shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("adopt_ssdp_device_${item.ipAddress}")
+                    modifier = Modifier.testTag("adopt_ssdp_device_${item.name}")
                 ) {
                     Icon(
                         imageVector = Icons.Default.AddCircleOutline,

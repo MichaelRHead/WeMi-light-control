@@ -349,12 +349,12 @@ fun WeMiSwitchApp(
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Surface(
-                    color = WemoGreenDark.copy(alpha = 0.95f),
-                    shape = RoundedCornerShape(24.dp),
-                    shadowElevation = 4.dp,
+                Box(
                     modifier = Modifier
-                        .clickable { viewModel.dismissBanner() }
+                        .background(
+                            color = WemoGreenDark.copy(alpha = 0.95f),
+                            shape = RoundedCornerShape(24.dp)
+                        )
                         .testTag("status_feedback_banner")
                 ) {
                     Text(

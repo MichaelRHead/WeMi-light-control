@@ -1,8 +1,11 @@
 package com.example
 
+import com.example.network.WeMoNetworkClient
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
+import java.net.DatagramPacket
+import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
@@ -31,7 +34,8 @@ class FakeWeMoUpnpServer(
     val signalStrengthPercent: Int = 89,
     val wifiSsid: String = "HeadFamily-2.4G",
     initialRelayOn: Boolean = false,
-    initialBrightness: Int = 64
+    initialBrightness: Int = 64,
+    enableSsdpResponder: Boolean = false
 ) : AutoCloseable {
 
     val relayStateOn = AtomicBoolean(initialRelayOn)
@@ -51,11 +55,63 @@ class FakeWeMoUpnpServer(
     val setupDoneCalled = AtomicBoolean(false)
     val receivedEncryptedPassword = AtomicReference("")
     val receivedSoapActions = CopyOnWriteArrayList<String>()
+    val receivedSsdpSearches = CopyOnWriteArrayList<String>()
 
     private val running = AtomicBoolean(true)
+    private val ssdpDiscoverable = AtomicBoolean(enableSsdpResponder)
     private val sidSequence = AtomicInteger(100)
     private val serverSocket = ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"))
     val port: Int = serverSocket.localPort
+
+    private val ssdpUdpSocket = DatagramSocket(0, InetAddress.getByName("127.0.0.1"))
+    val ssdpUdpPort: Int = ssdpUdpSocket.localPort
+
+    init {
+        if (enableSsdpResponder) {
+            WeMoNetworkClient.registerLoopbackSsdpPort(ssdpUdpPort)
+        }
+    }
+
+    fun setSsdpDiscoverable(enabled: Boolean) {
+        ssdpDiscoverable.set(enabled)
+        if (enabled) {
+            WeMoNetworkClient.registerLoopbackSsdpPort(ssdpUdpPort)
+        } else {
+            WeMoNetworkClient.unregisterLoopbackSsdpPort(ssdpUdpPort)
+        }
+    }
+
+    private val ssdpResponderThread = thread(start = true, isDaemon = true, name = "FakeWeMoSsdp-$ssdpUdpPort") {
+        val buf = ByteArray(2048)
+        while (running.get() && !ssdpUdpSocket.isClosed) {
+            try {
+                val packet = DatagramPacket(buf, buf.size)
+                ssdpUdpSocket.receive(packet)
+                if (!ssdpDiscoverable.get()) continue
+                val reqText = String(packet.data, 0, packet.length, Charsets.UTF_8)
+                if (reqText.contains("M-SEARCH", ignoreCase = true)) {
+                    val stMatch = Regex("(?m)^ST:\\s*(.+)$", RegexOption.IGNORE_CASE)
+                        .find(reqText)?.groupValues?.getOrNull(1)?.trim()
+                        ?: "urn:Belkin:service:basicevent:1"
+                    receivedSsdpSearches.add(stMatch)
+                    val responseText = buildString {
+                        append("HTTP/1.1 200 OK\r\n")
+                        append("CACHE-CONTROL: max-age=86400\r\n")
+                        append("EXT:\r\n")
+                        append("LOCATION: http://127.0.0.1:$port/setup.xml\r\n")
+                        append("OPT: \"http://schemas.upnp.org/upnp/1/0/\"; ns=01\r\n")
+                        append("ST: $stMatch\r\n")
+                        append("USN: $udn::$stMatch\r\n\r\n")
+                    }
+                    val respBytes = responseText.toByteArray(Charsets.UTF_8)
+                    val reply = DatagramPacket(respBytes, respBytes.size, packet.socketAddress)
+                    ssdpUdpSocket.send(reply)
+                }
+            } catch (_: Exception) {
+                if (!running.get()) break
+            }
+        }
+    }
 
     private val serverThread = thread(start = true, isDaemon = true, name = "FakeWeMoUpnpServer-$port") {
         while (running.get() && !serverSocket.isClosed) {
@@ -136,6 +192,7 @@ class FakeWeMoUpnpServer(
                     <iot>0</iot>
                     <binaryOption>0</binaryOption>
                     <binaryState>${if (relayStateOn.get()) 1 else 0}</binaryState>
+                    <brightness>${dimmerBrightness.get()}</brightness>
                   </device>
                 </root>
             """.trimIndent()
@@ -368,7 +425,10 @@ class FakeWeMoUpnpServer(
 
     override fun close() {
         running.set(false)
+        WeMoNetworkClient.unregisterLoopbackSsdpPort(ssdpUdpPort)
+        runCatching { ssdpUdpSocket.close() }
         runCatching { serverSocket.close() }
+        ssdpResponderThread.join(300)
         serverThread.join(500)
     }
 }

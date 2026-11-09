@@ -23,6 +23,8 @@ import com.example.network.WeMoSetupDeviceDescriptor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +35,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 enum class WeMoBottomTab {
     DEVICES,
@@ -177,7 +180,9 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             val initialKey = repository.ensureSeeded()
-            _activeNetworkKey.value = initialKey
+            if (_activeNetworkKey.value == DEFAULT_MAIN_HOME_KEY) {
+                _activeNetworkKey.value = initialKey
+            }
             if (!isDemoShowroomMode.value) {
                 reconnectCurrentHomeNetwork()
             }
@@ -215,18 +220,20 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // Phase 3 (Confirmed A1): Hybrid UPnP GENA Push Subscriptions + 30s Fallback Poll in Real LAN Mode
-        viewModelScope.launch {
-            var tick = 0
-            while (isActive) {
-                delay(30_000L)
-                if (!isDemoShowroomMode.value) {
-                    val key = _activeNetworkKey.value
-                    repository.pollActiveHomeStates(key)
-                    if (tick % 8 == 0) {
-                        // Renew GENA 300s subscriptions every ~240s
-                        repository.refreshGenaSubscriptionsForHome(key)
+        if (!WeMoRepository.isRunningInRobolectric()) {
+            viewModelScope.launch {
+                var tick = 0
+                while (isActive) {
+                    delay(30_000L)
+                    if (!isDemoShowroomMode.value) {
+                        val key = _activeNetworkKey.value
+                        repository.pollActiveHomeStates(key)
+                        if (tick % 8 == 0) {
+                            // Renew GENA 300s subscriptions every ~240s
+                            repository.refreshGenaSubscriptionsForHome(key)
+                        }
+                        tick++
                     }
-                    tick++
                 }
             }
         }
@@ -545,19 +552,21 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         if (_isRefreshing.value) return
         viewModelScope.launch {
             _isRefreshing.value = true
-            val activeKey = _activeNetworkKey.value
-            val activeSsid = currentWifiSsid()
-            val report = repository.executeSsdpScan(
-                searchTarget = searchTarget,
-                autoAdoptNew = autoAdoptNew,
-                activeNetworkKey = activeKey,
-                activeWifiSsid = activeSsid
-            )
-            delay(250)
-            _isRefreshing.value = false
-            showTransientStatus(
-                "SSDP Scan on $activeSsid (${report.scanDurationMs}ms): Found ${report.discoveredDevices.size} UPnP WeMi/WeMo devices"
-            )
+            try {
+                val activeKey = _activeNetworkKey.value
+                val activeSsid = currentWifiSsid()
+                val report = repository.executeSsdpScan(
+                    searchTarget = searchTarget,
+                    autoAdoptNew = autoAdoptNew,
+                    activeNetworkKey = activeKey,
+                    activeWifiSsid = activeSsid
+                )
+                showTransientStatus(
+                    "SSDP Scan on $activeSsid (${report.scanDurationMs}ms): Found ${report.discoveredDevices.size} UPnP WeMi/WeMo devices"
+                )
+            } finally {
+                _isRefreshing.value = false
+            }
         }
     }
 
