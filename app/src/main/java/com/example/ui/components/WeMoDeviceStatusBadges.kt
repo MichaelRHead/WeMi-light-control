@@ -11,6 +11,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +20,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,7 +32,9 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.WeMoConnectionQuality
@@ -45,6 +51,61 @@ internal val StatusSlowAmber = Color(0xFFD97706)
 internal val StatusSlowSoftBg = Color(0xFFFFFBEB)
 internal val StatusOfflineRed = Color(0xFFDC2626)
 internal val StatusOfflineSoftBg = Color(0xFFFEF2F2)
+
+/**
+ * Full-width switch title text that always keeps the entire device name visible across the card width
+ * and reactively reduces its font size (`maxFontSizeSp` down to `minFontSizeSp`) when a switch name
+ * is too long to fit at the default size.
+ */
+@Composable
+fun WeMoAutoShrinkSwitchName(
+    name: String,
+    color: Color,
+    maxFontSizeSp: Float = 18f,
+    minFontSizeSp: Float = 11f,
+    fontWeight: FontWeight = FontWeight.SemiBold,
+    fontFamily: FontFamily = WorkSansFontFamily,
+    modifier: Modifier = Modifier
+) {
+    val estimatedInitialSp = remember(name, maxFontSizeSp, minFontSizeSp) {
+        val len = name.length
+        val est = when {
+            len <= 24 -> maxFontSizeSp
+            len <= 30 -> maxFontSizeSp - 1.5f
+            len <= 36 -> maxFontSizeSp - 3f
+            len <= 44 -> maxFontSizeSp - 4.5f
+            len <= 54 -> maxFontSizeSp - 5.5f
+            else -> minFontSizeSp
+        }
+        est.coerceIn(minFontSizeSp, maxFontSizeSp)
+    }
+
+    var currentFontSizeSp by remember(name, maxFontSizeSp, minFontSizeSp) {
+        mutableFloatStateOf(estimatedInitialSp)
+    }
+
+    val allowSecondLine = currentFontSizeSp <= minFontSizeSp
+
+    Text(
+        text = name,
+        color = color,
+        fontFamily = fontFamily,
+        fontWeight = fontWeight,
+        fontSize = currentFontSizeSp.sp,
+        lineHeight = (currentFontSizeSp + 3f).sp,
+        maxLines = if (allowSecondLine) 2 else 1,
+        softWrap = allowSecondLine,
+        overflow = TextOverflow.Visible,
+        onTextLayout = { layoutResult ->
+            if ((layoutResult.didOverflowWidth || layoutResult.hasVisualOverflow) &&
+                currentFontSizeSp > minFontSizeSp
+            ) {
+                currentFontSizeSp = (currentFontSizeSp - 1f).coerceAtLeast(minFontSizeSp)
+            }
+        },
+        modifier = modifier.fillMaxWidth()
+    )
+}
 
 /**
  * Real-time connection status & latency indicator pill displayed on every discovered switch.

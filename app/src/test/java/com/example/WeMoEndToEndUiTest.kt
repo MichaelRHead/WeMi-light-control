@@ -129,17 +129,14 @@ class WeMoEndToEndUiTest {
     fun `verify E2E inline device diagnostics drawer, Ping RTT action, Edit Mode controls, and device rename`() {
         composeTestRule.waitForIdle()
 
-        // 1. Scroll to Christmas Tree Living (id=1), tap the row to expand WeMoDeviceDiagnosticsDrawer, and scroll drawer into view
+        // 1. Scroll to Christmas Tree Living (id=1), tap the row to expand WeMoDeviceDiagnosticsDrawer, and scroll Ping RTT into view
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasTestTag("device_row_1"))
         composeTestRule.onNodeWithText("Christmas Tree Living").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("devices_list")
-            .performScrollToNode(hasTestTag("device_row_2"))
-        composeTestRule.waitForIdle()
 
         // 2. Verify Ping RTT chip inside the expanded diagnostics drawer and trigger it
-        composeTestRule.onNodeWithTag("ping_device_1").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("ping_device_1").performScrollTo().assertIsDisplayed()
         composeTestRule.onNodeWithTag("ping_device_1").performClick()
         composeTestRule.waitForIdle()
 
@@ -159,7 +156,7 @@ class WeMoEndToEndUiTest {
         composeTestRule.onNodeWithTag("save_device_button").performClick()
         composeTestRule.waitForIdle()
 
-        // Exit Edit Mode and verify updated name is rendered in the device list
+        // Exit Edit Mode and verify updated name is rendered on its own full-width line above the status/category badges
         composeTestRule.onNodeWithTag("edit_devices_button").performClick()
         awaitLoopbackIo {
             runCatching {
@@ -169,6 +166,20 @@ class WeMoEndToEndUiTest {
             }.getOrDefault(false)
         }
         composeTestRule.onNodeWithText("Living Room Holiday Spruce").assertIsDisplayed()
+        val nameBounds = composeTestRule.onNodeWithTag("device_name_1", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val connBadgeBounds = composeTestRule.onNodeWithTag("connection_status_badge_1", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val catBadgeBounds = composeTestRule.onNodeWithTag("category_badge_1", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected switch name on line above connection badge (nameBounds=$nameBounds, connBadgeBounds=$connBadgeBounds)",
+            nameBounds.bottom <= connBadgeBounds.top + 4f
+        )
+        assertTrue(
+            "Expected switch name on line above category badge (nameBounds=$nameBounds, catBadgeBounds=$catBadgeBounds)",
+            nameBounds.bottom <= catBadgeBounds.top + 4f
+        )
     }
 
     @Test

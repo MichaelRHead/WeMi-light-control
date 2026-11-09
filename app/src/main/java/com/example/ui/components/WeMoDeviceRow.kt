@@ -10,6 +10,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,6 +34,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,12 +57,51 @@ import com.example.ui.theme.WemoDividerGray
 import com.example.ui.theme.WemoErrorRed
 import com.example.ui.theme.WemoGreenDark
 import com.example.ui.theme.WemoGreenPrimary
-import com.example.ui.theme.WemoGreenSoft
 import com.example.ui.theme.WemoRowSurface
 import com.example.ui.theme.WemoTextPrimary
 import com.example.ui.theme.WemoTextSecondary
 import com.example.ui.theme.WorkSansFontFamily
 
+/**
+ * Full-width switch title that reactively steps down its font size if a long switch name
+ * overflows the card width, ensuring the full switch name is always visible without occlusion.
+ */
+@Composable
+fun AutoResizingDeviceNameText(
+    text: String,
+    color: Color,
+    modifier: Modifier = Modifier,
+    initialFontSizeSp: Float = 18f,
+    minFontSizeSp: Float = 11f,
+    fontWeight: FontWeight = FontWeight.SemiBold
+) {
+    var fontSizeSp by remember(text, initialFontSizeSp) { mutableFloatStateOf(initialFontSizeSp) }
+    var allowWrapAtMinSize by remember(text, initialFontSizeSp) { mutableStateOf(false) }
+
+    Text(
+        text = text,
+        color = color,
+        fontFamily = WorkSansFontFamily,
+        fontWeight = fontWeight,
+        fontSize = fontSizeSp.sp,
+        lineHeight = (fontSizeSp * 1.2f).sp,
+        softWrap = allowWrapAtMinSize,
+        maxLines = if (allowWrapAtMinSize) 2 else 1,
+        overflow = TextOverflow.Visible,
+        onTextLayout = { layoutResult ->
+            if (!allowWrapAtMinSize && layoutResult.didOverflowWidth) {
+                if (fontSizeSp > minFontSizeSp) {
+                    fontSizeSp = (fontSizeSp * 0.90f).coerceAtLeast(minFontSizeSp)
+                } else {
+                    allowWrapAtMinSize = true
+                }
+            }
+        },
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun WeMoDeviceRow(
     device: WeMoDeviceEntity,
@@ -94,11 +140,11 @@ fun WeMoDeviceRow(
         ),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = 10.dp, vertical = 4.dp)
             .testTag("device_row_${device.id}")
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable {
@@ -109,79 +155,48 @@ fun WeMoDeviceRow(
                             else -> onToggleExpand()
                         }
                     }
-                    .padding(start = 14.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp)
             ) {
-                // Left: Semantic Category / Hardware Illustration with live connection status badge overlay
-                Box(
-                    modifier = Modifier.width(64.dp),
-                    contentAlignment = Alignment.CenterStart
-                ) {
-                    WeMoDeviceCategoryIllustration(
-                        category = device.visualCategory,
-                        isReachable = device.isReachable,
-                        isOn = device.isOn,
-                        brightness = device.brightness
-                    )
-                }
+                // Top Line: Full-width unobstructed Switch Name with reactive font size scaling
+                AutoResizingDeviceNameText(
+                    text = device.name,
+                    color = if (device.isReachable) WemoTextPrimary else WemoTextPrimary.copy(alpha = 0.65f),
+                    initialFontSizeSp = 17.5f,
+                    minFontSizeSp = 11f,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("device_name_${device.id}")
+                )
 
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
-                // Middle: Device Name + Room Badge + Category Badge + Real-Time Connection/Latency Indicator + Status
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.Center
+                // Second Line (Below Name): Hardware Illustration + Status/Category Widgets + Power/Edit Controls
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    // Left: Semantic Category / Hardware Illustration with live connection status badge overlay
+                    Box(
+                        modifier = Modifier.width(52.dp),
+                        contentAlignment = Alignment.CenterStart
                     ) {
-                        Text(
-                            text = device.name,
-                            color = if (device.isReachable) WemoTextPrimary else WemoTextPrimary.copy(alpha = 0.65f),
-                            fontFamily = WorkSansFontFamily,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 18.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
+                        WeMoDeviceCategoryIllustration(
+                            category = device.visualCategory,
+                            isReachable = device.isReachable,
+                            isOn = device.isOn,
+                            brightness = device.brightness,
+                            modifier = Modifier.size(width = 48.dp, height = 52.dp)
                         )
-                        Surface(
-                            color = WemoGreenSoft.copy(alpha = 0.7f),
-                            shape = RoundedCornerShape(5.dp)
-                        ) {
-                            Text(
-                                text = device.roomName,
-                                color = WemoGreenDark,
-                                fontFamily = WorkSansFontFamily,
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 10.sp,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
-                        Surface(
-                            color = Color(0xFFF1F5F9),
-                            shape = RoundedCornerShape(5.dp),
-                            border = BorderStroke(0.5.dp, Color(0xFFCBD5E1)),
-                            modifier = Modifier.testTag("category_badge_${device.id}")
-                        ) {
-                            Text(
-                                text = device.visualCategory.displayName,
-                                color = Color(0xFF475569),
-                                fontFamily = WorkSansFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 9.5.sp,
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
-                            )
-                        }
                     }
 
-                    Spacer(modifier = Modifier.height(5.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
 
-                    // Real-Time Connection Status & Latency Visual Indicator Row
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    // Middle: All secondary status, category, and telemetry widgets below the switch name
+                    FlowRow(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         WeMoConnectionStatusBadge(
                             device = device,
@@ -257,8 +272,25 @@ fun WeMoDeviceRow(
                                 )
                             }
                         }
+
+                        Surface(
+                            color = Color(0xFFF1F5F9),
+                            shape = RoundedCornerShape(5.dp),
+                            border = BorderStroke(0.5.dp, Color(0xFFCBD5E1)),
+                            modifier = Modifier.testTag("category_badge_${device.id}")
+                        ) {
+                            Text(
+                                text = device.visualCategory.displayName,
+                                color = Color(0xFF475569),
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 9.5.sp,
+                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                            )
+                        }
                     }
-                }
+
+                    Spacer(modifier = Modifier.width(6.dp))
 
                 // Right: Edit mode controls, Reconnect pill (for Offline), OR Cyan-Teal Power Toggle Ring
                 if (isEditMode) {
@@ -356,6 +388,7 @@ fun WeMoDeviceRow(
                             )
                         }
                     }
+                }
                 }
             }
 

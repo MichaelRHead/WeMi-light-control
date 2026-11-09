@@ -139,38 +139,76 @@ internal fun WeMoTvDeviceCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
+            // Top Line: Full-width unobstructed Switch Name with reactive font size scaling
+            AutoResizingDeviceNameText(
+                text = device.name,
+                color = TvTextPrimary,
+                initialFontSizeSp = 18f,
+                minFontSizeSp = 11f,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("tv_device_name_${device.id}")
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            val statusLabel = when {
+                isToggling -> "Sending SOAP SetBinaryState..."
+                !device.isReachable -> "Disconnected • Offline (Press OK to Retry)"
+                type == WeMoDeviceType.MOTION_SENSOR -> "${device.connectionBadgeText} • Motion: ${device.lastMotionTime ?: "Active"}"
+                type == WeMoDeviceType.LIGHTBULB_DIMMER ->
+                    if (device.isOn) "${device.connectionBadgeText} • ON (${device.brightness}%)" else "${device.connectionBadgeText} • OFF (Standby)"
+                else -> if (device.isOn) "${device.connectionBadgeText} • ON (${device.ipAddress})" else "${device.connectionBadgeText} • OFF (${device.ipAddress})"
+            }
+
+            // Second Line (Below Name): Hardware Illustration + Category/Status Telemetry + Power Indicator Ring
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = if (isHighlighted) {
-                        TvCyanFocusBorder.copy(alpha = 0.22f)
-                    } else {
-                        Color.White.copy(alpha = 0.08f)
-                    }
+                WeMoDeviceCategoryIllustration(
+                    category = device.visualCategory,
+                    isReachable = device.isReachable,
+                    isOn = device.isOn,
+                    brightness = device.brightness,
+                    modifier = Modifier.size(width = 40.dp, height = 50.dp)
+                )
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (isHighlighted) {
+                            TvCyanFocusBorder.copy(alpha = 0.22f)
+                        } else {
+                            Color.White.copy(alpha = 0.08f)
+                        }
                     ) {
-                        Icon(
-                            imageVector = iconForRoom(device.roomName),
-                            contentDescription = null,
-                            tint = TvCyanFocusBorder,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = device.roomName,
+                            text = device.visualCategory.displayName,
                             color = TvCyanFocusBorder,
                             fontFamily = WorkSansFontFamily,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
+                    Text(
+                        text = statusLabel,
+                        color = when {
+                            !device.isReachable -> Color(0xFFF87171)
+                            device.isOn -> TvCyanFocusBorder
+                            else -> Color(0xFFFBBF24)
+                        },
+                        fontFamily = WorkSansFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 // Distinct Power / Connection Status Ring (ON vs OFF-Standby vs Disconnected)
@@ -214,64 +252,6 @@ internal fun WeMoTvDeviceCard(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                WeMoDeviceCategoryIllustration(
-                    category = device.visualCategory,
-                    isReachable = device.isReachable,
-                    isOn = device.isOn,
-                    brightness = device.brightness,
-                    modifier = Modifier.size(width = 40.dp, height = 50.dp)
-                )
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = device.name,
-                        color = TvTextPrimary,
-                        fontFamily = WorkSansFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = device.visualCategory.displayName,
-                        color = TvCyanFocusBorder,
-                        fontFamily = WorkSansFontFamily,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            val statusLabel = when {
-                isToggling -> "Sending SOAP SetBinaryState..."
-                !device.isReachable -> "Disconnected • Offline (Press OK to Retry)"
-                type == WeMoDeviceType.MOTION_SENSOR -> "${device.connectionBadgeText} • Motion: ${device.lastMotionTime ?: "Active"}"
-                type == WeMoDeviceType.LIGHTBULB_DIMMER ->
-                    if (device.isOn) "${device.connectionBadgeText} • ON (${device.brightness}%)" else "${device.connectionBadgeText} • OFF (Standby)"
-                else -> if (device.isOn) "${device.connectionBadgeText} • ON (${device.ipAddress})" else "${device.connectionBadgeText} • OFF (${device.ipAddress})"
-            }
-
-            Text(
-                text = statusLabel,
-                color = when {
-                    !device.isReachable -> Color(0xFFF87171)
-                    device.isOn -> TvCyanFocusBorder
-                    else -> Color(0xFFFBBF24)
-                },
-                fontFamily = WorkSansFontFamily,
-                fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
 
             if (type == WeMoDeviceType.LIGHTBULB_DIMMER && device.isReachable) {
                 Spacer(modifier = Modifier.height(10.dp))

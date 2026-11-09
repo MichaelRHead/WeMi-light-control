@@ -54,17 +54,18 @@ Every switch row automatically displays a custom illustration and category badge
 
 ---
 
-## 4. Connection Quality & Latency Badge
+## 4. Full-Width Switch Name & Secondary Status Badges
 
-Below each switch's name, the **Connection Status Badge** shows real-time local Wi-Fi health:
+Each switch card displays its **friendly name across the full width of the top line** (reactively reducing the font size if a long switch name needs more room so the full name is always visible), without repeating the room name already shown on the room group header.
+
+On the line below each switch's name, the **Connection Status, Power State & Category Badges** show real-time local Wi-Fi health and classification:
 - **Pulsing Status Dot & 4-Bar Signal Meter**:
   - **4 Bars (Emerald — `Active • <= 28ms`)**: Fast local LAN response.
   - **3 Bars (Teal — `Active • 29–65ms`)**: Normal Wi-Fi response.
   - **2 Bars (Amber — `Slow • > 65ms`)**: Congested Wi-Fi or distant 2.4 GHz signal.
   - **0 Bars (Red — `Offline`)**: Switch did not respond on the local network.
-- **IP Address / Auto-Off Countdown**:
-  - Normally displays the switch's local IPv4 address (e.g., `192.168.1.104`).
-  - When an **Auto-Off Timer** is running for that switch, it switches to a live countdown (`Auto-Off 14:52`).
+- **IP Address / Auto-Off Countdown & Category Pill**:
+  - Displays the switch's local IPv4 address (e.g., `192.168.1.104`) or a live countdown (`Auto-Off 14:52`) alongside the semantic category pill (`Tree Lights`, `Fan`, `Light`, `Motion`, `Switch`).
 
 ---
 
