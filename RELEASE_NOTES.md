@@ -12,7 +12,7 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
-| **[`v20.0`](#version-200-versioncode--20--november-9-2026)** | `20` | Nov 9, 2026 | Unified 9-port Wi-Fi-bound self-healing reconnect, 3-tier hardware identity matching, CamelCase/`Ensuite` room grouping & streamlined setup debug panel |
+| **[`v20.0`](#version-200-versioncode--20--november-9-2026)** | `20` | Nov 9, 2026 | Unified 9-port Wi-Fi-bound self-healing reconnect, 3-tier hardware identity matching, CamelCase/`Ensuite` room grouping & instant offline recovery |
 | **[`v19.0`](#version-190-versioncode--19--november-9-2026)** | `19` | Nov 9, 2026 | Dedicated Troubleshooting & Telemetry Sharing Guide (`wemi-telemetry-latest.txt`) for 1-tap support diagnostics |
 | **[`v18.0`](#version-180-versioncode--18--november-9-2026)** | `18` | Nov 9, 2026 | Accessibility & navigation polish: 48dp+ touch targets, TalkBack switch labels, and predictable Back-button flows |
 | **[`v17.0`](#version-170-versioncode--17--november-89-2026)** | `17` | Nov 8–9, 2026 | Major `10.22.22.1` factory-reset setup reliability upgrade, on-screen screenshot debug card, smart room matching & top-first dimmer slider |

@@ -8,7 +8,7 @@ Detailed agent instructions, UX design architecture, debugging & support archite
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — **On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture** (**Owned Exclusively by the Antigravity Debugging & Support Agent** — read-only for all other agents)
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — **Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture** (**Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent** — read-only for all other agents)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
-- [`RELEASE_NOTES.md`](RELEASE_NOTES.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v20.0`)
+- [`RELEASE_NOTES.md`](RELEASE_NOTES.md) & [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v20.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v20.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
