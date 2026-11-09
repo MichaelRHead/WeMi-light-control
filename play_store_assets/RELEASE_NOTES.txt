@@ -1,6 +1,6 @@
 <en-US>
-What's new in WeMi Switch Control v19.0 (Phone, Tablet & Android TV):
+What's new in WeMi Switch Control v20.0 (Phone, Tablet & Android TV):
 • Zero-cloud 10.22.22.1 setup for factory-reset WeMo switches & dimmers with on-screen debug details and one-tap telemetry export.
+• Unified 9-port Wi-Fi-bound self-healing reconnect across all switch, dimmer, and Night Mode commands with live UPnP GENA push sync.
 • Expanded smart room grouping (Bedroom, Hallway & Landing, Kitchen, Unassigned) with one-tap LAN Reset & Rescan.
-• Distinct 3-state ON, OFF Standby, and Disconnected icons plus top-first dimmer brightness presets (1%–100%) and Night Mode (20%).
 </en-US>

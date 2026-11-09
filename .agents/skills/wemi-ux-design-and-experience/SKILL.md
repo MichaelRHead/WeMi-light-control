@@ -62,9 +62,9 @@ Whenever modifying or reviewing UI components in `app/src/main/java/com/example/
 
 ## 3. Critical User Journeys (CUJ Verification Checklist)
 
-Every major UX flow is backed by deterministic Robolectric + Jetpack Compose E2E tests in [`ExampleRobolectricTest.kt`](../../app/src/test/java/com/example/ExampleRobolectricTest.kt) and [`WeMoEndToEndUiTest.kt`](../../app/src/test/java/com/example/WeMoEndToEndUiTest.kt):
+Every major UX flow is backed by deterministic Robolectric + Jetpack Compose E2E tests (`26/26` total tests) across [`ExampleRobolectricTest.kt`](../../app/src/test/java/com/example/ExampleRobolectricTest.kt), [`WeMoEndToEndUiTest.kt`](../../app/src/test/java/com/example/WeMoEndToEndUiTest.kt), and [`WeMoHardwareCujEndToEndTest.kt`](../../app/src/test/java/com/example/WeMoHardwareCujEndToEndTest.kt):
 
 - **CUJ 1 (Reset → SSDP UDP Discovery → Auto-Adopt & Manual Adopt)**: `reset_lan_data_chip` → `confirm_reset_empty_button` → `empty_state_scan_ssdp_button` → `open_ssdp_scanner_button` → `adopt_ssdp_device_<Name>`.
-- **CUJ 2 (Optimistic Switch Toggle & Offline Reconnect Ring)**: `power_button_${id}` (`Toggle power for <Name>, currently Off/On`) and `reconnect_button_${id}` (`Reconnect <Name>`).
+- **CUJ 2 (Optimistic Switch Toggle, 9-Port Self-Healing Offline Reconnect Ring & GENA Push UI Transition)**: `power_button_${id}` (`Toggle power for <Name>, currently Off/On`), `reconnect_button_${id}` (`Reconnect <Name>`), live GENA `NOTIFY` push updates, and `export_telemetry_file_button` on the `More` tab.
 - **CUJ 3 (Multi-Modal Dimmer Scaling)**: Preset chips (`75%`, `21%`), continuous `brightness_slider_${id}`, `Night Mode (20%)`, `room_dimmer_button_${room}` → `room_dimmer_slider_${room}`, and `wemi TV` (`tv_remote_dpad_dim_up`, `tv_remote_dpad_dim_down`, `tv_scene_movie`).
-- **CUJ 4 (Zero-Cloud `10.22.22.1` Provisioning & Screenshot Debug Panel)**: `open_provision_ap_wizard_button` → `provision_ap_status_box` → `provision_debug_panel` (`Copy`, `Save/Share`, `keep_provision_dialog_open_chip`, and all 6 `pywemo` AES-128-CBC method × length-suffix chips).
+- **CUJ 4 (Zero-Cloud `10.22.22.1` Provisioning & Screenshot Debug Panel — `WeMoProvisionDebugPanel.kt`)**: `open_provision_ap_wizard_button` → `provision_ap_status_box` → `provision_debug_panel` (`Copy`, `Save/Share`, `keep_provision_dialog_open_chip`, and all 6 `pywemo` AES-128-CBC method × length-suffix chips).

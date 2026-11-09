@@ -193,7 +193,7 @@ When the user taps a switch's power ring or adjusts a dimmer slider/preset (`WeM
    - **Step 1 (Probe)**: Reads `/setup.xml` and `GetMetaInfo` over a Wi-Fi-bound socket (`createWifiBoundSocketFactory`) to display the exact hardware model (`F7C030`, `WLS040`, `F7C059`, `WDS060`, `F7C063`, `WSP080`), MAC, and Serial Number.
    - **Step 2 (Scan 2.4 GHz APs)**: Executes `WiFiSetup1#GetApList` / `GetNetworkList` (`8500ms` site-survey timeout) so the user can tap their home 2.4 GHz SSID from a live signal-strength list.
    - **Step 3 (Encrypt & Connect)**: Encrypts the password via `pywemo`-exact OpenSSL `EVP_BytesToKey` AES-128-CBC (`WeMoPasswordCrypto`), sends `ConnectHomeNetwork` twice (bridging firmware `Status=2`), and polls `GetNetworkStatus` for up to 20 seconds.
-   - **Non-Destructive Failure Handling & Screenshot Telemetry**: If the password fails (`NetworkStatus=0` or `2`), `CloseSetup` is **withheld** so the switch's `10.22.22.1` AP stays open for an immediate retry, and a collapsible **`SETUP DEBUG DETAILS`** card (`WeMoSetupDebugSnapshot`) renders full diagnostic telemetry on-screen for single-screenshot debugging.
+   - **Non-Destructive Failure Handling & Screenshot Telemetry (`WeMoProvisionDebugPanel.kt`)**: If the password fails (`NetworkStatus=0` or `2`), `CloseSetup` is **withheld** so the switch's `10.22.22.1` AP stays open for an immediate retry, and a collapsible **`SETUP DEBUG DETAILS`** card (`WeMoProvisionDebugPanel` / `WeMoSetupDebugSnapshot`) renders full diagnostic telemetry on-screen for single-screenshot debugging and `wemi-telemetry-latest.txt` export.
 
 ---
 
@@ -204,4 +204,4 @@ Before committing any UI, ViewModel, or Repository change, verify that:
 - [ ] **3-State Visual Redundancy**: `ON`, `OFF (Accessible Standby)`, and `Disconnected` remain visually distinct across color, center `Canvas` icon (`"I/O"` vs. diagonal slash), border style (solid vs. dashed), and status pill text.
 - [ ] **Dimmer Controls First**: Expanded `LIGHTBULB_DIMMER` rows render the brightness slider, quick presets (`1%`–`100%`), and Night Mode toggle at the top of `WeMoExpandedDrawer` before network metadata.
 - [ ] **48dp+ Touch Targets & Semantics**: All interactive controls meet `>= 48.dp` touch target minimums, include `Role` / `contentDescription` semantics, and carry deterministic `Modifier.testTag(...)` identifiers.
-- [ ] **End-to-End Tests Pass**: `./gradlew testDebugUnitTest --rerun-tasks` passes all 25 Robolectric unit, protocol, and Compose E2E UI tests (`WeMoEndToEndUiTest`).
+- [ ] **End-to-End Tests Pass**: `./gradlew testDebugUnitTest --rerun-tasks` passes all 26 Robolectric unit, protocol, and Compose E2E UI tests (`ExampleRobolectricTest`, `WeMoEndToEndUiTest`, and `WeMoHardwareCujEndToEndTest`).

@@ -4,6 +4,8 @@ Welcome to **WeMi Light Control**, a 100% local-network Android and Android TV c
 
 **WeMi Light Control** communicates directly with your switches over your home Wi-Fi using standard local UPnP, SSDP, SOAP, and GENA push protocols — **no Belkin cloud account, external server, or internet connection is required**.
 
+> **What's New in Each Version?** See the **[User-Facing Release Notes (`RELEASE_NOTES.md`)](RELEASE_NOTES.md)** for a high-level summary of major features and improvements in every Google Play Store release (`v1.0` → `v20.0`).
+
 ---
 
 ## Feature Guides Index
@@ -34,9 +36,10 @@ Each guide below explains one major area of the app in detail:
 
 ---
 
-## Developer & Architecture Documentation
+## Release Notes, Developer & Architecture Documentation
 
-For UX architecture, protocol details, architecture diagrams, and roadmap information, see:
+For release-by-release highlights, UX architecture, protocol details, architecture diagrams, and roadmap information, see:
+- [`RELEASE_NOTES.md`](RELEASE_NOTES.md) — User-Facing Release Notes for Every Google Play Store Version (`v1.0` → `v20.0`)
 - [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
 - [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & Critical User Journeys *(Owned Exclusively by the Google AI Studio Agent)*
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent)*

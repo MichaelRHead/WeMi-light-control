@@ -17,11 +17,12 @@ All project-level, architectural, UX, and engineering documents live **exclusive
 | [`../UX_DESIGN_AND_EXPERIENCE.md`](../UX_DESIGN_AND_EXPERIENCE.md) | Behavioral mental models, 5 Compose layout invariants & Critical User Journeys (CUJs) | **Google AI Studio Agent ONLY (Read-Only for other agents)** |
 | [`../DEBUGGING_AND_SUPPORT.md`](../DEBUGGING_AND_SUPPORT.md) | On-device screenshot & `wemi-telemetry-latest.txt` diagnostics, `10.22.22.1` provisioning invariants & support architecture | **Antigravity Debugging & Support Agent ONLY (Read-Only for other agents)** |
 | [`../USER_GUIDE.md`](../USER_GUIDE.md) | Top-level entry point & summary table linking to the human feature guides in `docs/user-guide/` | Shared across agents |
+| [`../RELEASE_NOTES.md`](../RELEASE_NOTES.md) | High-level user-facing Google Play Store Release Notes by version (`v1.0` → `v20.0`) | Shared across agents |
 | [`../IMPLEMENTED.md`](../IMPLEMENTED.md) | Reverse-chronological feature & bug-fix change log (newest at top) | Shared across agents |
 | [`../UPCOMING_FEATURES.md`](../UPCOMING_FEATURES.md) | Next-iteration engineering roadmap | Shared across agents |
 | [`../CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../CODE_QUALITY_AND_MODULARIZATION_PLAN.md) | Code modularization & E2E validation plan | Shared across agents |
 
-> **Rule**: Never run `cp IMPLEMENTED.md docs/IMPLEMENTED.md` or recreate `docs/IMPLEMENTED.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`.
+> **Rule**: Never run `cp IMPLEMENTED.md docs/IMPLEMENTED.md` or recreate `docs/IMPLEMENTED.md`, `docs/RELEASE_NOTES.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`.
 
 ---
 

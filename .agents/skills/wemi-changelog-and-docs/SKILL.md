@@ -19,15 +19,17 @@ Use this skill whenever you land a feature, bug fix, UI change, or architectural
 >   - [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md) *(Owned Exclusively by the Google AI Studio Agent — Read-Only for other agents)*
 >   - [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) *(Owned Exclusively by the Antigravity Debugging & Support Agent — Read-Only for other agents)*
 >   - [`IMPLEMENTED.md`](../../IMPLEMENTED.md)
+>   - [`RELEASE_NOTES.md`](../../RELEASE_NOTES.md)
 >   - [`UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md)
 >   - [`USER_GUIDE.md`](../../USER_GUIDE.md)
 >   - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../../CODE_QUALITY_AND_MODULARIZATION_PLAN.md)
 > - **The `docs/` folder is dedicated EXCLUSIVELY to the human-focused user guide** ([`docs/README.md`](../../docs/README.md) and [`docs/user-guide/*.md`](../../docs/user-guide/), where [`docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md) is owned exclusively by the Antigravity Debugging & Support Agent).
-> - **Do NOT copy or mirror `ALL_CAPS.md` files into `docs/`** (never create `docs/IMPLEMENTED.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`).
+> - **Do NOT copy or mirror `ALL_CAPS.md` files into `docs/`** (never create `docs/IMPLEMENTED.md`, `docs/RELEASE_NOTES.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`).
 
 | File Path | Role & Format |
 | :--- | :--- |
 | [`IMPLEMENTED.md`](../../IMPLEMENTED.md) | **Reverse-Chronological Feature Change Log**: Records every completed feature, bug fix, and improvement from **newest at the top to oldest at the bottom**, including the PST timestamp, version/commit reference, summary table row, and detailed bullet points. |
+| [`RELEASE_NOTES.md`](../../RELEASE_NOTES.md) | **User-Facing Google Play Store Release Notes**: High-level, non-technical summary of major user-facing features and improvements introduced in each Play Store release version (`v1.0` → `v20.0+`). |
 | [`UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md) | **Upcoming Features Roadmap**: Lists planned/unimplemented features and engineering tracks. When an upcoming feature is implemented, remove it from `UPCOMING_FEATURES.md` and prepend it to `IMPLEMENTED.md`. |
 | [`USER_GUIDE.md`](../../USER_GUIDE.md) | **User Guide Index**: Summarizes each user-facing feature in a table and links to detailed guides under [`docs/user-guide/`](../../docs/user-guide/). |
 | [`docs/user-guide/*.md`](../../docs/user-guide/) | **Detailed Human-Focused Feature Guides**: Individual user-facing guides (`main-screen.md`, `switch-discovery.md`, `fresh-device-setup.md`, `room-grouping.md`, `editing-and-managing-devices.md`, `wifi-homes.md`, `rules-and-timers.md`, `more-and-tv-mode.md`, `telemetry-and-troubleshooting.md`). |
