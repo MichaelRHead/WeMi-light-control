@@ -20,11 +20,22 @@ internal class WeMoProvisioningCoordinator(
     private val appendLog: (SoapLogEntry) -> Unit,
     private val nowFormatted: () -> String
 ) {
+    @Volatile
+    var lastDetectedDescriptor: WeMoSetupDeviceDescriptor? = null
+        private set
+
+    @Volatile
+    var lastScannedAps: List<WeMoScannedAp> = emptyList()
+        private set
+
+    fun latestProbeDiagnosticSummary(): String = provisionerClient.lastProbeDiagnosticSummary
+
+    fun latestApScanDiagnosticSummary(): String = provisionerClient.lastApScanDiagnosticSummary
 
     /**
      * Probes the factory-reset Belkin WeMo Setup AP at [apHost] (`10.22.22.1`) for its
      * `/setup.xml` / `/Lightsetup.xml` and `GetMetaInfo` descriptor (including `<rtos>`, `<iot>`,
-     * `<binaryOption>`, and recommended AES-128-CBC encryption method).
+     * `<binaryOption>`, `<new_algo>`, and recommended AES-128-CBC encryption method).
      */
     suspend fun probeSetupApDevice(
         apHost: String = "10.22.22.1",
@@ -34,9 +45,12 @@ internal class WeMoProvisioningCoordinator(
             apHost == "10.22.22.1" &&
             !detectCurrentLanIp().startsWith("10.22.22.")
         val live = if (useFastDemo) null else provisionerClient.probeSetupDevice(apHost = apHost, preferredPort = apPort)
-        if (live != null) return live
+        if (live != null) {
+            lastDetectedDescriptor = live
+            return live
+        }
         if (isDemoShowroomMode() && apHost == "10.22.22.1") {
-            return WeMoSetupDeviceDescriptor(
+            val demo = WeMoSetupDeviceDescriptor(
                 host = apHost,
                 port = apPort,
                 friendlyName = "WeMo Smart Switch",
@@ -51,9 +65,17 @@ internal class WeMoProvisioningCoordinator(
                 isIot = false,
                 binaryOption = false,
                 recommendedEncryptionMethod = 2,
-                recommendedAddLengths = false
+                recommendedAddLengths = false,
+                newAlgo = false,
+                setupXmlPath = "/setup.xml",
+                macAndSerialSource = "DemoShowroom",
+                rawMetaInfo = "EC1A59881122|221840K01088SETUP|WLS040|WeMo_WW_2.00.11563.PVT-RTOS|Wemo.LS3W.881|WLS040",
+                probeTraceSummary = ":49152/setup.xml=DEMO_OK"
             )
+            lastDetectedDescriptor = demo
+            return demo
         }
+        lastDetectedDescriptor = null
         return null
     }
 
@@ -68,8 +90,18 @@ internal class WeMoProvisioningCoordinator(
         val useFastDemo = isDemoShowroomMode() &&
             apHost == "10.22.22.1" &&
             !detectCurrentLanIp().startsWith("10.22.22.")
-        val liveList = if (useFastDemo) emptyList() else provisionerClient.fetchAvailableApList(apHost = apHost, apPort = apPort)
+        val cachedDescriptor = lastDetectedDescriptor?.takeIf { it.host == apHost && it.port == apPort }
+        val liveList = if (useFastDemo) {
+            emptyList()
+        } else {
+            provisionerClient.fetchAvailableApList(
+                apHost = apHost,
+                apPort = apPort,
+                knownDescriptor = cachedDescriptor
+            )
+        }
         if (liveList.isNotEmpty()) {
+            lastScannedAps = liveList
             appendLog(
                 SoapLogEntry(
                     timestamp = nowFormatted(),
@@ -90,6 +122,7 @@ internal class WeMoProvisioningCoordinator(
                 WeMoScannedAp("PineLake-Cabin-WiFi", channel = 11, signalStrengthPercent = 78, authMode = "WPA2PSK", encryptionType = "AES"),
                 WeMoScannedAp("Studio-Guest-LAN", channel = 6, signalStrengthPercent = 68, authMode = "WPA2PSK", encryptionType = "TKIPAES")
             )
+            lastScannedAps = demoAps
             appendLog(
                 SoapLogEntry(
                     timestamp = nowFormatted(),
@@ -103,6 +136,7 @@ internal class WeMoProvisioningCoordinator(
             )
             return demoAps
         }
+        lastScannedAps = emptyList()
         return emptyList()
     }
 
@@ -126,30 +160,45 @@ internal class WeMoProvisioningCoordinator(
         roomName: String? = null,
         deviceType: WeMoDeviceType? = null,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
-        maxStatusPolls: Int = 10,
-        statusPollDelayMs: Long = 750L
+        maxStatusPolls: Int = 18,
+        statusPollDelayMs: Long = 1000L,
+        onProgress: ((String) -> Unit)? = null
     ): WeMoProvisionResult {
         val useFastDemo = isDemoShowroomMode() &&
             apHost == "10.22.22.1" &&
             !detectCurrentLanIp().startsWith("10.22.22.")
-        val liveResult = if (useFastDemo) null else provisionerClient.provisionDeviceToHomeWifi(
-            apHost = apHost,
-            apPort = apPort,
-            ssid = ssid,
-            plainPassword = plainPassword,
-            channel = channel,
-            authMode = authMode,
-            encryptionType = encryptionType,
-            encryptionMethod = encryptionMethod,
-            addPasswordLengths = addPasswordLengths,
-            customFriendlyName = customDeviceName,
-            maxStatusPolls = maxStatusPolls,
-            statusPollDelayMs = statusPollDelayMs
-        )
+        val cachedDescriptor = lastDetectedDescriptor?.takeIf { it.host == apHost }
+        val liveResult = if (useFastDemo) {
+            null
+        } else {
+            provisionerClient.provisionDeviceToHomeWifi(
+                apHost = apHost,
+                apPort = cachedDescriptor?.port ?: apPort,
+                ssid = ssid,
+                plainPassword = plainPassword,
+                channel = channel,
+                authMode = authMode,
+                encryptionType = encryptionType,
+                encryptionMethod = encryptionMethod,
+                addPasswordLengths = addPasswordLengths,
+                customFriendlyName = customDeviceName,
+                maxStatusPolls = maxStatusPolls,
+                statusPollDelayMs = statusPollDelayMs,
+                knownDescriptor = cachedDescriptor,
+                knownScannedAps = lastScannedAps,
+                onProgress = onProgress
+            )
+        }
 
         val finalResult = if ((liveResult == null || (!liveResult.success && liveResult.networkStatusCode != 2)) && isDemoShowroomMode() && apHost == "10.22.22.1") {
             val isOpen = encryptionType.equals("NONE", ignoreCase = true) || authMode.equals("OPEN", ignoreCase = true) || plainPassword.isEmpty()
             if (!isOpen && plainPassword.length in 1..7) {
+                val trace = listOf(
+                    "[DEMO] Validating WPA2 password length (${plainPassword.length} chars)",
+                    "[STEP 5 SEND] ConnectHomeNetwork(\"$ssid\") -> Status=2 (ShortPassword < 8 chars)",
+                    "[STEP 6 HOLD] Setup AP left open for password correction"
+                )
+                trace.forEach { onProgress?.invoke(it) }
                 WeMoProvisionResult(
                     success = false,
                     networkStatusCode = 2,
@@ -163,7 +212,8 @@ internal class WeMoProvisioningCoordinator(
                         statusText = "ShortPassword (Status=2): < 8 chars",
                         xmlSnippet = "<NetworkStatus>2</NetworkStatus>",
                         isLiveLanSuccess = false
-                    )
+                    ),
+                    debugTraceLines = trace
                 )
             } else {
                 val demoDescriptor = probeSetupApDevice(apHost, apPort)
@@ -180,6 +230,14 @@ internal class WeMoProvisioningCoordinator(
                     ?: demoDescriptor?.friendlyName
                     ?: "WeMo Smart Switch"
                 val msg = "Provisioned '$resolvedLabel' to '$ssid' (Status=1, Method $effMethod) • Added to switches"
+                val trace = listOf(
+                    "[STEP 1 PROBE] DEMO 10.22.22.1:49152 (/setup.xml) model=WLS040 rtos=true",
+                    "[STEP 4 CRYPTO] Method=$effMethod addLengths=$effLengths plainLen=${plainPassword.length} encLen=${encPwd.length}",
+                    "[STEP 5 SEND #1/2] ConnectHomeNetwork(\"$ssid\", Ch=$channel, $authMode/$encryptionType) -> PairingStatus=1",
+                    "[POLL #1] GetNetworkStatus -> Status=1 (Connected)",
+                    "[STEP 6 CLOSE] CloseSetup -> success | SetSetupDoneStatus -> HTTP_200"
+                )
+                trace.forEach { onProgress?.invoke(it) }
                 WeMoProvisionResult(
                     success = true,
                     networkStatusCode = 1,
@@ -200,7 +258,8 @@ internal class WeMoProvisioningCoordinator(
                     setupDevice = demoDescriptor?.copy(
                         friendlyName = resolvedLabel,
                         deviceType = deviceType ?: demoDescriptor.deviceType
-                    )
+                    ),
+                    debugTraceLines = trace
                 )
             }
         } else {

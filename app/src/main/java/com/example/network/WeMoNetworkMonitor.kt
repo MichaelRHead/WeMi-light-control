@@ -21,7 +21,9 @@ data class LanNetworkSnapshot(
     val localIpv4: String = "192.168.1.50",
     val subnetPrefix: String = "192.168.1",
     val gatewayIp: String = "192.168.1.1",
-    val isWemoSetupApSubnet: Boolean = false
+    val isWemoSetupApSubnet: Boolean = false,
+    val interfaceName: String = "wlan0",
+    val isWifiSocketBound: Boolean = false
 )
 
 /**
@@ -56,6 +58,7 @@ class WeMoNetworkMonitor(
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
+                lastCallbackWifiNetwork = network
                 val prevSubnet = _networkState.value.subnetPrefix
                 val next = computeSnapshot(network)
                 _networkState.value = next
@@ -65,8 +68,9 @@ class WeMoNetworkMonitor(
             }
 
             override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
+                lastCallbackWifiNetwork = network
                 val prevSubnet = _networkState.value.subnetPrefix
-                val next = computeSnapshotFromLinkProperties(linkProperties) ?: computeSnapshot(network)
+                val next = computeSnapshotFromLinkProperties(linkProperties, isBound = true) ?: computeSnapshot(network)
                 _networkState.value = next
                 if (next.subnetPrefix != prevSubnet) {
                     onSubnetChanged?.invoke(next)
@@ -74,6 +78,9 @@ class WeMoNetworkMonitor(
             }
 
             override fun onLost(network: Network) {
+                if (lastCallbackWifiNetwork == network) {
+                    lastCallbackWifiNetwork = null
+                }
                 _networkState.value = computeSnapshot()
             }
         }
@@ -105,14 +112,14 @@ class WeMoNetworkMonitor(
             if (targetNet != null) {
                 val lp = runCatching { cm.getLinkProperties(targetNet) }.getOrNull()
                 if (lp != null) {
-                    computeSnapshotFromLinkProperties(lp)?.let { return it }
+                    computeSnapshotFromLinkProperties(lp, isBound = true)?.let { return it }
                 }
             }
         }
         return computeSnapshotFromInterfaces()
     }
 
-    private fun computeSnapshotFromLinkProperties(lp: LinkProperties): LanNetworkSnapshot? {
+    private fun computeSnapshotFromLinkProperties(lp: LinkProperties, isBound: Boolean = true): LanNetworkSnapshot? {
         val ipv4 = lp.linkAddresses
             .mapNotNull { it.address as? Inet4Address }
             .firstOrNull { !it.isLoopbackAddress && !(it.hostAddress ?: "").startsWith("169.254.") }
@@ -123,17 +130,21 @@ class WeMoNetworkMonitor(
             .mapNotNull { it.gateway as? Inet4Address }
             .firstOrNull { !it.isLoopbackAddress && (it.hostAddress ?: "0.0.0.0") != "0.0.0.0" }
             ?.hostAddress ?: "$prefix.1"
+        val ifName = lp.interfaceName?.takeIf { it.isNotBlank() } ?: "wlan0"
 
         return LanNetworkSnapshot(
             isConnected = true,
             localIpv4 = ipv4,
             subnetPrefix = prefix,
             gatewayIp = gateway,
-            isWemoSetupApSubnet = prefix == "10.22.22"
+            isWemoSetupApSubnet = prefix == "10.22.22",
+            interfaceName = ifName,
+            isWifiSocketBound = isBound
         )
     }
 
     private fun computeSnapshotFromInterfaces(): LanNetworkSnapshot {
+        var resolvedIfName = "wlan0"
         val ip = try {
             val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
             val sorted = interfaces.sortedBy { nif ->
@@ -152,6 +163,7 @@ class WeMoNetworkMonitor(
                         val h = addr.hostAddress ?: continue
                         if (!h.startsWith("169.254.")) {
                             found = h
+                            resolvedIfName = nif.name
                             break
                         }
                     }
@@ -164,16 +176,23 @@ class WeMoNetworkMonitor(
         }
 
         val prefix = ip.substringBeforeLast('.', "192.168.1")
+        val cm = connectivityManager
+        val boundNet = findPreferredWifiOrLanNetwork(cm)
         return LanNetworkSnapshot(
             isConnected = true,
             localIpv4 = ip,
             subnetPrefix = prefix,
             gatewayIp = "$prefix.1",
-            isWemoSetupApSubnet = prefix == "10.22.22"
+            isWemoSetupApSubnet = prefix == "10.22.22",
+            interfaceName = resolvedIfName,
+            isWifiSocketBound = boundNet != null
         )
     }
 
     companion object {
+        @Volatile
+        private var lastCallbackWifiNetwork: Network? = null
+
         /**
          * Finds the active Wi-Fi or Ethernet [Network] even when Android has not marked it as the
          * default Internet network (e.g. when connected to a Belkin WeMo Setup AP at 10.22.22.1
@@ -181,18 +200,34 @@ class WeMoNetworkMonitor(
          */
         @Suppress("DEPRECATION")
         fun findPreferredWifiOrLanNetwork(cm: ConnectivityManager?): Network? {
-            if (cm == null) return null
+            val cached = lastCallbackWifiNetwork
+            if (cm == null) return cached
             return runCatching {
+                if (cached != null) {
+                    val caps = cm.getNetworkCapabilities(cached)
+                    if (caps != null && (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+                    ) {
+                        return@runCatching cached
+                    }
+                }
                 val networks = cm.allNetworks.orEmpty()
-                // Prefer a TRANSPORT_WIFI network that has a valid IPv4 address (especially 10.22.22.x or LAN)
+                // Prefer a TRANSPORT_WIFI network on 10.22.22.x first, then any TRANSPORT_WIFI, then Ethernet
                 networks.firstOrNull { net ->
+                    val caps = cm.getNetworkCapabilities(net)
+                    val lp = cm.getLinkProperties(net)
+                    val hasSetupIp = lp?.linkAddresses?.any {
+                        (it.address as? Inet4Address)?.hostAddress?.startsWith("10.22.22.") == true
+                    } == true
+                    caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) && hasSetupIp
+                } ?: networks.firstOrNull { net ->
                     val caps = cm.getNetworkCapabilities(net)
                     caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
                 } ?: networks.firstOrNull { net ->
                     val caps = cm.getNetworkCapabilities(net)
                     caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
                 }
-            }.getOrNull()
+            }.getOrNull() ?: cached
         }
 
         /**

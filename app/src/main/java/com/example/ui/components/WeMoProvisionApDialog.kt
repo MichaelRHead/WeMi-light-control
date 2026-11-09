@@ -1,11 +1,14 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -32,16 +35,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.WeMoDeviceType
 import com.example.data.WeMoRepository
 import com.example.data.classifyDeviceCategory
 import com.example.data.inferRoomFromName
 import com.example.network.WeMoScannedAp
+import com.example.network.WeMoSetupDebugSnapshot
 import com.example.network.WeMoSetupDeviceDescriptor
 import com.example.ui.theme.WemoErrorRed
 import com.example.ui.theme.WemoGreenDark
@@ -57,6 +65,7 @@ fun ProvisionWeMoApDialog(
     defaultSsid: String = "",
     detectedDevice: WeMoSetupDeviceDescriptor? = null,
     statusMessage: String? = null,
+    debugSnapshot: WeMoSetupDebugSnapshot = WeMoSetupDebugSnapshot(),
     onScanApList: (String) -> Unit,
     onProvision: (
         apHost: String,
@@ -69,6 +78,19 @@ fun ProvisionWeMoApDialog(
         customDeviceName: String,
         roomName: String
     ) -> Unit,
+    onProvisionAdvanced: ((
+        apHost: String,
+        ssid: String,
+        password: String,
+        channel: Int,
+        authMode: String,
+        encryptionType: String,
+        encryptionMethod: Int,
+        addPasswordLengths: Boolean?,
+        customDeviceName: String,
+        roomName: String,
+        keepDialogOpenOnSuccess: Boolean
+    ) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
     var apHost by remember { mutableStateOf("10.22.22.1") }
@@ -77,8 +99,11 @@ fun ProvisionWeMoApDialog(
     var channelText by remember { mutableStateOf("6") }
     var authMode by remember { mutableStateOf("WPA2PSK") }
     var encryptionType by remember { mutableStateOf("AES") }
-    // 0 = Auto-Detect from /setup.xml (<rtos>, <iot>, <binaryOption>), 1 = Method 1, 2 = Method 2, 3 = Method 3
+    // 0 = Auto-Detect from /setup.xml (<rtos>, <iot>, <binaryOption>, <new_algo>), 1 = Method 1, 2 = Method 2, 3 = Method 3
     var encryptionMethod by remember { mutableIntStateOf(0) }
+    // null = Auto (true for Method 1/3, false for Method 2), true = Append +4 hex lengths, false = No length suffix
+    var addPasswordLengthsOverride by remember { mutableStateOf<Boolean?>(null) }
+    var keepDialogOpenOnSuccess by remember { mutableStateOf(false) }
     var customDeviceName by remember { mutableStateOf(detectedDevice?.friendlyName.orEmpty()) }
     var selectedRoom by remember { mutableStateOf("Living Room") }
 
@@ -132,10 +157,10 @@ fun ProvisionWeMoApDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                val isWarningOrError = detectedDevice == null &&
-                    (statusMessage?.contains("No response", ignoreCase = true) == true ||
-                        statusMessage?.contains("rejected", ignoreCase = true) == true ||
-                        statusMessage?.contains("unreachable", ignoreCase = true) == true)
+                val isWarningOrError = statusMessage?.contains("No response", ignoreCase = true) == true ||
+                    statusMessage?.contains("rejected", ignoreCase = true) == true ||
+                    statusMessage?.contains("unreachable", ignoreCase = true) == true ||
+                    statusMessage?.contains("did not join", ignoreCase = true) == true
                 Surface(
                     color = if (isWarningOrError) Color(0xFFFEF2F2) else WemoGreenSoft.copy(alpha = 0.65f),
                     shape = RoundedCornerShape(10.dp),
@@ -157,7 +182,7 @@ fun ProvisionWeMoApDialog(
                                 color = WemoGreenDark
                             )
                             Text(
-                                text = "MAC ${detectedDevice.macAddress} • SN ${detectedDevice.serialNumber} • Recommended AES Method ${detectedDevice.recommendedEncryptionMethod}",
+                                text = "MAC ${detectedDevice.macAddress} • SN ${detectedDevice.serialNumber} • Recommended AES Method ${detectedDevice.recommendedEncryptionMethod} (len=${detectedDevice.recommendedAddLengths})",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -173,6 +198,14 @@ fun ProvisionWeMoApDialog(
                         }
                     }
                 }
+
+                // Live On-Screen Setup Diagnostic & Trace Panel (Screenshot-Ready)
+                WeMoProvisionDebugPanel(
+                    debugSnapshot = debugSnapshot,
+                    selectedSsid = ssid,
+                    keepOpenOnSuccess = keepDialogOpenOnSuccess,
+                    onToggleKeepOpen = { keepDialogOpenOnSuccess = !keepDialogOpenOnSuccess }
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -229,7 +262,15 @@ fun ProvisionWeMoApDialog(
 
                 OutlinedTextField(
                     value = ssid,
-                    onValueChange = { ssid = it },
+                    onValueChange = { nextSsid ->
+                        ssid = nextSsid
+                        val matched = scannedAps.firstOrNull { it.ssid.equals(nextSsid.trim(), ignoreCase = true) }
+                        if (matched != null) {
+                            channelText = matched.channel.toString()
+                            authMode = matched.authMode
+                            encryptionType = matched.encryptionType
+                        }
+                    },
                     label = { Text("Target 2.4 GHz Wi-Fi SSID") },
                     placeholder = { Text("e.g. Home-WiFi-2.4G") },
                     singleLine = true,
@@ -247,6 +288,39 @@ fun ProvisionWeMoApDialog(
                         .fillMaxWidth()
                         .testTag("provision_password_input")
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    OutlinedTextField(
+                        value = channelText,
+                        onValueChange = { channelText = it },
+                        label = { Text("2.4G Ch") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(0.7f)
+                            .testTag("provision_channel_input")
+                    )
+                    OutlinedTextField(
+                        value = authMode,
+                        onValueChange = { authMode = it },
+                        label = { Text("Auth Mode") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(1.2f)
+                            .testTag("provision_auth_input")
+                    )
+                    OutlinedTextField(
+                        value = encryptionType,
+                        onValueChange = { encryptionType = it },
+                        label = { Text("Encrypt") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("provision_encrypt_input")
+                    )
+                }
 
                 OutlinedTextField(
                     value = customDeviceName,
@@ -362,22 +436,86 @@ fun ProvisionWeMoApDialog(
                         )
                     )
                 }
+
+                Text(
+                    text = "Password Length Suffix (xxyy hex)",
+                    style = MaterialTheme.typography.labelMedium
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    FilterChip(
+                        selected = addPasswordLengthsOverride == null,
+                        onClick = { addPasswordLengthsOverride = null },
+                        label = { Text("Auto (M1/M3=Yes, M2=No)") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WemoGreenSoft,
+                            selectedLabelColor = WemoGreenDark
+                        ),
+                        modifier = Modifier.testTag("provision_len_auto_chip")
+                    )
+                    FilterChip(
+                        selected = addPasswordLengthsOverride == true,
+                        onClick = { addPasswordLengthsOverride = true },
+                        label = { Text("Append +4 Hex Lengths") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WemoGreenSoft,
+                            selectedLabelColor = WemoGreenDark
+                        ),
+                        modifier = Modifier.testTag("provision_len_true_chip")
+                    )
+                    FilterChip(
+                        selected = addPasswordLengthsOverride == false,
+                        onClick = { addPasswordLengthsOverride = false },
+                        label = { Text("No Length Suffix") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = WemoGreenSoft,
+                            selectedLabelColor = WemoGreenDark
+                        ),
+                        modifier = Modifier.testTag("provision_len_false_chip")
+                    )
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
-                    onProvision(
-                        apHost.ifBlank { "10.22.22.1" },
-                        ssid.ifBlank { defaultSsid.ifBlank { "Home-WiFi-2.4G" } },
-                        password,
-                        channelText.toIntOrNull() ?: 6,
-                        authMode.ifBlank { "WPA2PSK" },
-                        encryptionType.ifBlank { "AES" },
-                        encryptionMethod,
-                        customDeviceName.trim(),
-                        selectedRoom.ifBlank { "Living Room" }
-                    )
+                    val resolvedHost = apHost.ifBlank { "10.22.22.1" }
+                    val resolvedSsid = ssid.ifBlank { defaultSsid.ifBlank { "Home-WiFi-2.4G" } }
+                    val resolvedCh = channelText.toIntOrNull() ?: 6
+                    val resolvedAuth = authMode.ifBlank { "WPA2PSK" }
+                    val resolvedEnc = encryptionType.ifBlank { "AES" }
+                    val resolvedName = customDeviceName.trim()
+                    val resolvedRoom = selectedRoom.ifBlank { "Living Room" }
+
+                    if (onProvisionAdvanced != null) {
+                        onProvisionAdvanced(
+                            resolvedHost,
+                            resolvedSsid,
+                            password,
+                            resolvedCh,
+                            resolvedAuth,
+                            resolvedEnc,
+                            encryptionMethod,
+                            addPasswordLengthsOverride,
+                            resolvedName,
+                            resolvedRoom,
+                            keepDialogOpenOnSuccess
+                        )
+                    } else {
+                        onProvision(
+                            resolvedHost,
+                            resolvedSsid,
+                            password,
+                            resolvedCh,
+                            resolvedAuth,
+                            resolvedEnc,
+                            encryptionMethod,
+                            resolvedName,
+                            resolvedRoom
+                        )
+                    }
                 },
                 enabled = !isProvisioning,
                 colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
@@ -392,4 +530,115 @@ fun ProvisionWeMoApDialog(
             }
         }
     )
+}
+
+@Suppress("DEPRECATION")
+@Composable
+private fun WeMoProvisionDebugPanel(
+    debugSnapshot: WeMoSetupDebugSnapshot,
+    selectedSsid: String,
+    keepOpenOnSuccess: Boolean,
+    onToggleKeepOpen: () -> Unit
+) {
+    val clipboardManager = LocalClipboardManager.current
+    var copiedFeedback by remember { mutableStateOf(false) }
+    val displayLines = remember(debugSnapshot, selectedSsid) {
+        debugSnapshot.toDisplayLines(selectedSsid)
+    }
+
+    Surface(
+        color = Color(0xFF12161F),
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, Color(0xFF2E384D)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("provision_debug_panel")
+    ) {
+        Column(
+            modifier = Modifier.padding(10.dp),
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "SETUP DEBUG DETAILS (SCREENSHOT)",
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.5.sp,
+                    color = Color(0xFF8BE836)
+                )
+                OutlinedButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(debugSnapshot.toClipboardText(selectedSsid)))
+                        copiedFeedback = true
+                    },
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                    border = BorderStroke(1.dp, Color(0xFF475569)),
+                    modifier = Modifier
+                        .height(24.dp)
+                        .testTag("copy_provision_debug_button")
+                ) {
+                    Text(
+                        text = if (copiedFeedback) "Copied" else "Copy",
+                        fontSize = 10.sp,
+                        color = Color(0xFFE2E8F0)
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("provision_debug_text"),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                displayLines.forEach { line ->
+                    val lineColor = when {
+                        line.contains("WARN", ignoreCase = true) ||
+                            line.contains("ERROR", ignoreCase = true) ||
+                            line.contains("MISSING", ignoreCase = true) ||
+                            line.contains("No WeMo setup", ignoreCase = true) ||
+                            line.contains("Status=2", ignoreCase = true) ||
+                            line.contains("HOLD", ignoreCase = true) -> Color(0xFFFCA5A5)
+                        line.contains("Status=1", ignoreCase = true) ||
+                            line.contains("HTTP_200", ignoreCase = true) ||
+                            line.contains("CLOSE] CloseSetup -> success", ignoreCase = true) -> Color(0xFF86EFAC)
+                        else -> Color(0xFFE2E8F0)
+                    }
+                    Text(
+                        text = line,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        lineHeight = 13.sp,
+                        color = lineColor
+                    )
+                }
+            }
+
+            FilterChip(
+                selected = keepOpenOnSuccess,
+                onClick = onToggleKeepOpen,
+                label = {
+                    Text(
+                        text = if (keepOpenOnSuccess) {
+                            "Keep Dialog Open on Success: ON (for screenshot)"
+                        } else {
+                            "Keep Dialog Open on Success: OFF (stays open on any error)"
+                        },
+                        fontSize = 10.5.sp
+                    )
+                },
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = Color(0xFF1E293B),
+                    labelColor = Color(0xFFCBD5E1),
+                    selectedContainerColor = Color(0xFF14532D),
+                    selectedLabelColor = Color(0xFFBBF7D0)
+                ),
+                modifier = Modifier.testTag("keep_provision_dialog_open_chip")
+            )
+        }
+    }
 }

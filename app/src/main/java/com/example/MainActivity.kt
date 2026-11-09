@@ -102,6 +102,7 @@ fun WeMiSwitchApp(
     val scannedSetupAps by viewModel.scannedSetupAps.collectAsStateWithLifecycle()
     val detectedSetupDevice by viewModel.detectedSetupDevice.collectAsStateWithLifecycle()
     val setupApStatusMessage by viewModel.setupApStatusMessage.collectAsStateWithLifecycle()
+    val setupDebugSnapshot by viewModel.setupDebugSnapshot.collectAsStateWithLifecycle()
     val isScanningSetupAp by viewModel.isScanningSetupAp.collectAsStateWithLifecycle()
     val isProvisioningAp by viewModel.isProvisioningAp.collectAsStateWithLifecycle()
     val lanNetworkState by viewModel.lanNetworkState.collectAsStateWithLifecycle()
@@ -382,6 +383,7 @@ fun WeMiSwitchApp(
             defaultSsid = currentSsid,
             detectedDevice = detectedSetupDevice,
             statusMessage = setupApStatusMessage,
+            debugSnapshot = setupDebugSnapshot,
             onScanApList = { apHost -> viewModel.scanSetupApNetworks(apHost) },
             onProvision = { apHost, ssid, pwd, ch, auth, enc, method, customName, roomName ->
                 viewModel.provisionWeMoAp(
@@ -394,6 +396,21 @@ fun WeMiSwitchApp(
                     encryptionMethod = method,
                     customDeviceName = customName,
                     roomName = roomName
+                )
+            },
+            onProvisionAdvanced = { apHost, ssid, pwd, ch, auth, enc, method, addLengths, customName, roomName, keepOpen ->
+                viewModel.provisionWeMoAp(
+                    apHost = apHost,
+                    ssid = ssid,
+                    password = pwd,
+                    channel = ch,
+                    authMode = auth,
+                    encryptionType = enc,
+                    encryptionMethod = method,
+                    addPasswordLengths = addLengths,
+                    customDeviceName = customName,
+                    roomName = roomName,
+                    keepDialogOpenOnSuccess = keepOpen
                 )
             },
             onDismiss = { viewModel.closeProvisionApDialog() }

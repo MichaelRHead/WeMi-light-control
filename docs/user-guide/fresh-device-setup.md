@@ -68,13 +68,29 @@ Inside the **Provision New WeMo AP (`10.22.22.1`)** dialog:
    - Type a custom **Room / Group** or tap one of the **Room Preset Chips** (`Living Room`, `Bedroom`, `Kitchen`, `Dining Room`, `Hallway & Landing`, `Ensuite`, `Outdoor`, `Garage`, `Office`) directly below the preview.
 4. **Enter Your 2.4 GHz Wi-Fi Password**:
    - Type your home Wi-Fi password in **Home Wi-Fi Password**.
-5. **Password Encryption Method (Auto-Detected)**:
-   - Leave **Password Encryption Method** set to **`Auto-Detect`** (recommended). The app inspects `/setup.xml` (`<rtos>`, `<iot>`, `<binaryOption>`) and `GetMetaInfo` to automatically select:
+5. **Password Encryption Method & Password Length Suffix (Auto-Detected)**:
+   - Leave **Password Encryption Method** set to **`Auto-Detect`** and **Password Length Suffix (`xxyy` hex)** set to **`Auto (Rec.)`**. The app inspects `/setup.xml` (`<rtos>`, `<iot>`, `<binaryOption>`, `<new_algo>`) and `GetMetaInfo` to automatically select:
      - **Method 1 (Gen 1 OpenWrt)**: `F7C030` Light Switch, `F7C059` Dimmer, `F7C063` Mini Plug.
      - **Method 2 (Gen 2 RTOS)**: `WLS040` / `WLS0403` 3-Way Switch, `WDS060` Dimmer, `WSP080` Mini Plug.
      - **Method 3 (Symmetric `<binaryOption>1</binaryOption>`)**: Newer symmetric-key firmware builds.
-   - You can also manually override the method using the **`Gen 1 (OpenWrt)`**, **`Gen 2 (RTOS)`**, or **`Method 3 (Sym)`** chips if needed.
+   - If your switch rejects the password (`NetworkStatus=0` or `2`), you can manually test any of the 6 `pywemo` encryption permutations by combining **`Gen 1 (OpenWrt)`** / **`Gen 2 (RTOS)`** / **`Method 3 (Sym)`** with **`Append xxyy`** or **`No Suffix`**.
 6. **Tap `Provision Switch`**:
-   - The app sets your custom `<FriendlyName>` on the hardware, encrypts your Wi-Fi password using Belkin's exact OpenSSL AES-128-CBC key derivation, sends `ConnectHomeNetwork`, verifies connection status (`GetNetworkStatus`), closes the setup AP (`CloseSetup` + `SetSetupDoneStatus`), and saves the switch into your Wi-Fi Home.
+   - The app sets your custom `<FriendlyName>` on the hardware, encrypts your Wi-Fi password using Belkin's exact OpenSSL AES-128-CBC key derivation, double-sends `ConnectHomeNetwork`, polls `GetNetworkStatus` for up to 20 seconds while the switch joins your 2.4 GHz router, closes the setup AP (`CloseSetup` + `SetSetupDoneStatus`) only when connection succeeds (`NetworkStatus = 1` or `3`), and saves the switch into your Wi-Fi Home.
+   - If connection fails (`NetworkStatus = 0` or `2`), the app **does not** call `CloseSetup`, keeping the switch's `10.22.22.1` Setup AP open and keeping the dialog on screen so you can inspect the debug trace and retry immediately.
 7. **Reconnect to Your Home Wi-Fi**:
    - Once the setup AP closes, your phone automatically reconnects to your regular Home Wi-Fi and **WeMi Light Control** discovers the switch at its new LAN IP address.
+
+---
+
+## 4. On-Screen Setup Debug Details (`Setup Debug Details (Screenshot)`)
+
+At the bottom of the **Provision New WeMo AP (`10.22.22.1`)** dialog, a high-contrast dark terminal card (**`Setup Debug Details (Screenshot)`**) prints real-time hardware and protocol diagnostics directly on screen so you can take a single screenshot or tap **`Copy`** (`copy_provision_debug_button`) to share:
+
+- **`[NET]`**: Your phone's active Wi-Fi interface (`wlan0`), IP address (`10.22.22.x`), `setupAp=true/false`, and whether sockets are bound directly to the unvalidated Wi-Fi network (`wifiBound=true/false`).
+- **`[PROBE]` & `[PROBE TRACE]`**: The exact port (`49151..49159`) and XML path (`/setup.xml` or `/Lightsetup.xml`) that responded on `10.22.22.1`, plus per-port status codes.
+- **`[XML]` & `[FLAGS]`**: Hardware `<modelName>`, `<friendlyName>`, `<firmwareVersion>`, and raw encryption flags (`rtos`, `iot`, `binaryOption`, `new_algo`, `autoMethod`).
+- **`[ID]`**: Hardware MAC address, Serial Number, which UPnP service provided them (`GetMetaInfo`, `setup.xml`, or `GetMacAddr/GetSerialNo`), and the raw pipe-delimited `GetMetaInfo` string.
+- **`[SCAN]` & `[TARGET AP]`**: The switch's `WiFiSetup1#GetApList` site survey count and the matched 2.4 GHz channel, auth mode (`WPA2PSK`), and cipher (`AES`) for your selected SSID.
+- **Live `[STEP 1..5]` Provisioning Trace**: Each step of `ChangeFriendlyName`, AES-128-CBC encryption (`Method 1/2/3`, `lenSuffix`, ciphertext hex length — **never** your plaintext password), `ConnectHomeNetwork` (`PairingStatus`), `GetNetworkStatus` polls (`1..18`), and `CloseSetup` (`kept_open_for_retry` on failure).
+- **`Keep Dialog Open on Success` Chip**: Toggle this chip ON before tapping **`Provision Switch`** if you want the dialog to remain open after a successful setup so you can screenshot the final trace.
+

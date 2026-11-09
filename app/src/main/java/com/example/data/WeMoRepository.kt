@@ -682,6 +682,12 @@ class WeMoRepository(
         return setDevicePowerExplicit(dev, false)
     }
 
+    fun latestSetupProbeSummary(): String =
+        provisioningCoordinator.latestProbeDiagnosticSummary()
+
+    fun latestSetupApScanSummary(): String =
+        provisioningCoordinator.latestApScanDiagnosticSummary()
+
     suspend fun probeSetupApDevice(
         apHost: String = "10.22.22.1",
         apPort: Int = 49152
@@ -710,8 +716,9 @@ class WeMoRepository(
         roomName: String? = null,
         deviceType: WeMoDeviceType? = null,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
-        maxStatusPolls: Int = 10,
-        statusPollDelayMs: Long = 750L
+        maxStatusPolls: Int = 18,
+        statusPollDelayMs: Long = 1000L,
+        onProgress: ((String) -> Unit)? = null
     ): WeMoProvisionResult {
         return provisioningCoordinator.provisionSetupApDevice(
             apHost = apHost,
@@ -728,7 +735,8 @@ class WeMoRepository(
             deviceType = deviceType,
             activeNetworkKey = activeNetworkKey,
             maxStatusPolls = maxStatusPolls,
-            statusPollDelayMs = statusPollDelayMs
+            statusPollDelayMs = statusPollDelayMs,
+            onProgress = onProgress
         )
     }
 

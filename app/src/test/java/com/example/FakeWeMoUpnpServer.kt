@@ -43,6 +43,7 @@ class FakeWeMoUpnpServer(
     val failSetupXml404 = AtomicBoolean(false)
     val failGetApList500 = AtomicBoolean(false)
     val simulate412OnNextGenaRenew = AtomicBoolean(false)
+    val forceNetworkStatusZero = AtomicBoolean(false)
 
     val connectHomeNetworkCalls = AtomicInteger(0)
     val networkStatusPolls = AtomicInteger(0)
@@ -278,10 +279,14 @@ class FakeWeMoUpnpServer(
 
             soapAction.contains("GetNetworkStatus") -> {
                 val pollNum = networkStatusPolls.incrementAndGet()
-                val statusVal = when (pollNum) {
-                    1 -> 0
-                    2 -> 3
-                    else -> 1
+                val statusVal = if (forceNetworkStatusZero.get()) {
+                    0
+                } else {
+                    when (pollNum) {
+                        1 -> 0
+                        2 -> 3
+                        else -> 1
+                    }
                 }
                 """
                 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">

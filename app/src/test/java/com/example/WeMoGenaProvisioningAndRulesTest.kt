@@ -203,6 +203,96 @@ class WeMoGenaProvisioningAndRulesTest {
             assertEquals("Outdoor / Porch", provisionedSwitch.roomName)
             assertEquals("WLS040FRESH99", provisionedSwitch.serialNumber)
             assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, provisionedSwitch.visualCategory)
+            assertTrue(result.debugTraceLines.any { it.contains("[STEP 1 PROBE]") })
+            assertTrue(result.debugTraceLines.any { it.contains("[STEP 4 CRYPTO] Method=2 addLengths=false") })
+            assertTrue(result.debugTraceLines.any { it.contains("[STEP 6 CLOSE] CloseSetup -> success") })
+        }
+    }
+
+    @Test
+    fun `verify WiFiSetup1 provisioning when NetworkStatus remains 0 reports failure, skips CloseSetup to keep Setup AP open, and emits screenshot debug trace`() = runBlocking {
+        FakeWeMoUpnpServer(
+            initialFriendlyName = "WeMo LightSwitch",
+            deviceTypeUrn = "urn:Belkin:device:lightswitch:1",
+            modelName = "F7C030",
+            serialNumber = "221517K01018F7",
+            firmwareVersion = "WeMo_WW_2.00.10966.PVT-OWRT-LS",
+            udn = "uuid:Lightswitch-1_0-221517K01018F7",
+            macAddress = "EC1A59CC7788",
+            isRtos = false,
+            wifiSsid = "WeMo.Light.788"
+        ).use { server ->
+            server.forceNetworkStatusZero.set(true)
+            val setupPort = server.port
+
+            val client = WeMoNetworkClient(extraCandidatePorts = listOf(setupPort))
+            val provisioner = WeMoProvisionerClient()
+            val repo = WeMoRepository(
+                dao = database.wemoDao(),
+                networkClient = client,
+                provisionerClient = provisioner,
+                initialDemoModeOverride = false
+            )
+            repo.ensureSeeded()
+
+            val probe = repo.probeSetupApDevice(apHost = "127.0.0.1", apPort = setupPort)
+            val aps = repo.scanSetupApNetworks(apHost = "127.0.0.1", apPort = setupPort)
+            val streamedLines = mutableListOf<String>()
+
+            val result = repo.provisionSetupApDevice(
+                apHost = "127.0.0.1",
+                apPort = setupPort,
+                ssid = "HeadFamily-2.4G",
+                plainPassword = "WrongRouterPassword99",
+                channel = 11,
+                authMode = "WPA2PSK",
+                encryptionType = "AES",
+                encryptionMethod = 1,
+                addPasswordLengths = true,
+                customDeviceName = "Garage Switch",
+                roomName = "Garage",
+                activeNetworkKey = "wifi_home_192_168_1",
+                maxStatusPolls = 3,
+                statusPollDelayMs = 15L,
+                onProgress = { streamedLines.add(it) }
+            )
+
+            // NetworkStatus=0 must NOT be reported as success and must NOT call CloseSetup
+            assertFalse(result.success)
+            assertEquals(0, result.networkStatusCode)
+            assertEquals("kept_open_for_retry", result.closeSetupStatus)
+            assertFalse(server.closeSetupCalled.get())
+            assertFalse(server.setupDoneCalled.get())
+            assertTrue(streamedLines.any { it.contains("[STEP 6 HOLD] NetworkStatus=0") })
+
+            // Verify auto-matching from ApList overrode manual Ch=11 with ApList's Ch=6 for HeadFamily-2.4G
+            assertTrue(result.debugTraceLines.any { it.contains("Matched \"HeadFamily-2.4G\" in ApList: Ch=6") })
+
+            // Verify WeMoSetupDebugSnapshot formats all screenshot lines cleanly
+            val snapshot = com.example.network.WeMoSetupDebugSnapshot(
+                timestamp = "10:45:00 PM",
+                phoneLocalIp = "10.22.22.142",
+                phoneGatewayIp = "10.22.22.1",
+                phoneInterface = "wlan0",
+                isWemoSetupSubnet = true,
+                isWifiSocketBound = true,
+                isDemoMode = false,
+                targetApHost = "127.0.0.1",
+                probeSummary = repo.latestSetupProbeSummary(),
+                detectedDevice = probe,
+                apScanSummary = repo.latestSetupApScanSummary(),
+                scannedAps = aps,
+                traceLines = result.debugTraceLines
+            )
+            val displayLines = snapshot.toDisplayLines("HeadFamily-2.4G")
+            assertTrue(displayLines.any { it.contains("[NET] mode=REAL-LAN ip=10.22.22.142") })
+            assertTrue(displayLines.any { it.contains("[ID] mac=EC1A59CC7788 sn=221517K01018F7 (src=GetMetaInfo)") })
+            assertTrue(displayLines.any { it.contains("[TARGET AP] \"HeadFamily-2.4G\" found in ApList: Ch=6") })
+
+            // Failed setup must not insert a phantom device row into Room
+            val savedDevices = database.wemoDao().getAllDevices().first()
+            assertEquals(0, savedDevices.size)
         }
     }
 }
+

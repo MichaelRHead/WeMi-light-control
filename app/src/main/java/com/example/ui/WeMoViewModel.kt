@@ -18,7 +18,11 @@ import com.example.network.LanNetworkSnapshot
 import com.example.network.SsdpScanReport
 import com.example.network.WeMoNetworkMonitor
 import com.example.network.WeMoScannedAp
+import com.example.network.WeMoSetupDebugSnapshot
 import com.example.network.WeMoSetupDeviceDescriptor
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -109,6 +113,9 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _setupApStatusMessage = MutableStateFlow<String?>(null)
     val setupApStatusMessage: StateFlow<String?> = _setupApStatusMessage.asStateFlow()
+
+    private val _setupDebugSnapshot = MutableStateFlow(WeMoSetupDebugSnapshot())
+    val setupDebugSnapshot: StateFlow<WeMoSetupDebugSnapshot> = _setupDebugSnapshot.asStateFlow()
 
     private val _isScanningSetupAp = MutableStateFlow(false)
     val isScanningSetupAp: StateFlow<Boolean> = _isScanningSetupAp.asStateFlow()
@@ -761,11 +768,15 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun nowTimeText(): String =
+        SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
+
     fun openProvisionApDialog() {
         _setupApStatusMessage.value = null
         _showProvisionApDialog.value = true
-        val preferredHost = if (lanNetworkState.value.isWemoSetupApSubnet) {
-            lanNetworkState.value.gatewayIp.ifBlank { "10.22.22.1" }
+        val netSnap = networkMonitor.refreshSnapshot()
+        val preferredHost = if (netSnap.isWemoSetupApSubnet) {
+            netSnap.gatewayIp.ifBlank { "10.22.22.1" }
         } else {
             "10.22.22.1"
         }
@@ -781,14 +792,49 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
             _isScanningSetupAp.value = true
             _setupApStatusMessage.value = null
             val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
+            val netSnap = networkMonitor.refreshSnapshot()
+            _setupDebugSnapshot.value = WeMoSetupDebugSnapshot(
+                timestamp = nowTimeText(),
+                phoneLocalIp = netSnap.localIpv4,
+                phoneGatewayIp = netSnap.gatewayIp,
+                phoneInterface = netSnap.interfaceName,
+                isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
+                isWifiSocketBound = netSnap.isWifiSocketBound,
+                isDemoMode = isDemoShowroomMode.value,
+                targetApHost = cleanHost,
+                probeSummary = "Probing $cleanHost (ports 49152..49159)...",
+                apScanSummary = "Waiting for probe..."
+            )
+
             val descriptor = repository.probeSetupApDevice(apHost = cleanHost)
             _detectedSetupDevice.value = descriptor
+            val probeTrace = descriptor?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
+                ?: repository.latestSetupProbeSummary()
+
+            _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
+                timestamp = nowTimeText(),
+                detectedDevice = descriptor,
+                probeSummary = probeTrace,
+                apScanSummary = "Scanning 2.4 GHz APs via WiFiSetup1#GetApList..."
+            )
+
             val list = repository.scanSetupApNetworks(
                 apHost = cleanHost,
                 apPort = descriptor?.port ?: 49152
             )
             _scannedSetupAps.value = list
             _isScanningSetupAp.value = false
+
+            val scanSummary = if (descriptor?.macAndSerialSource == "DemoShowroom") {
+                "DEMO_AP_LIST(count=${list.size})"
+            } else {
+                repository.latestSetupApScanSummary()
+            }
+            _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
+                timestamp = nowTimeText(),
+                scannedAps = list,
+                apScanSummary = scanSummary
+            )
 
             if (list.isNotEmpty() || descriptor != null) {
                 val hwSummary = if (descriptor != null) {
@@ -800,7 +846,7 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
                 _setupApStatusMessage.value = msg
                 showTransientStatus(msg)
             } else {
-                val err = "No response from WeMo Setup AP at $cleanHost — Open Android Wi-Fi Settings and connect to WeMo.Light.xxx / WeMo.Mini.xxx / WeMo.Dimmer.xxx first."
+                val err = "No response from WeMo Setup AP at $cleanHost ($probeTrace) — Connect phone Wi-Fi to WeMo.Light.xxx / WeMo.Mini.xxx / WeMo.Dimmer.xxx first."
                 _setupApStatusMessage.value = err
                 showTransientStatus(err)
             }
@@ -818,13 +864,28 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
         addPasswordLengths: Boolean? = null,
         customDeviceName: String = "",
         roomName: String = "",
-        deviceType: WeMoDeviceType? = null
+        deviceType: WeMoDeviceType? = null,
+        keepDialogOpenOnSuccess: Boolean = false
     ) {
         viewModelScope.launch {
+            val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
+            val netSnap = networkMonitor.refreshSnapshot()
             _isProvisioningAp.value = true
-            _setupApStatusMessage.value = "Provisioning switch on $apHost to '$ssid'..."
+            _setupApStatusMessage.value = "Provisioning switch on $cleanHost to '$ssid'..."
+            _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
+                timestamp = nowTimeText(),
+                phoneLocalIp = netSnap.localIpv4,
+                phoneGatewayIp = netSnap.gatewayIp,
+                phoneInterface = netSnap.interfaceName,
+                isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
+                isWifiSocketBound = netSnap.isWifiSocketBound,
+                isDemoMode = isDemoShowroomMode.value,
+                targetApHost = cleanHost,
+                traceLines = listOf("[START] Starting WiFiSetup1 provisioning to \"$ssid\" on $cleanHost...")
+            )
+
             val res = repository.provisionSetupApDevice(
-                apHost = apHost.trim().ifBlank { "10.22.22.1" },
+                apHost = cleanHost,
                 ssid = ssid.trim(),
                 plainPassword = password,
                 channel = channel,
@@ -835,11 +896,28 @@ class WeMoViewModel(application: Application) : AndroidViewModel(application) {
                 customDeviceName = customDeviceName.trim(),
                 roomName = roomName.trim(),
                 deviceType = deviceType,
-                activeNetworkKey = _activeNetworkKey.value
+                activeNetworkKey = _activeNetworkKey.value,
+                onProgress = { stepLine ->
+                    val current = _setupDebugSnapshot.value
+                    _setupDebugSnapshot.value = current.copy(
+                        timestamp = nowTimeText(),
+                        traceLines = (current.traceLines + stepLine).takeLast(24)
+                    )
+                }
             )
             _isProvisioningAp.value = false
             _setupApStatusMessage.value = res.statusMessage
-            if (res.success) {
+            if (res.setupDevice != null) {
+                _detectedSetupDevice.value = res.setupDevice
+            }
+            _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
+                timestamp = nowTimeText(),
+                detectedDevice = res.setupDevice ?: _detectedSetupDevice.value,
+                probeSummary = res.setupDevice?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
+                    ?: _setupDebugSnapshot.value.probeSummary,
+                traceLines = res.debugTraceLines.ifEmpty { _setupDebugSnapshot.value.traceLines }
+            )
+            if (res.success && !keepDialogOpenOnSuccess) {
                 _showProvisionApDialog.value = false
             }
             showTransientStatus(res.statusMessage)

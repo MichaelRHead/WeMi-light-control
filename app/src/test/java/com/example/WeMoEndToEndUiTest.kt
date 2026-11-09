@@ -200,22 +200,38 @@ class WeMoEndToEndUiTest {
     fun `verify E2E ProvisionWeMoApDialog validation and Rules tab creation, execution, and toggle`() {
         composeTestRule.waitForIdle()
 
-        // 1. Open ProvisionWeMoApDialog and verify short-password error banner
+        // 1. Open ProvisionWeMoApDialog and verify short-password error banner + screenshot debug panel
         composeTestRule.onNodeWithTag("add_device_button").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("open_provision_ap_wizard_button").performClick()
         composeTestRule.waitForIdle()
 
+        composeTestRule.onNodeWithTag("provision_len_auto_chip")
+            .performScrollTo()
+            .assertIsDisplayed()
+
         composeTestRule.onNodeWithTag("provision_password_input")
             .performScrollTo()
             .performTextReplacement("short")
-        composeTestRule.onNodeWithTag("confirm_provision_ap_button").performClick()
+        composeTestRule.onNodeWithTag("confirm_provision_ap_button")
+            .performClick()
         composeTestRule.waitForIdle()
 
-        // Dialog remains open and status box displays validation error for <8 char WPA2 password
+        // Dialog remains open and status box + screenshot debug panel display validation error & diagnostics
         composeTestRule.onNodeWithTag("provision_ap_status_box")
             .performScrollTo()
             .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("provision_debug_panel")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("copy_provision_debug_button")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("keep_provision_dialog_open_chip")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("provision_debug_text", useUnmergedTree = true)
+            .assertExists()
         composeTestRule.onNodeWithText("Cancel").performClick()
         composeTestRule.waitForIdle()
 

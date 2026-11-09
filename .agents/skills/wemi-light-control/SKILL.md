@@ -14,7 +14,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
 ## 1. Build, Test & Environment
 
 - **Toolchain**: AGP `9.1.0`, Kotlin `2.3.20`, KSP `2.3.6`, Compose BOM `2026.03.00`, Room `2.8.4` (`version = 5`), Robolectric `4.16.1`, `compileSdk = 36`, `minSdk = 24`.
-- **Unit, Protocol & E2E Compose UI Tests (`20/20` across 6 suites)**:
+- **Unit, Protocol & E2E Compose UI Tests (`23/23` across 6 suites)**:
   ```bash
   ./gradlew testDebugUnitTest --rerun-tasks
   ```
@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
   ```bash
   ./gradlew assembleDebug
   ```
-- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "16.0"`, `versionCode = 16`).
+- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "17.0"`, `versionCode = 17`).
 
 ---
 
@@ -39,7 +39,7 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 
 ---
 
-## 3. Codebase Map (`v16.0` / Modularized Phases M1–M4)
+## 3. Codebase Map (`v17.0` / Modularized Phases M1–M4)
 
 ### Data & Scheduling Layer (`app/src/main/java/com/example/data/`)
 - **`WeMoEntities.kt`**:
@@ -65,15 +65,15 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 - **`WeMoGenaSubscriptionManager.kt`**:
   - Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery) for `<100ms` physical switch updates.
 - **`WeMoNetworkMonitor.kt`**:
-  - Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory` (loopback `127.0.0.1` & Robolectric aware).
-- **`WeMoProvisionerClient.kt`** & **`WeMoPasswordCrypto.kt`**:
-  - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` and `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 AES-128-CBC (Methods 1, 2 & 3) double-send `ConnectHomeNetwork` + `CloseSetup` + `SetSetupDoneStatus` provisioner.
+  - Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory` (caching unvalidated `NetworkCallback` Wi-Fi handles + loopback `127.0.0.1` & Robolectric aware).
+- **`WeMoProvisionerClient.kt`**, **`WeMoSetupDiagnostics.kt`** & **`WeMoPasswordCrypto.kt`**:
+  - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` (`8500ms` site-survey timeout), OkHttp-framed `probeSetupDevice`, `WeMoSetupDebugSnapshot` screenshot diagnostics, and `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 AES-128-CBC (Methods 1, 2 & 3 × `addPasswordLengths`) double-send `ConnectHomeNetwork` + 20s `GetNetworkStatus` poll + `CloseSetup` + `SetSetupDoneStatus` provisioner.
 
 ### UI & Test Layer
 - **`WeMoViewModel.kt`**, **`MainActivity.kt`**, **`ui/screens/*`** & **`ui/components/*`**:
   - Full-width `AutoResizingDeviceNameText` on Line 1 of `WeMoDeviceRow`, `WeMoTvDeviceCard`, `WeMoRoomGroupHeaderCard`, and `WeMoWifiHomeBar` so long names (`"Hallway & Landing"`, `"My Home"`) never squeeze adjacent pills into vertical character columns.
-  - Dark-gray IEC `"I/O"` power-off icon (`drawIecPowerSymbol` in `#23272F`/`#181B20`) and red `WeMoDisconnectedRingButton` (`drawDisconnectedSymbol`).
+  - Dark-gray IEC `"I/O"` power-off icon (`drawIecPowerSymbol` in `#23272F`/`#181B20`), red `WeMoDisconnectedRingButton` (`drawDisconnectedSymbol`), and screenshot-ready `WeMoProvisionDebugPanel` (`provision_debug_panel`, `provision_debug_text`) inside `WeMoProvisionApDialog`.
   - One-tap `Reset` chip (`reset_lan_data_chip`) in `WeMoWifiHomeBar` and `more_reset_lan_homes_switches_button` on `WeMoMoreScreen`.
 - **`FakeWeMoUpnpServer.kt`**, **`WeMoSkuAndCryptoTest.kt`**, **`WeMoSoapAndSelfHealingTest.kt`**, **`WeMoGenaProvisioningAndRulesTest.kt`**, **`ExampleRobolectricTest.kt`** & **`WeMoEndToEndUiTest.kt`**:
-  - 20 automated loopback UPnP/SOAP/GENA protocol and full-stack Compose E2E tests.
+  - 23 automated loopback UPnP/SOAP/GENA protocol and full-stack Compose E2E tests.
 

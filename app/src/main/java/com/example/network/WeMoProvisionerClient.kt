@@ -10,11 +10,9 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
 import java.net.ConnectException
 import java.net.InetSocketAddress
+import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -44,7 +42,12 @@ data class WeMoSetupDeviceDescriptor(
     val isIot: Boolean,
     val binaryOption: Boolean,
     val recommendedEncryptionMethod: Int,
-    val recommendedAddLengths: Boolean
+    val recommendedAddLengths: Boolean,
+    val newAlgo: Boolean = false,
+    val setupXmlPath: String = "/setup.xml",
+    val macAndSerialSource: String = "GetMetaInfo",
+    val rawMetaInfo: String = "",
+    val probeTraceSummary: String = ""
 )
 
 data class WeMoProvisionResult(
@@ -56,15 +59,23 @@ data class WeMoProvisionResult(
     val closeSetupStatus: String = "",
     val effectiveEncryptionMethod: Int = 1,
     val addedLengthSuffix: Boolean = true,
-    val setupDevice: WeMoSetupDeviceDescriptor? = null
+    val setupDevice: WeMoSetupDeviceDescriptor? = null,
+    val debugTraceLines: List<String> = emptyList()
 )
 
 /**
  * Zero-cloud Belkin WeMo Wi-Fi setup provisioner (`10.22.22.1`) matching
  * `pywemo/ouimeaux_device/__init__.py` and `pywemo/ouimeaux_device/api/wifi_setup.py`.
  *
- * Delegates OpenSSL `EVP_BytesToKey` MD5 `AES-128-CBC` password encryption (Methods 1, 2, and 3)
- * to [WeMoPasswordCrypto] and AP list XML parsing to [WeMoXmlAndSkuParser].
+ * Key reliability & diagnostic guarantees:
+ * - Uses [OkHttpClient] (with `Content-Length` framing) rather than raw socket EOF reads when
+ *   fetching `/setup.xml` and `/Lightsetup.xml`, preventing 1000ms read timeouts on embedded
+ *   WeMo HTTP servers that delay TCP `FIN`.
+ * - Uses an 8.5s HTTP read timeout so active 11-channel 2.4 GHz site surveys (`WiFiSetup1#GetApList`)
+ *   and WPA2 handshakes complete without premature socket timeouts.
+ * - Requires `NetworkStatus == 1` (or `3` handshake followed by AP close) for success; never falsely
+ *   reports `NetworkStatus == 0` as success or calls `CloseSetup` when `NetworkStatus == 0`,
+ *   keeping the switch's `10.22.22.1` soft-AP alive for inspection and retry.
  */
 class WeMoProvisionerClient(
     private val appContext: Context? = null,
@@ -74,14 +85,22 @@ class WeMoProvisionerClient(
 
     private val httpClient = OkHttpClient.Builder()
         .socketFactory(wifiSocketFactory)
-        .connectTimeout(900, TimeUnit.MILLISECONDS)
-        .readTimeout(2200, TimeUnit.MILLISECONDS)
-        .writeTimeout(1200, TimeUnit.MILLISECONDS)
+        .connectTimeout(1500, TimeUnit.MILLISECONDS)
+        .readTimeout(8500, TimeUnit.MILLISECONDS)
+        .writeTimeout(2500, TimeUnit.MILLISECONDS)
         .retryOnConnectionFailure(false)
         .build()
 
     private val xmlMediaType = "text/xml; charset=\"utf-8\"".toMediaType()
     private val setupPorts = listOf(49152, 49153, 49154, 49151, 49155, 49156, 49157, 49158, 49159)
+
+    @Volatile
+    var lastProbeDiagnosticSummary: String = "Not probed yet"
+        private set
+
+    @Volatile
+    var lastApScanDiagnosticSummary: String = "Not scanned yet"
+        private set
 
     companion object {
         const val METHOD_2_RTOS_SALT_SUFFIX = WeMoPasswordCrypto.METHOD_2_RTOS_SALT_SUFFIX
@@ -108,8 +127,7 @@ class WeMoProvisionerClient(
 
     /**
      * Probes the Belkin WeMo Setup AP at [apHost] across all 9 UPnP ports for `/setup.xml` or `/Lightsetup.xml`,
-     * and enriches metadata via `metainfo1#GetMetaInfo` when available.
-     * Aborts immediately if TCP `connect()` times out so an unreachable IP fails in ~650ms.
+     * and enriches metadata via `metainfo1#GetMetaInfo` (with `/setup.xml` and `basicevent1#GetMacAddr` fallbacks).
      */
     suspend fun probeSetupDevice(
         apHost: String = defaultApHost,
@@ -117,55 +135,76 @@ class WeMoProvisionerClient(
     ): WeMoSetupDeviceDescriptor? = withContext(Dispatchers.IO) {
         val candidates = (listOf(preferredPort) + setupPorts).distinct()
         val paths = listOf("/setup.xml", "/Lightsetup.xml")
+        val isLoopback = apHost == "127.0.0.1" || apHost.equals("localhost", ignoreCase = true)
+        val tcpConnectTimeoutMs = if (isLoopback) 550 else 1500
 
         var foundPort: Int? = null
+        var foundPath = "/setup.xml"
         var setupXml: String? = null
+        val portLogs = mutableListOf<String>()
 
         for (port in candidates) {
             var hostUnreachable = false
+            val tcpStartMs = System.currentTimeMillis()
+            try {
+                wifiSocketFactory.createSocket().use { sock ->
+                    sock.connect(InetSocketAddress(apHost, port), tcpConnectTimeoutMs)
+                }
+            } catch (_: ConnectException) {
+                portLogs.add(":$port=REFUSED")
+                continue
+            } catch (_: SocketTimeoutException) {
+                val elapsed = System.currentTimeMillis() - tcpStartMs
+                portLogs.add(":$port=TCP_TIMEOUT(${elapsed}ms)")
+                hostUnreachable = true
+            } catch (_: NoRouteToHostException) {
+                portLogs.add(":$port=NO_ROUTE")
+                hostUnreachable = true
+            } catch (e: Exception) {
+                portLogs.add(":$port=${e.javaClass.simpleName}")
+                continue
+            }
+
+            if (hostUnreachable) {
+                break
+            }
+
             for (path in paths) {
-                val sock = wifiSocketFactory.createSocket()
+                val reqStartMs = System.currentTimeMillis()
                 try {
-                    try {
-                        sock.connect(InetSocketAddress(apHost, port), 650)
-                    } catch (_: ConnectException) {
-                        break
-                    } catch (_: SocketTimeoutException) {
-                        hostUnreachable = true
-                        break
+                    val req = Request.Builder()
+                        .url("http://$apHost:$port$path")
+                        .header("User-Agent", "WeMiSwitchControl/1.0 UPnP/1.1")
+                        .header("Connection", "close")
+                        .get()
+                        .build()
+                    httpClient.newCall(req).execute().use { resp ->
+                        val elapsed = System.currentTimeMillis() - reqStartMs
+                        val body = resp.body?.string().orEmpty()
+                        if (resp.isSuccessful && body.isNotBlank() &&
+                            (body.contains("<device", ignoreCase = true) ||
+                                body.contains("Belkin", ignoreCase = true) ||
+                                body.contains("WeMo", ignoreCase = true))
+                        ) {
+                            foundPort = port
+                            foundPath = path
+                            setupXml = body
+                            portLogs.add(":$port$path=HTTP_200(${elapsed}ms,${body.length}B)")
+                            break
+                        } else {
+                            portLogs.add(":$port$path=HTTP_${resp.code}(${elapsed}ms)")
+                        }
                     }
-
-                    sock.soTimeout = 1000
-                    val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
-                    writer.write(
-                        "GET $path HTTP/1.1\r\n" +
-                            "Host: $apHost:$port\r\n" +
-                            "User-Agent: WeMiSwitchControl/1.0 UPnP/1.1\r\n" +
-                            "Connection: close\r\n\r\n"
-                    )
-                    writer.flush()
-
-                    val reader = BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.UTF_8))
-                    val statusLine = reader.readLine() ?: continue
-                    if (!statusLine.contains("200")) continue
-                    var line = reader.readLine()
-                    while (line != null && line.isNotEmpty()) {
-                        line = reader.readLine()
-                    }
-                    val body = reader.readText()
-                    if (body.isNotBlank() && (body.contains("<device", ignoreCase = true) || body.contains("Belkin", ignoreCase = true))) {
-                        foundPort = port
-                        setupXml = body
-                        break
-                    }
-                } catch (_: Exception) {
-                    continue
-                } finally {
-                    runCatching { sock.close() }
+                } catch (e: Exception) {
+                    val elapsed = System.currentTimeMillis() - reqStartMs
+                    portLogs.add(":$port$path=${e.javaClass.simpleName}(${elapsed}ms)")
                 }
             }
-            if (foundPort != null || hostUnreachable) break
+            if (foundPort != null) break
         }
+
+        val traceSummary = portLogs.joinToString(" ")
+        lastProbeDiagnosticSummary = traceSummary.ifBlank { "No ports probed" }
 
         val resolvedPort = foundPort ?: return@withContext null
         val xml = setupXml.orEmpty()
@@ -173,22 +212,44 @@ class WeMoProvisionerClient(
         val friendlyName = extractXmlTag(xml, "friendlyName")?.ifBlank { null } ?: "WeMo Switch"
         val modelName = extractXmlTag(xml, "modelName")?.ifBlank { null } ?: "LightSwitch"
         val deviceTypeUrn = extractXmlTag(xml, "deviceType").orEmpty()
-        val xmlSerial = extractXmlTag(xml, "serialNumber").orEmpty()
+        val xmlSerial = extractXmlTag(xml, "serialNumber").orEmpty().trim()
         val xmlMac = extractXmlTag(xml, "macAddress").orEmpty()
-        val udn = extractXmlTag(xml, "UDN").orEmpty()
-        val xmlFirmware = extractXmlTag(xml, "firmwareVersion").orEmpty()
+            .replace(":", "").replace("-", "").trim()
+        val udn = extractXmlTag(xml, "UDN").orEmpty().trim()
+        val xmlFirmware = extractXmlTag(xml, "firmwareVersion").orEmpty().trim()
 
         val isRtos = extractXmlTag(xml, "rtos") == "1"
         val isIot = extractXmlTag(xml, "iot") == "1"
         val binaryOption = extractXmlTag(xml, "binaryOption") == "1"
+        val newAlgo = extractXmlTag(xml, "new_algo") == "1"
 
-        val metaClient = WeMoNetworkClient(appContext)
-        val meta = runCatching { metaClient.getMetaInfo(apHost, resolvedPort) }.getOrNull()
+        val (rawMetaString, meta) = fetchSetupMetaInfo(apHost, resolvedPort)
+        val metaMac = meta?.macAddress?.replace(":", "")?.replace("-", "")?.trim()?.ifBlank { null }
+        val metaSerial = meta?.serialNumber?.trim()?.ifBlank { null }
 
-        val mac = meta?.macAddress?.ifBlank { null }
-            ?: xmlMac.replace(":", "").replace("-", "").ifBlank { "EC1A59001122" }
-        val serial = meta?.serialNumber?.ifBlank { null }
-            ?: xmlSerial.ifBlank { "221517K01018AB" }
+        val basicMac = if (metaMac == null && xmlMac.isBlank()) {
+            fetchBasicEventTag(apHost, resolvedPort, "GetMacAddr", "MacAddr")
+                ?.replace(":", "")?.replace("-", "")?.trim()?.ifBlank { null }
+        } else {
+            null
+        }
+        val basicSerial = if (metaSerial == null && xmlSerial.isBlank()) {
+            fetchBasicEventTag(apHost, resolvedPort, "GetSerialNo", "SerialNo")?.trim()?.ifBlank { null }
+        } else {
+            null
+        }
+
+        val macSource = when {
+            metaMac != null && metaSerial != null -> "GetMetaInfo"
+            metaMac != null && xmlSerial.isNotBlank() -> "GetMetaInfo+setup.xml"
+            xmlMac.isNotBlank() && xmlSerial.isNotBlank() -> "setup.xml"
+            basicMac != null || basicSerial != null -> "basicevent1#GetMacAddr"
+            metaMac != null || xmlMac.isNotBlank() -> "partial(xml/meta)"
+            else -> "MISSING(Fallback!)"
+        }
+
+        val mac = metaMac ?: xmlMac.ifBlank { null } ?: basicMac ?: "EC1A59001122"
+        val serial = metaSerial ?: xmlSerial.ifBlank { null } ?: basicSerial ?: "221517K01018AB"
         val sku = meta?.deviceSku?.ifBlank { null } ?: modelName
         val firmware = meta?.firmwareVersion?.ifBlank { null } ?: xmlFirmware
 
@@ -206,6 +267,7 @@ class WeMoProvisionerClient(
         val recommendedMethod = when {
             isRtos && !isIot -> 2
             binaryOption -> 3
+            newAlgo -> 2
             sku.contains("WLS040", ignoreCase = true) ||
                 sku.contains("WDS060", ignoreCase = true) ||
                 sku.contains("WSP080", ignoreCase = true) -> 2
@@ -228,8 +290,71 @@ class WeMoProvisionerClient(
             isIot = isIot,
             binaryOption = binaryOption,
             recommendedEncryptionMethod = recommendedMethod,
-            recommendedAddLengths = recommendedAddLengths
+            recommendedAddLengths = recommendedAddLengths,
+            newAlgo = newAlgo,
+            setupXmlPath = foundPath,
+            macAndSerialSource = macSource,
+            rawMetaInfo = rawMetaString,
+            probeTraceSummary = traceSummary
         )
+    }
+
+    private fun fetchSetupMetaInfo(apHost: String, port: Int): Pair<String, WeMoMetaInfo?> {
+        val soapBody = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+              <s:Body>
+                <u:GetMetaInfo xmlns:u="urn:Belkin:service:metainfo:1">
+                </u:GetMetaInfo>
+              </s:Body>
+            </s:Envelope>
+        """.trimIndent()
+        return try {
+            val req = Request.Builder()
+                .url("http://$apHost:$port/upnp/control/metainfo1")
+                .header("SOAPACTION", "\"urn:Belkin:service:metainfo:1#GetMetaInfo\"")
+                .header("Content-Type", "text/xml; charset=\"utf-8\"")
+                .header("Connection", "close")
+                .post(soapBody.toRequestBody(xmlMediaType))
+                .build()
+            httpClient.newCall(req).execute().use { resp ->
+                val body = resp.body?.string().orEmpty()
+                if (!resp.isSuccessful) {
+                    return "HTTP_${resp.code}" to null
+                }
+                val rawTag = extractXmlTag(body, "MetaInfo").orEmpty()
+                rawTag to WeMoXmlAndSkuParser.parseMetaInfoSoapResponse(body)
+            }
+        } catch (e: Exception) {
+            "ERR_${e.javaClass.simpleName}" to null
+        }
+    }
+
+    private fun fetchBasicEventTag(apHost: String, port: Int, action: String, responseTag: String): String? {
+        val soapBody = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+              <s:Body>
+                <u:$action xmlns:u="urn:Belkin:service:basicevent:1">
+                </u:$action>
+              </s:Body>
+            </s:Envelope>
+        """.trimIndent()
+        return try {
+            val req = Request.Builder()
+                .url("http://$apHost:$port/upnp/control/basicevent1")
+                .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#$action\"")
+                .header("Content-Type", "text/xml; charset=\"utf-8\"")
+                .header("Connection", "close")
+                .post(soapBody.toRequestBody(xmlMediaType))
+                .build()
+            httpClient.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                extractXmlTag(resp.body?.string().orEmpty(), responseTag)
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     suspend fun resolveSetupPort(apHost: String = defaultApHost, preferredPort: Int = 49152): Int {
@@ -238,11 +363,13 @@ class WeMoProvisionerClient(
 
     suspend fun fetchAvailableApList(
         apHost: String = defaultApHost,
-        apPort: Int = 49152
+        apPort: Int = 49152,
+        knownDescriptor: WeMoSetupDeviceDescriptor? = null
     ): List<WeMoScannedAp> = withContext(Dispatchers.IO) {
-        val descriptor = probeSetupDevice(apHost, apPort)
+        val descriptor = knownDescriptor ?: probeSetupDevice(apHost, apPort)
         val resolvedPort = descriptor?.port ?: apPort
         val actions = listOf("GetApList", "GetNetworkList")
+        val actionLogs = mutableListOf<String>()
 
         for (action in actions) {
             val soapBody = """
@@ -255,6 +382,7 @@ class WeMoProvisionerClient(
                 </s:Envelope>
             """.trimIndent()
 
+            val startMs = System.currentTimeMillis()
             try {
                 val req = Request.Builder()
                     .url("http://$apHost:$resolvedPort/upnp/control/WiFiSetup1")
@@ -264,18 +392,26 @@ class WeMoProvisionerClient(
                     .post(soapBody.toRequestBody(xmlMediaType))
                     .build()
                 httpClient.newCall(req).execute().use { resp ->
+                    val elapsed = System.currentTimeMillis() - startMs
+                    val xml = resp.body?.string().orEmpty()
                     if (resp.isSuccessful) {
-                        val xml = resp.body?.string().orEmpty()
                         val parsed = parseApListXml(xml)
+                        actionLogs.add("$action=HTTP_200(${elapsed}ms,count=${parsed.size})")
                         if (parsed.isNotEmpty()) {
+                            lastApScanDiagnosticSummary = actionLogs.joinToString(" ")
                             return@withContext parsed
                         }
+                    } else {
+                        actionLogs.add("$action=HTTP_${resp.code}(${elapsed}ms)")
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                val elapsed = System.currentTimeMillis() - startMs
+                actionLogs.add("$action=${e.javaClass.simpleName}(${elapsed}ms)")
                 if (descriptor == null) break
             }
         }
+        lastApScanDiagnosticSummary = actionLogs.joinToString(" ").ifBlank { "No AP scan response" }
         emptyList()
     }
 
@@ -322,7 +458,7 @@ class WeMoProvisionerClient(
 
     /**
      * Provisions a factory-reset Belkin WeMo switch at [apHost]:[apPort] onto the target 2.4 GHz
-     * home Wi-Fi network using `pywemo`'s exact sequence.
+     * home Wi-Fi network using `pywemo`'s exact sequence and emitting live step-by-step debug telemetry.
      */
     suspend fun provisionDeviceToHomeWifi(
         apHost: String = defaultApHost,
@@ -335,13 +471,52 @@ class WeMoProvisionerClient(
         encryptionMethod: Int = 0,
         addPasswordLengths: Boolean? = null,
         customFriendlyName: String? = null,
-        maxStatusPolls: Int = 10,
-        statusPollDelayMs: Long = 750L
+        maxStatusPolls: Int = 18,
+        statusPollDelayMs: Long = 1000L,
+        knownDescriptor: WeMoSetupDeviceDescriptor? = null,
+        knownScannedAps: List<WeMoScannedAp> = emptyList(),
+        onProgress: ((String) -> Unit)? = null
     ): WeMoProvisionResult = withContext(Dispatchers.IO) {
-        val descriptor = probeSetupDevice(apHost, apPort)
+        val traceLines = mutableListOf<String>()
+        fun logStep(line: String) {
+            traceLines.add(line)
+            onProgress?.invoke(line)
+        }
+
+        val descriptor = knownDescriptor ?: probeSetupDevice(apHost, apPort)
         val resolvedPort = descriptor?.port ?: apPort
+        if (descriptor != null) {
+            logStep(
+                "[STEP 1 PROBE] OK $apHost:$resolvedPort (${descriptor.setupXmlPath}) model=${descriptor.modelName} sku=${descriptor.hardwareSku} fw=${descriptor.firmwareVersion}"
+            )
+            logStep(
+                "[STEP 2 ID] mac=${descriptor.macAddress} sn=${descriptor.serialNumber} (src=${descriptor.macAndSerialSource}) rtos=${descriptor.isRtos} iot=${descriptor.isIot} binOpt=${descriptor.binaryOption} newAlgo=${descriptor.newAlgo}"
+            )
+        } else {
+            logStep("[STEP 1 PROBE] WARN: Probe failed on $apHost ($lastProbeDiagnosticSummary)")
+        }
+
         val mac = descriptor?.macAddress?.ifBlank { "EC1A59001122" } ?: "EC1A59001122"
         val serial = descriptor?.serialNumber?.ifBlank { "221517K01018AB" } ?: "221517K01018AB"
+
+        val matchedAp = knownScannedAps.firstOrNull { it.ssid.equals(ssid.trim(), ignoreCase = true) }
+        val effectiveChannel = matchedAp?.channel ?: channel
+        val rawAuthMode = matchedAp?.authMode ?: authMode
+        val rawEncryptType = matchedAp?.encryptionType ?: encryptionType
+
+        if (matchedAp != null) {
+            logStep(
+                "[STEP 3 AP] Matched \"${matchedAp.ssid}\" in ApList: Ch=$effectiveChannel Auth=$rawAuthMode/$rawEncryptType RSSI=${matchedAp.signalStrengthPercent}%"
+            )
+        } else {
+            logStep(
+                "[STEP 3 AP] Using manual AP params for \"$ssid\": Ch=$effectiveChannel Auth=$rawAuthMode/$rawEncryptType (scannedCount=${knownScannedAps.size})"
+            )
+        }
+
+        if (rawAuthMode.equals("Unknown", ignoreCase = true)) {
+            logStep("[WARN] Router AuthMode is 'Unknown' (likely WPA3-only; WeMo requires 2.4 GHz WPA2-PSK/AES)!")
+        }
 
         val effectiveMethod = if (encryptionMethod in 1..3) {
             encryptionMethod
@@ -369,16 +544,20 @@ class WeMoProvisionerClient(
                     .header("Connection", "close")
                     .post(renameBody.toRequestBody(xmlMediaType))
                     .build()
-                httpClient.newCall(renameReq).execute().close()
+                httpClient.newCall(renameReq).execute().use { resp ->
+                    logStep("[RENAME] ChangeFriendlyName(\"${customFriendlyName.trim()}\") -> HTTP_${resp.code}")
+                }
+            }.onFailure { e ->
+                logStep("[RENAME] ChangeFriendlyName failed: ${e.javaClass.simpleName}")
             }
         }
 
-        val isOpenNetwork = encryptionType.equals("NONE", ignoreCase = true) ||
-            authMode.equals("OPEN", ignoreCase = true) ||
+        val isOpenNetwork = rawEncryptType.equals("NONE", ignoreCase = true) ||
+            rawAuthMode.equals("OPEN", ignoreCase = true) ||
             plainPassword.isEmpty()
 
-        val resolvedAuth = if (isOpenNetwork) "OPEN" else authMode
-        val resolvedEncrypt = if (isOpenNetwork) "NONE" else encryptionType
+        val resolvedAuth = if (isOpenNetwork) "OPEN" else rawAuthMode
+        val resolvedEncrypt = if (isOpenNetwork) "NONE" else rawEncryptType
         val encryptedPwd = if (isOpenNetwork) {
             ""
         } else {
@@ -391,6 +570,15 @@ class WeMoProvisionerClient(
             )
         }
 
+        val lenSuffixPreview = if (!isOpenNetwork && effectiveAddLengths && encryptedPwd.length >= 4) {
+            encryptedPwd.takeLast(4)
+        } else {
+            "none"
+        }
+        logStep(
+            "[STEP 4 CRYPTO] Method=$effectiveMethod addLengths=$effectiveAddLengths plainLen=${plainPassword.length} encLen=${encryptedPwd.length} suffix=$lenSuffixPreview"
+        )
+
         val connectBody = """
             <?xml version="1.0" encoding="utf-8"?>
             <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
@@ -400,7 +588,7 @@ class WeMoProvisionerClient(
                   <auth>${escapeXml(resolvedAuth)}</auth>
                   <password>${escapeXml(encryptedPwd)}</password>
                   <encrypt>${escapeXml(resolvedEncrypt)}</encrypt>
-                  <channel>$channel</channel>
+                  <channel>$effectiveChannel</channel>
                 </u:ConnectHomeNetwork>
               </s:Body>
             </s:Envelope>
@@ -408,8 +596,10 @@ class WeMoProvisionerClient(
 
         val endpoint = "http://$apHost:$resolvedPort/upnp/control/WiFiSetup1"
         var httpSuccess = false
+        var lastPairingStatus = ""
 
         repeat(2) { attempt ->
+            val sendStart = System.currentTimeMillis()
             try {
                 val req = Request.Builder()
                     .url(endpoint)
@@ -419,11 +609,22 @@ class WeMoProvisionerClient(
                     .post(connectBody.toRequestBody(xmlMediaType))
                     .build()
                 httpClient.newCall(req).execute().use { resp ->
+                    val elapsed = System.currentTimeMillis() - sendStart
+                    val respXml = resp.body?.string().orEmpty()
+                    val pairing = extractXmlTag(respXml, "PairingStatus").orEmpty()
+                    if (pairing.isNotEmpty()) lastPairingStatus = pairing
+                    logStep(
+                        "[STEP 5 SEND #${attempt + 1}] ConnectHomeNetwork -> HTTP_${resp.code} (${elapsed}ms) PairingStatus=${pairing.ifEmpty { "n/a" }}"
+                    )
                     if (resp.isSuccessful) {
                         httpSuccess = true
                     }
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                val elapsed = System.currentTimeMillis() - sendStart
+                logStep(
+                    "[STEP 5 SEND #${attempt + 1}] ERROR: ${e.javaClass.simpleName}: ${e.message?.take(60)} (${elapsed}ms)"
+                )
                 if (descriptor == null && attempt == 0) return@repeat
             }
             if (attempt == 0 && httpSuccess) delay(100L)
@@ -443,7 +644,8 @@ class WeMoProvisionerClient(
                 </s:Envelope>
             """.trimIndent()
 
-            suspend fun pollOnce(): Int? {
+            suspend fun pollOnce(pollIndex: Int): Int? {
+                val pollStart = System.currentTimeMillis()
                 return try {
                     val statusReq = Request.Builder()
                         .url(endpoint)
@@ -453,27 +655,39 @@ class WeMoProvisionerClient(
                         .post(statusBody.toRequestBody(xmlMediaType))
                         .build()
                     httpClient.newCall(statusReq).execute().use { resp ->
+                        val elapsed = System.currentTimeMillis() - pollStart
                         val body = resp.body?.string().orEmpty()
-                        Regex("<NetworkStatus>(\\d+)</NetworkStatus>", RegexOption.IGNORE_CASE)
+                        val code = Regex("<NetworkStatus>(\\d+)</NetworkStatus>", RegexOption.IGNORE_CASE)
                             .find(body)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                        logStep("[POLL #$pollIndex] GetNetworkStatus -> Status=${code ?: "HTTP_${resp.code}"} (${elapsed}ms)")
+                        code
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    val elapsed = System.currentTimeMillis() - pollStart
+                    logStep("[POLL #$pollIndex] GetNetworkStatus -> ${e.javaClass.simpleName} (${elapsed}ms)")
                     null
                 }
             }
 
-            delay(minOf(200L, statusPollDelayMs))
+            delay(minOf(350L, statusPollDelayMs))
             var polls = 0
+            var consecutiveNullPolls = 0
             while (polls < maxStatusPolls) {
-                val polled = pollOnce()
+                val polled = pollOnce(polls + 1)
                 if (polled != null) {
+                    consecutiveNullPolls = 0
                     netStatus = polled
                     if (netStatus == 1 || netStatus == 2) break
-                } else if (polls > 0 && netStatus == 3) {
-                    netStatus = 1
-                    break
                 } else {
-                    break
+                    consecutiveNullPolls++
+                    if (polls > 0 && netStatus == 3) {
+                        logStep("[POLL INFO] Setup AP closed after Status=3 handshake -> treating as connected (Status=1)")
+                        netStatus = 1
+                        break
+                    } else if (consecutiveNullPolls >= 3) {
+                        logStep("[POLL WARN] Setup AP unreachable for 3 consecutive polls")
+                        break
+                    }
                 }
                 polls++
                 if (polls < maxStatusPolls) {
@@ -484,45 +698,52 @@ class WeMoProvisionerClient(
             var extraHandshakeLoops = 3
             while (netStatus == 3 && extraHandshakeLoops > 0) {
                 delay(statusPollDelayMs)
-                val polled = pollOnce()
+                polls++
+                val polled = pollOnce(polls)
                 if (polled != null) {
                     netStatus = polled
                     if (netStatus == 1 || netStatus == 2) break
                 } else {
+                    logStep("[POLL INFO] Setup AP closed during extra Status=3 loop -> Status=1")
                     netStatus = 1
                     break
                 }
                 extraHandshakeLoops--
             }
 
-            try {
-                val closeBody = """
-                    <?xml version="1.0" encoding="utf-8"?>
-                    <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-                      <s:Body>
-                        <u:CloseSetup xmlns:u="urn:Belkin:service:WiFiSetup:1">
-                        </u:CloseSetup>
-                      </s:Body>
-                    </s:Envelope>
-                """.trimIndent()
-                val closeReq = Request.Builder()
-                    .url(endpoint)
-                    .header("SOAPACTION", "\"urn:Belkin:service:WiFiSetup:1#CloseSetup\"")
-                    .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                    .header("Connection", "close")
-                    .post(closeBody.toRequestBody(xmlMediaType))
-                    .build()
-                httpClient.newCall(closeReq).execute().use { resp ->
-                    val body = resp.body?.string().orEmpty()
-                    closeStatus = extractXmlTag(body, "status").orEmpty().ifBlank {
-                        if (resp.isSuccessful) "success" else "HTTP ${resp.code}"
-                    }
-                }
-            } catch (_: Exception) {
-                closeStatus = "ap_closed"
-            }
-
+            // CRITICAL: Only call CloseSetup & SetSetupDoneStatus when the switch actually connected
+            // (netStatus == 1 or 3). Calling CloseSetup when netStatus == 0 or 2 shuts down the
+            // switch's 10.22.22.1 soft-AP on a failed attempt and prevents retrying!
             if (netStatus == 1 || netStatus == 3) {
+                try {
+                    val closeBody = """
+                        <?xml version="1.0" encoding="utf-8"?>
+                        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+                          <s:Body>
+                            <u:CloseSetup xmlns:u="urn:Belkin:service:WiFiSetup:1">
+                            </u:CloseSetup>
+                          </s:Body>
+                        </s:Envelope>
+                    """.trimIndent()
+                    val closeReq = Request.Builder()
+                        .url(endpoint)
+                        .header("SOAPACTION", "\"urn:Belkin:service:WiFiSetup:1#CloseSetup\"")
+                        .header("Content-Type", "text/xml; charset=\"utf-8\"")
+                        .header("Connection", "close")
+                        .post(closeBody.toRequestBody(xmlMediaType))
+                        .build()
+                    httpClient.newCall(closeReq).execute().use { resp ->
+                        val body = resp.body?.string().orEmpty()
+                        closeStatus = extractXmlTag(body, "status").orEmpty().ifBlank {
+                            if (resp.isSuccessful) "success" else "HTTP ${resp.code}"
+                        }
+                    }
+                    logStep("[STEP 6 CLOSE] CloseSetup -> $closeStatus")
+                } catch (e: Exception) {
+                    closeStatus = "ap_closed"
+                    logStep("[STEP 6 CLOSE] CloseSetup -> ap_closed (${e.javaClass.simpleName})")
+                }
+
                 runCatching {
                     val doneBody = """
                         <?xml version="1.0" encoding="utf-8"?>
@@ -540,21 +761,28 @@ class WeMoProvisionerClient(
                         .header("Connection", "close")
                         .post(doneBody.toRequestBody(xmlMediaType))
                         .build()
-                    httpClient.newCall(doneReq).execute().close()
+                    httpClient.newCall(doneReq).execute().use { resp ->
+                        logStep("[STEP 6 DONE] SetSetupDoneStatus -> HTTP_${resp.code}")
+                    }
                 }
+            } else {
+                closeStatus = "kept_open_for_retry"
+                logStep(
+                    "[STEP 6 HOLD] NetworkStatus=$netStatus (not connected) • Skipping CloseSetup so 10.22.22.1 AP stays open for retry"
+                )
             }
         }
 
-        val overallSuccess = httpSuccess && netStatus != 2
+        val overallSuccess = httpSuccess && (netStatus == 1 || netStatus == 3)
         val statusDesc = when {
             httpSuccess && netStatus == 2 ->
                 "Password rejected by WeMo (Status=2): Wi-Fi password must be at least 8 characters"
-            httpSuccess && (netStatus == 1 || netStatus == 3) ->
-                "Provisioned to '$ssid' (Status=$netStatus, Method $effectiveMethod) • Setup AP closed, switch joining Home Wi-Fi"
-            httpSuccess ->
-                "Dispatched ConnectHomeNetwork + CloseSetup to '$ssid' at $apHost:$resolvedPort (Method $effectiveMethod)"
+            overallSuccess ->
+                "Provisioned to '$ssid' (Status=$netStatus, Method $effectiveMethod, lengths=$effectiveAddLengths) • Setup AP closed, switch joining Home Wi-Fi"
+            httpSuccess && netStatus == 0 ->
+                "Switch did not join '$ssid' (NetworkStatus=0 after polling, Method=$effectiveMethod, lengths=$effectiveAddLengths, Ch=$effectiveChannel). Setup AP left open — screenshot the debug panel below or try another AES Method / Length option."
             else ->
-                "WeMo Setup AP ($apHost:$resolvedPort) unreachable — connect phone Wi-Fi to WeMo.Light.xxx / WeMo.Mini.xxx first"
+                "WeMo Setup AP ($apHost:$resolvedPort) unreachable — connect phone Wi-Fi to WeMo.Light.xxx / WeMo.Mini.xxx first ($lastProbeDiagnosticSummary)"
         }
 
         val updatedDescriptor = if (descriptor != null && !customFriendlyName.isNullOrBlank()) {
@@ -572,7 +800,7 @@ class WeMoProvisionerClient(
                 timestamp = nowTime(),
                 deviceName = updatedDescriptor?.friendlyName ?: "WeMo Setup AP ($apHost)",
                 endpoint = endpoint,
-                soapAction = "WiFiSetup1#ConnectHomeNetwork($ssid, Method $effectiveMethod, lengths=$effectiveAddLengths)",
+                soapAction = "WiFiSetup1#ConnectHomeNetwork($ssid, Method $effectiveMethod, lengths=$effectiveAddLengths, Pairing=$lastPairingStatus)",
                 statusText = statusDesc,
                 xmlSnippet = connectBody.take(260),
                 isLiveLanSuccess = overallSuccess
@@ -580,7 +808,8 @@ class WeMoProvisionerClient(
             closeSetupStatus = closeStatus,
             effectiveEncryptionMethod = effectiveMethod,
             addedLengthSuffix = effectiveAddLengths,
-            setupDevice = updatedDescriptor
+            setupDevice = updatedDescriptor,
+            debugTraceLines = traceLines
         )
     }
 }
