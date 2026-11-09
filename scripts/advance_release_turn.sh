@@ -45,7 +45,9 @@ fi
 chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh 2>/dev/null || true
 
 PST_NOW="$(TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z")"
-HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || awk -F': *' '/^CANDIDATE_BASE_SHA:/ { print $2; exit }' RELEASE_SIGN_OFF.md | tr -d '\r' || echo "ai-studio")"
+STAGE4_SHA="$(sed -n 's/^SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (\([^ )]*\).*/\1/p' RELEASE_SIGN_OFF.md | tr -d '\r' | head -n 1 || true)"
+BASE_SHA="$(awk -F': *' '/^CANDIDATE_BASE_SHA:/ { print $2; exit }' RELEASE_SIGN_OFF.md | tr -d '\r' || true)"
+HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "${STAGE4_SHA:-${BASE_SHA:-ai-studio}}")"
 if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "NONE" ]]; then
   HEAD_SHA="v20.0-rc"
 fi
