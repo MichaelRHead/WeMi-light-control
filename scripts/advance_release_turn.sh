@@ -34,14 +34,21 @@ for arg in "$@"; do
   fi
 done
 
-# Pull latest origin/main before mutating RELEASE_SIGN_OFF.md
-git fetch origin main --quiet 2>/dev/null || true
+# Pull latest origin/main before mutating RELEASE_SIGN_OFF.md (when .git is present)
+if [[ -d ".git" ]]; then
+  git fetch origin main --quiet 2>/dev/null || true
+else
+  NO_PUSH="true"
+fi
 
 # Ensure executable bits on gradlew and release scripts
 chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh 2>/dev/null || true
 
 PST_NOW="$(TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z")"
-HEAD_SHA="$(git rev-parse --short HEAD)"
+HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || awk -F': *' '/^CANDIDATE_BASE_SHA:/ { print $2; exit }' RELEASE_SIGN_OFF.md | tr -d '\r' || echo "ai-studio")"
+if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "NONE" ]]; then
+  HEAD_SHA="v20.0-rc"
+fi
 
 python3 - "${ACTION}" "${PST_NOW}" "${HEAD_SHA}" "$@" <<'PYEOF'
 import re

@@ -9,7 +9,7 @@ Detailed agent instructions, UX design architecture, debugging & support archite
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — **Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture** (**Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent** — read-only for all other agents)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — **4-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine** (`ai_studio_ux_cuj` → `discovery_and_grouping` → `telemetry_and_debugging` → `code_quality_and_testing` → `ai_studio_ux_cuj`)
-- [`RELEASE_NOTES.md`](RELEASE_NOTES.md) & [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v20.0`)
+- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v20.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v20.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan

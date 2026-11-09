@@ -14,7 +14,7 @@ Use this skill whenever preparing, reviewing, advancing, or monitoring a Google 
 Every Play Store release candidate (`v20.0+`) is reviewed once by each of the 4 domain agents in a deterministic round-robin ring synchronized via [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md) on `origin/main`:
 
 1. **Stage 1 (Initiate) — `ai_studio_ux_cuj` (Google AI Studio Agent)**:
-   - Bumps `versionCode` / `versionName` in `app/build.gradle.kts`, audits UX/accessibility/navigation/CUJs (`UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`), updates `RELEASE_NOTES.md` & `docs/user-guide/release-notes.md`, records `SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF`, sets `RELEASE_STATUS: IN_REVIEW` and `CURRENT_TURN: discovery_and_grouping`, and pushes to `origin/main`.
+   - Verifies `versionCode` / `versionName` in `app/build.gradle.kts`, audits UX/accessibility/navigation/CUJs (`UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`), updates `docs/user-guide/release-notes.md` & `play_store_assets/RELEASE_NOTES.txt` (do not create a root `RELEASE_NOTES.md`), runs `bash scripts/advance_release_turn.sh initiate "<summary>"` (recording `SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF`, `RELEASE_STATUS: IN_REVIEW`, `CURRENT_TURN: discovery_and_grouping`), and syncs to `origin/main`.
 2. **Stage 2 (Review 1) — `discovery_and_grouping` (Antigravity Device Discovery & Room Grouping Agent)**:
    - Audits SSDP/unicast discovery (`WeMoSsdpDiscoveryEngine.kt`, `WeMoDiscoveryCoordinator.kt`), 3-tier hardware identity matching (`matchesDiscoveredDevice`), soft-AP SSID filtering (`isWemoDeviceSetupSsid`), and `CamelCase` / specificity-ordered room inference (`normalizeDeviceNameForInference`, `inferRoomFromName`, `resolveDeviceRoomAssignment` in `WeMoEntities.kt`).
    - Runs `./gradlew testDebugUnitTest --tests com.example.WeMoSkuAndCryptoTest --tests com.example.WeMoSoapAndSelfHealingTest`.
@@ -28,7 +28,7 @@ Every Play Store release candidate (`v20.0+`) is reviewed once by each of the 4 
    - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` (`26/26+` unit, protocol, and Compose E2E tests).
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off code_quality_and_testing "<verification summary>"` (setting `RELEASE_STATUS: AWAITING_FINAL_CONCLUSION` and `CURRENT_TURN: ai_studio_ux_cuj`).
 5. **Stage 5 (Conclude) — `ai_studio_ux_cuj` (Google AI Studio Agent)**:
-   - Verifies all 4 stages are `SIGNED_OFF` in `RELEASE_SIGN_OFF.md`, confirms `RELEASE_NOTES.md` & `docs/user-guide/release-notes.md` completeness, sets `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `CURRENT_TURN: NONE`, `FINAL_RELEASE_SHA`, and `CONCLUDED_AT`, and pushes to `origin/main`.
+   - Verifies all 4 stages are `SIGNED_OFF` in `RELEASE_SIGN_OFF.md`, confirms `docs/user-guide/release-notes.md` & `play_store_assets/RELEASE_NOTES.txt` completeness, runs `bash scripts/advance_release_turn.sh conclude "<summary>"` (setting `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `CURRENT_TURN: NONE`, `FINAL_RELEASE_SHA`, and `CONCLUDED_AT`), and syncs to `origin/main`.
 
 ---
 

@@ -17,12 +17,13 @@ All project-level, architectural, UX, and engineering documents live **exclusive
 | [`../UX_DESIGN_AND_EXPERIENCE.md`](../UX_DESIGN_AND_EXPERIENCE.md) | Behavioral mental models, 5 Compose layout invariants & Critical User Journeys (CUJs) | **Google AI Studio Agent ONLY (Read-Only for other agents)** |
 | [`../DEBUGGING_AND_SUPPORT.md`](../DEBUGGING_AND_SUPPORT.md) | On-device screenshot & `wemi-telemetry-latest.txt` diagnostics, `10.22.22.1` provisioning invariants & support architecture | **Antigravity Debugging & Support Agent ONLY (Read-Only for other agents)** |
 | [`../DISCOVERY_AND_ROOM_GROUPING.md`](../DISCOVERY_AND_ROOM_GROUPING.md) | Internal SSDP/unicast discovery logic, 3-tier hardware identity resolution & automatic room grouping/migration | **Antigravity Device Discovery & Room Grouping Agent ONLY (Read-Only for other agents)** |
+| [`../RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) & [`../RELEASE_SIGN_OFF.md`](../RELEASE_SIGN_OFF.md) | 4-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine | Shared across all 4 release review agents |
 | [`../USER_GUIDE.md`](../USER_GUIDE.md) | Top-level entry point & summary table linking to the human feature guides in `docs/user-guide/` | Shared across agents |
 | [`../IMPLEMENTED.md`](../IMPLEMENTED.md) | Reverse-chronological feature & bug-fix change log (newest at top) | Shared across agents |
 | [`../UPCOMING_FEATURES.md`](../UPCOMING_FEATURES.md) | Next-iteration engineering roadmap | Shared across agents |
 | [`../CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../CODE_QUALITY_AND_MODULARIZATION_PLAN.md) | Code modularization & E2E validation plan | Shared across agents |
 
-> **Rule**: Never run `cp IMPLEMENTED.md docs/IMPLEMENTED.md` or recreate `docs/IMPLEMENTED.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, `docs/DISCOVERY_AND_ROOM_GROUPING.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`.
+> **Rule**: Never run `cp IMPLEMENTED.md docs/IMPLEMENTED.md` or recreate `docs/IMPLEMENTED.md`, `docs/RELEASE_PROCESS.md`, `docs/RELEASE_SIGN_OFF.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, `docs/DISCOVERY_AND_ROOM_GROUPING.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`.
 
 ---
 

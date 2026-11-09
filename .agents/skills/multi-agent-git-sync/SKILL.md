@@ -29,8 +29,8 @@ Use this skill whenever multiple agent conversations or external tools (such as 
    - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../DISCOVERY_AND_ROOM_GROUPING.md) and [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md) are **owned exclusively by the Antigravity Device Discovery & Room Grouping Agent**.
    - Other agents must read and follow those files to preserve the SSDP/unicast discovery orchestration, 3-tier hardware identity resolution (`matchesDiscoveredDevice`), and automatic room inference/migration (`inferRoomFromName` & `resolveDeviceRoomAssignment`) invariants, **but must never edit, overwrite, or delete them**.
 7. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
-   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `RELEASE_NOTES.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) live **exclusively at the repository root (`/`)**.
-   - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`.
+   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) live **exclusively at the repository root (`/`)**.
+   - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` — including `docs/user-guide/release-notes.md` — and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`.
 
 ---
 
