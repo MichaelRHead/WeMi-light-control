@@ -11,7 +11,7 @@ description: Android & Android TV UX design architecture, navigation patterns, a
 > - **Policy**: **ONLY the Google AI Studio Agent may modify `.agents/skills/wemi-ux-design-and-experience/SKILL.md`, [`UX_DESIGN.md`](../../UX_DESIGN.md), or [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md).**
 > - **All other agents** (CLI agents, background sync agents, test runners, and external coding assistants) **MUST read, understand, and obey** the UX guidelines, navigation patterns, accessibility standards, behavioral models, visual state rules, and layout invariants documented here when implementing features or writing tests, **but MUST NOT edit, overwrite, or reformat these files.**
 
-For the complete Android UX guidelines (navigation patterns, accessibility standards for smart home controls, and user interaction flows) and behavioral architecture, read [`../../UX_DESIGN.md`](../../UX_DESIGN.md) and [`../../UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md).
+For the complete Android UX guidelines (navigation patterns, accessibility standards for smart home controls, and user interaction flows) and behavioral architecture, read [`../../UX_DESIGN.md`](../../UX_DESIGN.md) and [`../../UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md). For `10.22.22.1` provisioning diagnostics and telemetry architecture, read [`../../DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) and [`../wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md) *(owned exclusively by the Antigravity Debugging & Support Agent — strictly read-only for the Google AI Studio Agent)*.
 
 ---
 

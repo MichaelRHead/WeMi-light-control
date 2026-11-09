@@ -7,11 +7,17 @@
 > - **Google AI Studio Agent**: Sole owner and maintainer of this specification. Responsible for evolving the Android & Android TV user experience, navigation architecture, accessibility standards, human-factors modeling, and Critical User Journeys (CUJs).
 > - **All Other Agents (CLI, GitHub, CI/CD, or External Coding Agents)**: **DO NOT MODIFY, OVERWRITE, RENAME, OR DELETE THIS FILE.** You **must** read, understand, and strictly follow these UX guidelines when implementing features, refactoring code, or writing tests, but treat this document as **strictly read-only**.
 
+Related documentation:
+- [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & Critical User Journeys *(Owned Exclusively by the Google AI Studio Agent)*
+- [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent — read-only for the Google AI Studio Agent)*
+- [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
+- [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
+
 ---
 
 ## 1. Executive Summary & UX Philosophy
 
-**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v19.0`) reimagines the tactile, unmistakable physical affordances of the 2013 Belkin WeMo smart-home interface (`#73D41B` Belkin lime header, brushed metallic surfaces, glowing emerald power rings, and skeuomorphic appliance illustrations) while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
+**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v20.0`) reimagines the tactile, unmistakable physical affordances of the 2013 Belkin WeMo smart-home interface (`#73D41B` Belkin lime header, brushed metallic surfaces, glowing emerald power rings, and skeuomorphic appliance illustrations) while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
 
 Smart-home control apps fail when they treat physical wall switches like generic cloud database rows. Our UX design is anchored on four core principles:
 1. **Sub-Frame Tactile Responsiveness (`<16ms`)**: Tapping a light switch in the app must feel as instantaneous as flipping a physical paddle on the wall, backed by optimistic state projection and `1200ms` UPnP GENA echo suppression.
