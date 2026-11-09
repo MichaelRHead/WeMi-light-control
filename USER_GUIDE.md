@@ -4,7 +4,7 @@ Welcome to **WeMi Light Control**, a 100% local-network Android and Android TV c
 
 **WeMi Light Control** communicates directly with your switches over your home Wi-Fi using standard local UPnP, SSDP, SOAP, and GENA push protocols — **no Belkin cloud account, external server, or internet connection is required**.
 
-> **What's New in Each Version?** See the **[User-Facing Release Notes (`RELEASE_NOTES.md`)](RELEASE_NOTES.md)** for a high-level summary of major features and improvements in every Google Play Store release (`v1.0` → `v20.0`).
+> **What's New in Each Version?** See **[Release Notes & Version History (`docs/user-guide/release-notes.md`)](docs/user-guide/release-notes.md)** for a high-level summary of major features and improvements in every Google Play Store release (`v1.0` → `v20.0`).
 
 ---
 
@@ -23,6 +23,7 @@ Each guide below explains one major area of the app in detail:
 | **7** | **[Rules, Schedules & Auto-Off Timers](docs/user-guide/rules-and-timers.md)** | How to create and manage local **Schedule Rules** (`Daily at 6:30 PM`, `Sunset`, `Sunrise`), **Auto-Off Timers** (with live `Auto-Off MM:SS` countdown badges on the switch row), and **Motion Trigger Rules** on the **Rules** tab, plus testing rules immediately with the `▶` button. |
 | **8** | **[Master Controls, Diagnostics, Demo Mode & Android TV](docs/user-guide/more-and-tv-mode.md)** | How to use the **More** tab (`All Switches ON` / `All Switches OFF`, **Real LAN Mode** vs. **Demo Showroom Mode**, one-tap **Reset Homes, Discovered Switches & Rooms**, `wemi`/`wemo` header wordmark toggle, and the **Live UPnP / SOAP Packet Log Inspector** with **`Save/Share Log`**) and how to control your home from the couch with the **10-Foot Android TV Dashboard (`wemi TV`)** and TV remote D-Pad shortcuts. |
 | **9** | **[Troubleshooting, Screenshots & Sharing Telemetry Logs](docs/user-guide/telemetry-and-troubleshooting.md)** | Step-by-step instructions for capturing on-screen diagnostic screenshots (**`SETUP DEBUG DETAILS (SCREENSHOT)`**, **`UPnP / SOAP Packet Log`**, and **Inline Switch Diagnostics (`ⓘ`)**), exporting or sharing **`wemi-telemetry-latest.txt`** via **`Save/Share`** / **`Copy`**, and decoding `[NET]`, `[PROBE]`, `[FLAGS]`, `[TARGET AP]`, and `[STEP 1..5]` setup status codes *(Owned Exclusively by the Antigravity Debugging & Support Agent)*. |
+| **10** | **[Release Notes & Version History (`v1.0` → `v20.0`)](docs/user-guide/release-notes.md)** | High-level, non-technical summary of the major user-facing features, visual improvements, and reliability upgrades introduced in each Google Play Store release from **`v20.0`** back to **`v1.0`**. |
 
 ---
 
@@ -36,10 +37,10 @@ Each guide below explains one major area of the app in detail:
 
 ---
 
-## Release Notes, Developer & Architecture Documentation
+## Developer & Architecture Documentation
 
-For release-by-release highlights, UX architecture, protocol details, architecture diagrams, and roadmap information, see:
-- [`RELEASE_NOTES.md`](RELEASE_NOTES.md) — User-Facing Release Notes for Every Google Play Store Version (`v1.0` → `v20.0`)
+For UX architecture, protocol details, architecture diagrams, and roadmap information, see:
+- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Release Notes for Every Google Play Store Version (`v1.0` → `v20.0`)
 - [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
 - [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & Critical User Journeys *(Owned Exclusively by the Google AI Studio Agent)*
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
