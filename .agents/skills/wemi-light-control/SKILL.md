@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
   ```bash
   ./gradlew assembleDebug
   ```
-- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "18.0"`, `versionCode = 18`).
+- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "19.0"`, `versionCode = 19`).
 
 ---
 

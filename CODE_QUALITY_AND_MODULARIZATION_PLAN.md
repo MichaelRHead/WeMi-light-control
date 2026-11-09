@@ -1,13 +1,13 @@
 # WeMi Light Control — Code Quality, Human-Readable Modularization & End-to-End Validation Plan
 
-**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v18.0`)  
-**Status**: **Completed & Verified — All 4 Phases (M1, M2, M3 & M4) + `v13.0–v18.0` Enhancements Landed (`25/25` Unit, Protocol & E2E Compose UI Tests Passing)**
+**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v19.0`)  
+**Status**: **Completed & Verified — All 4 Phases (M1, M2, M3 & M4) + `v13.0–v19.0` Enhancements Landed (`25/25` Unit, Protocol & E2E Compose UI Tests Passing)**
 
 Related documents and skills:
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
 - [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines *(Owned Exclusively by the Google AI Studio Agent)*
 - [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & CUJs *(Owned Exclusively by the Google AI Studio Agent)*
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v18.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v19.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
