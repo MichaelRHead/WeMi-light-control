@@ -26,7 +26,7 @@ Use this skill whenever multiple agent conversations or external tools (such as 
    - [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md), [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md), and [`docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md) are **owned exclusively by the Antigravity Debugging & Support Agent**.
    - Other agents must read and follow those files to preserve the `10.22.22.1` provisioning diagnostics, screenshot debug panel, and `wemi-telemetry-latest.txt` exporter invariants, **but must never edit, overwrite, or delete them**.
 6. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
-   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) live **exclusively at the repository root (`/`)**.
+   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `RELEASE_NOTES.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) live **exclusively at the repository root (`/`)**.
    - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`.
 
 ---
