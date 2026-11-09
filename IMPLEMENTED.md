@@ -1,7 +1,7 @@
 # WeMi Light Control — Implemented Features & Change Log (`IMPLEMENTED.md`)
 
 **Repository**: `MichaelRHead/WeMi-light-control` (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
-**Current Version**: `v12.0` (`versionCode = 12`)  
+**Current Version**: `v13.0` (`versionCode = 13`)  
 **Target Platforms**: Android Phones, Tablets, and Android TV (`UI_MODE_TYPE_TELEVISION` 10-foot D-Pad interface)
 
 Related documentation:
@@ -24,7 +24,7 @@ Related documentation:
 
 | Landed (PST) | Version / Commit | Feature or Improvement | Primary Files |
 | :--- | :--- | :--- | :--- |
-| **2026-11-08 17:48 PST** | `v12.0` (`HEAD`) | **Full-Width Reactive Switch Name (`AutoResizingDeviceNameText`), Badges Below Name & Redundant Room Chip Removal** | [`WeMoDeviceRow.kt`](app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt), [`WeMoTvCardsAndScenes.kt`](app/src/main/java/com/example/ui/components/WeMoTvCardsAndScenes.kt), [`WeMoEndToEndUiTest.kt`](app/src/test/java/com/example/WeMoEndToEndUiTest.kt) |
+| **2026-11-08 17:48 PST** | `v13.0` (`HEAD`) | **Full-Width Reactive Switch Name (`AutoResizingDeviceNameText`), Badges Below Name & Redundant Room Chip Removal** | [`WeMoDeviceRow.kt`](app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt), [`WeMoTvCardsAndScenes.kt`](app/src/main/java/com/example/ui/components/WeMoTvCardsAndScenes.kt), [`WeMoEndToEndUiTest.kt`](app/src/test/java/com/example/WeMoEndToEndUiTest.kt) |
 | **2026-11-08 16:12 PST** | `v12.0` (`77bf3a6`..`df22cc8`) | **Phase M4 Test Suite Modularization, `FakeWeMoUpnpServer` Extraction, Loopback Socket/DB/Dialog Fixes & E2E Compose UI Tests (`20/20` Passing)** | [`FakeWeMoUpnpServer.kt`](app/src/test/java/com/example/FakeWeMoUpnpServer.kt), [`WeMoEndToEndUiTest.kt`](app/src/test/java/com/example/WeMoEndToEndUiTest.kt), [`WeMoSkuAndCryptoTest.kt`](app/src/test/java/com/example/WeMoSkuAndCryptoTest.kt), [`WeMoSoapAndSelfHealingTest.kt`](app/src/test/java/com/example/WeMoSoapAndSelfHealingTest.kt), [`WeMoGenaProvisioningAndRulesTest.kt`](app/src/test/java/com/example/WeMoGenaProvisioningAndRulesTest.kt), [`WeMoViewModel.kt`](app/src/main/java/com/example/ui/WeMoViewModel.kt), [`WeMoNetworkMonitor.kt`](app/src/main/java/com/example/network/WeMoNetworkMonitor.kt), [`WeMoDatabase.kt`](app/src/main/java/com/example/data/WeMoDatabase.kt) |
 | **2026-11-08 15:00 PST** | `v12.0` (`cce6bf4`) | **Phase M3 UI Layer Modularization: Illustrations, Dialogs, DeviceRow, TvScreen, Screens & `MainActivity`** | [`MainActivity.kt`](app/src/main/java/com/example/MainActivity.kt), [`WeMoDevicesTabScreen.kt`](app/src/main/java/com/example/ui/screens/WeMoDevicesTabScreen.kt), [`WeMoHardwareIllustrations.kt`](app/src/main/java/com/example/ui/components/WeMoHardwareIllustrations.kt), [`WeMoDeviceRow.kt`](app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt), [`WeMoTvScreen.kt`](app/src/main/java/com/example/ui/components/WeMoTvScreen.kt) |
 | **2026-11-08 14:48 PST** | `v12.0` (`f073177`) | **Phase M2 Network Layer Modularization: `WeMoXmlAndSkuParser`, `WeMoSsdpDiscoveryEngine` & `WeMoPasswordCrypto`** | [`WeMoNetworkClient.kt`](app/src/main/java/com/example/network/WeMoNetworkClient.kt), [`WeMoXmlAndSkuParser.kt`](app/src/main/java/com/example/network/WeMoXmlAndSkuParser.kt), [`WeMoSsdpDiscoveryEngine.kt`](app/src/main/java/com/example/network/WeMoSsdpDiscoveryEngine.kt), [`WeMoProvisionerClient.kt`](app/src/main/java/com/example/network/WeMoProvisionerClient.kt), [`WeMoPasswordCrypto.kt`](app/src/main/java/com/example/network/WeMoPasswordCrypto.kt) |
@@ -54,7 +54,7 @@ Related documentation:
 
 ## 2. Detailed Change Log (Newest to Oldest)
 
-### [2026-11-08 17:48 PST] — Full-Width Reactive Switch Name (`AutoResizingDeviceNameText`), Badges Below Name & Redundant Room Chip Removal (`v12.0`)
+### [2026-11-08 17:48 PST] — Full-Width Reactive Switch Name (`AutoResizingDeviceNameText`), Badges Below Name & Redundant Room Chip Removal (`v13.0`)
 - **Full-Width Unobstructed Switch Title with Reactive Font Scaling ([`WeMoDeviceRow.kt`](app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt), [`WeMoTvCardsAndScenes.kt`](app/src/main/java/com/example/ui/components/WeMoTvCardsAndScenes.kt))**:
   - Added `AutoResizingDeviceNameText` (`Modifier.fillMaxWidth()`, `testTag("device_name_${device.id}")`) at the top of both phone/tablet (`WeMoDeviceRow`) and Android TV (`WeMoTvDeviceCard`) switch cards so the switch name spans the full width of the card with zero competing widgets on its line and reactively steps down its font size (`18.sp` → `11.sp`) if a long name would otherwise overflow.
 - **Secondary Status & Category Widgets Moved Below the Switch Name ([`WeMoDeviceRow.kt`](app/src/main/java/com/example/ui/components/WeMoDeviceRow.kt))**:
