@@ -1,14 +1,14 @@
 # WeMi Light Control — Upcoming Features & Next-Iteration Roadmap (`UPCOMING_FEATURES.md`)
 
 **Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
-**Current Baseline**: `v19.0` (See [`IMPLEMENTED.md`](IMPLEMENTED.md) for the reverse-chronological Change Log of completed features)  
+**Current Baseline**: `v20.0` (See [`IMPLEMENTED.md`](IMPLEMENTED.md) for the reverse-chronological Change Log of completed features)  
 **Target Platforms**: Android Phones, Tablets, Home Screen Widgets, Quick Settings, and Android TV (10-foot D-Pad Hub)
 
 Related documents in this repository:
 - [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
 - [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & Critical User Journeys *(Owned Exclusively by the Google AI Studio Agent)*
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v19.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v20.0`)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan (Phases M1–M4)
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
@@ -22,7 +22,7 @@ Related documents in this repository:
 
 ## 1. Upcoming Features Overview
 
-With the core local UPnP/SSDP/SOAP/GENA engine, 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3`), compact single-line-safe Room/Home cards, dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), and one-tap LAN reset complete in `v17.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
+With the core local UPnP/SSDP/SOAP/GENA engine, 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3`), compact single-line-safe Room/Home cards, dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), one-tap LAN reset, and 26 full-stack E2E tests complete in `v20.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
 
 | Track | Upcoming Feature Area | Key Deliverables |
 | :--- | :--- | :--- |

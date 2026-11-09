@@ -14,7 +14,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
 ## 1. Build, Test & Environment
 
 - **Toolchain**: AGP `9.1.0`, Kotlin `2.3.20`, KSP `2.3.6`, Compose BOM `2026.03.00`, Room `2.8.4` (`version = 5`), Robolectric `4.16.1`, `compileSdk = 36`, `minSdk = 24`.
-- **Unit, Protocol & E2E Compose UI Tests (`25/25` across 6 suites)**:
+- **Unit, Protocol & E2E Compose UI Tests (`26/26` across 6 suites)**:
   ```bash
   ./gradlew testDebugUnitTest --rerun-tasks
   ```
@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
   ```bash
   ./gradlew assembleDebug
   ```
-- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "19.0"`, `versionCode = 19`).
+- **Package / Namespace**: `com.example` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "20.0"`, `versionCode = 20`).
 
 ---
 
@@ -39,7 +39,7 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 
 ---
 
-## 3. Codebase Map (`v17.0` / Modularized Phases M1–M4)
+## 3. Codebase Map (`v20.0` / Modularized Phases M1–M4)
 
 ### Data & Scheduling Layer (`app/src/main/java/com/example/data/`)
 - **`WeMoEntities.kt`**:
@@ -50,31 +50,31 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
   - `WeMoHomeNetworkEntity` (`wemo_home_networks`): Persistent multi-home Wi-Fi profiles (`networkKey`, `homeName`, `ssidLabel`, `subnetPrefix`, `gatewayIp`, `lastConnectedTime`, `autoReconnectOnArrival`, `sortOrder`).
   - `WeMoDeviceEntity` (`wemo_devices`): Persisted device state (`id`, `name`, `roomName`, `networkKey`, `wifiSsid`, `deviceType`, `ipAddress`, `port`, `isOn`, `isReachable`, `brightness`, `latencyMs`, `lastCheckedTime`, `lastMotionTime`, `serialNumber`, `firmwareVersion`, `hardwareModel`, `macAddress`, `udn`, `signalStrengthPercent`, `nightModeEnabled`, `sortOrder`, `autoOffMinutes`).
   - `WeMoRuleEntity` (`wemo_rules`): Local automation rules (`SCHEDULE`, `MOTION_TRIGGER`, `AUTO_OFF`).
-- **`WeMoDao.kt` & `WeMoDatabase.kt`**: Room DB at `version = 5` (`wemo_control_database.db`, `.fallbackToDestructiveMigration(true)`), with per-`Application` in-memory isolation under Robolectric.
+- **`WeMoDao.kt` & `WeMoDatabase.kt`**: Room DB at `version = 5` (`wemo_control_database.db`, `.fallbackToDestructiveMigration(true)`), with per-`Application` in-memory isolation and automatic `SQLiteDatabase.close()` on test transitions under Robolectric.
 - **`WeMoRepository.kt`**, **`WeMoDiscoveryCoordinator.kt`**, **`WeMoProvisioningCoordinator.kt`** & **`WeMoDemoFixtures.kt`**:
   - Coordinates `WeMoDao`, `WeMoNetworkClient`, `WeMoGenaSubscriptionManager`, and `WeMoProvisionerClient`.
   - Defaults to **Real LAN Mode** (`isDemoShowroomMode = false`) on physical Android devices and **Demo Showroom Mode** (`true`) inside Robolectric unless overridden.
-  - Enforces shared `Semaphore(3)` LAN concurrency + per-device `Mutex`, startup `GetBinaryState` detection (`detectStartupDeviceStates`), manual IP 9-port hardware probing (`saveDevice`), unified `executeOptimisticDeviceCommand` with 2-stage self-healing reconnect (9-port probe → targeted SSDP by `serialNumber`), and offline state revert (`isReachable = false, latencyMs = 0`).
-  - Filters out Belkin soft-AP SSIDs (`WeMo.Switch.xxx`, `Wemo.LS3W.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`) from `metainfo1#GetMetaInfo` (`isWemoDeviceSetupSsid`), auto-sanitizes any previously polluted `homeName`/`ssidLabel` rows and re-infers legacy `"Living Room"` room assignments on startup (`ensureSeeded`), and provides one-tap `resetLanHomesSwitchesAndRooms()`.
+  - Enforces shared `Semaphore(3)` LAN concurrency + per-device `Mutex`, startup `GetBinaryState` detection (`detectStartupDeviceStates`), manual IP 9-port hardware probing (`saveDevice`), unified `executeOptimisticDeviceCommand` with 2-stage self-healing reconnect (9-port probe → targeted SSDP by `serialNumber`), and offline state revert (`isReachable = false, latencyMs = 0`, clearing `lastSetStateTimestampMs`).
+  - Filters out Belkin soft-AP SSIDs (`WeMo.Switch.xxx`, `Wemo.LS3W.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`) from `metainfo1#GetMetaInfo` (`isWemoDeviceSetupSsid`), auto-sanitizes any previously polluted `homeName`/`ssidLabel` rows and re-infers legacy `"Living Room"` room assignments on startup (`sanitizeAndResolveInitialLanHome`), and provides one-tap `resetLanHomesSwitchesAndRooms()`.
 - **`WeMoRuleScheduler.kt`**:
   - Manages live per-device Auto-Off countdown timers (`activeCountdownsSec`) and evaluates daily `SCHEDULE` / Sunset / Sunrise rules.
 
 ### Network Layer (`app/src/main/java/com/example/network/`)
 - **`WeMoNetworkClient.kt`**, **`WeMoXmlAndSkuParser.kt`** & **`WeMoSsdpDiscoveryEngine.kt`**:
   - 9-port `probeWemoPort` (`49153, 49152, 49154, 49151, 49155..49159`) with TCP connect timeout vs. `ECONNREFUSED` vs. HTTP read timeout separation and `<serialNumber>`/`<UDN>` verification.
-  - `setBinaryState` (with `<BinaryState>Error</BinaryState>` quirk handling), `getBinaryState`, `getMetaInfo` (filtering Belkin soft-AP SSIDs in `parseMetaInfoSoapResponse`), `getSignalStrength`, `changeFriendlyName`, `configureNightMode`, `scanSubnetUnicast`, and `performSsdpDiscoveryScan` (`MulticastLock` + 1s retransmit).
+  - Unified `executeWithPortHealing`, `setBinaryState` (with `<BinaryState>Error</BinaryState>` quirk handling), `getBinaryState`, `getMetaInfo` (filtering Belkin soft-AP SSIDs in `parseMetaInfoSoapResponse`), `getSignalStrength`, `changeFriendlyName`, `configureNightMode`, `scanSubnetUnicast`, and `performSsdpDiscoveryScan` (`MulticastLock` + 1s retransmit).
 - **`WeMoGenaSubscriptionManager.kt`**:
-  - Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery) for `<100ms` physical switch updates.
+  - Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery) bound to `wifiSocketFactory` for `<100ms` physical switch updates.
 - **`WeMoNetworkMonitor.kt`**:
   - Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory` (caching unvalidated `NetworkCallback` Wi-Fi handles + loopback `127.0.0.1` & Robolectric aware).
 - **`WeMoProvisionerClient.kt`**, **`WeMoSetupDiagnostics.kt`** & **`WeMoPasswordCrypto.kt`**:
-  - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` (`8500ms` site-survey timeout), OkHttp-framed `probeSetupDevice`, `WeMoSetupDebugSnapshot` screenshot diagnostics, and `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 AES-128-CBC (Methods 1, 2 & 3 × `addPasswordLengths`) double-send `ConnectHomeNetwork` + 20s `GetNetworkStatus` poll + `CloseSetup` + `SetSetupDoneStatus` provisioner.
+  - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` (`8500ms` site-survey timeout), OkHttp-framed `probeSetupDevice`, `WeMoSetupDebugSnapshot` screenshot diagnostics, `WeMoTelemetryFileExporter` (`wemi-telemetry-latest.txt`), and `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 AES-128-CBC (Methods 1, 2 & 3 × `addPasswordLengths`) double-send `ConnectHomeNetwork` + 20s `GetNetworkStatus` poll + `CloseSetup` + `SetSetupDoneStatus` provisioner.
 
 ### UI & Test Layer
 - **`WeMoViewModel.kt`**, **`MainActivity.kt`**, **`ui/screens/*`** & **`ui/components/*`**:
   - Full-width `AutoResizingDeviceNameText` on Line 1 of `WeMoDeviceRow`, `WeMoTvDeviceCard`, `WeMoRoomGroupHeaderCard`, and `WeMoWifiHomeBar` so long names (`"Hallway & Landing"`, `"My Home"`) never squeeze adjacent pills into vertical character columns.
   - Dark-gray IEC `"I/O"` power-off icon (`drawIecPowerSymbol` in `#23272F`/`#181B20`), red `WeMoDisconnectedRingButton` (`drawDisconnectedSymbol`), and screenshot-ready `WeMoProvisionDebugPanel` (`provision_debug_panel`, `provision_debug_text`) inside `WeMoProvisionApDialog`.
   - One-tap `Reset` chip (`reset_lan_data_chip`) in `WeMoWifiHomeBar` and `more_reset_lan_homes_switches_button` on `WeMoMoreScreen`.
-- **`FakeWeMoUpnpServer.kt`**, **`WeMoSkuAndCryptoTest.kt`**, **`WeMoSoapAndSelfHealingTest.kt`**, **`WeMoGenaProvisioningAndRulesTest.kt`**, **`ExampleRobolectricTest.kt`** & **`WeMoEndToEndUiTest.kt`**:
-  - 25 automated loopback UPnP/SOAP/GENA protocol and full-stack Compose E2E tests.
+- **`FakeWeMoUpnpServer.kt`**, **`WeMoSkuAndCryptoTest.kt`**, **`WeMoSoapAndSelfHealingTest.kt`**, **`WeMoGenaProvisioningAndRulesTest.kt`**, **`ExampleRobolectricTest.kt`**, **`WeMoEndToEndUiTest.kt`** & **`WeMoHardwareCujEndToEndTest.kt`**:
+  - 26 automated loopback UPnP/SOAP/GENA protocol and full-stack Compose E2E tests.
 

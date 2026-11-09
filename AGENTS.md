@@ -1,13 +1,13 @@
 # WeMi Light Control — Architecture & Agent Guide (`AGENTS.md`)
 
-**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v19.0`) is an Android & Android TV local-LAN controller for Belkin WeMo smart switches, dimmers, and mini plugs. It pairs a 2013-era skeuomorphic Belkin WeMo interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with `pywemo`-grade local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
+**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v20.0`) is an Android & Android TV local-LAN controller for Belkin WeMo smart switches, dimmers, and mini plugs. It pairs a 2013-era skeuomorphic Belkin WeMo interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with `pywemo`-grade local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
 
 Detailed agent instructions, UX design architecture, debugging & support architecture, user guides, protocol specs, reverse-chronological change log, modularization plan, and upcoming features roadmap are packaged in:
 - [`UX_DESIGN.md`](UX_DESIGN.md) — **Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
 - [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — **Android & Android TV UX Design, Behavioral Model & Critical User Journeys** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — **On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture** (**Owned Exclusively by the Antigravity Debugging & Support Agent** — read-only for all other agents)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v19.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v20.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan
 - [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md) — **UX Design, Behavioral Modeling & CUJ Skill** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
