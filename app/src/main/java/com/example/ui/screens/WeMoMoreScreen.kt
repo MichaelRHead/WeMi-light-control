@@ -465,5 +465,77 @@ fun WeMoMoreScreen(
                 }
             }
         }
+
+        // Open Source License Card (MIT License)
+        item {
+            var showFullLicenseText by remember { mutableStateOf(false) }
+            Card(
+                colors = CardDefaults.cardColors(containerColor = WemoRowSurface),
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("open_source_licenses_card")
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Open Source License",
+                                fontFamily = WorkSansFontFamily,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 16.sp,
+                                color = WemoTextPrimary
+                            )
+                            Text(
+                                text = "MIT License • Copyright (c) 2026 Michael R. Head & Contributors",
+                                fontFamily = WorkSansFontFamily,
+                                fontSize = 12.sp,
+                                color = WemoTextSecondary
+                            )
+                        }
+                        TextButton(
+                            onClick = { showFullLicenseText = !showFullLicenseText },
+                            modifier = Modifier.testTag("toggle_license_details_button")
+                        ) {
+                            Text(
+                                text = if (showFullLicenseText) "Hide" else "View License",
+                                color = WemoGreenDark,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    if (showFullLicenseText) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            color = Color(0xFFF3F6F8),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = """
+                                    MIT License
+                                    Copyright (c) 2026 Michael R. Head and WeMi Light Control Contributors
+
+                                    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+                                    The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+                                    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+                                """.trimIndent(),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = WemoTextSecondary,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }

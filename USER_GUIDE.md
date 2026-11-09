@@ -40,6 +40,7 @@ Each guide below explains one major area of the app in detail:
 ## Developer & Architecture Documentation
 
 For UX architecture, protocol details, architecture diagrams, and roadmap information, see:
+- [`LICENSE`](LICENSE) — MIT License
 - [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Release Notes for Every Google Play Store Version (`v1.0` → `v20.0`)
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — 4-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine
 - [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
