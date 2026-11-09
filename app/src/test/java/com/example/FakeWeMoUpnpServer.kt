@@ -35,7 +35,8 @@ class FakeWeMoUpnpServer(
     val wifiSsid: String = "HeadFamily-2.4G",
     initialRelayOn: Boolean = false,
     initialBrightness: Int = 64,
-    enableSsdpResponder: Boolean = false
+    enableSsdpResponder: Boolean = false,
+    registerAsCandidatePort: Boolean = false
 ) : AutoCloseable {
 
     val relayStateOn = AtomicBoolean(initialRelayOn)
@@ -53,6 +54,7 @@ class FakeWeMoUpnpServer(
     val networkStatusPolls = AtomicInteger(0)
     val closeSetupCalled = AtomicBoolean(false)
     val setupDoneCalled = AtomicBoolean(false)
+    val lastGenaCallbackPort = AtomicInteger(0)
     val receivedEncryptedPassword = AtomicReference("")
     val receivedSoapActions = CopyOnWriteArrayList<String>()
     val receivedSsdpSearches = CopyOnWriteArrayList<String>()
@@ -69,6 +71,17 @@ class FakeWeMoUpnpServer(
     init {
         if (enableSsdpResponder) {
             WeMoNetworkClient.registerLoopbackSsdpPort(ssdpUdpPort)
+        }
+        if (registerAsCandidatePort) {
+            WeMoNetworkClient.registerLoopbackCandidatePort(port)
+        }
+    }
+
+    fun setCandidatePortDiscoverable(enabled: Boolean) {
+        if (enabled) {
+            WeMoNetworkClient.registerLoopbackCandidatePort(port)
+        } else {
+            WeMoNetworkClient.unregisterLoopbackCandidatePort(port)
         }
     }
 
@@ -143,6 +156,10 @@ class FakeWeMoUpnpServer(
                 }
                 header.startsWith("CALLBACK:", ignoreCase = true) -> {
                     hasCallback = true
+                    val parsedPort = Regex(":(\\d+)/").find(header)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                    if (parsedPort != null) {
+                        lastGenaCallbackPort.set(parsedPort)
+                    }
                 }
             }
         }
@@ -426,6 +443,7 @@ class FakeWeMoUpnpServer(
     override fun close() {
         running.set(false)
         WeMoNetworkClient.unregisterLoopbackSsdpPort(ssdpUdpPort)
+        WeMoNetworkClient.unregisterLoopbackCandidatePort(port)
         runCatching { ssdpUdpSocket.close() }
         runCatching { serverSocket.close() }
         ssdpResponderThread.join(300)

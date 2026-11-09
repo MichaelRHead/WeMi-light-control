@@ -147,12 +147,17 @@ object WeMoTelemetryFileExporter {
         }.trim()
     }
 
+    fun latestTelemetryFile(
+        context: Context,
+        fileName: String = DEFAULT_TELEMETRY_FILENAME
+    ): File = File(context.filesDir, fileName)
+
     fun saveTelemetryReportToFile(
         context: Context,
         reportText: String,
         fileName: String = DEFAULT_TELEMETRY_FILENAME
     ): File {
-        val outFile = File(context.filesDir, fileName)
+        val outFile = latestTelemetryFile(context, fileName)
         outFile.writeText(reportText)
         return outFile
     }

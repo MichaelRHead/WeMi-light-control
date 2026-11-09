@@ -15,7 +15,6 @@ import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.NetworkInterface
 import java.net.NoRouteToHostException
-import java.net.Socket
 import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -102,6 +101,20 @@ class WeMoNetworkClient(
             "221517K01018NEW"
         )
 
+        private val loopbackCandidatePorts = java.util.concurrent.CopyOnWriteArraySet<Int>()
+
+        fun registerLoopbackCandidatePort(port: Int) {
+            if (port in 1..65535) {
+                loopbackCandidatePorts.add(port)
+            }
+        }
+
+        fun unregisterLoopbackCandidatePort(port: Int) {
+            loopbackCandidatePorts.remove(port)
+        }
+
+        fun currentLoopbackCandidatePorts(): List<Int> = loopbackCandidatePorts.toList()
+
         fun registerLoopbackSsdpPort(udpPort: Int) =
             WeMoSsdpDiscoveryEngine.registerLoopbackSsdpPort(udpPort)
 
@@ -114,7 +127,7 @@ class WeMoNetworkClient(
     }
 
     private fun orderedCandidatePorts(preferredPort: Int): List<Int> {
-        return (listOf(preferredPort) + extraCandidatePorts + PROBE_PORTS).distinct()
+        return (listOf(preferredPort) + extraCandidatePorts + loopbackCandidatePorts + PROBE_PORTS).distinct()
     }
 
     fun resolveLocalIpv4Address(): String {
@@ -260,6 +273,54 @@ class WeMoNetworkClient(
     }
 
     /**
+     * Executes a SOAP action against [device.port] and, if unreachable or wedged, automatically
+     * probes all 9 Belkin UPnP ports via [probeWemoPort] (and Wi-Fi-bound socket fallback) to heal
+     * firmware port hops without duplicating retry boilerplate across SOAP actions.
+     */
+    private suspend fun executeWithPortHealing(
+        device: WeMoDeviceEntity,
+        executeOnPort: suspend (Int) -> SoapCallResult?
+    ): SoapCallResult? {
+        try {
+            val directResult = executeOnPort(device.port)
+            if (directResult != null) return directResult
+        } catch (_: Exception) {
+            // Fall through to 9-port self-healing probe
+        }
+
+        val discoveredPort = probeWemoPort(
+            ipAddress = device.ipAddress,
+            preferredPort = device.port,
+            expectedSerialOrUdn = device.serialNumber
+        )
+        if (discoveredPort != null && discoveredPort != device.port) {
+            try {
+                val retryResult = executeOnPort(discoveredPort)
+                if (retryResult != null) return retryResult
+            } catch (_: Exception) {
+                // Fall through to offline result
+            }
+        } else if (discoveredPort == null) {
+            for (port in orderedCandidatePorts(device.port).drop(1)) {
+                try {
+                    wifiSocketFactory.createSocket().use { s ->
+                        s.connect(InetSocketAddress(device.ipAddress, port), 350)
+                    }
+                    val fallbackResult = executeOnPort(port)
+                    if (fallbackResult != null) return fallbackResult
+                } catch (_: SocketTimeoutException) {
+                    break
+                } catch (_: NoRouteToHostException) {
+                    break
+                } catch (_: Exception) {
+                    continue
+                }
+            }
+        }
+        return null
+    }
+
+    /**
      * Sends a Belkin WeMo UPnP SOAP `SetBinaryState` call over HTTP to the device's `IP:port`.
      */
     suspend fun setBinaryState(
@@ -287,7 +348,7 @@ class WeMoNetworkClient(
 
         val soapAction = "\"urn:Belkin:service:basicevent:1#SetBinaryState\""
 
-        suspend fun executeOnPort(port: Int): SoapCallResult? {
+        val healedResult = executeWithPortHealing(device) { port ->
             val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
             val request = Request.Builder()
                 .url(endpoint)
@@ -317,7 +378,7 @@ class WeMoNetworkClient(
                         ?: targetBrightness
                         ?: device.brightness
 
-                    return SoapCallResult(
+                    return@executeWithPortHealing SoapCallResult(
                         reachableOnLan = true,
                         binaryStateOn = confirmedOn,
                         brightness = parsedBrightness,
@@ -335,47 +396,9 @@ class WeMoNetworkClient(
                     )
                 }
             }
-            return null
+            null
         }
-
-        var shouldProbeOtherPorts = false
-        try {
-            val directResult = executeOnPort(device.port)
-            if (directResult != null) return@withContext directResult
-            shouldProbeOtherPorts = true
-        } catch (_: Exception) {
-            shouldProbeOtherPorts = true
-        }
-
-        if (shouldProbeOtherPorts) {
-            val discoveredPort = probeWemoPort(
-                ipAddress = device.ipAddress,
-                preferredPort = device.port,
-                expectedSerialOrUdn = device.serialNumber
-            )
-            if (discoveredPort != null && discoveredPort != device.port) {
-                try {
-                    val retryResult = executeOnPort(discoveredPort)
-                    if (retryResult != null) return@withContext retryResult
-                } catch (_: Exception) {
-                    // Fall through to offline result
-                }
-            } else if (discoveredPort == null) {
-                for (port in orderedCandidatePorts(device.port).drop(1)) {
-                    try {
-                        Socket().use { s -> s.connect(InetSocketAddress(device.ipAddress, port), 350) }
-                        val fallbackResult = executeOnPort(port)
-                        if (fallbackResult != null) return@withContext fallbackResult
-                    } catch (_: SocketTimeoutException) {
-                        break
-                    } catch (_: NoRouteToHostException) {
-                        break
-                    } catch (_: Exception) {
-                        continue
-                    }
-                }
-            }
-        }
+        if (healedResult != null) return@withContext healedResult
 
         val fallbackEndpoint = "http://${device.ipAddress}:${device.port}/upnp/control/basicevent1"
         SoapCallResult(
@@ -413,7 +436,7 @@ class WeMoNetworkClient(
 
         val soapAction = "\"urn:Belkin:service:basicevent:1#GetBinaryState\""
 
-        suspend fun executeOnPort(port: Int): SoapCallResult? {
+        val healedResult = executeWithPortHealing(device) { port ->
             val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
             val request = Request.Builder()
                 .url(endpoint)
@@ -436,7 +459,7 @@ class WeMoNetworkClient(
                             ?.groupValues?.getOrNull(1)?.toIntOrNull()
                     val nightMode = Regex("<NightMode>(\\d+)</NightMode>", RegexOption.IGNORE_CASE).find(bodyStr)
                         ?.groupValues?.getOrNull(1)?.let { it == "1" }
-                    return SoapCallResult(
+                    return@executeWithPortHealing SoapCallResult(
                         reachableOnLan = true,
                         binaryStateOn = isOn,
                         brightness = parsedBrightness,
@@ -455,47 +478,9 @@ class WeMoNetworkClient(
                     )
                 }
             }
-            return null
+            null
         }
-
-        var shouldProbeOtherPorts = false
-        try {
-            val direct = executeOnPort(device.port)
-            if (direct != null) return@withContext direct
-            shouldProbeOtherPorts = true
-        } catch (_: Exception) {
-            shouldProbeOtherPorts = true
-        }
-
-        if (shouldProbeOtherPorts) {
-            val discoveredPort = probeWemoPort(
-                ipAddress = device.ipAddress,
-                preferredPort = device.port,
-                expectedSerialOrUdn = device.serialNumber
-            )
-            if (discoveredPort != null && discoveredPort != device.port) {
-                try {
-                    val retry = executeOnPort(discoveredPort)
-                    if (retry != null) return@withContext retry
-                } catch (_: Exception) {
-                    // Fall through
-                }
-            } else if (discoveredPort == null) {
-                for (port in orderedCandidatePorts(device.port).drop(1)) {
-                    try {
-                        Socket().use { s -> s.connect(InetSocketAddress(device.ipAddress, port), 350) }
-                        val fallback = executeOnPort(port)
-                        if (fallback != null) return@withContext fallback
-                    } catch (_: SocketTimeoutException) {
-                        break
-                    } catch (_: NoRouteToHostException) {
-                        break
-                    } catch (_: Exception) {
-                        continue
-                    }
-                }
-            }
-        }
+        if (healedResult != null) return@withContext healedResult
 
         val fallbackEndpoint = "http://${device.ipAddress}:${device.port}/upnp/control/basicevent1"
         SoapCallResult(
@@ -605,8 +590,8 @@ class WeMoNetworkClient(
             </s:Envelope>
         """.trimIndent()
 
-        val endpoint = "http://${device.ipAddress}:${device.port}/upnp/control/basicevent1"
-        try {
+        val healedResult = executeWithPortHealing(device) { port ->
+            val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
             val req = Request.Builder()
                 .url(endpoint)
                 .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#ChangeFriendlyName\"")
@@ -618,11 +603,11 @@ class WeMoNetworkClient(
                 val elapsed = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
                 val respXml = resp.body?.string().orEmpty()
                 if (resp.isSuccessful) {
-                    return@withContext SoapCallResult(
+                    return@executeWithPortHealing SoapCallResult(
                         reachableOnLan = true,
                         binaryStateOn = device.isOn,
                         brightness = device.brightness,
-                        resolvedPort = device.port,
+                        resolvedPort = port,
                         latencyMs = elapsed,
                         logEntry = SoapLogEntry(
                             timestamp = nowTime(),
@@ -636,9 +621,11 @@ class WeMoNetworkClient(
                     )
                 }
             }
-        } catch (_: Exception) {
-            // Ignore if offline
+            null
         }
+        if (healedResult != null) return@withContext healedResult
+
+        val endpoint = "http://${device.ipAddress}:${device.port}/upnp/control/basicevent1"
         SoapCallResult(
             reachableOnLan = false,
             binaryStateOn = device.isOn,
@@ -682,8 +669,8 @@ class WeMoNetworkClient(
               </s:Body>
             </s:Envelope>
         """.trimIndent()
-        val endpoint = "http://${device.ipAddress}:${device.port}/upnp/control/basicevent1"
-        try {
+        val healedResult = executeWithPortHealing(device) { port ->
+            val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
             val req = Request.Builder()
                 .url(endpoint)
                 .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#ConfigureNightMode\"")
@@ -695,11 +682,11 @@ class WeMoNetworkClient(
                 val elapsed = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
                 val respXml = resp.body?.string().orEmpty()
                 if (resp.isSuccessful) {
-                    return@withContext SoapCallResult(
+                    return@executeWithPortHealing SoapCallResult(
                         reachableOnLan = true,
                         binaryStateOn = device.isOn,
                         brightness = device.brightness,
-                        resolvedPort = device.port,
+                        resolvedPort = port,
                         latencyMs = elapsed,
                         logEntry = SoapLogEntry(
                             timestamp = nowTime(),
@@ -714,9 +701,11 @@ class WeMoNetworkClient(
                     )
                 }
             }
-        } catch (_: Exception) {
-            // Fall through
+            null
         }
+        if (healedResult != null) return@withContext healedResult
+
+        val endpoint = "http://${device.ipAddress}:${device.port}/upnp/control/basicevent1"
         SoapCallResult(
             reachableOnLan = false,
             binaryStateOn = device.isOn,

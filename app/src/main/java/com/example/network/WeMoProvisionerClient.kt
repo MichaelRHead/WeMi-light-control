@@ -133,9 +133,10 @@ class WeMoProvisionerClient(
         apHost: String = defaultApHost,
         preferredPort: Int = 49152
     ): WeMoSetupDeviceDescriptor? = withContext(Dispatchers.IO) {
-        val candidates = (listOf(preferredPort) + setupPorts).distinct()
-        val paths = listOf("/setup.xml", "/Lightsetup.xml")
         val isLoopback = apHost == "127.0.0.1" || apHost.equals("localhost", ignoreCase = true)
+        val loopbackExtraPorts = if (isLoopback) WeMoNetworkClient.currentLoopbackCandidatePorts() else emptyList()
+        val candidates = (listOf(preferredPort) + loopbackExtraPorts + setupPorts).distinct()
+        val paths = listOf("/setup.xml", "/Lightsetup.xml")
         val tcpConnectTimeoutMs = if (isLoopback) 550 else 1500
 
         var foundPort: Int? = null

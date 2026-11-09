@@ -178,75 +178,9 @@ class WeMoRepository(
             initialSeedDone.value = true
             DEFAULT_MAIN_HOME_KEY
         } else {
-            val localIp = detectCurrentLanIp()
-            val subnetPrefix = localIp.substringBeforeLast('.', "192.168.1")
-
-            // Sanitize any existing home networks or devices whose names/SSIDs were previously
-            // polluted by Belkin GetMetaInfo soft-AP SSIDs (e.g. "WeMo.Switch.xxx Home")
-            val rawHomes = dao.getAllHomeNetworks().first()
-            val existingHomes = rawHomes.mapIndexed { idx, home ->
-                val pollutedName = WeMoDiscoveryCoordinator.isWemoDeviceSetupSsid(home.homeName) ||
-                    home.homeName.startsWith("Home Wi-Fi (", ignoreCase = true)
-                val pollutedSsid = WeMoDiscoveryCoordinator.isWemoDeviceSetupSsid(home.ssidLabel)
-                if (pollutedName || pollutedSsid) {
-                    val repaired = home.copy(
-                        homeName = if (pollutedName) {
-                            if (idx == 0) "My Home" else "Home (${home.subnetPrefix}.x)"
-                        } else {
-                            home.homeName
-                        },
-                        ssidLabel = if (pollutedSsid) "LAN ${home.subnetPrefix}.0/24" else home.ssidLabel
-                    )
-                    dao.updateHomeNetwork(repaired)
-                    repaired
-                } else {
-                    home
-                }
-            }
-
-            val rawDevices = dao.getAllDevices().first()
-            rawDevices.forEach { dev ->
-                val cleanSsid = if (WeMoDiscoveryCoordinator.isWemoDeviceSetupSsid(dev.wifiSsid)) {
-                    "LAN $subnetPrefix.0/24"
-                } else {
-                    dev.wifiSsid
-                }
-                val inferredRoom = inferRoomFromName(dev.name)
-                val cleanRoom = if (dev.roomName.isBlank() ||
-                    dev.roomName.equals("Unassigned", ignoreCase = true) ||
-                    (dev.roomName.equals("Living Room", ignoreCase = true) && inferredRoom != "Living Room")
-                ) {
-                    inferredRoom
-                } else {
-                    dev.roomName
-                }
-                if (cleanSsid != dev.wifiSsid || cleanRoom != dev.roomName) {
-                    dao.updateDevice(dev.copy(wifiSsid = cleanSsid, roomName = cleanRoom))
-                }
-            }
-
-            val matchedHome = existingHomes.find { it.subnetPrefix == subnetPrefix }
-            val activeHome = when {
-                matchedHome != null -> matchedHome
-                existingHomes.isNotEmpty() -> existingHomes.first()
-                else -> {
-                    val key = "wifi_lan_${subnetPrefix.replace('.', '_')}"
-                    val newHome = WeMoHomeNetworkEntity(
-                        networkKey = key,
-                        homeName = "My Home",
-                        ssidLabel = "LAN $subnetPrefix.0/24",
-                        subnetPrefix = subnetPrefix,
-                        gatewayIp = "$subnetPrefix.1",
-                        lastConnectedTime = "Connected now",
-                        autoReconnectOnArrival = true,
-                        sortOrder = 0
-                    )
-                    dao.insertHomeNetwork(newHome)
-                    newHome
-                }
-            }
+            val activeKey = discoveryCoordinator.sanitizeAndResolveInitialLanHome(detectCurrentLanIp())
             initialSeedDone.value = true
-            activeHome.networkKey
+            activeKey
         }
     }
 
