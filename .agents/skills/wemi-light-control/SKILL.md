@@ -7,14 +7,14 @@ description: Architecture, Belkin WeMo UPnP/SSDP/SOAP/GENA protocol reference, R
 
 Use this skill when working on the **WeMi Light Control** Android & Android TV application in `/home/antigravity/MichaelRHead/WeMi-light-control`.
 
-For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin WeMo switches, dimmers, and mini plugs, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md) (reverse-chronological Change Log), [`../../UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md) (upcoming features roadmap), [`../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), and [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (plus [`../../docs/user-guide/`](../../docs/user-guide/)). For human-readable code modularization, E2E testing standards, multi-agent Git synchronization, and Change Log maintenance, also consult [`../android-code-modularization/SKILL.md`](../android-code-modularization/SKILL.md), [`../android-e2e-testing/SKILL.md`](../android-e2e-testing/SKILL.md), [`../multi-agent-git-sync/SKILL.md`](../multi-agent-git-sync/SKILL.md), and [`../wemi-changelog-and-docs/SKILL.md`](../wemi-changelog-and-docs/SKILL.md). Always keep `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified.
+For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin WeMo switches, dimmers, and mini plugs, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md) (reverse-chronological Change Log), [`../../UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md) (upcoming features roadmap), [`../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../../docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md), and [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (plus [`../../docs/user-guide/`](../../docs/user-guide/)). For human-readable code modularization, E2E testing standards, on-device screenshot/telemetry debugging, multi-agent Git synchronization, and Change Log maintenance, also consult [`../android-code-modularization/SKILL.md`](../android-code-modularization/SKILL.md), [`../android-e2e-testing/SKILL.md`](../android-e2e-testing/SKILL.md), [`../wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md), [`../multi-agent-git-sync/SKILL.md`](../multi-agent-git-sync/SKILL.md), and [`../wemi-changelog-and-docs/SKILL.md`](../wemi-changelog-and-docs/SKILL.md). Always keep `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified.
 
 ---
 
 ## 1. Build, Test & Environment
 
 - **Toolchain**: AGP `9.1.0`, Kotlin `2.3.20`, KSP `2.3.6`, Compose BOM `2026.03.00`, Room `2.8.4` (`version = 5`), Robolectric `4.16.1`, `compileSdk = 36`, `minSdk = 24`.
-- **Unit, Protocol & E2E Compose UI Tests (`23/23` across 6 suites)**:
+- **Unit, Protocol & E2E Compose UI Tests (`25/25` across 6 suites)**:
   ```bash
   ./gradlew testDebugUnitTest --rerun-tasks
   ```
@@ -76,5 +76,5 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
   - Dark-gray IEC `"I/O"` power-off icon (`drawIecPowerSymbol` in `#23272F`/`#181B20`), red `WeMoDisconnectedRingButton` (`drawDisconnectedSymbol`), and screenshot-ready `WeMoProvisionDebugPanel` (`provision_debug_panel`, `provision_debug_text`) inside `WeMoProvisionApDialog`.
   - One-tap `Reset` chip (`reset_lan_data_chip`) in `WeMoWifiHomeBar` and `more_reset_lan_homes_switches_button` on `WeMoMoreScreen`.
 - **`FakeWeMoUpnpServer.kt`**, **`WeMoSkuAndCryptoTest.kt`**, **`WeMoSoapAndSelfHealingTest.kt`**, **`WeMoGenaProvisioningAndRulesTest.kt`**, **`ExampleRobolectricTest.kt`** & **`WeMoEndToEndUiTest.kt`**:
-  - 23 automated loopback UPnP/SOAP/GENA protocol and full-stack Compose E2E tests.
+  - 25 automated loopback UPnP/SOAP/GENA protocol and full-stack Compose E2E tests.
 

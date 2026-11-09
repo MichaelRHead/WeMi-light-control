@@ -76,7 +76,7 @@ The app supports four physical Belkin WeMo hardware families:
   - `WeMoSkuAndCryptoTest.kt`: Hardware SKU classification (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`), `/setup.xml` parsing, `GetMetaInfo` soft-AP SSID filtering (`isWemoDeviceSetupSsid`), semantic device categorization, and `pywemo` AES-128-CBC encryption/decryption (Methods 1, 2 & 3).
   - `WeMoSoapAndSelfHealingTest.kt`: 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, offline rollback, manual IP probing, soft-AP SSID startup DB sanitization, `resetLanHomesSwitchesAndRooms`, and multi-device startup state detection.
   - `WeMoGenaProvisioningAndRulesTest.kt`: UPnP GENA `SUBSCRIBE`, HTTP 412 recovery, embedded `NOTIFY` callback server, `WeMoRuleScheduler`, and full loopback `10.22.22.1` `WiFiSetup1` provisioning (including `NetworkStatus=0` failure & `CloseSetup` hold and `WeMoSetupDebugSnapshot` formatting).
-  - `ExampleRobolectricTest.kt` & `WeMoEndToEndUiTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeWeMoUpnpServer` End-to-End UI tests (`24/24` tests passing), including the complete `Reset` -> `SSDP Discovery` -> `Adopt Switch & Dimmer` -> `Toggle Switch` -> `Toggle & Scale Dimmer Brightness (Presets, Slider, Night Mode, Room Master & Android TV)` CUJ.
+  - `ExampleRobolectricTest.kt` & `WeMoEndToEndUiTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeWeMoUpnpServer` End-to-End UI tests (`25/25` tests passing), including the complete `Reset` -> `SSDP Discovery` -> `Adopt Switch & Dimmer` -> `Toggle Switch` -> `Toggle & Scale Dimmer Brightness (Presets, Slider, Night Mode, Room Master & Android TV)` CUJ.
 
 ---
 
@@ -85,7 +85,7 @@ The app supports four physical Belkin WeMo hardware families:
 > **CRITICAL RULE**: **Only push code to GitHub (`origin/main` or `origin/agent-docs`) after verifying that the full build and all automated tests pass with zero errors.** Never push unverified or non-compiling code.
 
 ```bash
-# Force-execute all 24 Robolectric unit, protocol & E2E Compose UI tests
+# Force-execute all 25 Robolectric unit, protocol & E2E Compose UI tests
 ./gradlew testDebugUnitTest --rerun-tasks
 
 # Assemble debug APK

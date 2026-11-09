@@ -1,17 +1,18 @@
 # WeMi Light Control — Code Quality, Human-Readable Modularization & End-to-End Validation Plan
 
-**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v16.0`)  
-**Status**: **Completed & Verified — All 4 Phases (M1, M2, M3 & M4) + `v13.0–v16.0` Enhancements Landed (`23/23` Unit, Protocol & E2E Compose UI Tests Passing)**
+**Target Repository**: `MichaelRHead/WeMi-light-control` (`com.example` / `com.aistudio.wemiswitch.kxpqzr`, `v17.0`)  
+**Status**: **Completed & Verified — All 4 Phases (M1, M2, M3 & M4) + `v13.0–v17.0` Enhancements Landed (`25/25` Unit, Protocol & E2E Compose UI Tests Passing)**
 
 Related documents and skills:
 - [`AGENTS.md`](../AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v16.0`)
+- [`IMPLEMENTED.md`](../IMPLEMENTED.md) / [`docs/IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v17.0`)
 - [`UPCOMING_FEATURES.md`](../UPCOMING_FEATURES.md) / [`docs/UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](../USER_GUIDE.md) / [`docs/USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](user-guide/))
 - [`.agents/skills/android-code-modularization/SKILL.md`](../.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill
 - [`.agents/skills/android-e2e-testing/SKILL.md`](../.agents/skills/android-e2e-testing/SKILL.md) — Android End-to-End (E2E) Testing & Validation Skill
 - [`.agents/skills/multi-agent-git-sync/SKILL.md`](../.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
 - [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](../.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
+- [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](../.agents/skills/wemi-device-telemetry-debug/SKILL.md) — On-Device Screenshot & Recorded Telemetry File Debugging Skill
 - [`.agents/skills/wemi-light-control/SKILL.md`](../.agents/skills/wemi-light-control/SKILL.md) — WeMi Light Control Domain & UPnP Protocol Skill
 
 ---
