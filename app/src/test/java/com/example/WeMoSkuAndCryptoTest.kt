@@ -263,5 +263,18 @@ class WeMoSkuAndCryptoTest {
             val parsedRouterMeta = com.example.network.WeMoXmlAndSkuParser.parseMetaInfoSoapResponse(routerSsidMetaXml)
             assertEquals(routerSsid, parsedRouterMeta?.accessPointSsid)
         }
+
+        // 5. Verify inferRoomFromName handles "Bed", "Stairway", "Girls"/"Kids", word-bounded "Den"/"Hall", and "Unassigned" fallback
+        assertEquals("Bedroom", com.example.data.inferRoomFromName("Shprese Bed Lamp"))
+        assertEquals("Bedroom", com.example.data.inferRoomFromName("Mike Bed Light"))
+        assertEquals("Bedroom", com.example.data.inferRoomFromName("Girls Light"))
+        assertEquals("Bedroom", com.example.data.inferRoomFromName("Kids Nightstand Lamp"))
+        assertEquals("Hallway & Landing", com.example.data.inferRoomFromName("Stairway Light"))
+        assertEquals("Hallway & Landing", com.example.data.inferRoomFromName("Upstairs Hall Sconce"))
+        assertEquals("Living Room", com.example.data.inferRoomFromName("Living Room Floor Lamp"))
+        assertEquals("Living Room", com.example.data.inferRoomFromName("Family Den Switch"))
+        assertEquals("Unassigned", com.example.data.inferRoomFromName("Wooden Accent Lamp"))
+        assertEquals("Unassigned", com.example.data.inferRoomFromName("Marshall Amp Plug"))
+        assertEquals("Unassigned", com.example.data.inferRoomFromName("Espresso Machine"))
     }
 }

@@ -206,8 +206,22 @@ class WeMoRepository(
 
             val rawDevices = dao.getAllDevices().first()
             rawDevices.forEach { dev ->
-                if (WeMoDiscoveryCoordinator.isWemoDeviceSetupSsid(dev.wifiSsid)) {
-                    dao.updateDevice(dev.copy(wifiSsid = "LAN $subnetPrefix.0/24"))
+                val cleanSsid = if (WeMoDiscoveryCoordinator.isWemoDeviceSetupSsid(dev.wifiSsid)) {
+                    "LAN $subnetPrefix.0/24"
+                } else {
+                    dev.wifiSsid
+                }
+                val inferredRoom = inferRoomFromName(dev.name)
+                val cleanRoom = if (dev.roomName.isBlank() ||
+                    dev.roomName.equals("Unassigned", ignoreCase = true) ||
+                    (dev.roomName.equals("Living Room", ignoreCase = true) && inferredRoom != "Living Room")
+                ) {
+                    inferredRoom
+                } else {
+                    dev.roomName
+                }
+                if (cleanSsid != dev.wifiSsid || cleanRoom != dev.roomName) {
+                    dao.updateDevice(dev.copy(wifiSsid = cleanSsid, roomName = cleanRoom))
                 }
             }
 
@@ -761,7 +775,9 @@ class WeMoRepository(
 
         val enriched = if (liveDesc != null) {
             val resolvedName = device.name.trim().ifBlank { liveDesc.name }
-            val resolvedRoom = if (device.name.isBlank() && device.roomName == "Living Room") {
+            val resolvedRoom = if (device.name.isBlank() &&
+                (device.roomName == "Living Room" || device.roomName == "Unassigned")
+            ) {
                 liveDesc.roomName
             } else {
                 device.roomName.ifBlank { liveDesc.roomName }

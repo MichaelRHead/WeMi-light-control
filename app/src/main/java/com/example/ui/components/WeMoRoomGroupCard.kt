@@ -446,8 +446,8 @@ fun iconForRoom(roomName: String): ImageVector {
     val lower = roomName.lowercase()
     return when {
         "living" in lower -> Icons.Default.Chair
-        "bed" in lower -> Icons.Default.Bed
-        "kitchen" in lower -> Icons.Default.Kitchen
+        "bed" in lower || "girl" in lower || "boy" in lower || "kid" in lower -> Icons.Default.Bed
+        "kitchen" in lower || "dining" in lower -> Icons.Default.Kitchen
         "ensuite" in lower || "bath" in lower -> Icons.Default.Bathtub
         "outdoor" in lower || "patio" in lower || "porch" in lower -> Icons.Default.Deck
         else -> Icons.Default.MeetingRoom

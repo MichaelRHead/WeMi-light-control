@@ -388,8 +388,60 @@ class WeMoSoapAndSelfHealingTest {
                 serialNumber = "PORCH551"
             )
         ).toInt()
+        val stuckBedLampId = database.wemoDao().insertDevice(
+            WeMoDeviceEntity(
+                name = "Shprese Bed Lamp",
+                roomName = "Living Room",
+                networkKey = "wifi_lan_192_168_1",
+                wifiSsid = "LAN 192.168.1.0/24",
+                ipAddress = "192.168.1.205",
+                port = 49153,
+                isOn = false,
+                isReachable = true,
+                serialNumber = "BED205"
+            )
+        ).toInt()
+        val stuckStairwayId = database.wemoDao().insertDevice(
+            WeMoDeviceEntity(
+                name = "Stairway Light",
+                roomName = "Living Room",
+                networkKey = "wifi_lan_192_168_1",
+                wifiSsid = "LAN 192.168.1.0/24",
+                ipAddress = "192.168.1.34",
+                port = 49153,
+                isOn = false,
+                isReachable = true,
+                serialNumber = "STAIR34"
+            )
+        ).toInt()
+        val stuckGirlsId = database.wemoDao().insertDevice(
+            WeMoDeviceEntity(
+                name = "Girls Light",
+                roomName = "Living Room",
+                networkKey = "wifi_lan_192_168_1",
+                wifiSsid = "LAN 192.168.1.0/24",
+                ipAddress = "192.168.1.40",
+                port = 49153,
+                isOn = false,
+                isReachable = true,
+                serialNumber = "GIRLS40"
+            )
+        ).toInt()
+        val stuckUnassignedId = database.wemoDao().insertDevice(
+            WeMoDeviceEntity(
+                name = "Espresso Machine",
+                roomName = "Living Room",
+                networkKey = "wifi_lan_192_168_1",
+                wifiSsid = "LAN 192.168.1.0/24",
+                ipAddress = "192.168.1.99",
+                port = 49153,
+                isOn = false,
+                isReachable = true,
+                serialNumber = "ESPRESSO99"
+            )
+        ).toInt()
 
-        // 2. Calling ensureSeeded() in Real LAN Mode must automatically sanitize both homes and the device's wifiSsid
+        // 2. Calling ensureSeeded() in Real LAN Mode must automatically sanitize both homes, device wifiSsid, and legacy "Living Room" room assignments
         repo.ensureSeeded()
         val sanitizedHomes = database.wemoDao().getAllHomeNetworks().first()
         val primaryHome = sanitizedHomes.first { it.networkKey == "wifi_lan_192_168_1" }
@@ -401,6 +453,11 @@ class WeMoSoapAndSelfHealingTest {
 
         val sanitizedDevice = database.wemoDao().getDeviceById(pollutedDeviceId)!!
         assertEquals("LAN 192.168.1.0/24", sanitizedDevice.wifiSsid)
+        assertEquals("Porch & Entryway", sanitizedDevice.roomName)
+        assertEquals("Bedroom", database.wemoDao().getDeviceById(stuckBedLampId)!!.roomName)
+        assertEquals("Hallway & Landing", database.wemoDao().getDeviceById(stuckStairwayId)!!.roomName)
+        assertEquals("Bedroom", database.wemoDao().getDeviceById(stuckGirlsId)!!.roomName)
+        assertEquals("Unassigned", database.wemoDao().getDeviceById(stuckUnassignedId)!!.roomName)
 
         // 3. Adopting a device that reports a soft-AP SSID ("WeMo.Switch.777") must NOT pollute the device or home SSID
         val adoptedSoftAp = repo.adoptDiscoveredDevice(

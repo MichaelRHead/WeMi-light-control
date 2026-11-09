@@ -18,7 +18,9 @@ object WeMoDemoFixtures {
         "Ensuite",
         "Outdoor",
         "Garage",
-        "Office"
+        "Basement",
+        "Office",
+        "Unassigned"
     )
 
     fun defaultHomeNetworks(): List<WeMoHomeNetworkEntity> = listOf(

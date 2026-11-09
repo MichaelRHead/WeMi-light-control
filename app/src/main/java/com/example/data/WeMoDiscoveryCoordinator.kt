@@ -340,8 +340,21 @@ internal class WeMoDiscoveryCoordinator(
             if (match != null) {
                 val recentSetMs = lastSetStateTimestampMs[existing.id] ?: 0L
                 val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
+                val resolvedName = existing.name.ifBlank { match.name }
+                val inferredRoom = inferRoomFromName(resolvedName)
+                val resolvedRoom = if (!demoMode && (
+                        existing.roomName.isBlank() ||
+                            existing.roomName.equals("Unassigned", ignoreCase = true) ||
+                            (existing.roomName.equals("Living Room", ignoreCase = true) && inferredRoom != "Living Room")
+                        )
+                ) {
+                    inferredRoom
+                } else {
+                    existing.roomName
+                }
                 dao.updateDevice(
                     existing.copy(
+                        roomName = resolvedRoom,
                         ipAddress = match.ipAddress,
                         port = match.port,
                         isReachable = true,
@@ -415,8 +428,21 @@ internal class WeMoDiscoveryCoordinator(
             val newId = dao.insertDevice(newEntity).toInt()
             newEntity.copy(id = newId)
         } else {
+            val resolvedName = discovered.name.ifBlank { existing.name }
+            val inferredRoom = discovered.roomName.ifBlank { inferRoomFromName(resolvedName) }
+            val resolvedRoom = if (!isDemoShowroomMode() && (
+                    existing.roomName.isBlank() ||
+                        existing.roomName.equals("Unassigned", ignoreCase = true) ||
+                        (existing.roomName.equals("Living Room", ignoreCase = true) && inferredRoom != "Living Room")
+                    )
+            ) {
+                inferredRoom
+            } else {
+                existing.roomName
+            }
             val updated = existing.copy(
-                name = discovered.name.ifBlank { existing.name },
+                name = resolvedName,
+                roomName = resolvedRoom,
                 networkKey = activeNetworkKey,
                 wifiSsid = resolvedSsid,
                 ipAddress = discovered.ipAddress,
