@@ -19,6 +19,9 @@ Use this skill whenever multiple agent conversations or external tools (such as 
    - Always diff your recent commits against the latest `origin/main` to verify that none of your features, test tags, documentation sections, or links were lost.
 3. **Keep Code, Tests, User Guides, Change Log, and Skills Coherent**:
    - After integrating incoming commits, verify that version numbers (`versionCode` / `versionName` in `app/build.gradle.kts`), file line counts, `Modifier.testTag(...)` identifiers, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `AGENTS.md`, and `.agents/skills/*/SKILL.md` all agree with each other.
+4. **Respect Exclusive Ownership of `UX_DESIGN_AND_EXPERIENCE.md` & `wemi-ux-design-and-experience`**:
+   - [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md), [`docs/UX_DESIGN_AND_EXPERIENCE.md`](../../docs/UX_DESIGN_AND_EXPERIENCE.md), and [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md) are **owned exclusively by the Google AI Studio Agent**.
+   - Other agents must read and follow those files to understand the app's UX architecture, behavioral modeling, layout invariants, and CUJs, **but must never edit, overwrite, or reformat them**.
 
 ---
 
