@@ -1,13 +1,21 @@
 ---
 name: wemi-device-telemetry-debug
-description: Capture, parse, and diagnose on-device Belkin WeMo setup, discovery, and UPnP/SOAP telemetry from the user's physical Android phone or Android TV via screenshots (Setup Debug Details panel, SOAP Packet Log, Inline Diagnostics Drawer) or recorded telemetry files (wemi-telemetry-latest.txt / Copy / Save-Share). Use whenever debugging physical switch provisioning (10.22.22.1), Wi-Fi connection failures, SSDP discovery misses, or SOAP command errors with the user.
+description: Capture, parse, and diagnose on-device Belkin WeMo setup, discovery, and UPnP/SOAP telemetry from the user's physical Android phone or Android TV via screenshots (Setup Debug Details panel, SOAP Packet Log, Inline Diagnostics Drawer) or recorded telemetry files (wemi-telemetry-latest.txt / Copy / Save-Share). EXCLUSIVELY OWNED by the Antigravity Debugging & Support Agent (other agents MUST read and follow this skill when modifying provisioning/telemetry flows, but MUST NOT edit this skill, DEBUGGING_AND_SUPPORT.md, or docs/user-guide/telemetry-and-troubleshooting.md).
 ---
 
 # WeMi Device Telemetry & Screenshot Debugging Skill (`wemi-device-telemetry-debug`)
 
+> [!CAUTION]
+> **EXCLUSIVE OWNERSHIP & READ-ONLY RULE FOR PEER AGENTS**:
+> - **Owner**: **Antigravity Debugging & Support Agent — SOLE AUTHOR & MAINTAINER**.
+> - **Policy**: **ONLY the Antigravity Debugging & Support Agent may modify [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](SKILL.md), [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md), or [`docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md).**
+> - **All other agents** (including the Google AI Studio Agent, CLI agents, and external coding assistants) **MUST read, understand, and obey** the diagnostic invariants, non-destructive `10.22.22.1` provisioning rules, and telemetry `testTag` contracts documented here, **but MUST NOT edit, overwrite, or delete these files.**
+
+For the full debugging & support architecture and invariants, read [`../../DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) and the end-user guide in [`../../docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md).
+
 Use this skill whenever a user reports an issue with physical Belkin WeMo hardware (`F7C030`, `WLS040`/`WLS0403`, `F7C059`/`WDS060`, `F7C063`/`WSP080`) on their Android phone, tablet, or Android TV — especially during **`10.22.22.1` zero-cloud Wi-Fi setup**, **LAN SSDP discovery**, or **UPnP/SOAP control**.
 
-Because physical Belkin WeMo switches sit on the user's private local Wi-Fi (`192.168.x.x/24`) or isolated soft-AP (`10.22.22.1/24`), the fastest way to close the diagnostic loop is to inspect **structured on-screen screenshots** or **exported telemetry files (`wemi-telemetry-latest.txt`)** captured directly on the user's device (see the end-user instructions in [`../../docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md)).
+Because physical Belkin WeMo switches sit on the user's private local Wi-Fi (`192.168.x.x/24`) or isolated soft-AP (`10.22.22.1/24`), the fastest way to close the diagnostic loop is to inspect **structured on-screen screenshots** or **exported telemetry files (`wemi-telemetry-latest.txt`)** captured directly on the user's device.
 
 ---
 

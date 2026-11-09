@@ -22,8 +22,11 @@ Use this skill whenever multiple agent conversations or external tools (such as 
 4. **Respect Exclusive Ownership of `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md` & `wemi-ux-design-and-experience`**:
    - [`UX_DESIGN.md`](../../UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md), and [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md) are **owned exclusively by the Google AI Studio Agent**.
    - Other agents must read and follow those files to understand the app's UX guidelines, navigation patterns, accessibility standards, behavioral modeling, layout invariants, and CUJs, **but must never edit, overwrite, or reformat them**.
-5. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
-   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) live **exclusively at the repository root (`/`)**.
+5. **Respect Exclusive Ownership of `DEBUGGING_AND_SUPPORT.md`, `wemi-device-telemetry-debug` & `docs/user-guide/telemetry-and-troubleshooting.md`**:
+   - [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md), [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md), and [`docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md) are **owned exclusively by the Antigravity Debugging & Support Agent**.
+   - Other agents must read and follow those files to preserve the `10.22.22.1` provisioning diagnostics, screenshot debug panel, and `wemi-telemetry-latest.txt` exporter invariants, **but must never edit, overwrite, or delete them**.
+6. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
+   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) live **exclusively at the repository root (`/`)**.
    - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`.
 
 ---

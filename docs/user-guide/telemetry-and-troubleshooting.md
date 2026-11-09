@@ -1,6 +1,8 @@
 # Troubleshooting, Screenshots & Sharing Telemetry Logs
 
-[← Back to User Guide Index](../../USER_GUIDE.md)
+[← Back to User Guide Index](../../USER_GUIDE.md) • [Architecture & Debugging Spec (`DEBUGGING_AND_SUPPORT.md`)](../../DEBUGGING_AND_SUPPORT.md)
+
+> **EXCLUSIVE AGENT OWNERSHIP NOTICE (READ-ONLY FOR OTHER AGENTS)**: This guide (`docs/user-guide/telemetry-and-troubleshooting.md`), [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md), and [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](../../.agents/skills/wemi-device-telemetry-debug/SKILL.md) are **maintained exclusively by the Antigravity Debugging & Support Agent**. Other agents must read and respect these specifications without overwriting or deleting them.
 
 Because Belkin WeMo switches operate entirely on your private home Wi-Fi (`192.168.x.x`) or on a factory-reset switch's isolated setup hotspot (`10.22.22.1`), **WeMi Light Control** includes built-in **on-screen diagnostic panels** and a **one-tap telemetry file exporter (`wemi-telemetry-latest.txt`)**.
 

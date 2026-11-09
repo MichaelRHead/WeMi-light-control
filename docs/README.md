@@ -15,12 +15,13 @@ All project-level, architectural, UX, and engineering documents live **exclusive
 | [`../AGENTS.md`](../AGENTS.md) | Master architecture, package map, build gate, and multi-agent rules | Shared across agents |
 | [`../UX_DESIGN.md`](../UX_DESIGN.md) | Android UX Design Guidelines: navigation patterns, accessibility standards & interaction flows | **Google AI Studio Agent ONLY (Read-Only for other agents)** |
 | [`../UX_DESIGN_AND_EXPERIENCE.md`](../UX_DESIGN_AND_EXPERIENCE.md) | Behavioral mental models, 5 Compose layout invariants & Critical User Journeys (CUJs) | **Google AI Studio Agent ONLY (Read-Only for other agents)** |
+| [`../DEBUGGING_AND_SUPPORT.md`](../DEBUGGING_AND_SUPPORT.md) | On-device screenshot & `wemi-telemetry-latest.txt` diagnostics, `10.22.22.1` provisioning invariants & support architecture | **Antigravity Debugging & Support Agent ONLY (Read-Only for other agents)** |
 | [`../USER_GUIDE.md`](../USER_GUIDE.md) | Top-level entry point & summary table linking to the human feature guides in `docs/user-guide/` | Shared across agents |
 | [`../IMPLEMENTED.md`](../IMPLEMENTED.md) | Reverse-chronological feature & bug-fix change log (newest at top) | Shared across agents |
 | [`../UPCOMING_FEATURES.md`](../UPCOMING_FEATURES.md) | Next-iteration engineering roadmap | Shared across agents |
 | [`../CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../CODE_QUALITY_AND_MODULARIZATION_PLAN.md) | Code modularization & E2E validation plan | Shared across agents |
 
-> **Rule**: Never run `cp IMPLEMENTED.md docs/IMPLEMENTED.md` or recreate `docs/IMPLEMENTED.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`.
+> **Rule**: Never run `cp IMPLEMENTED.md docs/IMPLEMENTED.md` or recreate `docs/IMPLEMENTED.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`.
 
 ---
 
@@ -36,4 +37,4 @@ The `docs/` directory is dedicated **exclusively** to human-readable end-user gu
 - [`user-guide/wifi-homes.md`](user-guide/wifi-homes.md) — Managing Multiple Wi-Fi Homes & One-Tap LAN Reset
 - [`user-guide/rules-and-timers.md`](user-guide/rules-and-timers.md) — Schedules, Auto-Off Timers & Sunset/Sunrise Rules
 - [`user-guide/more-and-tv-mode.md`](user-guide/more-and-tv-mode.md) — Android TV 10-Foot Remote Mode (`wemi TV`) & Demo Showroom
-- [`user-guide/telemetry-and-troubleshooting.md`](user-guide/telemetry-and-troubleshooting.md) — Troubleshooting, Diagnostic Screenshots & Sharing Telemetry Logs (`wemi-telemetry-latest.txt`)
+- [`user-guide/telemetry-and-troubleshooting.md`](user-guide/telemetry-and-troubleshooting.md) — Troubleshooting, Diagnostic Screenshots & Sharing Telemetry Logs (`wemi-telemetry-latest.txt`) *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
