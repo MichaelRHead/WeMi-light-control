@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,7 +58,6 @@ import org.suppressingfire.wemi.ui.screens.RulesScreen
 import org.suppressingfire.wemi.ui.theme.WeMiTheme
 import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -349,7 +349,7 @@ fun WeMiSwitchApp(
                     Text(
                         text = statusBannerMessage.orEmpty(),
                         color = Color.White,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Medium,
                         fontSize = 13.sp,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)

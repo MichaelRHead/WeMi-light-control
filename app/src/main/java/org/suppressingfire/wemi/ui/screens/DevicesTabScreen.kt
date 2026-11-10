@@ -30,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -53,7 +54,6 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,14 +144,14 @@ fun DevicesTabScreen(
                             Text(
                                 text = "Smart Switch Setup AP Detected (${lanNetworkState.localIpv4})",
                                 color = Color.White,
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 14.sp
                             )
                             Text(
                                 text = "Tap here to provision this factory-reset smart switch (10.22.22.1) onto your 2.4 GHz Home Wi-Fi.",
                                 color = Color.White.copy(alpha = 0.9f),
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontSize = 12.sp
                             )
                         }
@@ -340,7 +340,7 @@ internal fun EmptyDevicesState(
 
             Text(
                 text = "No Smart Switches on This Wi-Fi Home",
-                fontFamily = WorkSansFontFamily,
+                fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 17.sp,
                 color = WemoTextPrimary,
@@ -349,7 +349,7 @@ internal fun EmptyDevicesState(
             Spacer(modifier = Modifier.height(6.dp))
             Text(
                 text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, provision a factory-reset switch (10.22.22.1), add a switch by IP, or restore the default preset.",
-                fontFamily = WorkSansFontFamily,
+                fontFamily = FontFamily.SansSerif,
                 fontSize = 13.sp,
                 color = WemoTextSecondary,
                 textAlign = TextAlign.Center

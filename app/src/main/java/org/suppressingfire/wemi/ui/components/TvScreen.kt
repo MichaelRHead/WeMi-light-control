@@ -67,10 +67,8 @@ import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
-import org.suppressingfire.wemi.ui.theme.ComfortaaFontFamily
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenTop
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 internal val TvDeepBackground = Color(0xFF071324)
 internal val TvSurfaceCard = Color(0xFF0D213B)
@@ -189,7 +187,7 @@ fun TvDashboardScreen(
                         Text(
                             text = "wemi TV",
                             color = Color.White,
-                            fontFamily = ComfortaaFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
                         )
@@ -200,14 +198,14 @@ fun TvDashboardScreen(
                     Text(
                         text = "10-Foot Smart Switch Remote Control",
                         color = TvTextPrimary,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp
                     )
                     Text(
                         text = "$activeSwitchCount/$totalSwitchCount Switches ON • UDP 239.255.255.250:1900",
                         color = TvCyanFocusBorder,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 12.sp
                     )
                 }
@@ -242,7 +240,7 @@ fun TvDashboardScreen(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (showVirtualRemotePad) "Hide Remote Pad" else "Remote D-Pad",
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 12.sp
                     )
                 }
@@ -342,7 +340,7 @@ fun TvDashboardScreen(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Toggle All in $currentMasterRoom",
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp
                     )
@@ -447,7 +445,7 @@ fun TvDashboardScreen(
                 Text(
                     text = "[OK / Select] Toggle Light   [◀ / ▶] Dimmer -/+10%   [Play] Room Master Toggle",
                     color = TvCyanFocusBorder,
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Medium,
                     fontSize = 12.sp,
                     maxLines = 1,
@@ -503,7 +501,7 @@ private fun VirtualTvRemoteBar(
                     Text(
                         text = "TV Remote Focus (${focusedIndex + 1}/$totalCount): ${focusedDevice.name}",
                         color = Color.White,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp,
                         maxLines = 1,
@@ -518,7 +516,7 @@ private fun VirtualTvRemoteBar(
                                 "Motion: ${focusedDevice.lastMotionTime ?: "Active"}"
                             else if (focusedDevice.isOn) "Switch ON" else "Switch OFF",
                         color = TvCyanFocusBorder,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 12.sp
                     )
                 }
@@ -570,7 +568,7 @@ private fun VirtualTvRemoteBar(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "OK: Toggle Switch",
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp
                     )
@@ -609,7 +607,7 @@ private fun VirtualTvRemoteBar(
                 ) {
                     Text(
                         text = "Room Toggle (${focusedDevice.roomName})",
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 12.sp
                     )
                 }

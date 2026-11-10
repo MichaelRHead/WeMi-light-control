@@ -53,19 +53,18 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.ui.BottomTab
-import org.suppressingfire.wemi.ui.theme.ComfortaaFontFamily
 import org.suppressingfire.wemi.ui.theme.WemoGreenBottom
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 import org.suppressingfire.wemi.ui.theme.WemoGreenTop
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 @Composable
 fun TopHeader(
@@ -163,7 +162,7 @@ fun TopHeader(
                         Text(
                             text = if (isEditMode) stringResource(R.string.action_done) else stringResource(R.string.action_edit),
                             color = if (isEditMode) WemoGreenBottom else Color.White,
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
                             fontSize = 16.sp
                         )
@@ -197,7 +196,7 @@ fun TopHeader(
                         stringResource(R.string.header_brand_wemo)
                     },
                     color = Color.White,
-                    fontFamily = ComfortaaFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 35.sp,
                     letterSpacing = (-0.8).sp
@@ -211,7 +210,7 @@ fun TopHeader(
                     Text(
                         text = "LAN SWITCHES",
                         color = Color(0xFFE0F7FA),
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 10.sp,
                         letterSpacing = 0.8.sp,

@@ -42,7 +42,6 @@ import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 internal val StatusActiveEmerald = Color(0xFF059669)
 internal val StatusActiveSoftBg = Color(0xFFECFDF5)
@@ -64,7 +63,7 @@ fun AutoShrinkSwitchName(
     maxFontSizeSp: Float = 18f,
     minFontSizeSp: Float = 11f,
     fontWeight: FontWeight = FontWeight.SemiBold,
-    fontFamily: FontFamily = WorkSansFontFamily,
+    fontFamily: FontFamily = FontFamily.SansSerif,
     modifier: Modifier = Modifier
 ) {
     val estimatedInitialSp = remember(name, maxFontSizeSp, minFontSizeSp) {
@@ -170,7 +169,7 @@ fun ConnectionStatusBadge(
             Text(
                 text = if (isPinging) "Pinging..." else device.connectionBadgeText,
                 color = textColor,
-                fontFamily = WorkSansFontFamily,
+                fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 11.sp,
                 maxLines = 1
@@ -250,7 +249,7 @@ fun PowerStatePill(
             Text(
                 text = label,
                 color = contentColor,
-                fontFamily = WorkSansFontFamily,
+                fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 11.sp,
                 maxLines = 1

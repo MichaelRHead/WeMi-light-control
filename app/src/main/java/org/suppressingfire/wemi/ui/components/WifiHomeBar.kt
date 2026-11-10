@@ -64,7 +64,6 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 /**
  * Displays the remembered Wi-Fi Home Network selector bar at the top of the switch list.
@@ -156,7 +155,7 @@ fun WifiHomeBar(
                                 }
                             },
                             color = WemoTextSecondary,
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontSize = 11.sp,
                             maxLines = 1,
                             softWrap = false,
@@ -188,7 +187,7 @@ fun WifiHomeBar(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (isReconnectingHome) "Syncing..." else "Reconnect",
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 11.5.sp,
                         maxLines = 1,
@@ -223,7 +222,7 @@ fun WifiHomeBar(
                         label = {
                             Text(
                                 text = "${network.homeName} ($rememberedCount)",
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                                 fontSize = 11.5.sp,
                                 maxLines = 1,
@@ -254,7 +253,7 @@ fun WifiHomeBar(
                     label = {
                         Text(
                             text = "Add Home",
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontSize = 11.5.sp,
                             maxLines = 1,
                             softWrap = false
@@ -278,7 +277,7 @@ fun WifiHomeBar(
                     label = {
                         Text(
                             text = "Reset",
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontSize = 11.5.sp,
                             maxLines = 1,
                             softWrap = false
@@ -298,7 +297,7 @@ fun WifiHomeBar(
             title = {
                 Text(
                     text = "Reset Homes, Switches & Rooms?",
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -306,7 +305,7 @@ fun WifiHomeBar(
                 Text(
                     text = "This clears all remembered Wi-Fi Homes, discovered switches, and room assignments, then resets your primary LAN profile back to a clean 'My Home'.",
                     color = WemoTextSecondary,
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontSize = 13.sp
                 )
             },
@@ -358,7 +357,7 @@ fun AddWifiHomeNetworkDialog(
         title = {
             Text(
                 text = "Remember Wi-Fi Home Network",
-                fontFamily = WorkSansFontFamily,
+                fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Bold
             )
         },
@@ -367,7 +366,7 @@ fun AddWifiHomeNetworkDialog(
                 Text(
                     text = "Each Wi-Fi network is saved as a separate Home. When you connect to this Wi-Fi network, WeMi Switch Control automatically recalls and reconnects all switches discovered here.",
                     color = WemoTextSecondary,
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontSize = 13.sp
                 )
                 OutlinedTextField(

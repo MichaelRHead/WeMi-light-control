@@ -57,7 +57,6 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 @Composable
 fun MoreScreen(
@@ -101,7 +100,7 @@ fun MoreScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Master Switch Control",
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
                             fontSize = 18.sp,
                             color = WemoTextPrimary
@@ -110,7 +109,7 @@ fun MoreScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "${devices.count { it.isReachable && it.isOn }} of ${devices.count { it.isReachable }} detected devices are currently ON.",
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 14.sp,
                         color = WemoTextSecondary
                     )
@@ -158,7 +157,7 @@ fun MoreScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Offline Local UPnP / SOAP Engine",
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
                             fontSize = 18.sp,
                             color = WemoTextPrimary
@@ -167,7 +166,7 @@ fun MoreScreen(
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Communicates directly with Belkin's discontinued smart switch platform over local Wi-Fi via SSDP (UDP 239.255.255.250:1900), UPnP GENA Push (/upnp/event/basicevent1), and SOAP HTTP (/upnp/control/basicevent1 on ports 49151–49159) — no cloud account required.",
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 13.sp,
                         color = WemoTextSecondary
                     )
@@ -181,7 +180,7 @@ fun MoreScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Demo Showroom Mode",
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 15.sp,
                                 color = WemoTextPrimary
@@ -192,7 +191,7 @@ fun MoreScreen(
                                 } else {
                                     "Real LAN Mode • Controlling physical local switches only"
                                 },
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontSize = 13.sp,
                                 color = WemoTextSecondary
                             )
@@ -215,14 +214,14 @@ fun MoreScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Header Logo Wordmark",
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 15.sp,
                                 color = WemoTextPrimary
                             )
                             Text(
                                 text = "Showing 'wemi' wordmark in top bar",
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontSize = 13.sp,
                                 color = WemoTextSecondary
                             )
@@ -312,7 +311,7 @@ fun MoreScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = "Google Play Store Assets Ready",
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
                             fontSize = 18.sp,
                             color = WemoTextPrimary
@@ -342,14 +341,14 @@ fun MoreScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "WeMi Switch Control",
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp,
                                 color = WemoTextPrimary
                             )
                             Text(
                                 text = "512×512 Icon, 1024×500 Feature Graphic, Store Listing & Privacy Policy bundled in /play_store_assets/",
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontSize = 12.sp,
                                 color = WemoTextSecondary
                             )
@@ -376,7 +375,7 @@ fun MoreScreen(
                     ) {
                         Text(
                             text = "UPnP / SOAP Packet Log (${soapLogs.size})",
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
                             fontSize = 16.sp,
                             color = WemoTextPrimary,
@@ -418,7 +417,7 @@ fun MoreScreen(
                     if (soapLogs.isEmpty()) {
                         Text(
                             text = "Toggle any light switch or tap Refresh to inspect live Belkin UPnP SOAP envelopes.",
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontSize = 13.sp,
                             color = WemoTextSecondary
                         )
@@ -485,14 +484,14 @@ fun MoreScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = "Open Source License",
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 16.sp,
                                 color = WemoTextPrimary
                             )
                             Text(
                                 text = "MIT License • Copyright (c) 2026 Michael R. Head & Contributors",
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontSize = 12.sp,
                                 color = WemoTextSecondary
                             )
@@ -548,8 +547,6 @@ fun MoreScreen(
                                     Third-Party Open Source Notices & Protocol Attribution:
                                     • AndroidX, Jetpack Compose & Room — Apache License 2.0 (Copyright The Android Open Source Project)
                                     • Kotlin & Kotlinx Coroutines — Apache License 2.0 (Copyright JetBrains s.r.o.)
-                                    • Square OkHttp — Apache License 2.0 (Copyright Square, Inc.)
-                                    • pywemo UPnP/SOAP/Crypto Protocol Reference — MIT License (Copyright pywemo contributors; clean-room Kotlin implementation)
                                     • Trademark Notice: WeMi Light Control is an independent open-source project and is not affiliated with or endorsed by Belkin International, Inc.
                                 """.trimIndent(),
                                 fontFamily = FontFamily.Monospace,

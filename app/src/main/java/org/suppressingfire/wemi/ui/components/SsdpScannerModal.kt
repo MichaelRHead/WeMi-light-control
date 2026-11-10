@@ -64,7 +64,6 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 /**
  * Compact SSDP Discovery Status & Action Bar shown at the top of the Devices list.
@@ -125,7 +124,7 @@ fun SsdpDiscoveryBanner(
                     Text(
                         text = "SSDP Local Network Discovery",
                         color = WemoTextPrimary,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 14.sp,
                         maxLines = 1,
@@ -139,7 +138,7 @@ fun SsdpDiscoveryBanner(
                             "UDP 239.255.255.250:1900 • $savedDeviceCount smart switches configured"
                         },
                         color = WemoTextSecondary,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 11.sp,
                         maxLines = 1,
                         softWrap = false,
@@ -167,7 +166,7 @@ fun SsdpDiscoveryBanner(
                 Spacer(modifier = Modifier.width(5.dp))
                 Text(
                     text = "SSDP Scan",
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Medium,
                     fontSize = 12.sp,
                     maxLines = 1,
@@ -233,14 +232,14 @@ fun SsdpScannerModal(
                                 Text(
                                     text = "SSDP Network Discovery Scan",
                                     color = WemoTextPrimary,
-                                    fontFamily = WorkSansFontFamily,
+                                    fontFamily = FontFamily.SansSerif,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 19.sp
                                 )
                                 Text(
                                     text = "Multicast M-SEARCH • 239.255.255.250:1900",
                                     color = WemoTextSecondary,
-                                    fontFamily = WorkSansFontFamily,
+                                    fontFamily = FontFamily.SansSerif,
                                     fontSize = 12.sp
                                 )
                             }
@@ -263,7 +262,7 @@ fun SsdpScannerModal(
                         Text(
                             text = "SSDP Search Target (ST Header):",
                             color = WemoTextSecondary,
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
                             fontSize = 12.sp
                         )
@@ -340,7 +339,7 @@ fun SsdpScannerModal(
                             Text(
                                 text = "Discovered Devices (${discoveredList.size})",
                                 color = WemoTextPrimary,
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp
                             )
@@ -440,7 +439,7 @@ private fun SsdpDiscoveredDeviceRow(
                     Text(
                         text = item.name,
                         color = WemoTextPrimary,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
                         maxLines = 1,
@@ -470,7 +469,7 @@ private fun SsdpDiscoveredDeviceRow(
                 Text(
                     text = "${item.ipAddress}:${item.port} • ${item.hardwareSku} • SN: ${item.serialNumber}",
                     color = WemoGreenDark,
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Medium,
                     fontSize = 12.sp
                 )

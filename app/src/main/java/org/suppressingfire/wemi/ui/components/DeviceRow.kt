@@ -60,7 +60,6 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 /**
  * Full-width switch title that reactively steps down its font size if a long switch name
@@ -82,7 +81,7 @@ fun AutoResizingDeviceNameText(
     Text(
         text = text,
         color = color,
-        fontFamily = WorkSansFontFamily,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = fontWeight,
         fontSize = fontSizeSp.sp,
         lineHeight = (fontSizeSp * 1.2f).sp,
@@ -210,7 +209,7 @@ fun DeviceRow(
                                 Text(
                                     text = stringResource(R.string.status_not_detected),
                                     color = WemoTextSecondary,
-                                    fontFamily = WorkSansFontFamily,
+                                    fontFamily = FontFamily.SansSerif,
                                     fontWeight = FontWeight.Normal,
                                     fontSize = 12.sp,
                                     maxLines = 1,
@@ -221,7 +220,7 @@ fun DeviceRow(
                                 Text(
                                     text = stringResource(R.string.status_motion_sensed, device.lastMotionTime),
                                     color = WemoGreenDark,
-                                    fontFamily = WorkSansFontFamily,
+                                    fontFamily = FontFamily.SansSerif,
                                     fontWeight = FontWeight.Normal,
                                     fontSize = 12.sp,
                                     maxLines = 1,
@@ -283,7 +282,7 @@ fun DeviceRow(
                             Text(
                                 text = device.visualCategory.displayName,
                                 color = Color(0xFF475569),
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 9.5.sp,
                                 modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)

@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -69,7 +70,6 @@ import org.suppressingfire.wemi.ui.theme.WemoRowExpandedSurface
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 import kotlin.math.roundToInt
 
 /**
@@ -108,7 +108,7 @@ fun RoomFilterBar(
             label = {
                 Text(
                     text = if (isGroupedByRoom) "Grouped by Room" else "Flat List",
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 12.sp
                 )
@@ -127,7 +127,7 @@ fun RoomFilterBar(
             label = {
                 Text(
                     text = "All Rooms (${rooms.size})",
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontSize = 12.sp
                 )
             },
@@ -154,7 +154,7 @@ fun RoomFilterBar(
                 label = {
                     Text(
                         text = room,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 12.sp
                     )
                 },
@@ -309,7 +309,7 @@ fun RoomGroupHeaderCard(
                                     "${roomDevices.size} Device(s)"
                                 },
                                 color = if (isAnySwitchOn) Color.White else WemoTextSecondary,
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 11.sp,
                                 maxLines = 1,
@@ -321,7 +321,7 @@ fun RoomGroupHeaderCard(
                         Text(
                             text = roomSubtitle,
                             color = WemoTextSecondary,
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontSize = 12.sp,
                             maxLines = 1,
                             softWrap = false,
@@ -407,7 +407,7 @@ fun RoomGroupHeaderCard(
                             Text(
                                 text = "$roomName Master Brightness (${dimmableBulbs.size} bulb${if (dimmableBulbs.size > 1) "s" else ""})",
                                 color = WemoGreenBottom,
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 13.sp
                             )
@@ -415,7 +415,7 @@ fun RoomGroupHeaderCard(
                         Text(
                             text = "${roomSliderVal.roundToInt()}%",
                             color = WemoGreenDark,
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )

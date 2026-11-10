@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,7 +50,6 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 import org.suppressingfire.wemi.ui.theme.WemoRowExpandedSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -83,14 +83,14 @@ internal fun ExpandedDrawer(
                 Text(
                     text = "Brightness Level",
                     color = WemoTextPrimary,
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Medium,
                     fontSize = 14.sp
                 )
                 Text(
                     text = "${sliderVal.roundToInt()}%",
                     color = WemoGreenDark,
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp,
                     modifier = Modifier.testTag("brightness_value_label_${device.id}")
@@ -178,14 +178,14 @@ internal fun ExpandedDrawer(
                             "Connection: Offline (Unreachable on Port ${device.port})"
                         },
                         color = if (device.isReachable) WemoGreenDark else StatusOfflineRed,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp
                     )
                     Text(
                         text = "Last Checked: ${device.lastCheckedTime} • Endpoint: ${device.ipAddress}:${device.port}",
                         color = WemoTextSecondary,
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontSize = 11.sp
                     )
                 }
@@ -218,13 +218,13 @@ internal fun ExpandedDrawer(
                 Text(
                     text = "UPnP Endpoint: http://${device.ipAddress}:${device.port}",
                     color = WemoTextSecondary,
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontSize = 12.sp
                 )
                 Text(
                     text = "SN: ${device.serialNumber} • ${device.firmwareVersion}",
                     color = WemoTextSecondary,
-                    fontFamily = WorkSansFontFamily,
+                    fontFamily = FontFamily.SansSerif,
                     fontSize = 11.sp
                 )
             }

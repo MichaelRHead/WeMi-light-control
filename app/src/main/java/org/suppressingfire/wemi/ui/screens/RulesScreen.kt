@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,7 +49,6 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 @Composable
 fun RulesScreen(
@@ -82,14 +82,14 @@ fun RulesScreen(
                         Text(
                             text = "Local Switch Rules & Timers",
                             color = WemoTextPrimary,
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
                             fontSize = 18.sp
                         )
                         Text(
                             text = "Executes directly over LAN without cloud servers",
                             color = WemoTextSecondary,
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontSize = 13.sp
                         )
                     }
@@ -149,20 +149,20 @@ fun RulesScreen(
                             Text(
                                 text = rule.name,
                                 color = WemoTextPrimary,
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.Normal,
                                 fontSize = 18.sp
                             )
                             Text(
                                 text = rule.triggerSummary,
                                 color = WemoTextSecondary,
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontSize = 14.sp
                             )
                             Text(
                                 text = rule.actionSummary,
                                 color = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary,
-                                fontFamily = WorkSansFontFamily,
+                                fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 13.sp
                             )

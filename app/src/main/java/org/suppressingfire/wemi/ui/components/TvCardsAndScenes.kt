@@ -47,6 +47,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -56,7 +57,6 @@ import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenTop
-import org.suppressingfire.wemi.ui.theme.WorkSansFontFamily
 
 @Composable
 internal fun TvDeviceCard(
@@ -190,7 +190,7 @@ internal fun TvDeviceCard(
                         Text(
                             text = device.visualCategory.displayName,
                             color = TvCyanFocusBorder,
-                            fontFamily = WorkSansFontFamily,
+                            fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 11.sp,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
@@ -203,7 +203,7 @@ internal fun TvDeviceCard(
                             device.isOn -> TvCyanFocusBorder
                             else -> Color(0xFFFBBF24)
                         },
-                        fontFamily = WorkSansFontFamily,
+                        fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.Medium,
                         fontSize = 12.5.sp,
                         maxLines = 1,
@@ -344,7 +344,7 @@ internal fun TvSceneChip(
             Text(
                 text = title,
                 color = Color.White,
-                fontFamily = WorkSansFontFamily,
+                fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.SemiBold,
                 fontSize = 13.sp
             )
@@ -374,7 +374,7 @@ internal fun TvRoomPill(
         Text(
             text = label,
             color = if (isSelected) TvDeepBackground else Color.White,
-            fontFamily = WorkSansFontFamily,
+            fontFamily = FontFamily.SansSerif,
             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
             fontSize = 13.sp,
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
