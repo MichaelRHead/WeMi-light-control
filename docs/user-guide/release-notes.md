@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v21.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v22.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v21.0`)
+## Quick Release Summary (`v1.0` → `v22.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v22.0`](#version-220-versioncode--22--november-10-2026)** | `22` | Nov 10, 2026 | Refreshed Google Play Store & in-app visual showcase across Phone, 7"/10" Tablets & Android TV matching the live Ocean Teal, Electric Cyan & Deep Sapphire UI, auto-shrinking switch titles & 3-state power/reconnect rings |
 | **[`v21.0`](#version-210-versioncode--21--november-910-2026)** | `21` | Nov 9–10, 2026 | Native Phone/Tablet vs. Android TV form-factor layouts, in-app Open Source MIT & Third-Party Notices card on the **More** tab, `org.suppressingfire.wemi` architecture & neutral hardware branding |
 | **[`v20.0`](#version-200-versioncode--20--november-9-2026)** | `20` | Nov 9, 2026 | Unified 9-port self-healing reconnect, cellular-safe Wi-Fi binding, 3-tier hardware identity matching, CamelCase/`Ensuite` room grouping & instant offline reconnect recovery |
 | **[`v19.0`](#version-190-versioncode--19--november-9-2026)** | `19` | Nov 9, 2026 | Dedicated Troubleshooting & Telemetry Sharing Guide (`wemi-telemetry-latest.txt`) for 1-tap support diagnostics |
@@ -40,6 +41,11 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 22.0 (`versionCode = 22`) — November 10, 2026
+- **Refreshed Google Play Store & In-App Visual Showcase**: Updated all 21 Google Play Store screenshots, banners, icons, and in-app preview graphics (`More` tab & Android TV Leanback banner) across Phone (`1080×1920`), 7-Inch Tablet (`1200×1920`), 10-Inch Tablet (`1600×2560`), and 10-Foot Android TV (`1920×1080` & `1280×720`) to match the live **Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), and Deep Sapphire (`#0F4C81`)** interface, `Comfortaa` & `Work Sans` typography, full-width auto-shrinking switch titles (`AutoShrinkSwitchName`), 3-state hardware icons (`ON`, `OFF` Standby `#23272F`, and Offline `Disconnected` `#DC2626`), top-first dimmer controls, and native Phone/Tablet vs. Android TV headers without manual Phone/TV toggle buttons.
+
+---
 
 ### Version 21.0 (`versionCode = 21`) — November 9–10, 2026
 - **Dedicated Native Phone/Tablet & Android TV Form-Factor Layouts**: Removed the manual Phone ↔ TV layout switch button from both the phone header and the Android TV dashboard so each device form factor always runs its purpose-built interaction model—touch-first cards and inline drawers on phones/tablets, and the 10-foot D-Pad remote dashboard (`wemi TV`) automatically on Android TV and Google TV (`UI_MODE_TYPE_TELEVISION`).

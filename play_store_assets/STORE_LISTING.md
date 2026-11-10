@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v21.0 — Phone, Tablet & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v22.0 — Phone, Tablet & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `21.0` (`versionCode = 21`)
+- **Version:** `22.0` (`versionCode = 22`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,7 +17,8 @@ WeMi Switch Control brings reliable, instant local-network control back to Belki
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
-### What's New in Version 21.0
+### What's New in Version 22.0
+- **Refreshed Google Play Store & In-App Visual Showcase:** Updated all Phone, 7-Inch Tablet, 10-Inch Tablet, and Android TV (`wemi TV`) screenshots, banners, and in-app preview graphics to match the live Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), and Deep Sapphire (`#0F4C81`) interface, full-width auto-shrinking switch titles, 3-state hardware icons (`ON`, `OFF` Standby `#23272F`, and Offline `Disconnected` `#DC2626`), and native form-factor headers.
 - **Dedicated Native Phone/Tablet & Android TV Layouts:** Automatically runs the touch-first dashboard on phones/tablets and the 10-foot D-Pad dashboard (`wemi TV`) on Android TV / Google TV (`UI_MODE_TYPE_TELEVISION`) without manual Phone/TV mode switch buttons.
 - **In-App Open Source MIT & Third-Party Notices (`More` Tab):** Expandable Open Source Licenses card displaying the full MIT License, permissive third-party library attributions, and non-affiliation notice, paired with reproducible APK metadata (`includeInApk = false`).
 - **Streamlined `org.suppressingfire.wemi` Architecture & 9-Port Self-Healing Reconnect:** Automatically recovers from firmware port shifts (`49151–49159`) across power toggles, dimmer sliders, friendly-name updates, and Night Mode while keeping sockets bound to Wi-Fi even when cellular data is active.

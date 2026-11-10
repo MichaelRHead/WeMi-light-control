@@ -16,8 +16,8 @@ android {
     applicationId = "com.aistudio.wemiswitch.kxpqzr"
     minSdk = 24
     targetSdk = 36
-    versionCode = 21
-    versionName = "21.0"
+    versionCode = 22
+    versionName = "22.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

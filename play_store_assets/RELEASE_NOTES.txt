@@ -1,4 +1,4 @@
-WeMi Light Control v21.0:
-• Native Form-Factor Layouts: Phone/tablet touch UI & 10-foot Android TV D-Pad dashboard run automatically on their native form factors without manual Phone/TV mode switch buttons.
-• In-App Open Source Notices: Added expandable MIT License & Third-Party Notices card on the More tab.
-• Streamlined Architecture: Repackaged under org.suppressingfire.wemi with 9-port self-healing UPnP/SOAP/GENA control & smarter room grouping.
+WeMi Switch Control v22.0:
+• Refreshed Play Store & In-App Visuals: Updated all Phone, 7"/10" Tablet & Android TV screenshots, banners, and icons to match the live Ocean Teal & Sapphire interface, auto-shrinking switch names, and 3-state power/reconnect rings.
+• Native Form-Factor Layouts: Touch UI on phones/tablets & 10-foot D-Pad dashboard on Android TV.
+• Local Control & Open Source Notices: 9-port self-healing UPnP/SOAP/GENA control & MIT/Third-Party notices on the More tab.
