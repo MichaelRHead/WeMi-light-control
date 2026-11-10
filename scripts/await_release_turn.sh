@@ -90,25 +90,15 @@ while true; do
       fi
     fi
 
-    # 2. Auto-initiation fallback for Stage 2 (discovery_and_grouping):
-    #    Wake up if AI Studio marked SIGN_OFF_AI_STUDIO_UX_CUJ as SIGNED_OFF while
-    #    SIGN_OFF_DISCOVERY_AND_GROUPING is still PENDING, OR if app/build.gradle.kts
-    #    on origin/main has a higher versionCode than VERSION_CODE in RELEASE_SIGN_OFF.md.
+    # 2. Fallback for Stage 2 (discovery_and_grouping):
+    #    Wake up if RELEASE_STATUS is IN_REVIEW and AI Studio marked
+    #    SIGN_OFF_AI_STUDIO_UX_CUJ as SIGNED_OFF while SIGN_OFF_DISCOVERY_AND_GROUPING
+    #    is still PENDING.
     if [[ "${ROLE}" == "discovery_and_grouping" ]]; then
-      if [[ "${AI_SIGN}" == SIGNED_OFF* && "${DISC_SIGN}" == "PENDING" ]]; then
+      if [[ "${REL_STATUS}" == "IN_REVIEW" && "${AI_SIGN}" == SIGNED_OFF* && "${DISC_SIGN}" == "PENDING" ]]; then
         echo "=================================================================="
         echo "[RELEASE COORDINATOR] AI Studio Stage 1 sign-off detected for '${ROLE}'!"
         echo "  RELEASE_VERSION : ${REL_VER} (versionCode = ${VER_CODE}, Round ${ROUND_NUM})"
-        echo "  ORIGIN_MAIN_SHA : ${ORIGIN_SHA}"
-        echo "=================================================================="
-        exit 0
-      fi
-
-      GRADLE_VER_CODE="$(git show origin/main:app/build.gradle.kts 2>/dev/null | awk -F'= *' '/versionCode/ { gsub(/[^0-9]/, "", $2); print $2; exit }')"
-      if [[ -n "${GRADLE_VER_CODE}" && -n "${VER_CODE}" ]] && (( GRADLE_VER_CODE > VER_CODE )); then
-        echo "=================================================================="
-        echo "[RELEASE COORDINATOR] New versionCode (${GRADLE_VER_CODE} > ${VER_CODE}) detected on origin/main!"
-        echo "  Waking '${ROLE}' to begin Stage 2 review."
         echo "  ORIGIN_MAIN_SHA : ${ORIGIN_SHA}"
         echo "=================================================================="
         exit 0
