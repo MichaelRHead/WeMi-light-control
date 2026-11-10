@@ -63,8 +63,12 @@ Whenever you implement a feature, fix a bug, or adjust existing behavior:
    - Update the corresponding detailed feature guide in [`docs/user-guide/`](../../docs/user-guide/) (or create a new guide in `docs/user-guide/` if introducing a major new feature area).
    - Update the summary table in [`USER_GUIDE.md`](../../USER_GUIDE.md).
 
-### Step 4: Run Pre-Push Build & Test Gate Before Pushing
-Never push code or documentation to `origin/main` unless the full Gradle build and unit/Robolectric test suite succeed:
+### Step 4: Run Pre-Push Build & Test Gate and Commit with Agent Attribution
+Never push code or documentation to `origin/main` unless the full Gradle build and unit/Robolectric test suite succeed, and always include your canonical agent name in the commit description per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md):
 ```bash
 ./gradlew assembleDebug testDebugUnitTest --rerun-tasks
+bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
+  <your_role_id> \
+  "<type>(<scope>): <concise summary>" \
+  "<1-4 sentence commit description explaining what changed, why, and how it was verified.>"
 ```

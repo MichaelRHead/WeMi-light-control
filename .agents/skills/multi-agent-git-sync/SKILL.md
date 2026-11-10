@@ -92,14 +92,17 @@ Before committing or pushing your integrated changes:
 2. **Sync Repository Skills (`.agents/skills/`) with Persistent Agent Skills**:
    - Whenever any `.agents/skills/<skill-name>/SKILL.md` is added or updated in the repository, also call `save_skill(overwrite = true, skill_dir = "/home/antigravity/MichaelRHead/WeMi-light-control/.agents/skills/<skill-name>")` so the persistent skill registry stays in lockstep with GitHub.
 
-### Step 5: Mandatory Pre-Push Verification & Atomic Push
+### Step 5: Mandatory Pre-Push Verification, Agent Commit Attribution & Atomic Push
 1. If any Kotlin source, resource, or test files were modified, run the mandatory build & test gate:
    ```bash
    ./gradlew testDebugUnitTest --rerun-tasks assembleDebug
    ```
-2. Stage, commit, and push atomically, re-checking `git pull --rebase origin main` if another agent pushed in the meantime:
+2. Stage, commit **with mandatory agent attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (never bare one-liners — always include `[<Short Agent Name>]` on the subject line and a commit description body ending with `Agent: <Canonical Agent Name> (<role_id>)`), and push atomically:
    ```bash
    git add -A
-   git commit -m "<concise commit message>"
+   bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
+     <your_role_id> \
+     "<type>(<scope>): <concise summary>" \
+     "<1-4 sentence commit description explaining what changed, why, and how it was verified.>"
    git pull --rebase origin main && git push origin main
    ```

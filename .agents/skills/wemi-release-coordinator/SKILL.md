@@ -62,8 +62,8 @@ When `scripts/await_release_turn.sh <your_role>` exits `0` and wakes your conver
    ```bash
    git pull --rebase origin main
    ```
-2. Perform your domain audit and run your required Gradle verification tests (fixing any issues within your domain if found).
-3. Record your sign-off and hand off `CURRENT_TURN` to the next agent in the ring:
+2. Perform your domain audit and run your required Gradle verification tests. If committing any domain fixes during your turn, follow [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (`bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <your_role> "<subject>" "<description>"`) so every commit description includes your canonical agent name.
+3. Record your sign-off and hand off `CURRENT_TURN` to the next agent in the ring (`advance_release_turn.sh` automatically formats its commit subject and description with your canonical agent name):
    ```bash
    bash scripts/advance_release_turn.sh sign_off <your_role> "<concise summary of checks and tests passed>"
    ```

@@ -41,8 +41,10 @@ else
   NO_PUSH="true"
 fi
 
-# Ensure executable bits on gradlew and release scripts
-chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh 2>/dev/null || true
+# Ensure executable bits on gradlew, release scripts, and commit attribution scripts
+chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
+  .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
+  .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || true
 
 PST_NOW="$(TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z")"
 STAGE5_SHA="$(sed -n 's/^SIGN_OFF_LICENSE_GOVERNANCE: SIGNED_OFF (\([^ )]*\).*/\1/p' RELEASE_SIGN_OFF.md | tr -d '\r' | head -n 1 || true)"
@@ -200,9 +202,47 @@ if [[ "${NO_PUSH}" == "true" ]]; then
   exit 0
 fi
 
-ROLE_TAG="${2:-release}"
-git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh
-git commit -m "chore(release): ${ACTION} by ${ROLE_TAG} in RELEASE_SIGN_OFF.md"
+CLEAN_ARGS=()
+for arg in "$@"; do
+  if [[ "${arg}" != "--no-push" ]]; then
+    CLEAN_ARGS+=("${arg}")
+  fi
+done
+
+case "${ACTION}" in
+  initiate)
+    ACTING_ROLE="ai_studio_ux_cuj"
+    COMMIT_DESC="${CLEAN_ARGS[1]:-Initiated release review in RELEASE_SIGN_OFF.md.}"
+    ;;
+  sign_off)
+    ACTING_ROLE="${CLEAN_ARGS[1]:-code_quality_and_testing}"
+    COMMIT_DESC="${CLEAN_ARGS[2]:-Recorded ${ACTING_ROLE} sign-off in RELEASE_SIGN_OFF.md.}"
+    ;;
+  conclude)
+    ACTING_ROLE="ai_studio_ux_cuj"
+    COMMIT_DESC="${CLEAN_ARGS[1]:-Concluded release review in RELEASE_SIGN_OFF.md (APPROVED_FOR_PLAY_STORE).}"
+    ;;
+  request_rereview)
+    ACTING_ROLE="${CLEAN_ARGS[1]:-code_quality_and_testing}"
+    TARGET_ROLE="${CLEAN_ARGS[2]:-discovery_and_grouping}"
+    COMMIT_DESC="Requested Round re-review of ${TARGET_ROLE}: ${CLEAN_ARGS[3]:-Re-verification requested.}"
+    ;;
+  *)
+    ACTING_ROLE="antigravity_general"
+    COMMIT_DESC="Updated RELEASE_SIGN_OFF.md (${ACTION})."
+    ;;
+esac
+
+git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
+  .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
+  .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || \
+  git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh
+
+bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
+  "${ACTING_ROLE}" \
+  "chore(release): ${ACTION} by ${ACTING_ROLE} in RELEASE_SIGN_OFF.md" \
+  "${COMMIT_DESC}"
+
 git pull --rebase origin main
 git push origin main
 echo "[RELEASE COORDINATOR] Pushed updated RELEASE_SIGN_OFF.md to origin/main."
