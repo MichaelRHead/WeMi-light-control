@@ -99,12 +99,15 @@ class LicenseAndBrandGovernanceTest {
             wemoNamedFiles.isEmpty()
         )
 
-        // 3. Store-facing & app resource files must not leak the "WeMo" trademark
+        // 3. Store-facing, screenshot generator & app resource files must not leak the "WeMo" trademark
         val brandBoundaryFiles = listOf(
             "app/src/main/res/values/strings.xml",
             "metadata.json",
             "play_store_assets/STORE_LISTING.md",
-            "play_store_assets/RELEASE_NOTES.txt"
+            "play_store_assets/RELEASE_NOTES.txt",
+            "play_store_assets/PRIVACY_POLICY.md",
+            "play_store_assets/DATA_SAFETY_GUIDE.md",
+            "scripts/GeneratePlayStoreAssets.java"
         )
         for (relPath in brandBoundaryFiles) {
             val file = File(repoRoot, relPath)
@@ -142,5 +145,6 @@ class LicenseAndBrandGovernanceTest {
         composeTestRule.onNodeWithTag("third_party_notices_surface").assertExists()
         composeTestRule.onNodeWithText("Permission is hereby granted, free of charge", substring = true).assertExists()
         composeTestRule.onNodeWithText("Third-Party Open Source Notices & Protocol Attribution:", substring = true).assertExists()
+        composeTestRule.onNodeWithText("SIL Open Font License 1.1", substring = true).assertExists()
     }
 }

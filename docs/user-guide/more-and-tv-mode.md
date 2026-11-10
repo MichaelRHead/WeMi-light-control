@@ -48,10 +48,10 @@ Near the bottom of the **More** tab, the **UPnP / SOAP Packet Log** card records
 
 ## 4. Open Source License & Third-Party Notices (`More` Tab)
 
-At the bottom of the **More** tab, the **Open Source License** card (`open_source_licenses_card`) summarizes **WeMi Light Control**'s open-source licensing (**MIT License • Permissive Open Source**):
-- Tap **`View MIT License`** (`toggle_license_details_button`) to expand:
+At the bottom of the **More** tab, the **Open Source License** card (`open_source_licenses_card`) summarizes **WeMi Light Control**'s open-source licensing (**`MIT License • Copyright (c) 2026 Michael R. Head & Contributors`**):
+- Tap **`View License`** (`toggle_license_details_button`) to expand:
   1. **Full MIT License Text** (`mit_license_text_surface`), matching the root [`LICENSE`](../../LICENSE) file (`Copyright (c) 2026 Michael R. Head and WeMi Light Control Contributors`).
-  2. **Third-Party Open-Source Notices & Protocol Attribution** (`third_party_notices_surface`), listing the permissive runtime libraries (**AndroidX Jetpack Compose, Activity, Lifecycle & Room** under `Apache-2.0`, **Kotlin Stdlib & Coroutines** under `Apache-2.0`, **Square OkHttp** under `Apache-2.0`), clean-room UPnP/SSDP/SOAP/GENA protocol reference attribution to **`pywemo`** (`MIT License`), and the Belkin non-affiliation trademark notice.
+  2. **Third-Party Open-Source Notices & Protocol Attribution** (`third_party_notices_surface`), listing the permissive runtime libraries (**AndroidX Jetpack Compose, Activity, Lifecycle & Room** under `Apache-2.0`, **Kotlin Stdlib & Coroutines** under `Apache-2.0`, **Square OkHttp** under `Apache-2.0`), bundled **Comfortaa & Work Sans** typefaces (`SIL Open Font License 1.1`), clean-room UPnP/SSDP/SOAP/GENA protocol reference attribution to **`pywemo`** (`MIT License`), and the Belkin non-affiliation trademark notice.
 
 ---
 
