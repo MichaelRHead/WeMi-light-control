@@ -306,6 +306,20 @@ class ExampleRobolectricTest {
             .performScrollToNode(hasText("Christmas Tree Living"))
         composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()
     }
-}
 
+    @Test
+    @Config(sdk = [34], qualifiers = "television")
+    fun `verify native Android TV dashboard launches automatically under UI_MODE_TYPE_TELEVISION without manual layout toggle`() {
+        composeTestRule.waitForIdle()
+
+        // Verify Android TV 10-foot dashboard launches automatically under UI_MODE_TYPE_TELEVISION
+        composeTestRule.onNodeWithTag("tv_dashboard_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tv_remote_dpad_ok").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tv_scene_movie").assertIsDisplayed()
+
+        // Trigger Movie Night scene on Android TV
+        composeTestRule.onNodeWithTag("tv_scene_movie").performClick()
+        composeTestRule.waitForIdle()
+    }
+}
 

@@ -11,7 +11,7 @@ Detailed agent instructions, UX design architecture, debugging & support archite
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — **5-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine** (`ai_studio_ux_cuj` → `discovery_and_grouping` → `telemetry_and_debugging` → `code_quality_and_testing` → `license_governance` → `ai_studio_ux_cuj`)
 - [`LICENSE`](LICENSE) — **MIT License**
-- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v20.0+`)
+- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v21.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v21.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — **5-Agent Autonomous Round-Robin Release Review & Sign-Off Coordinator Skill**

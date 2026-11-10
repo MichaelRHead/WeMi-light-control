@@ -83,14 +83,8 @@ fun WeMiSwitchApp(
     viewModel: SwitchViewModel = viewModel()
 ) {
     val configuration = LocalConfiguration.current
-    val isHardwareTelevision = remember(configuration) {
+    val isTvMode = remember(configuration) {
         (configuration.uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
-    }
-
-    LaunchedEffect(isHardwareTelevision) {
-        if (isHardwareTelevision) {
-            viewModel.setTvMode(true)
-        }
     }
 
     val devices by viewModel.devices.collectAsStateWithLifecycle()
@@ -127,7 +121,6 @@ fun WeMiSwitchApp(
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
     val isDemoShowroomMode by viewModel.isDemoShowroomMode.collectAsStateWithLifecycle()
-    val isTvMode by viewModel.isTvMode.collectAsStateWithLifecycle()
 
     val homeDevices by remember(devices, activeNetworkKey) {
         derivedStateOf {
@@ -167,7 +160,6 @@ fun WeMiSwitchApp(
         enabled = showSsdpScannerSheet ||
             showAddHomeDialog ||
             showProvisionApDialog ||
-            (isTvMode && !isHardwareTelevision) ||
             isEditMode ||
             selectedRoomFilter != null ||
             selectedTab != BottomTab.DEVICES
@@ -176,7 +168,6 @@ fun WeMiSwitchApp(
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
             showAddHomeDialog -> viewModel.closeAddHomeDialog()
             showProvisionApDialog -> viewModel.closeProvisionApDialog()
-            isTvMode && !isHardwareTelevision -> viewModel.setTvMode(false)
             isEditMode -> viewModel.setEditMode(false)
             selectedRoomFilter != null -> viewModel.selectRoomFilter(null)
             else -> viewModel.selectTab(BottomTab.DEVICES)

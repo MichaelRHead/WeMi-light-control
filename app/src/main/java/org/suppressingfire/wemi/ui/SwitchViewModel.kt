@@ -174,9 +174,6 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
     private val _useWeMiWordmark = MutableStateFlow(true)
     val useWeMiWordmark: StateFlow<Boolean> = _useWeMiWordmark.asStateFlow()
 
-    private val _isTvMode = MutableStateFlow(false)
-    val isTvMode: StateFlow<Boolean> = _isTvMode.asStateFlow()
-
     init {
         viewModelScope.launch {
             val initialKey = repository.ensureSeeded()
@@ -340,14 +337,6 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
 
     fun detectCurrentLanIp(): String {
         return repository.detectCurrentLanIp()
-    }
-
-    fun setTvMode(enabled: Boolean) {
-        _isTvMode.value = enabled
-    }
-
-    fun toggleTvMode() {
-        _isTvMode.value = !_isTvMode.value
     }
 
     fun stepDeviceBrightness(device: DeviceEntity, deltaPercent: Int) {

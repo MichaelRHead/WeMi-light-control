@@ -4,22 +4,23 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v20.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v21.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v20.0`)
+## Quick Release Summary (`v1.0` → `v21.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v21.0`](#version-210-versioncode--21--november-910-2026)** | `21` | Nov 9–10, 2026 | Native Phone/Tablet vs. Android TV form-factor layouts (no manual Phone/TV toggle button), `org.suppressingfire.wemi` package architecture & streamlined switch engine |
 | **[`v20.0`](#version-200-versioncode--20--november-9-2026)** | `20` | Nov 9, 2026 | Unified 9-port self-healing reconnect, cellular-safe Wi-Fi binding, 3-tier hardware identity matching, CamelCase/`Ensuite` room grouping & instant offline reconnect recovery |
 | **[`v19.0`](#version-190-versioncode--19--november-9-2026)** | `19` | Nov 9, 2026 | Dedicated Troubleshooting & Telemetry Sharing Guide (`wemi-telemetry-latest.txt`) for 1-tap support diagnostics |
 | **[`v18.0`](#version-180-versioncode--18--november-9-2026)** | `18` | Nov 9, 2026 | Accessibility & navigation polish: 48dp+ touch targets, TalkBack switch labels, and predictable Back-button flows |
 | **[`v17.0`](#version-170-versioncode--17--november-89-2026)** | `17` | Nov 8–9, 2026 | Major `10.22.22.1` factory-reset setup reliability upgrade, on-screen screenshot debug card, smart room matching & top-first dimmer slider |
 | **[`v16.0`](#version-160-versioncode--16--november-8-2026)** | `16` | Nov 8, 2026 | Compact single-line Wi-Fi Home & Discovery bars, one-tap **Reset & Rescan LAN**, and protection against switch soft-AP names |
-| **[`v15.0`](#version-150-versioncode--15--november-8-2026)** | `15` | Nov 8, 2026 | Full-width auto-resizing switch & room titles (`AutoResizingDeviceNameText`)—no more truncated or wrapped switch names |
+| **[`v15.0`](#version-150-versioncode--15--november-8-2026)** | `15` | Nov 8, 2026 | Full-width auto-resizing switch & room titles (`AutoShrinkSwitchName`)—no more truncated or wrapped switch names |
 | **[`v14.0`](#version-140-versioncode--14--november-8-2026)** | `14` | Nov 8, 2026 | Distinct dark-gray `"I/O"` power button for `OFF` standby switches and red **Disconnected Reconnect Ring** for offline switches |
 | **[`v13.0`](#version-130-versioncode--13--november-8-2026)** | `13` | Nov 8, 2026 | Uniform collapsed Room Group card heights and cleaner, uncluttered device rows |
 | **[`v12.0`](#version-120-versioncode--12--november-8-2026)** | `12` | Nov 8, 2026 | Guided Empty-Home onboarding card, expanded holiday/fan/light icon recognition, and clearer setup error banners |
@@ -39,6 +40,12 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 21.0 (`versionCode = 21`) — November 9–10, 2026
+- **Dedicated Native Phone/Tablet & Android TV Layouts**: Removed the manual Phone ↔ TV layout switch button from both the phone header and the Android TV dashboard so each device form factor always runs its purpose-built interaction model (touch-first on phones/tablets and 10-foot D-Pad remote navigation on Android TV / Google TV under `UI_MODE_TYPE_TELEVISION`).
+- **Streamlined `org.suppressingfire.wemi` Architecture**: Repackaged the core application and UPnP/SSDP/SOAP/GENA engine under `org.suppressingfire.wemi` with cleaner, streamlined component names focused on Belkin's discontinued smart switch platform.
+
+---
 
 ### Version 20.0 (`versionCode = 20`) — November 9, 2026
 - **Unified 9-Port Wi-Fi-Bound Self-Healing Reconnect**: Belkin WeMo switches occasionally shift their internal control port (`49151–49159`) after a power blink or router reboot. Every switch command—turning power ON/OFF, sliding dimmer brightness, renaming a switch, or toggling Night Mode—now automatically checks all 9 ports and heals the connection without interruption.

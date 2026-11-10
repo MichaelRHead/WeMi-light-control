@@ -1,6 +1,4 @@
-<en-US>
-What's new in WeMi Switch Control v20.0 (Phone, Tablet & Android TV):
-• Unified 9-port Wi-Fi-bound self-healing reconnect across all switch, dimmer, and Night Mode commands with live UPnP GENA push sync.
-• Smarter room grouping (CamelCase splitting, Ensuite-first bathroom matching, Bedroom, Hallway & Landing, Unassigned) & 3-tier serial identity matching.
-• Zero-cloud 10.22.22.1 setup for Belkin's discontinued smart switch platform with on-screen debug card & one-tap telemetry export.
-</en-US>
+WeMi Light Control v21.0:
+• Native Form-Factor Layouts: Phone/tablet touch UI & 10-foot Android TV D-Pad dashboard now run strictly on their native device form factors without manual Phone/TV mode switch buttons.
+• Smarter Room Grouping: Switches named "Bed", "Nightstand", "Girls/Boys/Kids Light", or "Stairway" automatically group into Bedroom or Hallway & Landing, migrating switches stuck in Living Room.
+• One-Tap Reset & Rescan: Reset chip clears stale LAN homes/switches in one tap.
