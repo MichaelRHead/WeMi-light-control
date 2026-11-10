@@ -70,7 +70,7 @@ Format:
   - Must be `10.22.22.x` (`setupSubnet=true`) when connected to a factory-reset switch's soft-AP (`WeMo.Switch.xxx`, `WeMo.Light.xxx`, `Wemo.LS3W.xxx`, `WeMo.Mini.xxx`).
   - If `ip=192.168.x.x` (`setupSubnet=false`), the phone is still on the home router Wi-Fi (or auto-switched away from the switch AP because it had no internet).
 - **`wifiBound=true/false`**:
-  - Must be `true` on real Android hardware so OkHttp/raw sockets bind via `wifiNetwork.bindSocket(socket)` (`NetworkMonitor.createWifiBoundSocketFactory`) and bypass Android cellular data routing.
+  - Must be `true` on real Android hardware so `LanHttpClient` and raw TCP sockets bind via `wifiNetwork.bindSocket(socket)` (`NetworkMonitor.createWifiBoundSocketFactory`) and bypass Android cellular data routing.
   - If `wifiBound=false` while `ip=10.22.22.x`, ask the user to temporarily toggle Mobile Data OFF or tap *"Stay connected"* on Android's *"This network has no internet access"* prompt.
 
 ### 2.2 `[PROBE]` & `[XML]` — `10.22.22.1` Port & Descriptor Probe
