@@ -14,10 +14,10 @@ RELEASE_VERSION: v21.0
 VERSION_CODE: 21
 ROUND_NUMBER: 1
 RELEASE_STATUS: IN_REVIEW
-CURRENT_TURN: discovery_and_grouping
+CURRENT_TURN: telemetry_and_debugging
 CANDIDATE_BASE_SHA: 11acfe4
 SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (11acfe4 @ 2026-11-10 08:21 PST)
-SIGN_OFF_DISCOVERY_AND_GROUPING: PENDING
+SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (cb3e591 @ 2026-11-10 08:28 PST)
 SIGN_OFF_TELEMETRY_AND_DEBUGGING: PENDING
 SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
 SIGN_OFF_LICENSE_GOVERNANCE: PENDING
@@ -33,7 +33,7 @@ CONCLUDED_AT: NONE
 | Stage | Role ID | Agent | Status | Verified Commit SHA | Timestamp (PST) | Verification Summary |
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
 | **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `11acfe4` | `2026-11-10 08:21 PST` | Initiated v21.0 (versionCode=21, org.suppressingfire.wemi) release review: verified native Phone/Tablet vs. Android TV (UI_MODE_TYPE_TELEVISION) form-factor routing without manual layout toggle buttons, 5 Compose layout invariants, 48dp+ accessibility targets, TalkBack labels, Back navigation, Play Store metadata (STORE_LISTING.md & RELEASE_NOTES.txt), and docs/user-guide/release-notes.md; 30/30 unit, protocol, governance & Compose E2E tests passing. |
-| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `PENDING` | `-` | `-` | Awaiting Discovery & Room Grouping Agent review. |
+| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `cb3e591` | `2026-11-10 08:28 PST` | Audited Stage 2 (discovery_and_grouping) for v21.0 (org.suppressingfire.wemi): verified SSDP M-SEARCH & /24 unicast discovery (SsdpDiscoveryEngine.kt, DiscoveryCoordinator.kt), 3-tier hardware identity matching (matchesDiscoveredDevice: <serialNumber> -> <UDN>/USN -> endpoint/<friendlyName>), CamelCase normalization & specificity-ordered room inference (inferRoomFromName: Ensuite before Bedroom, Unassigned fallback in DeviceEntities.kt), non-destructive migration (resolveDeviceRoomAssignment), and soft-AP SSID shielding (isWemoDeviceSetupSsid in XmlAndSkuParser.kt); SkuAndCryptoTest & SoapAndSelfHealingTest passing. |
 | **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `PENDING` | `-` | `-` | Awaiting Telemetry & Debugging Agent review. |
 | **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
 | **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
@@ -54,4 +54,5 @@ CONCLUDED_AT: NONE
 | 2026-11-09 14:04 PST | `1` | `ai_studio_ux_cuj` | `APPROVED_FOR_PLAY_STORE` | `NONE` | `a58ebab` | All 4 agents (ai_studio_ux_cuj, discovery_and_grouping, telemetry_and_debugging, code_quality_and_testing) signed off Round 1; UX, discovery, telemetry, code modularity, 26/26 unit & Compose E2E tests, and docs/user-guide/release-notes.md verified. v20.0 (versionCode = 20) approved for Google Play Store release. |
 | 2026-11-10 07:08 PST | `1` | `license_governance` | `ADDED_STAGE_5_GOVERNANCE` | `NONE` | `11acfe4` | Added Stage 5 (`license_governance` — Antigravity License & Brand Governance Agent) to the 5-agent / 6-stage release ring before Stage 6 (`ai_studio_ux_cuj` Final Conclusion) with `LicenseAndBrandGovernanceTest.kt` (29/29 tests passing). |
 | 2026-11-10 08:21 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `11acfe4` | Initiated v21.0 (versionCode=21, org.suppressingfire.wemi) release review: verified native Phone/Tablet vs. Android TV (UI_MODE_TYPE_TELEVISION) form-factor routing without manual layout toggle buttons, 5 Compose layout invariants, 48dp+ accessibility targets, TalkBack labels, Back navigation, Play Store metadata (STORE_LISTING.md & RELEASE_NOTES.txt), and docs/user-guide/release-notes.md; 30/30 unit, protocol, governance & Compose E2E tests passing. |
+| 2026-11-10 08:28 PST | `1` | `discovery_and_grouping` | `SIGNED_OFF` | `telemetry_and_debugging` | `cb3e591` | Audited Stage 2 (discovery_and_grouping) for v21.0 (org.suppressingfire.wemi): verified SSDP M-SEARCH & /24 unicast discovery (SsdpDiscoveryEngine.kt, DiscoveryCoordinator.kt), 3-tier hardware identity matching (matchesDiscoveredDevice: <serialNumber> -> <UDN>/USN -> endpoint/<friendlyName>), CamelCase normalization & specificity-ordered room inference (inferRoomFromName: Ensuite before Bedroom, Unassigned fallback in DeviceEntities.kt), non-destructive migration (resolveDeviceRoomAssignment), and soft-AP SSID shielding (isWemoDeviceSetupSsid in XmlAndSkuParser.kt); SkuAndCryptoTest & SoapAndSelfHealingTest passing. |
 <!-- AUDIT_LOG_END -->
