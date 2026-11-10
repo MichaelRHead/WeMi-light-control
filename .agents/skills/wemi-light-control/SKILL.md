@@ -14,7 +14,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
 ## 1. Build, Test & Environment
 
 - **Toolchain**: AGP `9.1.0`, Kotlin `2.3.20`, KSP `2.3.6`, Compose BOM `2026.03.00`, Room `2.8.4` (`version = 5`), Robolectric `4.16.1`, `compileSdk = 36`, `minSdk = 24`.
-- **Unit, Protocol, Governance & E2E Compose UI Tests (`29/29` across 7 suites)**:
+- **Unit, Protocol, Governance & E2E Compose UI Tests (`30/30` across 7 suites)**:
   ```bash
   ./gradlew testDebugUnitTest --rerun-tasks
   ```

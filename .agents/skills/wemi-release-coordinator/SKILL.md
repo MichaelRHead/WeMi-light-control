@@ -25,7 +25,7 @@ Every Play Store release candidate (`v21.0+`) is reviewed once by each of the 5 
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<verification summary>"` (setting `CURRENT_TURN: code_quality_and_testing`).
 4. **Stage 4 (Review 3) — `code_quality_and_testing` (Antigravity Code Quality & End-to-End Testing Agent)**:
    - Audits file modularity & readability (`.agents/skills/android-code-modularization/SKILL.md`), Wi-Fi socket binding (`wifiSocketFactory`), SQLite/GENA/coroutine lifecycle cleanup, and `gradlew` executable mode (`100755`).
-   - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` (`29/29+` unit, protocol, governance, and Compose E2E tests).
+   - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` (`30/30+` unit, protocol, governance, and Compose E2E tests).
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off code_quality_and_testing "<verification summary>"` (setting `CURRENT_TURN: license_governance`).
 5. **Stage 5 (Review 4) — `license_governance` (Antigravity License & Brand Governance Agent)**:
    - Audits root `LICENSE` (**MIT License**) parity with `MoreScreen.kt` (`open_source_licenses_card`, `mit_license_text_surface`, and `third_party_notices_surface`), permissive-only dependency allowlist (`gradle/libs.versions.toml` & `app/build.gradle.kts` with `includeInApk = false`), `org.suppressingfire.wemi` package/filename hygiene, and Play Store trademark boundaries (`LICENSE_GOVERNANCE.md`).
