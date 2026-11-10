@@ -15,11 +15,11 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ApplicationProvider
-import com.example.data.WeMoDeviceCategory
-import com.example.data.WeMoDeviceType
+import com.example.data.DeviceCategory
+import com.example.data.DeviceType
 import com.example.data.classifyDeviceCategory
 import com.example.data.inferRoomFromName
-import com.example.network.WeMoNetworkClient
+import com.example.network.NetworkClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -44,7 +44,7 @@ class ExampleRobolectricTest {
 
     @Test
     fun `verify SSDP packet builder, UPnP setup xml parser, room inference, and name-based category classification`() {
-        val client = WeMoNetworkClient()
+        val client = NetworkClient()
         val mSearch = client.buildSsdpMSearchPacket("urn:Belkin:service:basicevent:1")
         assertTrue(mSearch.contains("M-SEARCH * HTTP/1.1"))
         assertTrue(mSearch.contains("HOST: 239.255.255.250:1900"))
@@ -55,18 +55,18 @@ class ExampleRobolectricTest {
         assertEquals("Hallway & Landing", inferRoomFromName("Lightbulb Landing"))
 
         // Verify semantic icon classification from switch name
-        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Christmas Tree Living"))
-        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Holiday Tree Lights"))
-        assertEquals(WeMoDeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Porch Christmas Garland"))
-        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Bedroom Ceiling Fan"))
-        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Attic Exhaust Fan"))
-        assertEquals(WeMoDeviceCategory.FAN, classifyDeviceCategory("Utility Room Vent"))
-        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Living Room Floor Lamp"))
-        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Cabin Porch Floodlight"))
-        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Kitchen Island Pendant"))
-        assertEquals(WeMoDeviceCategory.LIGHT, classifyDeviceCategory("Christmas Candle"))
-        assertEquals(WeMoDeviceCategory.MOTION_SENSOR, classifyDeviceCategory("Bedroom Light Motion", WeMoDeviceType.MOTION_SENSOR))
-        assertEquals(WeMoDeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Office Wall Switch"))
+        assertEquals(DeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Christmas Tree Living"))
+        assertEquals(DeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Holiday Tree Lights"))
+        assertEquals(DeviceCategory.CHRISTMAS_TREE, classifyDeviceCategory("Porch Christmas Garland"))
+        assertEquals(DeviceCategory.FAN, classifyDeviceCategory("Bedroom Ceiling Fan"))
+        assertEquals(DeviceCategory.FAN, classifyDeviceCategory("Attic Exhaust Fan"))
+        assertEquals(DeviceCategory.FAN, classifyDeviceCategory("Utility Room Vent"))
+        assertEquals(DeviceCategory.LIGHT, classifyDeviceCategory("Living Room Floor Lamp"))
+        assertEquals(DeviceCategory.LIGHT, classifyDeviceCategory("Cabin Porch Floodlight"))
+        assertEquals(DeviceCategory.LIGHT, classifyDeviceCategory("Kitchen Island Pendant"))
+        assertEquals(DeviceCategory.LIGHT, classifyDeviceCategory("Christmas Candle"))
+        assertEquals(DeviceCategory.MOTION_SENSOR, classifyDeviceCategory("Bedroom Light Motion", DeviceType.MOTION_SENSOR))
+        assertEquals(DeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Office Wall Switch"))
 
         val rawSsdpResponse = """
             HTTP/1.1 200 OK
@@ -104,8 +104,8 @@ class ExampleRobolectricTest {
         assertEquals("Office", discovered.roomName)
         assertEquals("192.168.1.122", discovered.ipAddress)
         assertEquals(49153, discovered.port)
-        assertEquals(WeMoDeviceType.SWITCH_PLUG, discovered.deviceType)
-        assertEquals(WeMoDeviceCategory.SWITCH_PLUG, discovered.visualCategory)
+        assertEquals(DeviceType.SWITCH_PLUG, discovered.deviceType)
+        assertEquals(DeviceCategory.SWITCH_PLUG, discovered.visualCategory)
     }
 
     @Test
@@ -248,16 +248,16 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `verify fresh-device setup wizard (ProvisionWeMoApDialog) scans APs, previews semantic icon, provisions switch, and adds it to device list`() {
+    fun `verify fresh-device setup wizard (ProvisionApDialog) scans APs, previews semantic icon, provisions switch, and adds it to device list`() {
         composeTestRule.waitForIdle()
 
-        // Open Add Device dialog via add_device_button -> launch Setup Factory-Reset WeMo AP (10.22.22.1) wizard
+        // Open Add Device dialog via add_device_button -> launch Setup Factory-Reset Switch AP (10.22.22.1) wizard
         composeTestRule.onNodeWithTag("add_device_button").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("open_provision_ap_wizard_button").performClick()
         composeTestRule.waitForIdle()
 
-        // Verify ProvisionWeMoApDialog is displayed and shows scanned APs / status box
+        // Verify ProvisionApDialog is displayed and shows scanned APs / status box
         composeTestRule.onNodeWithTag("provision_ap_status_box").assertIsDisplayed()
         composeTestRule.onNodeWithTag("provision_status_box", useUnmergedTree = true).assertIsDisplayed()
         composeTestRule.onNodeWithTag("provision_ap_ip_input").performScrollTo().assertIsDisplayed()
@@ -273,7 +273,7 @@ class ExampleRobolectricTest {
             .performTextReplacement("Porch Christmas Tree")
         composeTestRule.waitForIdle()
 
-        // Verify live semantic category preview updates to Tree Lights (WeMoDeviceCategory.CHRISTMAS_TREE.displayName)
+        // Verify live semantic category preview updates to Tree Lights (DeviceCategory.CHRISTMAS_TREE.displayName)
         composeTestRule.onNodeWithText("Icon Category: Tree Lights")
             .performScrollTo()
             .assertIsDisplayed()

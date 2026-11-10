@@ -1,43 +1,22 @@
-# `docs/` Directory Guide — Human-Focused User Guides Only
+# WeMi Light Control — User Documentation Index
 
-> **IMPORTANT NOTICE FOR ALL AGENTS (`AI Studio`, CLI, & GitHub Agents)**
->
-> **Do NOT duplicate or place `ALL_CAPS.md` architecture/changelog/roadmap documents inside `docs/`.**
->
-> To prevent mirror drift and merge conflicts across multi-agent workflows, our documentation is organized into two non-overlapping locations:
+Welcome to the user documentation for **WeMi Light Control**, a local-network Android and Android TV controller for **Belkin's discontinued smart switch platform** (in-wall switches, dimmers, motion sensors, and mini smart plugs).[^1]
 
-## 1. Repository Root (`/`) — All `ALL_CAPS.md` Project & Architecture Documents
+## User Guides (`docs/user-guide/`)
 
-All project-level, architectural, UX, and engineering documents live **exclusively at the top level (`/`) of the repository**:
-
-| Root File | Purpose | Ownership |
-| :--- | :--- | :--- |
-| [`../AGENTS.md`](../AGENTS.md) | Master architecture, package map, build gate, and multi-agent rules | Shared across agents |
-| [`../UX_DESIGN.md`](../UX_DESIGN.md) | Android UX Design Guidelines: navigation patterns, accessibility standards & interaction flows | **Google AI Studio Agent ONLY (Read-Only for other agents)** |
-| [`../UX_DESIGN_AND_EXPERIENCE.md`](../UX_DESIGN_AND_EXPERIENCE.md) | Behavioral mental models, 5 Compose layout invariants & Critical User Journeys (CUJs) | **Google AI Studio Agent ONLY (Read-Only for other agents)** |
-| [`../DEBUGGING_AND_SUPPORT.md`](../DEBUGGING_AND_SUPPORT.md) | On-device screenshot & `wemi-telemetry-latest.txt` diagnostics, `10.22.22.1` provisioning invariants & support architecture | **Antigravity Debugging & Support Agent ONLY (Read-Only for other agents)** |
-| [`../DISCOVERY_AND_ROOM_GROUPING.md`](../DISCOVERY_AND_ROOM_GROUPING.md) | Internal SSDP/unicast discovery logic, 3-tier hardware identity resolution & automatic room grouping/migration | **Antigravity Device Discovery & Room Grouping Agent ONLY (Read-Only for other agents)** |
-| [`../RELEASE_PROCESS.md`](../RELEASE_PROCESS.md) & [`../RELEASE_SIGN_OFF.md`](../RELEASE_SIGN_OFF.md) | 4-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine | Shared across all 4 release review agents |
-| [`../USER_GUIDE.md`](../USER_GUIDE.md) | Top-level entry point & summary table linking to the human feature guides in `docs/user-guide/` | Shared across agents |
-| [`../IMPLEMENTED.md`](../IMPLEMENTED.md) | Reverse-chronological feature & bug-fix change log (newest at top) | Shared across agents |
-| [`../UPCOMING_FEATURES.md`](../UPCOMING_FEATURES.md) | Next-iteration engineering roadmap | Shared across agents |
-| [`../CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](../CODE_QUALITY_AND_MODULARIZATION_PLAN.md) | Code modularization & E2E validation plan | Shared across agents |
-
-> **Rule**: Never run `cp IMPLEMENTED.md docs/IMPLEMENTED.md` or recreate `docs/IMPLEMENTED.md`, `docs/RELEASE_PROCESS.md`, `docs/RELEASE_SIGN_OFF.md`, `docs/UPCOMING_FEATURES.md`, `docs/USER_GUIDE.md`, `docs/UX_DESIGN.md`, `docs/UX_DESIGN_AND_EXPERIENCE.md`, `docs/DEBUGGING_AND_SUPPORT.md`, `docs/DISCOVERY_AND_ROOM_GROUPING.md`, or `docs/CODE_QUALITY_AND_MODULARIZATION_PLAN.md`.
+| Guide | Topics Covered |
+| :--- | :--- |
+| **[Main Screen & Device Controls](user-guide/main-screen.md)** | Devices dashboard, power states (`ON`, `OFF / Accessible Standby`, `Disconnected`), custom hardware and appliance illustrations, inline dimmer sliders (`1–100%`), Night Mode (`20%`), and live signal quality badges. |
+| **[Switch Discovery & Network Scanning](user-guide/switch-discovery.md)** | Finding switches over local Wi-Fi via UPnP/SSDP discovery, adopting discovered switches, `/24` subnet fallback scanning, and automatic 9-port self-healing reconnection. |
+| **[Fresh Device Setup (`10.22.22.1`)](user-guide/fresh-device-setup.md)** | Provisioning brand-new or factory-reset smart switches onto your 2.4 GHz home Wi-Fi without the discontinued cloud app. |
+| **[Room Grouping & Master Controls](user-guide/room-grouping.md)** | Automatic room assignment from switch names, switching between **Grouped by Room** and **Flat List** views, room filter chips, and whole-room power/dimmer controls. |
+| **[Editing, Renaming & Managing Switches](user-guide/editing-and-managing-devices.md)** | Reordering, renaming, or removing switches in **Edit Mode**, syncing `<friendlyName>` directly to switch hardware, live appliance icon previews, and manual IP entry. |
+| **[Multi-Home Wi-Fi Profiles](user-guide/wifi-homes.md)** | Managing switches across multiple Wi-Fi networks/locations (`My Home`, `Lake Cabin`, `Studio Office`), one-tap reconnection, and resetting remembered homes and switches. |
+| **[Rules, Schedules & Auto-Off Timers](user-guide/rules-and-timers.md)** | Creating local daily schedules, Sunset/Sunrise triggers, Auto-Off countdown timers, and motion-triggered rules. |
+| **[Master Controls, Demo Mode & Android TV](user-guide/more-and-tv-mode.md)** | Using the **More** tab (`All Switches ON/OFF`, Demo Showroom Mode, Open Source License) and controlling your home with a TV remote in the 10-foot **Android TV (`wemi TV`)** interface. |
+| **[Troubleshooting & Telemetry Logs](user-guide/telemetry-and-troubleshooting.md)** | Capturing on-screen diagnostic views (`SETUP DEBUG DETAILS`, `UPnP / SOAP Packet Log`, Inline Switch Diagnostics) and exporting or sharing `wemi-telemetry-latest.txt`. |
+| **[Release Notes & Version History](user-guide/release-notes.md)** | Summary of user-facing features, visual refinements, and reliability improvements across releases (`v1.0` → `v20.0`). |
 
 ---
 
-## 2. `docs/user-guide/` — Human-Focused Feature Guides
-
-The `docs/` directory is dedicated **exclusively** to human-readable end-user guides under [`user-guide/`](user-guide/):
-
-- [`user-guide/main-screen.md`](user-guide/main-screen.md) — Main Screen, Status Badges & Power Controls
-- [`user-guide/switch-discovery.md`](user-guide/switch-discovery.md) — Finding & Adopting Existing Switches on Wi-Fi (SSDP)
-- [`user-guide/fresh-device-setup.md`](user-guide/fresh-device-setup.md) — Setting Up a Factory-Reset WeMo Switch (`10.22.22.1`)
-- [`user-guide/room-grouping.md`](user-guide/room-grouping.md) — Room Grouping, Master Power & Room Dimmer Sliders
-- [`user-guide/editing-and-managing-devices.md`](user-guide/editing-and-managing-devices.md) — Renaming Switches, Appliance Icons & Hardware Diagnostics
-- [`user-guide/wifi-homes.md`](user-guide/wifi-homes.md) — Managing Multiple Wi-Fi Homes & One-Tap LAN Reset
-- [`user-guide/rules-and-timers.md`](user-guide/rules-and-timers.md) — Schedules, Auto-Off Timers & Sunset/Sunrise Rules
-- [`user-guide/more-and-tv-mode.md`](user-guide/more-and-tv-mode.md) — Android TV 10-Foot Remote Mode (`wemi TV`) & Demo Showroom
-- [`user-guide/telemetry-and-troubleshooting.md`](user-guide/telemetry-and-troubleshooting.md) — Troubleshooting, Diagnostic Screenshots & Sharing Telemetry Logs (`wemi-telemetry-latest.txt`) *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
-- [`user-guide/release-notes.md`](user-guide/release-notes.md) — User-Facing Release Notes & Version History (`v1.0` → `v20.0`)
+[^1]: Top-level user guide overview and developer/architecture documentation (`USER_GUIDE.md`, `AGENTS.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `UX_DESIGN.md`, etc.) are maintained as `ALL_CAPS.md` files in the [repository root (`../`)](../).

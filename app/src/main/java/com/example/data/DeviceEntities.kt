@@ -1,0 +1,431 @@
+package com.example.data
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+const val DEFAULT_MAIN_HOME_KEY = "wifi_home_192_168_1"
+const val DEFAULT_CABIN_HOME_KEY = "wifi_cabin_192_168_50"
+const val DEFAULT_OFFICE_HOME_KEY = "wifi_office_10_0_10"
+
+enum class DeviceType {
+    SWITCH_PLUG,
+    MOTION_SENSOR,
+    LIGHTBULB_DIMMER
+}
+
+/**
+ * Semantic device category derived from the switch's friendly name (or hardware type),
+ * used to render specialized icons in the app (Christmas trees, fans, lamps/lights, motion sensors, or generic switches).
+ */
+enum class DeviceCategory(val displayName: String) {
+    CHRISTMAS_TREE("Tree Lights"),
+    FAN("Fan"),
+    LIGHT("Light"),
+    MOTION_SENSOR("Motion"),
+    SWITCH_PLUG("Switch")
+}
+
+enum class ConnectionQuality(
+    val statusTitle: String,
+    val signalBars: Int
+) {
+    EXCELLENT(statusTitle = "Active", signalBars = 4),
+    GOOD(statusTitle = "Active", signalBars = 3),
+    SLOW(statusTitle = "High Latency", signalBars = 2),
+    OFFLINE(statusTitle = "Offline", signalBars = 0)
+}
+
+/**
+ * Represents a remembered Wi-Fi Network ("Home") so the app remembers all switches discovered
+ * on each Wi-Fi network and automatically reconnects/rediscovers them when returning home.
+ */
+@Entity(tableName = "wemo_home_networks")
+data class HomeNetworkEntity(
+    @PrimaryKey val networkKey: String,
+    val homeName: String,
+    val ssidLabel: String,
+    val subnetPrefix: String,
+    val gatewayIp: String = "${subnetPrefix}.1",
+    val lastConnectedTime: String = "Connected now",
+    val autoReconnectOnArrival: Boolean = true,
+    val sortOrder: Int = 0
+)
+
+@Entity(tableName = "wemo_devices")
+data class DeviceEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,
+    val roomName: String = "Living Room",
+    val networkKey: String = DEFAULT_MAIN_HOME_KEY,
+    val wifiSsid: String = "WeMi-Home-5G",
+    val deviceType: String = DeviceType.SWITCH_PLUG.name,
+    val ipAddress: String = "192.168.1.100",
+    val port: Int = 49153,
+    val isOn: Boolean = true,
+    val isReachable: Boolean = true,
+    val brightness: Int = 100,
+    val latencyMs: Int = 14,
+    val lastCheckedTime: String = "Just now",
+    val lastMotionTime: String = "4:15:15 PM",
+    val serialNumber: String = "221517K01018AB",
+    val firmwareVersion: String = "WeMo_WW_2.00.11532.PVT",
+    val hardwareModel: String = "LightSwitch",
+    val macAddress: String = "",
+    val udn: String = "",
+    val signalStrengthPercent: Int = 85,
+    val nightModeEnabled: Boolean = false,
+    val sortOrder: Int = 0,
+    val autoOffMinutes: Int = 0
+) {
+    val parsedType: DeviceType
+        get() = runCatching { DeviceType.valueOf(deviceType) }
+            .getOrDefault(DeviceType.SWITCH_PLUG)
+
+    val visualCategory: DeviceCategory
+        get() = classifyDeviceCategory(name = name, deviceType = parsedType)
+
+    val connectionQuality: ConnectionQuality
+        get() = when {
+            !isReachable || latencyMs <= 0 -> ConnectionQuality.OFFLINE
+            latencyMs <= 28 -> ConnectionQuality.EXCELLENT
+            latencyMs <= 65 -> ConnectionQuality.GOOD
+            else -> ConnectionQuality.SLOW
+        }
+
+    val connectionBadgeText: String
+        get() = when (connectionQuality) {
+            ConnectionQuality.OFFLINE -> "Offline • Timeout"
+            ConnectionQuality.EXCELLENT -> "Active • ${latencyMs}ms"
+            ConnectionQuality.GOOD -> "Active • ${latencyMs}ms"
+            ConnectionQuality.SLOW -> "Slow • ${latencyMs}ms"
+        }
+}
+
+@Entity(tableName = "wemo_rules")
+data class RuleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val name: String,
+    val ruleType: String, // SCHEDULE, MOTION_TRIGGER, AUTO_OFF
+    val targetDeviceId: Int,
+    val targetDeviceName: String,
+    val triggerSummary: String,
+    val actionSummary: String,
+    val targetStateOn: Boolean = true,
+    val targetBrightness: Int = 100,
+    val isEnabled: Boolean = true
+)
+
+data class SoapLogEntry(
+    val id: Long = System.nanoTime(),
+    val timestamp: String,
+    val deviceName: String,
+    val endpoint: String,
+    val soapAction: String,
+    val statusText: String,
+    val xmlSnippet: String,
+    val isLiveLanSuccess: Boolean
+)
+
+data class SsdpDiscoveredDevice(
+    val name: String,
+    val roomName: String = inferRoomFromName(name),
+    val ipAddress: String,
+    val port: Int,
+    val deviceType: DeviceType,
+    val modelName: String,
+    val serialNumber: String,
+    val firmwareVersion: String,
+    val usn: String,
+    val searchTarget: String,
+    val locationUrl: String,
+    val responseTimeMs: Long,
+    val isOn: Boolean = true,
+    val brightness: Int = 100,
+    val isLiveUdpResponse: Boolean = false,
+    val hardwareSku: String = modelName,
+    val macAddress: String = "",
+    val wifiSsid: String = "",
+    val signalStrengthPercent: Int = 85
+) {
+    val visualCategory: DeviceCategory
+        get() = classifyDeviceCategory(name = name, deviceType = deviceType)
+}
+
+/**
+ * Classifies a switch's visual device category based on its friendly name and UPnP device type:
+ * - Tree lights ("Christmas Tree", "Tree Lights", "Xmas Tree", "Pine Tree") -> CHRISTMAS_TREE
+ * - Fans ("Ceiling Fan", "Bedroom Fan", "Exhaust Fan", "Blower") -> FAN
+ * - Lamps & Lights ("Lamp", "Light", "Lightbulb", "Candle", "Sconce", "Floodlight", "Lantern", or Dimmer) -> LIGHT
+ * - Motion sensors -> MOTION_SENSOR
+ * - Everything else -> SWITCH_PLUG
+ */
+fun classifyDeviceCategory(
+    name: String,
+    deviceType: DeviceType = DeviceType.SWITCH_PLUG
+): DeviceCategory {
+    if (deviceType == DeviceType.MOTION_SENSOR) {
+        return DeviceCategory.MOTION_SENSOR
+    }
+    val lower = name.lowercase()
+    return when {
+        "tree" in lower ||
+            "xmas" in lower ||
+            "evergreen" in lower ||
+            "spruce" in lower ||
+            "fir " in lower ||
+            "garland" in lower ||
+            "wreath" in lower ||
+            "tinsel" in lower ||
+            "noel" in lower ||
+            ("christmas" in lower && "candle" !in lower && "lamp" !in lower && "sconce" !in lower && "lantern" !in lower) ->
+            DeviceCategory.CHRISTMAS_TREE
+
+        "fan" in lower ||
+            "blower" in lower ||
+            "vent" in lower ||
+            "exhaust" in lower ||
+            "ventilat" in lower ||
+            "circulator" in lower ->
+            DeviceCategory.FAN
+
+        deviceType == DeviceType.LIGHTBULB_DIMMER ||
+            "lamp" in lower ||
+            "light" in lower ||
+            "bulb" in lower ||
+            "candle" in lower ||
+            "sconce" in lower ||
+            "chandelier" in lower ||
+            "lantern" in lower ||
+            "pendant" in lower ||
+            "flood" in lower ||
+            "spot" in lower ||
+            "downlight" in lower ||
+            "uplight" in lower ||
+            "strip" in lower ||
+            "neon" in lower ||
+            "torch" in lower ||
+            "dimmer" in lower ||
+            "led" in lower ||
+            "fixture" in lower ->
+            DeviceCategory.LIGHT
+
+        "motion" in lower || "sensor" in lower ->
+            DeviceCategory.MOTION_SENSOR
+
+        else -> DeviceCategory.SWITCH_PLUG
+    }
+}
+
+private val CAMEL_CASE_BOUNDARY_REGEX = Regex("([a-z])([A-Z])")
+private val DELIMITER_NORMALIZE_REGEX = Regex("[_\\-/.]+")
+private val MULTI_SPACE_REGEX = Regex("\\s+")
+private val WORD_BED_REGEX = Regex("\\bbed\\b")
+private val WORD_GIRL_REGEX = Regex("\\bgirl\\b")
+private val WORD_BOY_REGEX = Regex("\\bboy\\b")
+private val WORD_KID_REGEX = Regex("\\bkid\\b")
+private val WORD_HALL_REGEX = Regex("\\bhall\\b")
+private val WORD_DEN_REGEX = Regex("\\bden\\b")
+private val WORD_WC_REGEX = Regex("\\bwc\\b")
+
+/**
+ * Normalizes a hardware `<friendlyName>` or user-supplied switch name for room/category inference
+ * by splitting CamelCase boundaries (`"StairwayLight"` -> `"stairway light"`,
+ * `"MasterBathVanity"` -> `"master bath vanity"`) and converting `_`, `-`, `/`, `.` to spaces.
+ */
+fun normalizeDeviceNameForInference(deviceName: String): String {
+    if (deviceName.isBlank()) return ""
+    return deviceName
+        .replace(CAMEL_CASE_BOUNDARY_REGEX, "$1 $2")
+        .replace(DELIMITER_NORMALIZE_REGEX, " ")
+        .lowercase()
+        .replace(MULTI_SPACE_REGEX, " ")
+        .trim()
+}
+
+/**
+ * Infers the best household room assignment from a switch's [deviceName] (`<friendlyName>`).
+ *
+ * Precedence Order:
+ * 1. Specific functional rooms (`"Kitchen"`, `"Dining Room"`, `"Ensuite"`) are evaluated **before**
+ *    broad modifiers (`"master"`, `"primary"`, `"guest"`, `"kids"`) so compound names like
+ *    `"Master Bath Vanity"`, `"Guest Bathroom Light"`, or `"Kids Bath Fan"` resolve to `"Ensuite"`
+ *    rather than `"Bedroom"`.
+ * 2. Circulation & entry spaces (`"Hallway & Landing"`) match `"stair"` (`"stair"`, `"stairs"`,
+ *    `"stairway"`, `"staircase"`, `"upstairs"`, `"downstairs"`), `"landing"`, `"foyer"`, `"entry"`,
+ *    `"mudroom"`, `"corridor"`, and word-bounded `"hall"`.
+ * 3. Sleeping spaces (`"Bedroom"`) match `"bedroom"`, `"bedside"`, `"nightstand"`, word-bounded `"bed"`,
+ *    `"girls"`/`"girl"`, `"boys"`/`"boy"`, `"kids"`/`"kid"`, `"master"`, `"primary"`, `"guest"`, `"nursery"`, etc.
+ * 4. Exterior, utility, workspace, and living spaces (`"Outdoor"`, `"Garage"`, `"Basement"`, `"Office"`,
+ *    `"Living Room"` with word-bounded `"den"`).
+ * 5. Unrecognized names default to `"Unassigned"` (never `"Living Room"`).
+ */
+fun inferRoomFromName(deviceName: String): String {
+    val normalized = normalizeDeviceNameForInference(deviceName)
+    if (normalized.isEmpty()) return "Unassigned"
+    return when {
+        "kitchen" in normalized ||
+            "pantry" in normalized ||
+            "island" in normalized ||
+            "breakfast" in normalized ||
+            "nook" in normalized ||
+            "undercabinet" in normalized ||
+            "under cabinet" in normalized ||
+            "countertop" in normalized -> "Kitchen"
+
+        "dining" in normalized ||
+            "buffet" in normalized ||
+            "hutch" in normalized ||
+            "china cabinet" in normalized -> "Dining Room"
+
+        "ensuite" in normalized ||
+            "en suite" in normalized ||
+            "bath" in normalized ||
+            "powder" in normalized ||
+            "vanity" in normalized ||
+            "restroom" in normalized ||
+            "lavatory" in normalized ||
+            "shower" in normalized ||
+            WORD_WC_REGEX.containsMatchIn(normalized) -> "Ensuite"
+
+        "hallway" in normalized ||
+            WORD_HALL_REGEX.containsMatchIn(normalized) ||
+            "landing" in normalized ||
+            "stair" in normalized ||
+            "foyer" in normalized ||
+            "entry" in normalized ||
+            "vestibule" in normalized ||
+            "mudroom" in normalized ||
+            "mud room" in normalized ||
+            "corridor" in normalized ||
+            "breezeway" in normalized -> "Hallway & Landing"
+
+        "bedroom" in normalized ||
+            "bedside" in normalized ||
+            "nightstand" in normalized ||
+            "night stand" in normalized ||
+            "headboard" in normalized ||
+            "dresser" in normalized ||
+            "wardrobe" in normalized ||
+            WORD_BED_REGEX.containsMatchIn(normalized) ||
+            "crib" in normalized ||
+            "cradle" in normalized ||
+            "loft" in normalized ||
+            "master" in normalized ||
+            "primary" in normalized ||
+            "nursery" in normalized ||
+            "guest" in normalized ||
+            "bunk" in normalized ||
+            "dorm" in normalized ||
+            "girls" in normalized ||
+            WORD_GIRL_REGEX.containsMatchIn(normalized) ||
+            "boys" in normalized ||
+            WORD_BOY_REGEX.containsMatchIn(normalized) ||
+            "kids" in normalized ||
+            WORD_KID_REGEX.containsMatchIn(normalized) ||
+            "children" in normalized -> "Bedroom"
+
+        "patio" in normalized ||
+            "porch" in normalized ||
+            "veranda" in normalized ||
+            "lanai" in normalized ||
+            "outdoor" in normalized ||
+            "outside" in normalized ||
+            "exterior" in normalized ||
+            "garden" in normalized ||
+            "dock" in normalized ||
+            "pier" in normalized ||
+            "yard" in normalized ||
+            "deck" in normalized ||
+            "flood" in normalized ||
+            "walkway" in normalized ||
+            "sidewalk" in normalized ||
+            "pathway" in normalized ||
+            "balcony" in normalized ||
+            "terrace" in normalized ||
+            "gazebo" in normalized ||
+            "pergola" in normalized ||
+            "trellis" in normalized ||
+            "pool" in normalized ||
+            "fountain" in normalized ||
+            "landscape" in normalized -> "Outdoor"
+
+        "garage" in normalized ||
+            "workshop" in normalized ||
+            "workbench" in normalized ||
+            "driveway" in normalized ||
+            "carport" in normalized ||
+            "shed" in normalized ||
+            "barn" in normalized -> "Garage"
+
+        "basement" in normalized ||
+            "cellar" in normalized ||
+            "laundry" in normalized ||
+            "utility" in normalized ||
+            "boiler" in normalized ||
+            "furnace" in normalized ||
+            "sump" in normalized ||
+            "crawlspace" in normalized ||
+            "rec room" in normalized ||
+            "game room" in normalized ||
+            "media room" in normalized ||
+            "theater" in normalized ||
+            "theatre" in normalized -> "Basement"
+
+        "office" in normalized ||
+            "study" in normalized ||
+            "desk" in normalized ||
+            "workstation" in normalized ||
+            "studio" in normalized ||
+            "library" in normalized -> "Office"
+
+        "living" in normalized ||
+            "family" in normalized ||
+            WORD_DEN_REGEX.containsMatchIn(normalized) ||
+            "lounge" in normalized ||
+            "great room" in normalized ||
+            "parlor" in normalized ||
+            "parlour" in normalized ||
+            "sitting" in normalized ||
+            "sunroom" in normalized ||
+            "sun room" in normalized ||
+            "solarium" in normalized ||
+            "mantel" in normalized ||
+            "hearth" in normalized ||
+            "fireplace" in normalized ||
+            "couch" in normalized ||
+            "sofa" in normalized -> "Living Room"
+
+        else -> "Unassigned"
+    }
+}
+
+/**
+ * Resolves the room assignment for an existing or newly discovered device:
+ * - Preserves intentional user-assigned rooms (e.g., `"Porch & Entryway"` or `"Kids Suite"`).
+ * - In Real LAN mode (`!isDemoMode`), automatically migrates devices whose `existingRoomName`
+ *   is blank, `"Unassigned"`, or stuck in legacy `"Living Room"` (when `inferredRoom != "Living Room"`).
+ */
+fun resolveDeviceRoomAssignment(
+    existingRoomName: String,
+    deviceName: String,
+    discoveredRoomName: String = "",
+    isDemoMode: Boolean = false
+): String {
+    val inferredRoom = discoveredRoomName.takeIf {
+        it.isNotBlank() && !it.equals("Unassigned", ignoreCase = true)
+    } ?: inferRoomFromName(deviceName)
+
+    if (existingRoomName.isBlank()) return inferredRoom
+    if (isDemoMode) return existingRoomName
+
+    val isUnassignedPlaceholder = existingRoomName.equals("Unassigned", ignoreCase = true)
+    val isLegacyLivingRoomFallback = existingRoomName.equals("Living Room", ignoreCase = true) &&
+        inferredRoom != "Living Room"
+
+    return if (isUnassignedPlaceholder || isLegacyLivingRoomFallback) {
+        inferredRoom
+    } else {
+        existingRoomName
+    }
+}
+

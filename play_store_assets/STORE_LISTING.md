@@ -9,16 +9,16 @@
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
 - **Content Rating:** Everyone
 
-## Short Description (79 / 80 chars max)
-Local Wi-Fi controller for WeMi & WeMo switches on Phone, Tablet & Android TV.
+## Short Description (78 / 80 chars max)
+Local Wi-Fi controller for Belkin's discontinued smart switch platform & TV.
 
 ## Full Description
-WeMi Switch Control brings reliable, instant local-network control back to your home's smart light switches, plugs, dimmable LED bulbs, and motion sensors across your Android phone, tablet, and **Android TV**—styled with a modern Ocean Teal, Electric Cyan, and Sapphire Blue interface.
+WeMi Switch Control brings reliable, instant local-network control back to Belkin's discontinued smart switch platform—including smart light switches, plugs, dimmable LED bulbs, and motion sensors—across your Android phone, tablet, and **Android TV**, styled with a modern Ocean Teal, Electric Cyan, and Sapphire Blue interface.
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
 ### What's New in Version 20.0
-- **Zero-Cloud `10.22.22.1` Switch Provisioning & Screenshot Diagnostics:** Set up factory-reset Belkin WeMo switches (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`) directly over local Wi-Fi with automatic OpenWrt/RTOS AES-128-CBC encryption, non-destructive retry, and one-tap `wemi-telemetry-latest.txt` export.
+- **Zero-Cloud `10.22.22.1` Switch Provisioning & Screenshot Diagnostics:** Set up factory-reset switches from Belkin's discontinued smart switch platform (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`) directly over local Wi-Fi with automatic OpenWrt/RTOS AES-128-CBC encryption, non-destructive retry, and one-tap `wemi-telemetry-latest.txt` export.
 - **Unified 9-Port Wi-Fi-Bound Self-Healing Reconnect:** Automatically recovers from Belkin firmware port shifts (`49151–49159`) across power toggles, dimmer sliders, friendly-name updates, and Night Mode while keeping sockets bound to Wi-Fi even when cellular data is active.
 - **Smarter Room Grouping & 3-Tier Hardware Identity Matching:** Splits `CamelCase`/underscore/hyphenated switch names, prioritizes **Ensuite** before general bedroom modifiers (`"Master Bath Vanity"`, `"Guest Bathroom"`), groups into Bedroom, Hallway & Landing, Kitchen, Living Room, or `Unassigned`, and matches switches by `<serialNumber>` first so DHCP IP swaps never mix up switches.
 - **3-State Appliance Icons & Top-First Dimmer Controls:** Distinct `ON`, `OFF (Accessible Standby)`, and `Disconnected` icons for Christmas Trees, Fans, Lights, Motion Sensors, and Switches, plus top-first brightness sliders (`1%–100%`) and hardware Night Mode (`20%`).

@@ -12,7 +12,6 @@ Related documents in this repository:
 - [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v20.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v20.0`)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
-- [`CODE_QUALITY_AND_MODULARIZATION_PLAN.md`](CODE_QUALITY_AND_MODULARIZATION_PLAN.md) — Human-Readable Code Modularization, Implementation Validation & End-to-End (E2E) Testing Plan (Phases M1–M4)
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
 - [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md) — Device Discovery Logic, 3-Tier Identity Resolution & Automatic Room Grouping Skill *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill

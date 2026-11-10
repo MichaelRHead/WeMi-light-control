@@ -41,19 +41,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.ui.WeMoBottomTab
-import com.example.ui.WeMoViewModel
-import com.example.ui.components.AddOrEditWeMoDeviceDialog
-import com.example.ui.components.AddWeMoRuleDialog
+import com.example.ui.BottomTab
+import com.example.ui.SwitchViewModel
+import com.example.ui.components.AddOrEditDeviceDialog
+import com.example.ui.components.AddRuleDialog
 import com.example.ui.components.AddWifiHomeNetworkDialog
-import com.example.ui.components.ProvisionWeMoApDialog
-import com.example.ui.components.WeMoBottomNavigationBar
-import com.example.ui.components.WeMoSsdpScannerModal
-import com.example.ui.components.WeMoTopHeader
-import com.example.ui.components.WeMoTvDashboardScreen
-import com.example.ui.screens.WeMoDevicesTabScreen
-import com.example.ui.screens.WeMoMoreScreen
-import com.example.ui.screens.WeMoRulesScreen
+import com.example.ui.components.ProvisionApDialog
+import com.example.ui.components.BottomNavigationBar
+import com.example.ui.components.SsdpScannerModal
+import com.example.ui.components.TopHeader
+import com.example.ui.components.TvDashboardScreen
+import com.example.ui.screens.DevicesTabScreen
+import com.example.ui.screens.MoreScreen
+import com.example.ui.screens.RulesScreen
 import com.example.ui.theme.WeMiTheme
 import com.example.ui.theme.WemoBackgroundGray
 import com.example.ui.theme.WemoGreenDark
@@ -80,7 +80,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeMiSwitchApp(
-    viewModel: WeMoViewModel = viewModel()
+    viewModel: SwitchViewModel = viewModel()
 ) {
     val configuration = LocalConfiguration.current
     val isHardwareTelevision = remember(configuration) {
@@ -170,7 +170,7 @@ fun WeMiSwitchApp(
             (isTvMode && !isHardwareTelevision) ||
             isEditMode ||
             selectedRoomFilter != null ||
-            selectedTab != WeMoBottomTab.DEVICES
+            selectedTab != BottomTab.DEVICES
     ) {
         when {
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
@@ -179,7 +179,7 @@ fun WeMiSwitchApp(
             isTvMode && !isHardwareTelevision -> viewModel.setTvMode(false)
             isEditMode -> viewModel.setEditMode(false)
             selectedRoomFilter != null -> viewModel.selectRoomFilter(null)
-            else -> viewModel.selectTab(WeMoBottomTab.DEVICES)
+            else -> viewModel.selectTab(BottomTab.DEVICES)
         }
     }
 
@@ -187,19 +187,19 @@ fun WeMiSwitchApp(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (!isTvMode) {
-                WeMoTopHeader(
+                TopHeader(
                     isRefreshing = isRefreshing,
                     isEditMode = isEditMode,
                     useWeMiWordmark = useWeMiWordmark,
                     onRefreshClick = { viewModel.openSsdpScannerAndScan() },
                     onEditClick = {
-                        if (selectedTab != WeMoBottomTab.DEVICES) {
-                            viewModel.selectTab(WeMoBottomTab.DEVICES)
+                        if (selectedTab != BottomTab.DEVICES) {
+                            viewModel.selectTab(BottomTab.DEVICES)
                         }
                         viewModel.toggleEditMode()
                     },
                     onAddClick = {
-                        if (selectedTab == WeMoBottomTab.RULES) {
+                        if (selectedTab == BottomTab.RULES) {
                             viewModel.openAddRuleDialog()
                         } else {
                             viewModel.openAddDeviceDialog()
@@ -212,7 +212,7 @@ fun WeMiSwitchApp(
         },
         bottomBar = {
             if (!isTvMode) {
-                WeMoBottomNavigationBar(
+                BottomNavigationBar(
                     selectedTab = selectedTab,
                     onSelectTab = { viewModel.selectTab(it) }
                 )
@@ -228,7 +228,7 @@ fun WeMiSwitchApp(
             contentAlignment = Alignment.TopCenter
         ) {
             if (isTvMode) {
-                WeMoTvDashboardScreen(
+                TvDashboardScreen(
                     devices = homeDevices,
                     rooms = availableRooms,
                     selectedRoomFilter = selectedRoomFilter,
@@ -253,8 +253,8 @@ fun WeMiSwitchApp(
                         .widthIn(max = 680.dp)
                 ) {
                     when (selectedTab) {
-                        WeMoBottomTab.DEVICES -> {
-                            WeMoDevicesTabScreen(
+                        BottomTab.DEVICES -> {
+                            DevicesTabScreen(
                                 allDevices = devices,
                                 homeDevices = homeDevices,
                                 filteredDevices = filteredDevices,
@@ -307,8 +307,8 @@ fun WeMiSwitchApp(
                             )
                         }
 
-                        WeMoBottomTab.RULES -> {
-                            WeMoRulesScreen(
+                        BottomTab.RULES -> {
+                            RulesScreen(
                                 rules = rules,
                                 onToggleRule = { viewModel.toggleRule(it) },
                                 onRunRuleNow = { viewModel.runRuleNow(it) },
@@ -317,8 +317,8 @@ fun WeMiSwitchApp(
                             )
                         }
 
-                        WeMoBottomTab.MORE -> {
-                            WeMoMoreScreen(
+                        BottomTab.MORE -> {
+                            MoreScreen(
                                 devices = homeDevices,
                                 soapLogs = soapLogs,
                                 useWeMiWordmark = useWeMiWordmark,
@@ -382,7 +382,7 @@ fun WeMiSwitchApp(
 
     if (showProvisionApDialog) {
         val currentSsid = homeNetworks.find { it.networkKey == activeNetworkKey }?.ssidLabel.orEmpty()
-        ProvisionWeMoApDialog(
+        ProvisionApDialog(
             scannedAps = scannedSetupAps,
             isScanning = isScanningSetupAp,
             isProvisioning = isProvisioningAp,
@@ -392,7 +392,7 @@ fun WeMiSwitchApp(
             debugSnapshot = setupDebugSnapshot,
             onScanApList = { apHost -> viewModel.scanSetupApNetworks(apHost) },
             onProvision = { apHost, ssid, pwd, ch, auth, enc, method, customName, roomName ->
-                viewModel.provisionWeMoAp(
+                viewModel.provisionSetupAp(
                     apHost = apHost,
                     ssid = ssid,
                     password = pwd,
@@ -405,7 +405,7 @@ fun WeMiSwitchApp(
                 )
             },
             onProvisionAdvanced = { apHost, ssid, pwd, ch, auth, enc, method, addLengths, customName, roomName, keepOpen ->
-                viewModel.provisionWeMoAp(
+                viewModel.provisionSetupAp(
                     apHost = apHost,
                     ssid = ssid,
                     password = pwd,
@@ -424,7 +424,7 @@ fun WeMiSwitchApp(
     }
 
     if (showSsdpScannerSheet) {
-        WeMoSsdpScannerModal(
+        SsdpScannerModal(
             isScanning = isRefreshing,
             selectedSearchTarget = selectedSearchTarget,
             scanReport = latestSsdpReport,
@@ -438,7 +438,7 @@ fun WeMiSwitchApp(
     }
 
     if (showAddDeviceDialog || editingDevice != null) {
-        AddOrEditWeMoDeviceDialog(
+        AddOrEditDeviceDialog(
             initialDevice = editingDevice,
             onDismiss = {
                 viewModel.closeAddDeviceDialog()
@@ -470,7 +470,7 @@ fun WeMiSwitchApp(
     }
 
     if (showAddRuleDialog) {
-        AddWeMoRuleDialog(
+        AddRuleDialog(
             devices = homeDevices,
             onDismiss = { viewModel.closeAddRuleDialog() },
             onCreateRule = { name, ruleType, targetDevice, triggerSummary, targetStateOn, brightness ->
