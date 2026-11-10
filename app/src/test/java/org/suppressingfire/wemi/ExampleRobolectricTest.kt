@@ -308,7 +308,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    @Config(sdk = [34], qualifiers = "television")
+    @Config(sdk = [36], qualifiers = "television")
     fun `verify native Android TV dashboard launches automatically under UI_MODE_TYPE_TELEVISION without manual layout toggle`() {
         composeTestRule.waitForIdle()
 
