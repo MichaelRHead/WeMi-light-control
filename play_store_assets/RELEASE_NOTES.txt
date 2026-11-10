@@ -1,4 +1,4 @@
 WeMi Light Control v21.0:
-• Native Form-Factor Layouts: Phone/tablet touch UI & 10-foot Android TV D-Pad dashboard now run strictly on their native device form factors without manual Phone/TV mode switch buttons.
-• Smarter Room Grouping: Switches named "Bed", "Nightstand", "Girls/Boys/Kids Light", or "Stairway" automatically group into Bedroom or Hallway & Landing, migrating switches stuck in Living Room.
-• One-Tap Reset & Rescan: Reset chip clears stale LAN homes/switches in one tap.
+• Native Form-Factor Layouts: Phone/tablet touch UI & 10-foot Android TV D-Pad dashboard run automatically on their native form factors without manual Phone/TV mode switch buttons.
+• In-App Open Source Notices: Added expandable MIT License & Third-Party Notices card on the More tab.
+• Streamlined Architecture: Repackaged under org.suppressingfire.wemi with 9-port self-healing UPnP/SOAP/GENA control & smarter room grouping.

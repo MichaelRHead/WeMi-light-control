@@ -14,7 +14,7 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
-| **[`v21.0`](#version-210-versioncode--21--november-910-2026)** | `21` | Nov 9–10, 2026 | Native Phone/Tablet vs. Android TV form-factor layouts (no manual Phone/TV toggle button), `org.suppressingfire.wemi` package architecture & streamlined switch engine |
+| **[`v21.0`](#version-210-versioncode--21--november-910-2026)** | `21` | Nov 9–10, 2026 | Native Phone/Tablet vs. Android TV form-factor layouts, in-app Open Source MIT & Third-Party Notices card on the **More** tab, `org.suppressingfire.wemi` architecture & neutral hardware branding |
 | **[`v20.0`](#version-200-versioncode--20--november-9-2026)** | `20` | Nov 9, 2026 | Unified 9-port self-healing reconnect, cellular-safe Wi-Fi binding, 3-tier hardware identity matching, CamelCase/`Ensuite` room grouping & instant offline reconnect recovery |
 | **[`v19.0`](#version-190-versioncode--19--november-9-2026)** | `19` | Nov 9, 2026 | Dedicated Troubleshooting & Telemetry Sharing Guide (`wemi-telemetry-latest.txt`) for 1-tap support diagnostics |
 | **[`v18.0`](#version-180-versioncode--18--november-9-2026)** | `18` | Nov 9, 2026 | Accessibility & navigation polish: 48dp+ touch targets, TalkBack switch labels, and predictable Back-button flows |
@@ -42,8 +42,9 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ## Release-by-Release Highlights (Newest to Oldest)
 
 ### Version 21.0 (`versionCode = 21`) — November 9–10, 2026
-- **Dedicated Native Phone/Tablet & Android TV Layouts**: Removed the manual Phone ↔ TV layout switch button from both the phone header and the Android TV dashboard so each device form factor always runs its purpose-built interaction model (touch-first on phones/tablets and 10-foot D-Pad remote navigation on Android TV / Google TV under `UI_MODE_TYPE_TELEVISION`).
-- **Streamlined `org.suppressingfire.wemi` Architecture**: Repackaged the core application and UPnP/SSDP/SOAP/GENA engine under `org.suppressingfire.wemi` with cleaner, streamlined component names focused on Belkin's discontinued smart switch platform.
+- **Dedicated Native Phone/Tablet & Android TV Form-Factor Layouts**: Removed the manual Phone ↔ TV layout switch button from both the phone header and the Android TV dashboard so each device form factor always runs its purpose-built interaction model—touch-first cards and inline drawers on phones/tablets, and the 10-foot D-Pad remote dashboard (`wemi TV`) automatically on Android TV and Google TV (`UI_MODE_TYPE_TELEVISION`).
+- **In-App Open Source License & Third-Party Notices Card (`More` Tab)**: Added an expandable **Open Source Licenses (MIT)** card on the **More** tab displaying the full MIT License text, permissive third-party library attributions (`AndroidX Jetpack Compose & Room`, `Kotlin & Coroutines`, `Square OkHttp`, and clean-room `pywemo` protocol interoperability attribution), and a clear non-affiliation notice, paired with reproducible APK metadata (`includeInApk = false`).
+- **Streamlined `org.suppressingfire.wemi` Package & Trademark-Clean Copy**: Repackaged the entire application and UPnP/SSDP/SOAP/GENA engine under `org.suppressingfire.wemi` and standardized all user-facing labels, dialogs, and Play Store metadata around neutral hardware compatibility descriptions (*"Belkin's discontinued smart switch platform"*).
 
 ---
 

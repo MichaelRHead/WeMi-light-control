@@ -10,34 +10,34 @@ This file is the live synchronization state machine for the **5-Agent Autonomous
 ## 1. Live Release State Machine Header (Machine & Human Readable)
 
 <!-- RELEASE_STATE_BEGIN -->
-RELEASE_VERSION: v20.0
-VERSION_CODE: 20
+RELEASE_VERSION: v21.0
+VERSION_CODE: 21
 ROUND_NUMBER: 1
-RELEASE_STATUS: APPROVED_FOR_PLAY_STORE
-CURRENT_TURN: NONE
-CANDIDATE_BASE_SHA: 60b4e8a
-SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (60b4e8a @ 2026-11-09 13:40 PST)
-SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (a58ebab @ 2026-11-09 13:58 PST)
-SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (a58ebab @ 2026-11-09 13:58 PST)
-SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (a58ebab @ 2026-11-09 13:58 PST)
-SIGN_OFF_LICENSE_GOVERNANCE: SIGNED_OFF (11acfe4 @ 2026-11-10 07:08 PST)
-FINAL_RELEASE_SHA: a58ebab
-CONCLUDED_AT: 2026-11-09 14:04 PST
+RELEASE_STATUS: IN_REVIEW
+CURRENT_TURN: discovery_and_grouping
+CANDIDATE_BASE_SHA: 11acfe4
+SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (11acfe4 @ 2026-11-10 08:21 PST)
+SIGN_OFF_DISCOVERY_AND_GROUPING: PENDING
+SIGN_OFF_TELEMETRY_AND_DEBUGGING: PENDING
+SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
+SIGN_OFF_LICENSE_GOVERNANCE: PENDING
+FINAL_RELEASE_SHA: NONE
+CONCLUDED_AT: NONE
 <!-- RELEASE_STATE_END -->
 
 ---
 
-## 2. Current Release Candidate Sign-Off Status (`v20.0` / `versionCode = 20`)
+## 2. Current Release Candidate Sign-Off Status (`v21.0` / `versionCode = 21`)
 
 <!-- SIGN_OFF_TABLE_BEGIN -->
 | Stage | Role ID | Agent | Status | Verified Commit SHA | Timestamp (PST) | Verification Summary |
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
-| **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `60b4e8a` | `2026-11-09 13:40 PST` | UX, 5 Compose layout invariants, 48dp+ accessibility targets, TalkBack labels, Back navigation, Play Store metadata (v20.0 / versionCode=20), and docs/user-guide/release-notes.md verified; 26/26 unit & Compose E2E tests passing. |
-| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `a58ebab` | `2026-11-09 13:58 PST` | Audited Stage 2 (discovery_and_grouping) via subagent dfb7bb2198cf75c3b31ea6820f5ff3be: verified 3-tier hardware identity matching (matchesDiscoveredDevice: <serialNumber> -> <UDN>/USN -> endpoint/<friendlyName>), CamelCase normalization & specificity-ordered room inference (inferRoomFromName: Ensuite before Bedroom, Unassigned fallback), non-destructive migration (resolveDeviceRoomAssignment), soft-AP SSID shielding (isWemoDeviceSetupSsid), and Wi-Fi-bound UDP M-SEARCH + /24 unicast discovery. |
-| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `SIGNED_OFF` | `a58ebab` | `2026-11-09 13:58 PST` | Audited Stage 3 (telemetry_and_debugging) via subagent cb74cbfb6b637138485a18c0ce919a9b: verified 10.22.22.1 zero-cloud setup diagnostics ([NET], [PROBE], [XML], [FLAGS], [ID], [SCAN], [TARGET AP], [STEP 1..6] in SetupDiagnostics.kt, ProvisionerClient.kt & ProvisionDebugPanel.kt), wemi-telemetry-latest.txt Copy/Save-Share export, inline RTT diagnostics drawer, strict Wi-Fi password privacy (plainLen/encLen only), and non-destructive CloseSetup hold on NetworkStatus=0/2. |
-| **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `SIGNED_OFF` | `a58ebab` | `2026-11-09 13:58 PST` | Audited Stage 4 (code_quality_and_testing): verified single-responsibility file modularity, Wi-Fi socket binding across all LAN/GENA/unicast paths, offline echo-suppression clearing, leak-free Robolectric SQLite/GENA/coroutine lifecycle cleanup, executable gradlew & release scripts (100755), and unit, protocol & Compose E2E tests + assembleDebug passing. |
-| **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `SIGNED_OFF` | `11acfe4` | `2026-11-10 07:08 PST` | Established Stage 5 (license_governance): verified root MIT LICENSE parity with MoreScreen.kt (mit_license_text_surface & third_party_notices_surface), permissive-only dependency allowlist (gradle/libs.versions.toml & app/build.gradle.kts), org.suppressingfire.wemi namespace & filename hygiene, and Play Store trademark boundaries via LicenseAndBrandGovernanceTest.kt (29/29 tests passing). |
-| **6 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `SIGNED_OFF` | `a58ebab` | `2026-11-09 14:04 PST` | All agents signed off Round 1; UX, discovery, telemetry, code modularity, license governance, unit & Compose E2E tests, and docs/user-guide/release-notes.md verified. Approved for Google Play Store release. |
+| **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `11acfe4` | `2026-11-10 08:21 PST` | Initiated v21.0 (versionCode=21, org.suppressingfire.wemi) release review: verified native Phone/Tablet vs. Android TV (UI_MODE_TYPE_TELEVISION) form-factor routing without manual layout toggle buttons, 5 Compose layout invariants, 48dp+ accessibility targets, TalkBack labels, Back navigation, Play Store metadata (STORE_LISTING.md & RELEASE_NOTES.txt), and docs/user-guide/release-notes.md; 30/30 unit, protocol, governance & Compose E2E tests passing. |
+| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `PENDING` | `-` | `-` | Awaiting Discovery & Room Grouping Agent review. |
+| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `PENDING` | `-` | `-` | Awaiting Telemetry & Debugging Agent review. |
+| **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
+| **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
+| **6 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `PENDING` | `-` | `-` | Awaiting Stages 1-5 sign-off. |
 <!-- SIGN_OFF_TABLE_END -->
 
 ---
@@ -53,4 +53,5 @@ CONCLUDED_AT: 2026-11-09 14:04 PST
 | 2026-11-09 13:58 PST | `1` | `code_quality_and_testing` | `SIGNED_OFF` | `ai_studio_ux_cuj` | `a58ebab` | Audited Stage 4 (code_quality_and_testing): verified single-responsibility file modularity, Wi-Fi socket binding across all LAN/GENA/unicast paths, offline echo-suppression clearing, leak-free Robolectric SQLite/GENA/coroutine lifecycle cleanup, executable gradlew & release scripts (100755), and 26/26 unit, protocol & Compose E2E tests + assembleDebug passing. |
 | 2026-11-09 14:04 PST | `1` | `ai_studio_ux_cuj` | `APPROVED_FOR_PLAY_STORE` | `NONE` | `a58ebab` | All 4 agents (ai_studio_ux_cuj, discovery_and_grouping, telemetry_and_debugging, code_quality_and_testing) signed off Round 1; UX, discovery, telemetry, code modularity, 26/26 unit & Compose E2E tests, and docs/user-guide/release-notes.md verified. v20.0 (versionCode = 20) approved for Google Play Store release. |
 | 2026-11-10 07:08 PST | `1` | `license_governance` | `ADDED_STAGE_5_GOVERNANCE` | `NONE` | `11acfe4` | Added Stage 5 (`license_governance` — Antigravity License & Brand Governance Agent) to the 5-agent / 6-stage release ring before Stage 6 (`ai_studio_ux_cuj` Final Conclusion) with `LicenseAndBrandGovernanceTest.kt` (29/29 tests passing). |
+| 2026-11-10 08:21 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `11acfe4` | Initiated v21.0 (versionCode=21, org.suppressingfire.wemi) release review: verified native Phone/Tablet vs. Android TV (UI_MODE_TYPE_TELEVISION) form-factor routing without manual layout toggle buttons, 5 Compose layout invariants, 48dp+ accessibility targets, TalkBack labels, Back navigation, Play Store metadata (STORE_LISTING.md & RELEASE_NOTES.txt), and docs/user-guide/release-notes.md; 30/30 unit, protocol, governance & Compose E2E tests passing. |
 <!-- AUDIT_LOG_END -->

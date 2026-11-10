@@ -112,6 +112,12 @@ if action == "initiate":
     text = set_state(text, "SIGN_OFF_LICENSE_GOVERNANCE", "PENDING")
     text = set_state(text, "FINAL_RELEASE_SHA", "NONE")
     text = set_state(text, "CONCLUDED_AT", "NONE")
+    text = re.sub(
+        r"^## 2\. Current Release Candidate Sign-Off Status \(`v[^`]+` / `versionCode = \d+`\)$",
+        f"## 2. Current Release Candidate Sign-Off Status (`{gradle_ver_name}` / `versionCode = {gradle_ver_code}`)",
+        text,
+        flags=re.MULTILINE,
+    )
 
     text = update_table_row(text, "1 (Initiate)", "SIGNED_OFF", head_sha, pst_now, summary)
     text = update_table_row(text, "2 (Review 1)", "PENDING", "-", "-", "Awaiting Discovery & Room Grouping Agent review.")

@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v20.0 — Phone, Tablet & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v21.0 — Phone, Tablet & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `20.0` (`versionCode = 20`)
+- **Version:** `21.0` (`versionCode = 21`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,12 +17,12 @@ WeMi Switch Control brings reliable, instant local-network control back to Belki
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
-### What's New in Version 20.0
-- **Zero-Cloud `10.22.22.1` Switch Provisioning & Screenshot Diagnostics:** Set up factory-reset switches from Belkin's discontinued smart switch platform (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`) directly over local Wi-Fi with automatic OpenWrt/RTOS AES-128-CBC encryption, non-destructive retry, and one-tap `wemi-telemetry-latest.txt` export.
-- **Unified 9-Port Wi-Fi-Bound Self-Healing Reconnect:** Automatically recovers from Belkin firmware port shifts (`49151–49159`) across power toggles, dimmer sliders, friendly-name updates, and Night Mode while keeping sockets bound to Wi-Fi even when cellular data is active.
+### What's New in Version 21.0
+- **Dedicated Native Phone/Tablet & Android TV Layouts:** Automatically runs the touch-first dashboard on phones/tablets and the 10-foot D-Pad dashboard (`wemi TV`) on Android TV / Google TV (`UI_MODE_TYPE_TELEVISION`) without manual Phone/TV mode switch buttons.
+- **In-App Open Source MIT & Third-Party Notices (`More` Tab):** Expandable Open Source Licenses card displaying the full MIT License, permissive third-party library attributions, and non-affiliation notice, paired with reproducible APK metadata (`includeInApk = false`).
+- **Streamlined `org.suppressingfire.wemi` Architecture & 9-Port Self-Healing Reconnect:** Automatically recovers from firmware port shifts (`49151–49159`) across power toggles, dimmer sliders, friendly-name updates, and Night Mode while keeping sockets bound to Wi-Fi even when cellular data is active.
 - **Smarter Room Grouping & 3-Tier Hardware Identity Matching:** Splits `CamelCase`/underscore/hyphenated switch names, prioritizes **Ensuite** before general bedroom modifiers (`"Master Bath Vanity"`, `"Guest Bathroom"`), groups into Bedroom, Hallway & Landing, Kitchen, Living Room, or `Unassigned`, and matches switches by `<serialNumber>` first so DHCP IP swaps never mix up switches.
-- **3-State Appliance Icons & Top-First Dimmer Controls:** Distinct `ON`, `OFF (Accessible Standby)`, and `Disconnected` icons for Christmas Trees, Fans, Lights, Motion Sensors, and Switches, plus top-first brightness sliders (`1%–100%`) and hardware Night Mode (`20%`).
-- **Android TV 10-Foot Remote Interface:** Control your living room, bedroom, and kitchen lights right from your couch using your Android TV remote (D-Pad navigation, OK/Select power toggle, Left/Right `-10% / +10%` dimmer control, Play/Pause Master Room toggle, and one-click Movie Mode / Holiday / Bedtime TV scenes).
+- **Zero-Cloud `10.22.22.1` Switch Provisioning & Screenshot Diagnostics:** Set up factory-reset switches from Belkin's discontinued smart switch platform (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`) directly over local Wi-Fi with automatic OpenWrt/RTOS AES-128-CBC encryption, non-destructive retry, and one-tap `wemi-telemetry-latest.txt` export.
 
 ### Key Features
 - **Instant One-Tap Cyan Power Ring Toggles:** Turn individual switches or entire room groups ON or OFF directly over your local Wi-Fi network.
