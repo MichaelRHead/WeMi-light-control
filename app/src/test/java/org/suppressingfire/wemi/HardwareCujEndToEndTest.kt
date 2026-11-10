@@ -477,7 +477,7 @@ class HardwareCujEndToEndTest {
             wifiSsid = "Wemo.LS3W.880",
             registerAsCandidatePort = true
         ).use { setupServer ->
-            // 1. Open AddOrEditWeMoDeviceDialog -> launch ProvisionWeMoApDialog
+            // 1. Open AddOrEditDeviceDialog -> launch ProvisionApDialog
             composeTestRule.onNodeWithTag("add_device_button").performClick()
             composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag("open_provision_ap_wizard_button").performClick()

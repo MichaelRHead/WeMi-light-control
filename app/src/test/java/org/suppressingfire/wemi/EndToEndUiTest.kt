@@ -128,7 +128,7 @@ class EndToEndUiTest {
     fun `verify E2E inline device diagnostics drawer, Ping RTT action, Edit Mode controls, and device rename`() {
         composeTestRule.waitForIdle()
 
-        // 1. Scroll to Christmas Tree Living (id=1), tap the row to expand WeMoDeviceDiagnosticsDrawer, and scroll Ping RTT into view
+        // 1. Scroll to Christmas Tree Living (id=1), tap the row to expand DeviceDiagnosticsDrawer, and scroll Ping RTT into view
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasTestTag("device_row_1"))
         composeTestRule.onNodeWithText("Christmas Tree Living").performClick()
@@ -139,7 +139,7 @@ class EndToEndUiTest {
         composeTestRule.onNodeWithTag("ping_device_1").performClick()
         composeTestRule.waitForIdle()
 
-        // 3. Enter Edit Mode via edit_devices_button and open AddOrEditWeMoDeviceDialog for device 1
+        // 3. Enter Edit Mode via edit_devices_button and open AddOrEditDeviceDialog for device 1
         composeTestRule.onNodeWithTag("edit_devices_button").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("devices_list")

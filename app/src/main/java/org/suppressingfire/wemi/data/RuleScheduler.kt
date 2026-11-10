@@ -15,11 +15,11 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * App-driven coroutine scheduler for Belkin WeMo local rules & timers:
- * 1. Manages per-device Auto-Off countdown timers (from WeMoDeviceEntity.autoOffMinutes or
+ * App-driven coroutine scheduler for local switch rules & timers:
+ * 1. Manages per-device Auto-Off countdown timers (from DeviceEntity.autoOffMinutes or
  *    enabled AUTO_OFF rules) that automatically turn switches OFF when the timer expires.
  * 2. Evaluates enabled SCHEDULE rules (e.g. "Daily at 7:00 PM", "Daily at Sunset (5:15 PM)")
- *    and dispatches them over LAN via WeMoRepository.
+ *    and dispatches them over LAN via SwitchRepository.
  */
 class RuleScheduler(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
