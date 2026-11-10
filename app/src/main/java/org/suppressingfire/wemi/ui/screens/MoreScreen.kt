@@ -544,7 +544,7 @@ fun MoreScreen(
                         ) {
                             Text(
                                 text = """
-                                    Third-Party Open Source Notices & Protocol Attribution:
+                                    Third-Party Open Source Notices:
                                     • AndroidX, Jetpack Compose & Room — Apache License 2.0 (Copyright The Android Open Source Project)
                                     • Kotlin & Kotlinx Coroutines — Apache License 2.0 (Copyright JetBrains s.r.o.)
                                     • Trademark Notice: WeMi Light Control is an independent open-source project and is not affiliated with or endorsed by Belkin International, Inc.

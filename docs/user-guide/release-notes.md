@@ -44,7 +44,7 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 ### Version 22.0 (`versionCode = 22`) — November 10, 2026
 - **Refreshed Google Play Store & In-App Visual Showcase**: Updated all 21 Google Play Store screenshots, banners, icons, and in-app preview graphics (`More` tab & Android TV Leanback banner) across Phone (`1080×1920`), 7-Inch Tablet (`1200×1920`), 10-Inch Tablet (`1600×2560`), and 10-Foot Android TV (`1920×1080` & `1280×720`) to match the live **Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), and Deep Sapphire (`#0F4C81`)** interface, full-width auto-shrinking switch titles (`AutoShrinkSwitchName`), 3-state hardware icons (`ON`, `OFF` Standby `#23272F`, and Offline `Disconnected` `#DC2626`), top-first dimmer controls, and native Phone/Tablet vs. Android TV headers without manual Phone/TV toggle buttons.
-- **Zero Custom Bundled Fonts & Reduced Licensing Footprint**: Replaced bundled TrueType font files with Android's built-in platform `FontFamily.SansSerif` (`Type.kt`), reducing APK size and keeping the runtime licensing footprint strictly to `MIT` and `Apache-2.0`.
+- **Streamlined Dependency & Licensing Footprint (`MIT` + `Apache-2.0` Only)**: Replaced external HTTP libraries (`OkHttp`) with a lightweight first-party local UPnP/HTTP engine (`LanHttpClient`) and replaced bundled TrueType font files with Android's built-in platform `FontFamily.SansSerif` (`Type.kt`), reducing APK overhead and keeping the runtime licensing footprint strictly to first-party `MIT` and AndroidX/Kotlin `Apache-2.0`.
 
 ---
 
