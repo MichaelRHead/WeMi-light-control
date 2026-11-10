@@ -29,7 +29,7 @@ Use this skill whenever multiple agent conversations or external tools (such as 
    - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../DISCOVERY_AND_ROOM_GROUPING.md) and [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md) are **owned exclusively by the Antigravity Device Discovery & Room Grouping Agent**.
    - Other agents must read and follow those files to preserve the SSDP/unicast discovery orchestration, 3-tier hardware identity resolution (`matchesDiscoveredDevice`), and automatic room inference/migration (`inferRoomFromName` & `resolveDeviceRoomAssignment`) invariants, **but must never edit, overwrite, or delete them**.
 7. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
-   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) live **exclusively at the repository root (`/`)**.
+   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `LICENSE`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) live **exclusively at the repository root (`/`)**.
    - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` — including `docs/user-guide/release-notes.md` — and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`.
 
 ---
@@ -56,17 +56,17 @@ git diff --name-status <your-earliest-commit>..origin/main
 ```
 Check specifically for:
 1. **Dropped Additions in Shared Files**:
-   - If an incoming commit rewrote a file you also edited (`IMPLEMENTED.md`, `AGENTS.md`, `USER_GUIDE.md`, `MainActivity.kt`, `WeMoDialogs.kt`, etc.), inspect `git diff <your-commit>..origin/main -- <file>`.
+   - If an incoming commit rewrote a file you also edited (`IMPLEMENTED.md`, `AGENTS.md`, `USER_GUIDE.md`, `MainActivity.kt`, `ProvisionApDialog.kt`, etc.), inspect `git diff <your-commit>..origin/main -- <file>`.
    - If any of your additions (such as a new section, test tag, bug fix, or skill link) were accidentally overwritten, **reapply them cleanly** into the new structure of the file.
 2. **File Renames or Deletions**:
-   - If an incoming commit renamed or deleted a file (for example, replacing `docs/IMPLEMENTATION_PLAN.md` with `UPCOMING_FEATURES.md`), search the entire workspace for stale references:
+   - If an incoming commit renamed or deleted a file (for example, renaming `WeMo*.kt` or migrating `com.example` to `org.suppressingfire.wemi`), search the entire workspace for stale references:
      ```bash
      grep -rn "<old-file-name>" . .agents/
      ```
    - Update every link in your plans, docs, and skills to point to the new file path.
 3. **Version & Metric Drift**:
    - Check `app/build.gradle.kts` (`versionCode` / `versionName`) and `wc -l $(find app/src -name "*.kt" | sort)`.
-   - If another agent bumped the version (e.g., `v11.0` → `v12.0`) or added UI/network code, update your documentation and plans to reflect the new version and any new components or `testTag`s.
+   - If another agent bumped the version (e.g., `v20.0` → `v21.0`) or added UI/network code, update your documentation and plans to reflect the new version and any new components or `testTag`s.
 
 ### Step 3: Rebase & Resolve Conflicts Additively
 Integrate incoming commits using rebase so history stays linear and readable:
@@ -84,7 +84,7 @@ If Git reports a conflict in any file:
 ### Step 4: Verify Documentation Organization & Skill Synchronization
 Before committing or pushing your integrated changes:
 1. **Verify Single-Source Root `ALL_CAPS.md` Layout**:
-   - Confirm that all `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `CODE_QUALITY_AND_MODULARIZATION_PLAN.md`) exist only at the repository root (`/`) and are **not** duplicated inside `docs/`.
+   - Confirm that all `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) exist only at the repository root (`/`) and are **not** duplicated inside `docs/`.
    - Do not modify `UX_DESIGN.md` or `UX_DESIGN_AND_EXPERIENCE.md` unless you are the Google AI Studio Agent.
 2. **Sync Repository Skills (`.agents/skills/`) with Persistent Agent Skills**:
    - Whenever any `.agents/skills/<skill-name>/SKILL.md` is added or updated in the repository, also call `save_skill(overwrite = true, skill_dir = "/home/antigravity/MichaelRHead/WeMi-light-control/.agents/skills/<skill-name>")` so the persistent skill registry stays in lockstep with GitHub.

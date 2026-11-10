@@ -33,32 +33,32 @@ Use this skill whenever designing, reviewing, or refactoring Kotlin & Jetpack Co
 ### 2.1 Repository & Domain Coordination (`data/`)
 Avoid letting a `Repository` class grow into a 1,500+ line God object that mixes seed data, network discovery, device state transitions, and hardware provisioning:
 - **Extract Seed & Demo Fixtures (`*DemoFixtures.kt`)**:
-  - Move static sample entities (`defaultHomeNetworks()`, `defaultClassicDevices()`, `defaultClassicRules()`) into a dedicated file (`WeMoDemoFixtures.kt`).
+  - Move static sample entities (`defaultHomeNetworks()`, `defaultClassicDevices()`, `defaultClassicRules()`) into a dedicated file (`DemoFixtures.kt`).
 - **Unify Optimistic State-Transition Templates**:
   - Never copy-paste 70-line `mutex.withLock { optimisticWrite(); semaphore.withPermit { soapCall() }; twoStageReconnect(); commitOrRevert() }` blocks across `togglePower`, `setPowerExplicit`, and `updateBrightness`.
   - Extract a single higher-order helper (e.g., `executeOptimisticDeviceCommand(...)`) that encapsulates the concurrency lock, optimistic Room update, 2-stage self-healing retry, SOAP log recording, and offline rollback in one place.
 - **Decompose by Domain Workflow**:
-  - Keep `Repository` as a concise facade (~300–450 lines) that delegates to focused internal collaborators:
-    - `*DiscoveryAndAdoptionManager`: SSDP scan orchestration, `<serialNumber>` matching across DHCP IP changes, startup parallel state probing, and `/24` subnet home resolution.
-    - `*ProvisioningCoordinator`: Zero-cloud `10.22.22.1` setup AP probing, AP scanning, `ConnectHomeNetwork` provisioning, and automatic Room registration.
+  - Keep `SwitchRepository` as a concise facade (~300–450 lines) that delegates to focused internal collaborators:
+    - `DiscoveryCoordinator`: SSDP scan orchestration, `<serialNumber>` matching across DHCP IP changes, startup parallel state probing, and `/24` subnet home resolution.
+    - `ProvisioningCoordinator`: Zero-cloud `10.22.22.1` setup AP probing, AP scanning, `ConnectHomeNetwork` provisioning, and automatic Room registration.
 
 ### 2.2 Network & Wire Protocol Layer (`network/`)
 Separate **stateless wire parsing / cryptography** from **stateful socket & HTTP I/O**:
-- **Stateless Parsers & Classifiers (`*XmlAndSkuParser.kt`)**:
+- **Stateless Parsers & Classifiers (`XmlAndSkuParser.kt`)**:
   - Keep pure functions (`parseSsdpHeaders`, `parseSetupXmlDescriptor`, `classifyHardwareSku`, `buildSsdpMSearchPacket`) in a stateless, zero-Android-dependency file that can be unit-tested in milliseconds.
-- **Pure Cryptographic Helpers (`*PasswordCrypto.kt`)**:
+- **Pure Cryptographic Helpers (`PasswordCrypto.kt`)**:
   - Isolate key derivation (`EVP_BytesToKey` MD5 / PBKDF2) and cipher routines (`AES/CBC/PKCS5Padding` Methods 1, 2, and 3) into a dedicated crypto utility file with round-trip `encrypt`/`decrypt` functions.
 - **Discovery vs. Control Separation**:
-  - Separate UDP multicast `M-SEARCH` + `/24` unicast subnet sweeping (`*SsdpDiscoveryEngine.kt`) from point-to-point HTTP SOAP control (`*NetworkClient.kt`).
+  - Separate UDP multicast `M-SEARCH` + `/24` unicast subnet sweeping (`SsdpDiscoveryEngine.kt`) from point-to-point HTTP SOAP control (`NetworkClient.kt`).
 
 ### 2.3 Jetpack Compose UI Layer (`ui/`)
 1. **One Screen or Dialog Per File**:
-   - Never bundle unrelated modal dialogs (`AddOrEditDeviceDialog`, `AddRuleDialog`, `ProvisionApDialog`) into a single `Dialogs.kt` monolith. Give each dialog its own file named after its workflow (`WeMoDeviceEditDialog.kt`, `WeMoRuleDialog.kt`, `WeMoProvisionApDialog.kt`).
-2. **Separate Custom Canvas Illustrations by Category (`ui/components/illustrations/`)**:
-   - Custom `Canvas` / vector artwork is line-heavy (~150–250 lines per 3-state illustration). Group illustrations into dedicated files (e.g., `WeMoSwitchAndPlugIllustration.kt`, `WeMoLightAndSensorIllustrations.kt`, `WeMoChristmasTreeIllustration.kt`, `WeMoFanIllustration.kt`, and `WeMoIllustrationCommon.kt` for the category router and shared badges).
+   - Never bundle unrelated modal dialogs (`AddOrEditDeviceDialog`, `AddRuleDialog`, `ProvisionApDialog`) into a single `Dialogs.kt` monolith. Give each dialog its own file named after its workflow (`DeviceEditDialog.kt`, `RuleDialog.kt`, `ProvisionApDialog.kt`).
+2. **Separate Custom Canvas Illustrations by Category (`ui/components/`)**:
+   - Custom `Canvas` / vector artwork is line-heavy (~150–250 lines per 3-state illustration). Group illustrations into dedicated files (e.g., `SwitchAndPlugIllustration.kt`, `LightAndSensorIllustrations.kt`, `ChristmasTreeIllustration.kt`, `FanIllustration.kt`, and `HardwareIllustrations.kt` for the category router and shared badges).
 3. **Keep `MainActivity.kt` as a Thin App Shell (`< 300` Lines)**:
    - `MainActivity` / `WeMiSwitchApp` should only handle edge-to-edge system bars, TV vs. Mobile mode routing, top/bottom scaffold bars, `BackHandler`, and modal dialog hosting.
-   - Extract each bottom-navigation tab's body into `ui/screens/` (e.g., `WeMoDevicesTabScreen.kt`, `WeMoRulesScreen.kt`, `WeMoMoreScreen.kt`, `WeMoTvDashboardScreen.kt`).
+   - Extract each bottom-navigation tab's body into `ui/screens/` (e.g., `DevicesTabScreen.kt`, `RulesScreen.kt`, `MoreScreen.kt`) and TV dashboard into `ui/components/TvScreen.kt`.
 4. **Cohesive UI State Slices in ViewModels**:
    - Avoid exposing 25–35 independent `StateFlow` properties that force the root composable to write 35 `.collectAsStateWithLifecycle()` lines. Group related UI state into immutable data classes (e.g., `ProvisioningUiState`, `DeviceListUiState`) or cohesive screen state holders.
 
@@ -68,16 +68,16 @@ Separate **stateless wire parsing / cryptography** from **stateful socket & HTTP
 
 Whenever refactoring ViewModels, Compose dialogs, network clients, or Room persistence, enforce these three invariants to prevent subtle UI hangs and E2E test breakages:
 
-1. **Never Block Synchronous Modal/Dialog Dismissal on Background `Dispatchers.IO` Network Probes (`WeMoViewModel.saveDevice` Pattern)**:
-   - When a user taps **Save** or **Confirm** in a standard CRUD dialog (`AddOrEditWeMoDeviceDialog`, `AddWeMoRuleDialog`), always update the dialog visibility state synchronously (`_showAddDeviceDialog.value = false`, `_editingDevice.value = null`) **before** launching `viewModelScope.launch` / `Dispatchers.IO` background work (`repository.saveDevice` 9-port `probeWemoPort` or `ChangeFriendlyName` SOAP calls).
+1. **Never Block Synchronous Modal/Dialog Dismissal on Background `Dispatchers.IO` Network Probes (`SwitchViewModel.saveDevice` Pattern)**:
+   - When a user taps **Save** or **Confirm** in a standard CRUD dialog (`AddOrEditDeviceDialog`, `AddRuleDialog`), always update the dialog visibility state synchronously (`_showAddDeviceDialog.value = false`, `_editingDevice.value = null`) **before** launching `viewModelScope.launch` / `Dispatchers.IO` background work (`repository.saveDevice` 9-port `probeWemoPort` or `ChangeFriendlyName` SOAP calls).
    - Keeping modal dismissal inside `viewModelScope.launch` *after* a suspending network call leaves the `Dialog` covering the screen while TCP connect timeouts run against unreachable or demo IPs (`192.168.1.x`). This makes the **Save** button feel frozen in production and causes Compose UI tests (`createAndroidComposeRule`) to click into the modal scrim instead of the underlying screen.
-   - *Exception*: Multi-step interactive wizards with an explicit in-dialog progress state machine (`ProvisionWeMoApDialog`) intentionally remain open while showing step-by-step progress and only auto-dismiss upon completion or Cancel.
-2. **Preserve `0`-Arg `SocketFactory.createSocket()` Loopback & Test Guards (`WeMoNetworkMonitor.createWifiBoundSocketFactory` Pattern)**:
+   - *Exception*: Multi-step interactive wizards with an explicit in-dialog progress state machine (`ProvisionApDialog`) intentionally remain open while showing step-by-step progress and only auto-dismiss upon completion or Cancel.
+2. **Preserve `0`-Arg `SocketFactory.createSocket()` Loopback & Test Guards (`NetworkMonitor.createWifiBoundSocketFactory` Pattern)**:
    - `OkHttpClient` invokes the **zero-argument** `SocketFactory.createSocket()` and subsequently calls `socket.connect(endpoint, timeout)`.
    - Never bind a socket to a Wi-Fi `Network` unconditionally inside `createSocket()`. Wrap `Socket` and override `connect(endpoint, timeout)` so `wifiNet.bindSocket(this)` is **skipped** when `inetAddr.isLoopbackAddress` (`127.0.0.1` loopback test servers) or when running under Robolectric (`Build.FINGERPRINT == "robolectric"`).
-3. **Scope Singleton Room Databases Per `Application` Instance Under Robolectric (`WeMoDatabase.getDatabase` Pattern)**:
-   - Robolectric creates a fresh `Application` instance for every `@Test` method while static singletons (`WeMoDatabase.INSTANCE`) persist across tests in the same JVM process.
-   - Always track `lastAppContext` in `WeMoDatabase.getDatabase(context)` and rebuild with `Room.inMemoryDatabaseBuilder(...).allowMainThreadQueries()` under Robolectric whenever `context.applicationContext !== lastAppContext`, preventing stale SQLite connection errors and cross-test state leakage.
+3. **Scope Singleton Room Databases Per `Application` Instance Under Robolectric (`SwitchDatabase.getDatabase` Pattern)**:
+   - Robolectric creates a fresh `Application` instance for every `@Test` method while static singletons (`SwitchDatabase.INSTANCE`) persist across tests in the same JVM process.
+   - Always track `lastAppContext` in `SwitchDatabase.getDatabase(context)` and rebuild with `Room.inMemoryDatabaseBuilder(...).allowMainThreadQueries()` under Robolectric whenever `context.applicationContext !== lastAppContext`, preventing stale SQLite connection errors and cross-test state leakage.
 
 ---
 
