@@ -6,10 +6,6 @@ import org.suppressingfire.wemi.data.DeviceType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.ConnectException
 import java.net.InetSocketAddress
 import java.net.NoRouteToHostException
@@ -17,7 +13,6 @@ import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 data class ScannedAp(
     val ssid: String,
@@ -64,13 +59,12 @@ data class ProvisionResult(
 )
 
 /**
- * Zero-cloud Belkin WeMo Wi-Fi setup provisioner (`10.22.22.1`) matching
- * `pywemo/ouimeaux_device/__init__.py` and `pywemo/ouimeaux_device/api/wifi_setup.py`.
+ * Zero-cloud smart-switch Wi-Fi setup provisioner (`10.22.22.1`).
  *
  * Key reliability & diagnostic guarantees:
- * - Uses [OkHttpClient] (with `Content-Length` framing) rather than raw socket EOF reads when
+ * - Uses [LanHttpClient] (with byte-exact `Content-Length` framing) rather than raw socket EOF reads when
  *   fetching `/setup.xml` and `/Lightsetup.xml`, preventing 1000ms read timeouts on embedded
- *   WeMo HTTP servers that delay TCP `FIN`.
+ *   HTTP servers that delay TCP `FIN`.
  * - Uses an 8.5s HTTP read timeout so active 11-channel 2.4 GHz site surveys (`WiFiSetup1#GetApList`)
  *   and WPA2 handshakes complete without premature socket timeouts.
  * - Requires `NetworkStatus == 1` (or `3` handshake followed by AP close) for success; never falsely
@@ -83,15 +77,12 @@ class ProvisionerClient(
 ) {
     private val wifiSocketFactory = NetworkMonitor.createWifiBoundSocketFactory(appContext)
 
-    private val httpClient = OkHttpClient.Builder()
-        .socketFactory(wifiSocketFactory)
-        .connectTimeout(1500, TimeUnit.MILLISECONDS)
-        .readTimeout(8500, TimeUnit.MILLISECONDS)
-        .writeTimeout(2500, TimeUnit.MILLISECONDS)
-        .retryOnConnectionFailure(false)
-        .build()
+    private val httpClient = LanHttpClient(
+        socketFactory = wifiSocketFactory,
+        connectTimeoutMs = 1500,
+        readTimeoutMs = 8500
+    )
 
-    private val xmlMediaType = "text/xml; charset=\"utf-8\"".toMediaType()
     private val setupPorts = listOf(49152, 49153, 49154, 49151, 49155, 49156, 49157, 49158, 49159)
 
     @Volatile
@@ -173,28 +164,24 @@ class ProvisionerClient(
             for (path in paths) {
                 val reqStartMs = System.currentTimeMillis()
                 try {
-                    val req = Request.Builder()
-                        .url("http://$apHost:$port$path")
-                        .header("User-Agent", "WeMiSwitchControl/1.0 UPnP/1.1")
-                        .header("Connection", "close")
-                        .get()
-                        .build()
-                    httpClient.newCall(req).execute().use { resp ->
-                        val elapsed = System.currentTimeMillis() - reqStartMs
-                        val body = resp.body?.string().orEmpty()
-                        if (resp.isSuccessful && body.isNotBlank() &&
-                            (body.contains("<device", ignoreCase = true) ||
-                                body.contains("Belkin", ignoreCase = true) ||
-                                body.contains("WeMo", ignoreCase = true))
-                        ) {
-                            foundPort = port
-                            foundPath = path
-                            setupXml = body
-                            portLogs.add(":$port$path=HTTP_200(${elapsed}ms,${body.length}B)")
-                            break
-                        } else {
-                            portLogs.add(":$port$path=HTTP_${resp.code}(${elapsed}ms)")
-                        }
+                    val resp = httpClient.get(
+                        url = "http://$apHost:$port$path",
+                        headers = mapOf("User-Agent" to "WeMiSwitchControl/1.0 UPnP/1.1")
+                    )
+                    val elapsed = System.currentTimeMillis() - reqStartMs
+                    val body = resp.body
+                    if (resp.isSuccessful && body.isNotBlank() &&
+                        (body.contains("<device", ignoreCase = true) ||
+                            body.contains("Belkin", ignoreCase = true) ||
+                            body.contains("WeMo", ignoreCase = true))
+                    ) {
+                        foundPort = port
+                        foundPath = path
+                        setupXml = body
+                        portLogs.add(":$port$path=HTTP_200(${elapsed}ms,${body.length}B)")
+                        break
+                    } else {
+                        portLogs.add(":$port$path=HTTP_${resp.code}(${elapsed}ms)")
                     }
                 } catch (e: Exception) {
                     val elapsed = System.currentTimeMillis() - reqStartMs
@@ -311,21 +298,16 @@ class ProvisionerClient(
             </s:Envelope>
         """.trimIndent()
         return try {
-            val req = Request.Builder()
-                .url("http://$apHost:$port/upnp/control/metainfo1")
-                .header("SOAPACTION", "\"urn:Belkin:service:metainfo:1#GetMetaInfo\"")
-                .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                .header("Connection", "close")
-                .post(soapBody.toRequestBody(xmlMediaType))
-                .build()
-            httpClient.newCall(req).execute().use { resp ->
-                val body = resp.body?.string().orEmpty()
-                if (!resp.isSuccessful) {
-                    return "HTTP_${resp.code}" to null
-                }
-                val rawTag = extractXmlTag(body, "MetaInfo").orEmpty()
-                rawTag to XmlAndSkuParser.parseMetaInfoSoapResponse(body)
+            val resp = httpClient.postXml(
+                url = "http://$apHost:$port/upnp/control/metainfo1",
+                soapBody = soapBody,
+                soapAction = "\"urn:Belkin:service:metainfo:1#GetMetaInfo\""
+            )
+            if (!resp.isSuccessful) {
+                return "HTTP_${resp.code}" to null
             }
+            val rawTag = extractXmlTag(resp.body, "MetaInfo").orEmpty()
+            rawTag to XmlAndSkuParser.parseMetaInfoSoapResponse(resp.body)
         } catch (e: Exception) {
             "ERR_${e.javaClass.simpleName}" to null
         }
@@ -342,17 +324,13 @@ class ProvisionerClient(
             </s:Envelope>
         """.trimIndent()
         return try {
-            val req = Request.Builder()
-                .url("http://$apHost:$port/upnp/control/basicevent1")
-                .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#$action\"")
-                .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                .header("Connection", "close")
-                .post(soapBody.toRequestBody(xmlMediaType))
-                .build()
-            httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return null
-                extractXmlTag(resp.body?.string().orEmpty(), responseTag)
-            }
+            val resp = httpClient.postXml(
+                url = "http://$apHost:$port/upnp/control/basicevent1",
+                soapBody = soapBody,
+                soapAction = "\"urn:Belkin:service:basicevent:1#$action\""
+            )
+            if (!resp.isSuccessful) return null
+            extractXmlTag(resp.body, responseTag)
         } catch (_: Exception) {
             null
         }
@@ -385,26 +363,22 @@ class ProvisionerClient(
 
             val startMs = System.currentTimeMillis()
             try {
-                val req = Request.Builder()
-                    .url("http://$apHost:$resolvedPort/upnp/control/WiFiSetup1")
-                    .header("SOAPACTION", "\"urn:Belkin:service:WiFiSetup:1#$action\"")
-                    .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                    .header("Connection", "close")
-                    .post(soapBody.toRequestBody(xmlMediaType))
-                    .build()
-                httpClient.newCall(req).execute().use { resp ->
-                    val elapsed = System.currentTimeMillis() - startMs
-                    val xml = resp.body?.string().orEmpty()
-                    if (resp.isSuccessful) {
-                        val parsed = parseApListXml(xml)
-                        actionLogs.add("$action=HTTP_200(${elapsed}ms,count=${parsed.size})")
-                        if (parsed.isNotEmpty()) {
-                            lastApScanDiagnosticSummary = actionLogs.joinToString(" ")
-                            return@withContext parsed
-                        }
-                    } else {
-                        actionLogs.add("$action=HTTP_${resp.code}(${elapsed}ms)")
+                val resp = httpClient.postXml(
+                    url = "http://$apHost:$resolvedPort/upnp/control/WiFiSetup1",
+                    soapBody = soapBody,
+                    soapAction = "\"urn:Belkin:service:WiFiSetup:1#$action\""
+                )
+                val elapsed = System.currentTimeMillis() - startMs
+                val xml = resp.body
+                if (resp.isSuccessful) {
+                    val parsed = parseApListXml(xml)
+                    actionLogs.add("$action=HTTP_200(${elapsed}ms,count=${parsed.size})")
+                    if (parsed.isNotEmpty()) {
+                        lastApScanDiagnosticSummary = actionLogs.joinToString(" ")
+                        return@withContext parsed
                     }
+                } else {
+                    actionLogs.add("$action=HTTP_${resp.code}(${elapsed}ms)")
                 }
             } catch (e: Exception) {
                 val elapsed = System.currentTimeMillis() - startMs
@@ -458,8 +432,8 @@ class ProvisionerClient(
     )
 
     /**
-     * Provisions a factory-reset Belkin WeMo switch at [apHost]:[apPort] onto the target 2.4 GHz
-     * home Wi-Fi network using `pywemo`'s exact sequence and emitting live step-by-step debug telemetry.
+     * Provisions a factory-reset smart switch at [apHost]:[apPort] onto the target 2.4 GHz
+     * home Wi-Fi network and emits live step-by-step debug telemetry.
      */
     suspend fun provisionDeviceToHomeWifi(
         apHost: String = defaultApHost,
@@ -538,16 +512,12 @@ class ProvisionerClient(
                       </s:Body>
                     </s:Envelope>
                 """.trimIndent()
-                val renameReq = Request.Builder()
-                    .url("http://$apHost:$resolvedPort/upnp/control/basicevent1")
-                    .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#ChangeFriendlyName\"")
-                    .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                    .header("Connection", "close")
-                    .post(renameBody.toRequestBody(xmlMediaType))
-                    .build()
-                httpClient.newCall(renameReq).execute().use { resp ->
-                    logStep("[RENAME] ChangeFriendlyName(\"${customFriendlyName.trim()}\") -> HTTP_${resp.code}")
-                }
+                val resp = httpClient.postXml(
+                    url = "http://$apHost:$resolvedPort/upnp/control/basicevent1",
+                    soapBody = renameBody,
+                    soapAction = "\"urn:Belkin:service:basicevent:1#ChangeFriendlyName\""
+                )
+                logStep("[RENAME] ChangeFriendlyName(\"${customFriendlyName.trim()}\") -> HTTP_${resp.code}")
             }.onFailure { e ->
                 logStep("[RENAME] ChangeFriendlyName failed: ${e.javaClass.simpleName}")
             }
@@ -605,24 +575,20 @@ class ProvisionerClient(
         repeat(2) { attempt ->
             val sendStart = System.currentTimeMillis()
             try {
-                val req = Request.Builder()
-                    .url(endpoint)
-                    .header("SOAPACTION", "\"urn:Belkin:service:WiFiSetup:1#ConnectHomeNetwork\"")
-                    .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                    .header("Connection", "close")
-                    .post(connectBody.toRequestBody(xmlMediaType))
-                    .build()
-                httpClient.newCall(req).execute().use { resp ->
-                    val elapsed = System.currentTimeMillis() - sendStart
-                    val respXml = resp.body?.string().orEmpty()
-                    val pairing = extractXmlTag(respXml, "PairingStatus").orEmpty()
-                    if (pairing.isNotEmpty()) lastPairingStatus = pairing
-                    logStep(
-                        "[STEP 5 SEND #${attempt + 1}] ConnectHomeNetwork -> HTTP_${resp.code} (${elapsed}ms) PairingStatus=${pairing.ifEmpty { "n/a" }}"
-                    )
-                    if (resp.isSuccessful) {
-                        httpSuccess = true
-                    }
+                val resp = httpClient.postXml(
+                    url = endpoint,
+                    soapBody = connectBody,
+                    soapAction = "\"urn:Belkin:service:WiFiSetup:1#ConnectHomeNetwork\""
+                )
+                val elapsed = System.currentTimeMillis() - sendStart
+                val respXml = resp.body
+                val pairing = extractXmlTag(respXml, "PairingStatus").orEmpty()
+                if (pairing.isNotEmpty()) lastPairingStatus = pairing
+                logStep(
+                    "[STEP 5 SEND #${attempt + 1}] ConnectHomeNetwork -> HTTP_${resp.code} (${elapsed}ms) PairingStatus=${pairing.ifEmpty { "n/a" }}"
+                )
+                if (resp.isSuccessful) {
+                    httpSuccess = true
                 }
             } catch (e: Exception) {
                 val elapsed = System.currentTimeMillis() - sendStart
@@ -651,21 +617,17 @@ class ProvisionerClient(
             suspend fun pollOnce(pollIndex: Int): Int? {
                 val pollStart = System.currentTimeMillis()
                 return try {
-                    val statusReq = Request.Builder()
-                        .url(endpoint)
-                        .header("SOAPACTION", "\"urn:Belkin:service:WiFiSetup:1#GetNetworkStatus\"")
-                        .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                        .header("Connection", "close")
-                        .post(statusBody.toRequestBody(xmlMediaType))
-                        .build()
-                    httpClient.newCall(statusReq).execute().use { resp ->
-                        val elapsed = System.currentTimeMillis() - pollStart
-                        val body = resp.body?.string().orEmpty()
-                        val code = Regex("<NetworkStatus>(\\d+)</NetworkStatus>", RegexOption.IGNORE_CASE)
-                            .find(body)?.groupValues?.getOrNull(1)?.toIntOrNull()
-                        logStep("[POLL #$pollIndex] GetNetworkStatus -> Status=${code ?: "HTTP_${resp.code}"} (${elapsed}ms)")
-                        code
-                    }
+                    val resp = httpClient.postXml(
+                        url = endpoint,
+                        soapBody = statusBody,
+                        soapAction = "\"urn:Belkin:service:WiFiSetup:1#GetNetworkStatus\""
+                    )
+                    val elapsed = System.currentTimeMillis() - pollStart
+                    val body = resp.body
+                    val code = Regex("<NetworkStatus>(\\d+)</NetworkStatus>", RegexOption.IGNORE_CASE)
+                        .find(body)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                    logStep("[POLL #$pollIndex] GetNetworkStatus -> Status=${code ?: "HTTP_${resp.code}"} (${elapsed}ms)")
+                    code
                 } catch (e: Exception) {
                     val elapsed = System.currentTimeMillis() - pollStart
                     logStep("[POLL #$pollIndex] GetNetworkStatus -> ${e.javaClass.simpleName} (${elapsed}ms)")
@@ -729,18 +691,13 @@ class ProvisionerClient(
                           </s:Body>
                         </s:Envelope>
                     """.trimIndent()
-                    val closeReq = Request.Builder()
-                        .url(endpoint)
-                        .header("SOAPACTION", "\"urn:Belkin:service:WiFiSetup:1#CloseSetup\"")
-                        .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                        .header("Connection", "close")
-                        .post(closeBody.toRequestBody(xmlMediaType))
-                        .build()
-                    httpClient.newCall(closeReq).execute().use { resp ->
-                        val body = resp.body?.string().orEmpty()
-                        closeStatus = extractXmlTag(body, "status").orEmpty().ifBlank {
-                            if (resp.isSuccessful) "success" else "HTTP ${resp.code}"
-                        }
+                    val resp = httpClient.postXml(
+                        url = endpoint,
+                        soapBody = closeBody,
+                        soapAction = "\"urn:Belkin:service:WiFiSetup:1#CloseSetup\""
+                    )
+                    closeStatus = extractXmlTag(resp.body, "status").orEmpty().ifBlank {
+                        if (resp.isSuccessful) "success" else "HTTP ${resp.code}"
                     }
                     logStep("[STEP 6 CLOSE] CloseSetup -> $closeStatus")
                 } catch (e: Exception) {
@@ -758,16 +715,12 @@ class ProvisionerClient(
                           </s:Body>
                         </s:Envelope>
                     """.trimIndent()
-                    val doneReq = Request.Builder()
-                        .url("http://$apHost:$resolvedPort/upnp/control/basicevent1")
-                        .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#SetSetupDoneStatus\"")
-                        .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                        .header("Connection", "close")
-                        .post(doneBody.toRequestBody(xmlMediaType))
-                        .build()
-                    httpClient.newCall(doneReq).execute().use { resp ->
-                        logStep("[STEP 6 DONE] SetSetupDoneStatus -> HTTP_${resp.code}")
-                    }
+                    val resp = httpClient.postXml(
+                        url = "http://$apHost:$resolvedPort/upnp/control/basicevent1",
+                        soapBody = doneBody,
+                        soapAction = "\"urn:Belkin:service:basicevent:1#SetSetupDoneStatus\""
+                    )
+                    logStep("[STEP 6 DONE] SetSetupDoneStatus -> HTTP_${resp.code}")
                 }
             } else {
                 closeStatus = "kept_open_for_retry"

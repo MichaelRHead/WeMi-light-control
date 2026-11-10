@@ -57,7 +57,7 @@ class SkuAndCryptoTest {
     }
 
     @Test
-    fun `verify Phase 6 ProvisionerClient GetApList parsing and pywemo AES-128-CBC round-trip encryption across Methods 1, 2, and 3`() {
+    fun `verify Phase 6 ProvisionerClient GetApList parsing and OpenSSL AES-128-CBC round-trip encryption across Methods 1, 2, and 3`() {
         val provisioner = ProvisionerClient()
         val sampleApXml = """
             <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
@@ -80,7 +80,7 @@ class SkuAndCryptoTest {
         assertEquals("WPA2PSK", aps[0].authMode)
         assertEquals("AES", aps[0].encryptionType)
 
-        // Verify pywemo-exact keydata construction for Methods 1, 2, and 3
+        // Verify hardware keydata construction for Methods 1, 2, and 3
         val mac = "EC:1A:59:AA:11:22"
         val serial = "221517K01018AB"
         assertEquals(
@@ -119,7 +119,7 @@ class SkuAndCryptoTest {
         // Method 1 & Method 3 append 4-hex-digit length suffix (Base64 len 44 = 0x2c + original len 21 = 0x15 -> "2c15")
         assertTrue(method1Enc.endsWith("2c15"))
         assertTrue(method3Enc.endsWith("2c15"))
-        // Method 2 (Gen 2 RTOS) uses addLengths = false in pywemo -> pure Base64 without hex length suffix
+        // Method 2 (Gen 2 RTOS) uses addLengths = false -> pure Base64 without hex length suffix
         assertFalse(method2Enc.endsWith("2c15"))
         assertFalse(method1Enc == method2Enc)
         assertFalse(method1Enc == method3Enc)

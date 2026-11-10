@@ -9,7 +9,7 @@ import javax.crypto.spec.SecretKeySpec
 
 /**
  * Pure OpenSSL `EVP_BytesToKey` MD5 + `AES-128-CBC` Wi-Fi password encryption and decryption
- * matching `pywemo/ouimeaux_device/__init__.py` and `pywemo/ouimeaux_device/api/wifi_setup.py`:
+ * for smart-switch `10.22.22.1` `WiFiSetup1#ConnectHomeNetwork` provisioning:
  * - **Method 1** (Gen-1 OpenWrt `F7C030` / `F7C059` / `F7C063`): `mac[0..6] + serial + mac[6..12]`, `addLengths = true`
  * - **Method 2** (Gen-2 RTOS `WLS040` / `WLS0403` / `WDS060` / `WSP080`): `mac[0..6] + serial + mac[6..12] + METHOD_2_RTOS_SALT_SUFFIX`, `addLengths = false`
  * - **Method 3** (`binaryOption = 1`): `mac[0..3] + mac[9..12] + serial + METHOD_3_BINARY_OPTION_EXTRA + mac[6..9] + mac[3..6]`, `addLengths = true`

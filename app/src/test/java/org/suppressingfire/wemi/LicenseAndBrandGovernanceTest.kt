@@ -55,10 +55,13 @@ class LicenseAndBrandGovernanceTest {
         val libsToml = File(repoRoot, "gradle/libs.versions.toml")
         assertTrue("gradle/libs.versions.toml must exist", libsToml.exists())
         val libsTomlLower = libsToml.readText().lowercase()
-        val forbiddenTokens = listOf("gpl", "agpl", "lgpl", "sspl", "commons-clause")
+        val forbiddenTokens = listOf(
+            "gpl", "agpl", "lgpl", "sspl", "commons-clause",
+            "okhttp", "retrofit", "moshi", "coil", "firebase", "play-services"
+        )
         for (token in forbiddenTokens) {
             assertFalse(
-                "gradle/libs.versions.toml must not reference copyleft/restricted token '$token'",
+                "gradle/libs.versions.toml must not reference prohibited or unapproved third-party token '$token'",
                 libsTomlLower.contains(token)
             )
         }
@@ -74,6 +77,21 @@ class LicenseAndBrandGovernanceTest {
             "app/build.gradle.kts must omit dependency metadata block in APK",
             buildGradleText.contains("includeInApk = false")
         )
+        assertFalse(
+            "app/build.gradle.kts must not depend on okhttp",
+            buildGradleText.lowercase().contains("okhttp")
+        )
+
+        // Verify zero okhttp3 imports and zero pywemo references across production Kotlin sources
+        val mainJavaRoot = File(repoRoot, "app/src/main/java")
+        mainJavaRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .forEach { ktFile ->
+                val relPath = ktFile.relativeTo(repoRoot).path
+                val src = ktFile.readText()
+                assertFalse("$relPath must not import okhttp3", src.contains("okhttp3"))
+                assertFalse("$relPath must not reference pywemo", src.contains("pywemo", ignoreCase = true))
+            }
     }
 
     @Test
@@ -144,7 +162,9 @@ class LicenseAndBrandGovernanceTest {
         composeTestRule.onNodeWithTag("mit_license_text_surface").assertExists()
         composeTestRule.onNodeWithTag("third_party_notices_surface").assertExists()
         composeTestRule.onNodeWithText("Permission is hereby granted, free of charge", substring = true).assertExists()
-        composeTestRule.onNodeWithText("Third-Party Open Source Notices & Protocol Attribution:", substring = true).assertExists()
+        composeTestRule.onNodeWithText("Third-Party Open Source Notices:", substring = true).assertExists()
         composeTestRule.onNodeWithText("SIL Open Font License 1.1", substring = true).assertExists()
+        composeTestRule.onNodeWithText("OkHttp", substring = true).assertDoesNotExist()
+        composeTestRule.onNodeWithText("pywemo", substring = true).assertDoesNotExist()
     }
 }

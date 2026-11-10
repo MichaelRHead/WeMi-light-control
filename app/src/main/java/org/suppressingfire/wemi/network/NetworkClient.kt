@@ -6,10 +6,6 @@ import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
 import org.suppressingfire.wemi.data.DeviceEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.ConnectException
 import java.net.Inet4Address
 import java.net.InetSocketAddress
@@ -19,7 +15,6 @@ import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 data class SoapCallResult(
     val reachableOnLan: Boolean,
@@ -51,7 +46,7 @@ data class SsdpScanReport(
 )
 
 /**
- * Core Belkin WeMo UPnP / SOAP network client.
+ * Core UPnP / SOAP local-LAN network client.
  *
  * Responsibilities kept cohesive here:
  * - 9-port `probeWemoPort` state machine (`49153, 49152, 49154, 49151, 49155..49159`) separating
@@ -70,15 +65,11 @@ class NetworkClient(
 ) {
     private val wifiSocketFactory = NetworkMonitor.createWifiBoundSocketFactory(appContext)
 
-    private val httpClient = OkHttpClient.Builder()
-        .socketFactory(wifiSocketFactory)
-        .connectTimeout(750, TimeUnit.MILLISECONDS)
-        .readTimeout(1200, TimeUnit.MILLISECONDS)
-        .writeTimeout(900, TimeUnit.MILLISECONDS)
-        .retryOnConnectionFailure(false)
-        .build()
-
-    private val xmlMediaType = "text/xml; charset=\"utf-8\"".toMediaType()
+    private val httpClient = LanHttpClient(
+        socketFactory = wifiSocketFactory,
+        connectTimeoutMs = 750,
+        readTimeoutMs = 1200
+    )
 
     private val ssdpEngine = SsdpDiscoveryEngine(
         appContext = appContext,
@@ -198,8 +189,7 @@ class NetworkClient(
     )
 
     /**
-     * Probes a Belkin WeMo host across [PROBE_PORTS] (`49153, 49152, 49154, 49151, 49155..49159`)
-     * following `pywemo`'s `probe_wemo` algorithm:
+     * Probes a smart-switch host across [PROBE_PORTS] (`49153, 49152, 49154, 49151, 49155..49159`):
      * - Distinguishes TCP connect timeout (host offline -> abort early) from `ECONNREFUSED`
      *   (port closed -> try next port immediately) and HTTP read timeout (wedged port -> try next port).
      * - Fetches `/setup.xml` (and `/Lightsetup.xml` fallback for 1st-Gen `F7C030`).
@@ -234,33 +224,27 @@ class NetworkClient(
             val descriptorPaths = listOf("/setup.xml", "/Lightsetup.xml")
             for (path in descriptorPaths) {
                 try {
-                    val req = Request.Builder()
-                        .url("http://$ipAddress:$port$path")
-                        .header("Connection", "close")
-                        .get()
-                        .build()
-                    httpClient.newCall(req).execute().use { resp ->
-                        if (resp.isSuccessful) {
-                            val xml = resp.body?.string().orEmpty()
-                            val isBelkin = xml.contains("Belkin", ignoreCase = true) ||
-                                xml.contains("WeMo", ignoreCase = true) ||
-                                xml.contains("WeMi", ignoreCase = true) ||
-                                xml.contains("basicevent", ignoreCase = true)
-                            if (isBelkin) {
-                                if (verifyIdentity) {
-                                    val xmlSerial = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
-                                        .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
-                                    val xmlUdn = Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
-                                        .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
-                                    val matches = xmlSerial.equals(cleanExpected, ignoreCase = true) ||
-                                        xmlUdn.contains(cleanExpected, ignoreCase = true) ||
-                                        cleanExpected.contains(xmlSerial, ignoreCase = true)
-                                    if (!matches && xmlSerial.isNotEmpty()) {
-                                        return@withContext null
-                                    }
+                    val resp = httpClient.get("http://$ipAddress:$port$path")
+                    if (resp.isSuccessful) {
+                        val xml = resp.body
+                        val isBelkin = xml.contains("Belkin", ignoreCase = true) ||
+                            xml.contains("WeMo", ignoreCase = true) ||
+                            xml.contains("WeMi", ignoreCase = true) ||
+                            xml.contains("basicevent", ignoreCase = true)
+                        if (isBelkin) {
+                            if (verifyIdentity) {
+                                val xmlSerial = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
+                                    .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+                                val xmlUdn = Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
+                                    .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+                                val matches = xmlSerial.equals(cleanExpected, ignoreCase = true) ||
+                                    xmlUdn.contains(cleanExpected, ignoreCase = true) ||
+                                    cleanExpected.contains(xmlSerial, ignoreCase = true)
+                                if (!matches && xmlSerial.isNotEmpty()) {
+                                    return@withContext null
                                 }
-                                return@withContext port
                             }
+                            return@withContext port
                         }
                     }
                 } catch (_: SocketTimeoutException) {
@@ -275,7 +259,7 @@ class NetworkClient(
 
     /**
      * Executes a SOAP action against [device.port] and, if unreachable or wedged, automatically
-     * probes all 9 Belkin UPnP ports via [probeWemoPort] (and Wi-Fi-bound socket fallback) to heal
+     * probes all 9 UPnP ports via [probeWemoPort] (and Wi-Fi-bound socket fallback) to heal
      * firmware port hops without duplicating retry boilerplate across SOAP actions.
      */
     private suspend fun executeWithPortHealing(
@@ -322,7 +306,7 @@ class NetworkClient(
     }
 
     /**
-     * Sends a Belkin WeMo UPnP SOAP `SetBinaryState` call over HTTP to the device's `IP:port`.
+     * Sends a UPnP SOAP `SetBinaryState` call over HTTP to the device's `IP:port`.
      */
     suspend fun setBinaryState(
         device: DeviceEntity,
@@ -351,51 +335,46 @@ class NetworkClient(
 
         val healedResult = executeWithPortHealing(device) { port ->
             val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
-            val request = Request.Builder()
-                .url(endpoint)
-                .header("SOAPACTION", soapAction)
-                .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                .header("Connection", "close")
-                .post(soapBody.toRequestBody(xmlMediaType))
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val elapsedMs = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
-                    val respXml = response.body?.string().orEmpty()
-                    val rawState = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
-                        .find(respXml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
-                    val parts = rawState.split("|")
-                    val firstToken = parts.firstOrNull()?.trim().orEmpty()
-                    val confirmedOn = when {
-                        firstToken.equals("Error", ignoreCase = true) -> targetOn
-                        firstToken == "1" || firstToken == "8" -> true
-                        firstToken == "0" -> false
-                        else -> targetOn
-                    }
-                    val parsedBrightness = parts.getOrNull(1)?.trim()?.toIntOrNull()
-                        ?: Regex("<brightness>(\\d+)</brightness>", RegexOption.IGNORE_CASE)
-                            .find(respXml)?.groupValues?.getOrNull(1)?.toIntOrNull()
-                        ?: targetBrightness
-                        ?: device.brightness
-
-                    return@executeWithPortHealing SoapCallResult(
-                        reachableOnLan = true,
-                        binaryStateOn = confirmedOn,
-                        brightness = parsedBrightness,
-                        resolvedPort = port,
-                        latencyMs = elapsedMs,
-                        logEntry = SoapLogEntry(
-                            timestamp = nowTime(),
-                            deviceName = device.name,
-                            endpoint = endpoint,
-                            soapAction = "SetBinaryState($stateInt${if (targetBrightness != null) ", lvl=$targetBrightness%" else ""})",
-                            statusText = "HTTP ${response.code} OK (${elapsedMs}ms)",
-                            xmlSnippet = respXml.take(260).ifEmpty { soapBody },
-                            isLiveLanSuccess = true
-                        )
-                    )
+            val response = httpClient.postXml(
+                url = endpoint,
+                soapBody = soapBody,
+                soapAction = soapAction
+            )
+            if (response.isSuccessful) {
+                val elapsedMs = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
+                val respXml = response.body
+                val rawState = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
+                    .find(respXml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+                val parts = rawState.split("|")
+                val firstToken = parts.firstOrNull()?.trim().orEmpty()
+                val confirmedOn = when {
+                    firstToken.equals("Error", ignoreCase = true) -> targetOn
+                    firstToken == "1" || firstToken == "8" -> true
+                    firstToken == "0" -> false
+                    else -> targetOn
                 }
+                val parsedBrightness = parts.getOrNull(1)?.trim()?.toIntOrNull()
+                    ?: Regex("<brightness>(\\d+)</brightness>", RegexOption.IGNORE_CASE)
+                        .find(respXml)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                    ?: targetBrightness
+                    ?: device.brightness
+
+                return@executeWithPortHealing SoapCallResult(
+                    reachableOnLan = true,
+                    binaryStateOn = confirmedOn,
+                    brightness = parsedBrightness,
+                    resolvedPort = port,
+                    latencyMs = elapsedMs,
+                    logEntry = SoapLogEntry(
+                        timestamp = nowTime(),
+                        deviceName = device.name,
+                        endpoint = endpoint,
+                        soapAction = "SetBinaryState($stateInt${if (targetBrightness != null) ", lvl=$targetBrightness%" else ""})",
+                        statusText = "HTTP ${response.code} OK (${elapsedMs}ms)",
+                        xmlSnippet = respXml.take(260).ifEmpty { soapBody },
+                        isLiveLanSuccess = true
+                    )
+                )
             }
             null
         }
@@ -439,45 +418,40 @@ class NetworkClient(
 
         val healedResult = executeWithPortHealing(device) { port ->
             val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
-            val request = Request.Builder()
-                .url(endpoint)
-                .header("SOAPACTION", soapAction)
-                .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                .header("Connection", "close")
-                .post(soapBody.toRequestBody(xmlMediaType))
-                .build()
-
-            httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) {
-                    val elapsedMs = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
-                    val bodyStr = response.body?.string().orEmpty()
-                    val rawState = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
-                        .find(bodyStr)?.groupValues?.getOrNull(1).orEmpty()
-                    val parts = rawState.split("|")
-                    val isOn = parts.firstOrNull()?.trim().let { it == "1" || it == "8" }
-                    val parsedBrightness = parts.getOrNull(1)?.trim()?.toIntOrNull()
-                        ?: Regex("<brightness>(\\d+)</brightness>", RegexOption.IGNORE_CASE).find(bodyStr)
-                            ?.groupValues?.getOrNull(1)?.toIntOrNull()
-                    val nightMode = Regex("<NightMode>(\\d+)</NightMode>", RegexOption.IGNORE_CASE).find(bodyStr)
-                        ?.groupValues?.getOrNull(1)?.let { it == "1" }
-                    return@executeWithPortHealing SoapCallResult(
-                        reachableOnLan = true,
-                        binaryStateOn = isOn,
-                        brightness = parsedBrightness,
-                        resolvedPort = port,
-                        latencyMs = elapsedMs,
-                        logEntry = SoapLogEntry(
-                            timestamp = nowTime(),
-                            deviceName = device.name,
-                            endpoint = endpoint,
-                            soapAction = "GetBinaryState",
-                            statusText = "HTTP ${response.code} OK (Live LAN)",
-                            xmlSnippet = bodyStr.take(260).ifEmpty { soapBody },
-                            isLiveLanSuccess = true
-                        ),
-                        nightModeEnabled = nightMode
-                    )
-                }
+            val response = httpClient.postXml(
+                url = endpoint,
+                soapBody = soapBody,
+                soapAction = soapAction
+            )
+            if (response.isSuccessful) {
+                val elapsedMs = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
+                val bodyStr = response.body
+                val rawState = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
+                    .find(bodyStr)?.groupValues?.getOrNull(1).orEmpty()
+                val parts = rawState.split("|")
+                val isOn = parts.firstOrNull()?.trim().let { it == "1" || it == "8" }
+                val parsedBrightness = parts.getOrNull(1)?.trim()?.toIntOrNull()
+                    ?: Regex("<brightness>(\\d+)</brightness>", RegexOption.IGNORE_CASE).find(bodyStr)
+                        ?.groupValues?.getOrNull(1)?.toIntOrNull()
+                val nightMode = Regex("<NightMode>(\\d+)</NightMode>", RegexOption.IGNORE_CASE).find(bodyStr)
+                    ?.groupValues?.getOrNull(1)?.let { it == "1" }
+                return@executeWithPortHealing SoapCallResult(
+                    reachableOnLan = true,
+                    binaryStateOn = isOn,
+                    brightness = parsedBrightness,
+                    resolvedPort = port,
+                    latencyMs = elapsedMs,
+                    logEntry = SoapLogEntry(
+                        timestamp = nowTime(),
+                        deviceName = device.name,
+                        endpoint = endpoint,
+                        soapAction = "GetBinaryState",
+                        statusText = "HTTP ${response.code} OK (Live LAN)",
+                        xmlSnippet = bodyStr.take(260).ifEmpty { soapBody },
+                        isLiveLanSuccess = true
+                    ),
+                    nightModeEnabled = nightMode
+                )
             }
             null
         }
@@ -517,18 +491,13 @@ class NetworkClient(
         """.trimIndent()
 
         try {
-            val req = Request.Builder()
-                .url("http://$ipAddress:$port/upnp/control/metainfo1")
-                .header("SOAPACTION", "\"urn:Belkin:service:metainfo:1#GetMetaInfo\"")
-                .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                .header("Connection", "close")
-                .post(soapBody.toRequestBody(xmlMediaType))
-                .build()
-            httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext null
-                val body = resp.body?.string().orEmpty()
-                return@withContext XmlAndSkuParser.parseMetaInfoSoapResponse(body)
-            }
+            val resp = httpClient.postXml(
+                url = "http://$ipAddress:$port/upnp/control/metainfo1",
+                soapBody = soapBody,
+                soapAction = "\"urn:Belkin:service:metainfo:1#GetMetaInfo\""
+            )
+            if (!resp.isSuccessful) return@withContext null
+            XmlAndSkuParser.parseMetaInfoSoapResponse(resp.body)
         } catch (_: Exception) {
             null
         }
@@ -549,25 +518,20 @@ class NetworkClient(
         """.trimIndent()
 
         try {
-            val req = Request.Builder()
-                .url("http://$ipAddress:$port/upnp/control/basicevent1")
-                .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#GetSignalStrength\"")
-                .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                .header("Connection", "close")
-                .post(soapBody.toRequestBody(xmlMediaType))
-                .build()
-            httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext null
-                val body = resp.body?.string().orEmpty()
-                return@withContext XmlAndSkuParser.parseSignalStrengthSoapResponse(body)
-            }
+            val resp = httpClient.postXml(
+                url = "http://$ipAddress:$port/upnp/control/basicevent1",
+                soapBody = soapBody,
+                soapAction = "\"urn:Belkin:service:basicevent:1#GetSignalStrength\""
+            )
+            if (!resp.isSuccessful) return@withContext null
+            XmlAndSkuParser.parseSignalStrengthSoapResponse(resp.body)
         } catch (_: Exception) {
             null
         }
     }
 
     /**
-     * Updates the hardware `friendlyName` stored in the physical Belkin WeMo switch's NVRAM
+     * Updates the hardware `friendlyName` stored in the physical switch's NVRAM
      * via `urn:Belkin:service:basicevent:1#ChangeFriendlyName`.
      */
     suspend fun changeFriendlyName(
@@ -593,34 +557,30 @@ class NetworkClient(
 
         val healedResult = executeWithPortHealing(device) { port ->
             val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
-            val req = Request.Builder()
-                .url(endpoint)
-                .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#ChangeFriendlyName\"")
-                .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                .header("Connection", "close")
-                .post(soapBody.toRequestBody(xmlMediaType))
-                .build()
-            httpClient.newCall(req).execute().use { resp ->
-                val elapsed = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
-                val respXml = resp.body?.string().orEmpty()
-                if (resp.isSuccessful) {
-                    return@executeWithPortHealing SoapCallResult(
-                        reachableOnLan = true,
-                        binaryStateOn = device.isOn,
-                        brightness = device.brightness,
-                        resolvedPort = port,
-                        latencyMs = elapsed,
-                        logEntry = SoapLogEntry(
-                            timestamp = nowTime(),
-                            deviceName = newFriendlyName,
-                            endpoint = endpoint,
-                            soapAction = "ChangeFriendlyName($newFriendlyName)",
-                            statusText = "HTTP ${resp.code} OK (${elapsed}ms)",
-                            xmlSnippet = respXml.take(260).ifEmpty { soapBody },
-                            isLiveLanSuccess = true
-                        )
+            val resp = httpClient.postXml(
+                url = endpoint,
+                soapBody = soapBody,
+                soapAction = "\"urn:Belkin:service:basicevent:1#ChangeFriendlyName\""
+            )
+            val elapsed = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
+            val respXml = resp.body
+            if (resp.isSuccessful) {
+                return@executeWithPortHealing SoapCallResult(
+                    reachableOnLan = true,
+                    binaryStateOn = device.isOn,
+                    brightness = device.brightness,
+                    resolvedPort = port,
+                    latencyMs = elapsed,
+                    logEntry = SoapLogEntry(
+                        timestamp = nowTime(),
+                        deviceName = newFriendlyName,
+                        endpoint = endpoint,
+                        soapAction = "ChangeFriendlyName($newFriendlyName)",
+                        statusText = "HTTP ${resp.code} OK (${elapsed}ms)",
+                        xmlSnippet = respXml.take(260).ifEmpty { soapBody },
+                        isLiveLanSuccess = true
                     )
-                }
+                )
             }
             null
         }
@@ -646,7 +606,7 @@ class NetworkClient(
     }
 
     /**
-     * Configures Night Mode on Belkin WeMo Smart Dimmers (`F7C059` / `WDS060`) via `ConfigureNightMode`.
+     * Configures Night Mode on Smart Dimmers (`F7C059` / `WDS060`) via `ConfigureNightMode`.
      */
     suspend fun configureNightMode(
         device: DeviceEntity,
@@ -672,35 +632,31 @@ class NetworkClient(
         """.trimIndent()
         val healedResult = executeWithPortHealing(device) { port ->
             val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
-            val req = Request.Builder()
-                .url(endpoint)
-                .header("SOAPACTION", "\"urn:Belkin:service:basicevent:1#ConfigureNightMode\"")
-                .header("Content-Type", "text/xml; charset=\"utf-8\"")
-                .header("Connection", "close")
-                .post(soapBody.toRequestBody(xmlMediaType))
-                .build()
-            httpClient.newCall(req).execute().use { resp ->
-                val elapsed = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
-                val respXml = resp.body?.string().orEmpty()
-                if (resp.isSuccessful) {
-                    return@executeWithPortHealing SoapCallResult(
-                        reachableOnLan = true,
-                        binaryStateOn = device.isOn,
-                        brightness = device.brightness,
-                        resolvedPort = port,
-                        latencyMs = elapsed,
-                        logEntry = SoapLogEntry(
-                            timestamp = nowTime(),
-                            deviceName = device.name,
-                            endpoint = endpoint,
-                            soapAction = "ConfigureNightMode($modeInt, ${nightBrightness}%)",
-                            statusText = "HTTP ${resp.code} OK (${elapsed}ms)",
-                            xmlSnippet = respXml.take(260).ifEmpty { soapBody },
-                            isLiveLanSuccess = true
-                        ),
-                        nightModeEnabled = enabled
-                    )
-                }
+            val resp = httpClient.postXml(
+                url = endpoint,
+                soapBody = soapBody,
+                soapAction = "\"urn:Belkin:service:basicevent:1#ConfigureNightMode\""
+            )
+            val elapsed = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
+            val respXml = resp.body
+            if (resp.isSuccessful) {
+                return@executeWithPortHealing SoapCallResult(
+                    reachableOnLan = true,
+                    binaryStateOn = device.isOn,
+                    brightness = device.brightness,
+                    resolvedPort = port,
+                    latencyMs = elapsed,
+                    logEntry = SoapLogEntry(
+                        timestamp = nowTime(),
+                        deviceName = device.name,
+                        endpoint = endpoint,
+                        soapAction = "ConfigureNightMode($modeInt, ${nightBrightness}%)",
+                        statusText = "HTTP ${resp.code} OK (${elapsed}ms)",
+                        xmlSnippet = respXml.take(260).ifEmpty { soapBody },
+                        isLiveLanSuccess = true
+                    ),
+                    nightModeEnabled = enabled
+                )
             }
             null
         }
@@ -738,15 +694,9 @@ class NetworkClient(
         isLiveUdp: Boolean
     ): SsdpDiscoveredDevice? = withContext(Dispatchers.IO) {
         try {
-            val req = Request.Builder()
-                .url(locationUrl)
-                .header("Connection", "close")
-                .get()
-                .build()
-            val xml = httpClient.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) return@withContext null
-                resp.body?.string().orEmpty()
-            }
+            val resp = httpClient.get(locationUrl)
+            if (!resp.isSuccessful) return@withContext null
+            val xml = resp.body
             val isBelkinWeMo = xml.contains("Belkin", ignoreCase = true) ||
                 xml.contains("WeMo", ignoreCase = true) ||
                 xml.contains("WeMi", ignoreCase = true) ||

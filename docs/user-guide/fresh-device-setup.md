@@ -73,7 +73,7 @@ Inside the **Provision New WeMo AP (`10.22.22.1`)** dialog:
      - **Method 1 (Gen 1 OpenWrt)**: `F7C030` Light Switch, `F7C059` Dimmer, `F7C063` Mini Plug.
      - **Method 2 (Gen 2 RTOS)**: `WLS040` / `WLS0403` 3-Way Switch, `WDS060` Dimmer, `WSP080` Mini Plug.
      - **Method 3 (Symmetric `<binaryOption>1</binaryOption>`)**: Newer symmetric-key firmware builds.
-   - If your switch rejects the password (`NetworkStatus=0` or `2`), you can manually test any of the 6 `pywemo` encryption permutations by combining **`Gen 1 (OpenWrt)`** / **`Gen 2 (RTOS)`** / **`Method 3 (Sym)`** with **`Append xxyy`** or **`No Suffix`**.
+   - If your switch rejects the password (`NetworkStatus=0` or `2`), you can manually test any of the 6 hardware encryption permutations by combining **`Gen 1 (OpenWrt)`** / **`Gen 2 (RTOS)`** / **`Method 3 (Sym)`** with **`Append xxyy`** or **`No Suffix`**.
 6. **Tap `Provision Switch`**:
    - The app sets your custom `<FriendlyName>` on the hardware, encrypts your Wi-Fi password using Belkin's exact OpenSSL AES-128-CBC key derivation, double-sends `ConnectHomeNetwork`, polls `GetNetworkStatus` for up to 20 seconds while the switch joins your 2.4 GHz router, closes the setup AP (`CloseSetup` + `SetSetupDoneStatus`) only when connection succeeds (`NetworkStatus = 1` or `3`), and saves the switch into your Wi-Fi Home.
    - If connection fails (`NetworkStatus = 0` or `2`), the app **does not** call `CloseSetup`, keeping the switch's `10.22.22.1` Setup AP open and keeping the dialog on screen so you can inspect the debug trace and retry immediately.

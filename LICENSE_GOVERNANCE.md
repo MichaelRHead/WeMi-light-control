@@ -33,10 +33,12 @@ Because the app interoperates over local Wi-Fi with physical switches from **Bel
 
 1. **First-Party Open-Source Licensing & In-App Parity (`LICENSE` ↔ `MoreScreen.kt`)**:
    - The repository root [`LICENSE`](LICENSE) file and the expandable **Open Source License** card (`open_source_licenses_card`) on the **More** tab ([`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt)) must remain in lockstep under the standard OSI MIT License.
-2. **Permissive-Only Third-Party Dependency Allowlist (`gradle/libs.versions.toml` & `app/build.gradle.kts`)**:
-   - Every runtime, compile-time, and test dependency in the Gradle version catalog must be audited and approved under a permissive license (`Apache-2.0`, `MIT`, `BSD`, or `EPL` for test-only JUnit runners). Copyleft (`GPL`, `AGPL`, `LGPL`), server-side restricted (`SSPL`, `Commons Clause`), or proprietary closed-source telemetry/ad SDKs are strictly prohibited.
-3. **Clean-Room Protocol Reference Attribution (`pywemo` & Third-Party Notices)**:
-   - While **WeMi Light Control** contains zero copied code from third-party repositories, its local UPnP / SSDP / SOAP / GENA wire-protocol behavior and OpenSSL `EVP_BytesToKey` MD5 AES-128-CBC Wi-Fi setup encryption ([`PasswordCrypto.kt`](app/src/main/java/org/suppressingfire/wemi/network/PasswordCrypto.kt)) were designed for clean-room interoperability informed by the open-source `pywemo` project (`MIT License`). Both in-repo documentation and the in-app **Open Source License** card provide clear third-party attributions.
+2. **Minimal, Permissive-Only Third-Party Dependency Footprint (`gradle/libs.versions.toml` & `app/build.gradle.kts`)**:
+   - Runtime software dependencies are minimized strictly to first-party platform libraries (**AndroidX / Jetpack Compose / Room** and **Kotlin / Kotlinx Coroutines** under `Apache-2.0`) plus the two bundled UI fonts (**Comfortaa** and **Work Sans** under `OFL-1.1`).
+   - All local UPnP / SSDP / SOAP / GENA HTTP/1.1 framing ([`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt)) and OpenSSL `EVP_BytesToKey` AES-128-CBC Wi-Fi setup encryption ([`PasswordCrypto.kt`](app/src/main/java/org/suppressingfire/wemi/network/PasswordCrypto.kt)) are implemented directly in first-party Kotlin over JDK `SocketFactory` / `javax.crypto` without third-party HTTP, JSON, image, or cloud SDKs (`OkHttp`, `Retrofit`, `Moshi`, `Coil`, `Firebase`, and `Play Services` are excluded).
+   - Copyleft (`GPL`, `AGPL`, `LGPL`), server-side restricted (`SSPL`, `Commons Clause`), or proprietary closed-source telemetry/ad SDKs are strictly prohibited.
+3. **Accurate In-App Open-Source Attribution (`MoreScreen.kt`)**:
+   - **WeMi Light Control** includes zero code from external smart-home projects (such as `pywemo`) and only lists third-party open-source components actually shipped in the APK/AAB (**AndroidX / Jetpack Compose / Room** `Apache-2.0`, **Kotlin & Coroutines** `Apache-2.0`, and **Comfortaa & Work Sans** `SIL Open Font License 1.1`).
 4. **Trademark, Brand & Package Namespace Hygiene (`"WeMi"` & `org.suppressingfire.wemi` vs. `"WeMo"`)**:
    - **WeMi Light Control** is an independent project and is not affiliated with, endorsed by, or sponsored by Belkin International, Inc.
    - All Kotlin source and test packages reside under `org.suppressingfire.wemi` (never `com.example`), no Kotlin source/test file uses a `WeMo*.kt` filename prefix, and all user-facing UI strings, app titles, and Google Play Store listing assets describe hardware compatibility neutrally as **"Belkin's discontinued smart switch platform"** or **"Smart Switch"**—reserving `"WeMo"` / `"wemo"` strictly for hardware wire-protocol literals (`urn:Belkin:*`, `WeMo.Light.*`, `Wemo.LS3W.*`, `/setup.xml`, `WeMo_WW_*`) and existing Room v5 SQLite table names (`wemo_devices`, `wemo_home_networks`, `wemo_rules`).
@@ -49,14 +51,14 @@ Because the app interoperates over local Wi-Fi with physical switches from **Bel
 flowchart TD
     subgraph Repo["Repository & Build Governance"]
         LIC["Root LICENSE File\n(MIT License • Copyright (c) 2026 Michael R. Head & Contributors)"]
-        TOML["gradle/libs.versions.toml & app/build.gradle.kts\n(Permissive Dependency Allowlist: Apache-2.0 / MIT / BSD)"]
+        TOML["gradle/libs.versions.toml & app/build.gradle.kts\n(Minimal Runtime Footprint: AndroidX + Kotlin Apache-2.0 Only)"]
         PKG["Package & File Hygiene\n(package org.suppressingfire.wemi • Zero WeMo*.kt files)"]
     end
 
     subgraph AppUI["In-App Attribution & Brand Boundary"]
-        MORE["MoreScreen.kt\n(open_source_licenses_card & toggle_license_details_button\nMIT License + Third-Party Notices)"]
+        MORE["MoreScreen.kt\n(open_source_licenses_card & toggle_license_details_button\nMIT License + Shipped Third-Party Notices)"]
         COPY["User-Facing Copy & Play Store Assets\n(strings.xml, metadata.json, play_store_assets/*\nZero 'WeMo' Brand Leaks)"]
-        WIRE["Hardware Wire-Protocol Layer\n(XmlAndSkuParser, ProvisionerClient, SwitchDao\nStrict Protocol-Only 'WeMo.*' / 'wemo_*' Literals)"]
+        WIRE["First-Party Network & Protocol Layer\n(LanHttpClient, XmlAndSkuParser, ProvisionerClient, SwitchDao\nZero Third-Party HTTP SDKs)"]
     end
 
     subgraph Gate["Automated Verification & Stage 5 Release Gate"]
@@ -80,10 +82,11 @@ flowchart TD
 | File | Governance Role |
 | :--- | :--- |
 | [`LICENSE`](LICENSE) | Canonical OSI **MIT License** text (`Copyright (c) 2026 Michael R. Head and WeMi Light Control Contributors`). |
-| [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) | Renders the in-app **Open Source License** card (`open_source_licenses_card`) and **`View License` / `Hide`** toggle (`toggle_license_details_button`), displaying the full MIT License and Third-Party Open Source Notices (`Apache-2.0` AndroidX/Compose/Kotlin/Room/OkHttp, `OFL-1.1` Comfortaa & Work Sans typefaces, and `MIT` `pywemo` protocol reference). |
-| [`gradle/libs.versions.toml`](gradle/libs.versions.toml), [`app/build.gradle.kts`](app/build.gradle.kts) & [`app/src/main/res/font/`](app/src/main/res/font/) | Declares all build plugins, runtime libraries, test dependencies, bundled `OFL-1.1` fonts (`comfortaa.ttf`, `work_sans.ttf`), `namespace = "org.suppressingfire.wemi"`, and `dependenciesInfo { includeInApk = false; includeInBundle = true }`. |
+| [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) | Renders the in-app **Open Source License** card (`open_source_licenses_card`) and **`View License` / `Hide`** toggle (`toggle_license_details_button`), displaying the full MIT License and accurate Third-Party Open Source Notices (`Apache-2.0` AndroidX/Compose/Room and Kotlin/Coroutines, plus `OFL-1.1` Comfortaa & Work Sans typefaces). |
+| [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) | Zero-dependency first-party local-LAN HTTP/1.1 & UPnP GENA client built directly on JDK `SocketFactory`, eliminating external HTTP client libraries (`OkHttp`/`Retrofit`) from the runtime footprint. |
+| [`gradle/libs.versions.toml`](gradle/libs.versions.toml), [`app/build.gradle.kts`](app/build.gradle.kts) & [`app/src/main/res/font/`](app/src/main/res/font/) | Declares the minimal set of build plugins (`android-application`, `kotlin-compose`, `google-devtools-ksp`), runtime libraries (AndroidX + Kotlin Coroutines), test dependencies, bundled `OFL-1.1` fonts (`comfortaa.ttf`, `work_sans.ttf`), `namespace = "org.suppressingfire.wemi"`, and `dependenciesInfo { includeInApk = false; includeInBundle = true }`. |
 | [`strings.xml`](app/src/main/res/values/strings.xml), [`metadata.json`](metadata.json), [`play_store_assets/`](play_store_assets/) & [`scripts/GeneratePlayStoreAssets.java`](scripts/GeneratePlayStoreAssets.java) | User-facing app name (`WeMi Switch Control`), header wordmarks, store listing (`STORE_LISTING.md`), release notes (`RELEASE_NOTES.txt`), privacy policy (`PRIVACY_POLICY.md`), data safety guide (`DATA_SAFETY_GUIDE.md`), and deterministic Play Store screenshot/banner/icon generator (`GeneratePlayStoreAssets.java`). |
-| [`LicenseAndBrandGovernanceTest.kt`](app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt) | Automated Robolectric + Compose UI governance test suite verifying MIT license parity, dependency allowlist compliance, `OFL-1.1` font attribution, `org.suppressingfire.wemi` package/filename hygiene, trademark boundary compliance, and in-app license card rendering. |
+| [`LicenseAndBrandGovernanceTest.kt`](app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt) | Automated Robolectric + Compose UI governance test suite verifying MIT license parity, minimal dependency allowlist compliance (excluding `OkHttp`/`Retrofit`/`Moshi`/`Coil`/`Firebase`/`Play Services`), `OFL-1.1` font attribution, `org.suppressingfire.wemi` package/filename hygiene, trademark boundary compliance, and in-app license card rendering. |
 
 ---
 
@@ -93,13 +96,13 @@ flowchart TD
 
 | Tier | Policy Status | Permitted SPDX Identifiers | Scope & Rules |
 | :---: | :---: | :--- | :--- |
-| **Tier A** | **Approved (Runtime, Assets & Test)** | `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `0BSD`, `OFL-1.1`, `CC0-1.0` | Permissive software and open font licenses fully compatible with MIT source distribution and Google Play APK/AAB distribution without copyleft source-disclosure obligations. |
+| **Tier A** | **Approved (Runtime, Assets & Test)** | `MIT`, `Apache-2.0`, `BSD-2-Clause`, `BSD-3-Clause`, `ISC`, `0BSD`, `OFL-1.1`, `CC0-1.0` | Permissive software and open font licenses compatible with MIT source distribution and Google Play APK/AAB distribution. **Runtime library policy**: minimize third-party code; prefer first-party JDK/Android APIs unless explicitly approved here. |
 | **Tier B** | **Approved (Test & Build Tooling Only)** | `EPL-1.0`, `EPL-2.0`, `GPL-2.0-with-classpath-exception` | Permitted strictly for `testImplementation`, `androidTestImplementation`, or JDK/Gradle build tooling (e.g., JUnit 4 `EPL-1.0`, OpenJDK 21 `GPL-2.0-with-classpath-exception`) that is **never** packaged into the production APK/AAB. |
-| **Tier C** | **Strictly Prohibited** | `GPL-2.0-only`, `GPL-3.0-*`, `AGPL-3.0-*`, `LGPL-*`, `SSPL-1.0`, `Commons Clause`, `Proprietary Ad/Tracker SDKs` | **Never permitted** in `gradle/libs.versions.toml` or `app/build.gradle.kts`. Any PR or commit adding a Tier C dependency must be rejected during Stage 5 (`license_governance`) review. |
+| **Tier C** | **Strictly Prohibited** | `GPL-2.0-only`, `GPL-3.0-*`, `AGPL-3.0-*`, `LGPL-*`, `SSPL-1.0`, `Commons Clause`, `Proprietary Ad/Tracker SDKs`, unapproved 3rd-party SDKs | **Never permitted** in `gradle/libs.versions.toml` or `app/build.gradle.kts`. Any PR or commit adding a Tier C or unapproved third-party dependency must be rejected during Stage 5 (`license_governance`) review. |
 
-### 3.2 Audited Dependency & Bundled Font Inventory (`gradle/libs.versions.toml`, `app/build.gradle.kts` & `app/src/main/res/font/`)
+### 3.2 Complete Dependency & Bundled Font Inventory (`gradle/libs.versions.toml`, `app/build.gradle.kts` & `app/src/main/res/font/`)
 
-All active runtime, compiler, bundled font, and test dependencies in **WeMi Light Control** have been audited and verified:
+All active runtime, compiler, bundled font, and test dependencies in **WeMi Light Control** have been streamlined and audited:
 
 | Dependency Group / Artifact | Version (`libs.versions.toml`) | Configuration Scope | SPDX License | Copyright / Maintainer | Governance Status |
 | :--- | :---: | :---: | :---: | :--- | :---: |
@@ -107,19 +110,12 @@ All active runtime, compiler, bundled font, and test dependencies in **WeMi Ligh
 | **Jetpack Compose UI & Material 3** (`androidx.compose:compose-bom`, `ui`, `ui-graphics`, `material3`, `material-icons-*`) | `2024.09.00` | `implementation` / `debugImplementation` | `Apache-2.0` | The Android Open Source Project (Google) | **Tier A Approved** |
 | **AndroidX Room Persistence** (`androidx.room:room-runtime`, `room-ktx`, `room-compiler`) | `2.7.0` | `implementation` / `ksp` | `Apache-2.0` | The Android Open Source Project (Google) | **Tier A Approved** |
 | **Kotlin Standard Library & Coroutines** (`org.jetbrains.kotlin:*`, `org.jetbrains.kotlinx:kotlinx-coroutines-core`, `kotlinx-coroutines-android`) | `2.2.10` / `1.10.2` | `implementation` | `Apache-2.0` | JetBrains s.r.o. and Kotlin Programming Language Contributors | **Tier A Approved** |
-| **Square OkHttp** (`com.squareup.okhttp3:okhttp`) | `4.10.0` | `implementation` | `Apache-2.0` | Square, Inc. | **Tier A Approved** |
 | **Comfortaa & Work Sans Typefaces** (`app/src/main/res/font/comfortaa.ttf`, `work_sans.ttf`) | Bundled TTF | `res/font` & `GeneratePlayStoreAssets.java` | `OFL-1.1` | The Comfortaa Project Authors / The Work Sans Project Authors | **Tier A Approved** |
 | **Google Symbol Processing (KSP)** (`com.google.devtools.ksp`) | `2.3.5` | `plugin` / `ksp` | `Apache-2.0` | Google LLC | **Tier A Approved** |
-| **Secrets Gradle Plugin** (`com.google.android.libraries.mapsplatform.secrets-gradle-plugin`) | `2.0.1` | `plugin` | `Apache-2.0` | Google LLC | **Tier A Approved** |
 | **Robolectric** (`org.robolectric:robolectric`) | `4.16.1` | `testImplementation` | `MIT` | Robolectric Contributors | **Tier A/B Approved** |
 | **AndroidX Test & Espresso** (`androidx.test:core`, `runner`, `ext:junit`, `espresso-core`, `ui-test-junit4`) | `1.6.1` / `1.3.0` / `3.7.0` | `testImplementation` / `androidTestImplementation` | `Apache-2.0` | The Android Open Source Project (Google) | **Tier A/B Approved** |
 | **Kotlinx Coroutines Test** (`org.jetbrains.kotlinx:kotlinx-coroutines-test`) | `1.10.2` | `testImplementation` | `Apache-2.0` | JetBrains s.r.o. | **Tier A/B Approved** |
 | **JUnit 4** (`junit:junit`) | `4.13.2` | `testImplementation` | `EPL-1.0` | JUnit Team | **Tier B Approved (Test-Only)** |
-
-### 3.3 Clean-Room Protocol & Architectural Attribution (`pywemo`)
-
-- **Protocol Reference**: `pywemo` (`https://github.com/pywemo/pywemo`) — **MIT License** (`Copyright (c) pywemo contributors`).
-- **Nature of Use**: **WeMi Light Control** is a 100% original Kotlin and Jetpack Compose codebase (`org.suppressingfire.wemi`). Wire-protocol documentation (`.agents/skills/wemi-light-control/references/wemo-upnp-protocol.md`), UPnP/SSDP/SOAP/GENA endpoint paths (`/setup.xml`, `/upnp/control/basicevent1`, `/upnp/control/WiFiSetup1`, `/upnp/control/metainfo1`), and OpenSSL `EVP_BytesToKey` AES-128-CBC key derivation parameters (`Methods 1, 2 & 3` in [`PasswordCrypto.kt`](app/src/main/java/org/suppressingfire/wemi/network/PasswordCrypto.kt)) were implemented in clean-room Kotlin for local LAN interoperability and credit the `pywemo` community under the MIT License.
 
 ---
 
@@ -129,9 +125,9 @@ All agents modifying code, build scripts, resources, or documentation must prese
 
 1. **Invariant 1 — Root [`LICENSE`](LICENSE) & In-App [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) Parity**:
    - Root [`LICENSE`](LICENSE) must contain the complete OSI MIT License with `Copyright (c) 2026 Michael R. Head and WeMi Light Control Contributors`.
-   - [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) must render `open_source_licenses_card` and `toggle_license_details_button`, and expanding it must show both the MIT License text (`mit_license_text_surface`) and the Third-Party Open Source Notices (`third_party_notices_surface`), including `Apache-2.0` libraries, `OFL-1.1` bundled fonts (`Comfortaa` & `Work Sans`), and `MIT` `pywemo` attribution.
-2. **Invariant 2 — Permissive Dependency Allowlist Enforcement**:
-   - No dependency or bundled asset may be added to [`gradle/libs.versions.toml`](gradle/libs.versions.toml), [`app/build.gradle.kts`](app/build.gradle.kts), or `app/src/main/res/` unless its license is verified as **Tier A** (`MIT`, `Apache-2.0`, `BSD-*`, `ISC`, `OFL-1.1`) or **Tier B** (test-only) and registered in [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) and [`LicenseAndBrandGovernanceTest.kt`](app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt).
+   - [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) must render `open_source_licenses_card` and `toggle_license_details_button`, and expanding it must show both the MIT License text (`mit_license_text_surface`) and accurate Third-Party Open Source Notices (`third_party_notices_surface`) listing only shipped components (`Apache-2.0` AndroidX & Kotlin libraries and `OFL-1.1` `Comfortaa` & `Work Sans` fonts).
+2. **Invariant 2 — Minimal Third-Party Dependency Allowlist Enforcement**:
+   - Runtime dependencies are restricted to AndroidX, Jetpack Compose, Room, and Kotlin/Coroutines (`Apache-2.0`) plus the bundled `OFL-1.1` fonts. Do **not** re-introduce third-party networking/JSON/image/cloud libraries (`OkHttp`, `Retrofit`, `Moshi`, `Coil`, `Firebase`, `Play Services`) or any unapproved third-party dependency without explicit user approval and registration in [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) and [`LicenseAndBrandGovernanceTest.kt`](app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt).
    - `dependenciesInfo { includeInApk = false; includeInBundle = true }` in [`app/build.gradle.kts`](app/build.gradle.kts) must keep `includeInApk = false` so standalone/F-Droid/GitHub debug & release APKs remain free of proprietary Google Play dependency metadata blobs while AAB bundles remain Play Console compliant.
 3. **Invariant 3 — `org.suppressingfire.wemi` Package Namespace & Zero `WeMo*.kt` File Prefix**:
    - `namespace = "org.suppressingfire.wemi"` in [`app/build.gradle.kts`](app/build.gradle.kts) must be preserved (`applicationId = "com.aistudio.wemiswitch.kxpqzr"` is retained for AI Studio & Play Store package continuity).

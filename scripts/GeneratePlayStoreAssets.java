@@ -1086,7 +1086,7 @@ public class GeneratePlayStoreAssets {
             {"SetBinaryState (1) • Christmas Tree Living", "POST /upnp/control/basicevent1 -> 200 OK (11ms)"},
             {"SUBSCRIBE • GENA Push Eventing", "CALLBACK: <http://192.168.1.50:39412/upnp/event>"},
             {"ConfigureNightMode (20%) • Lightbulb Landing", "POST /upnp/control/basicevent1 -> 200 OK (12ms)"},
-            {"Open Source Notices: AndroidX, Compose, Room", "pywemo MIT Protocol Reference (Clean-Room Kotlin)"}
+            {"Open Source Notices: AndroidX, Compose, Room", "Kotlin (Apache-2.0) • Comfortaa & Work Sans (OFL-1.1)"}
         };
         int liy = ry + (int) (58 * s);
         for (String[] li : lItems) {

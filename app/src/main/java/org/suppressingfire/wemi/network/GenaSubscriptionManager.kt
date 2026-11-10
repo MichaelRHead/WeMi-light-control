@@ -10,9 +10,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
@@ -23,7 +20,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.SocketFactory
 
@@ -48,8 +44,7 @@ data class GenaSubscriptionRecord(
 )
 
 /**
- * Implements Belkin WeMo UPnP GENA (General Event Notification Architecture) local push
- * subscriptions matching pywemo/subscribe.py:
+ * Implements UPnP GENA (General Event Notification Architecture) local push subscriptions:
  * - Runs a lightweight embedded HTTP NOTIFY server (port 8989 or ephemeral fallback) on the local LAN.
  * - Subscribes to /upnp/event/basicevent1 with TIMEOUT: Second-300.
  * - Automatically recovers from HTTP 412 Precondition Failed on renewal by issuing a fresh SUBSCRIBE.
@@ -62,13 +57,11 @@ class GenaSubscriptionManager(
     wifiSocketFactory: SocketFactory = SocketFactory.getDefault(),
     private val onNotification: (GenaEventNotification) -> Unit
 ) {
-    private val httpClient = OkHttpClient.Builder()
-        .socketFactory(wifiSocketFactory)
-        .connectTimeout(900, TimeUnit.MILLISECONDS)
-        .readTimeout(1200, TimeUnit.MILLISECONDS)
-        .writeTimeout(900, TimeUnit.MILLISECONDS)
-        .retryOnConnectionFailure(false)
-        .build()
+    private val httpClient = LanHttpClient(
+        socketFactory = wifiSocketFactory,
+        connectTimeoutMs = 900,
+        readTimeoutMs = 1200
+    )
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val isRunning = AtomicBoolean(false)
@@ -286,26 +279,25 @@ class GenaSubscriptionManager(
         // If we have an active SID for the same IP:port, attempt renewal first
         if (existing != null && existing.sid.isNotBlank() && existing.ipAddress == device.ipAddress && existing.port == device.port) {
             try {
-                val renewReq = Request.Builder()
-                    .url(endpoint)
-                    .method("SUBSCRIBE", "".toRequestBody(null))
-                    .header("SID", existing.sid)
-                    .header("TIMEOUT", "Second-$timeoutSeconds")
-                    .header("Connection", "close")
-                    .build()
-                httpClient.newCall(renewReq).execute().use { resp ->
-                    if (resp.isSuccessful) {
-                        val sid = resp.header("SID")?.trim().takeUnless { it.isNullOrEmpty() } ?: existing.sid
-                        val updated = existing.copy(
-                            sid = sid,
-                            expiresAtMs = now + timeoutSeconds * 1000L
-                        )
-                        subscriptionsByDeviceKey[deviceKey] = updated
-                        deviceKeyBySid[sid] = deviceKey
-                        return@withContext updated
-                    }
-                    // HTTP 412 Precondition Failed or error -> fall through to fresh SUBSCRIBE
+                val resp = httpClient.execute(
+                    method = "SUBSCRIBE",
+                    url = endpoint,
+                    headers = mapOf(
+                        "SID" to existing.sid,
+                        "TIMEOUT" to "Second-$timeoutSeconds"
+                    )
+                )
+                if (resp.isSuccessful) {
+                    val sid = resp.header("SID")?.trim().takeUnless { it.isNullOrEmpty() } ?: existing.sid
+                    val updated = existing.copy(
+                        sid = sid,
+                        expiresAtMs = now + timeoutSeconds * 1000L
+                    )
+                    subscriptionsByDeviceKey[deviceKey] = updated
+                    deviceKeyBySid[sid] = deviceKey
+                    return@withContext updated
                 }
+                // HTTP 412 Precondition Failed or error -> fall through to fresh SUBSCRIBE
             } catch (_: Exception) {
                 // Fall through to fresh SUBSCRIBE
             }
@@ -315,30 +307,29 @@ class GenaSubscriptionManager(
         val localIp = if (device.ipAddress == "127.0.0.1") "127.0.0.1" else localIpProvider()
         val callbackUrl = "<http://$localIp:$listenPort/gena/$deviceKey>"
         try {
-            val subReq = Request.Builder()
-                .url(endpoint)
-                .method("SUBSCRIBE", "".toRequestBody(null))
-                .header("CALLBACK", callbackUrl)
-                .header("NT", "upnp:event")
-                .header("TIMEOUT", "Second-$timeoutSeconds")
-                .header("Connection", "close")
-                .build()
-            httpClient.newCall(subReq).execute().use { resp ->
-                if (resp.isSuccessful) {
-                    val sid = resp.header("SID")?.trim().orEmpty().ifEmpty { "uuid:gena-$deviceKey" }
-                    val record = GenaSubscriptionRecord(
-                        deviceKey = deviceKey,
-                        deviceName = device.name,
-                        ipAddress = device.ipAddress,
-                        port = device.port,
-                        sid = sid,
-                        subscribedAtMs = now,
-                        expiresAtMs = now + timeoutSeconds * 1000L
-                    )
-                    subscriptionsByDeviceKey[deviceKey] = record
-                    deviceKeyBySid[sid] = deviceKey
-                    return@withContext record
-                }
+            val resp = httpClient.execute(
+                method = "SUBSCRIBE",
+                url = endpoint,
+                headers = mapOf(
+                    "CALLBACK" to callbackUrl,
+                    "NT" to "upnp:event",
+                    "TIMEOUT" to "Second-$timeoutSeconds"
+                )
+            )
+            if (resp.isSuccessful) {
+                val sid = resp.header("SID")?.trim().orEmpty().ifEmpty { "uuid:gena-$deviceKey" }
+                val record = GenaSubscriptionRecord(
+                    deviceKey = deviceKey,
+                    deviceName = device.name,
+                    ipAddress = device.ipAddress,
+                    port = device.port,
+                    sid = sid,
+                    subscribedAtMs = now,
+                    expiresAtMs = now + timeoutSeconds * 1000L
+                )
+                subscriptionsByDeviceKey[deviceKey] = record
+                deviceKeyBySid[sid] = deviceKey
+                return@withContext record
             }
         } catch (_: Exception) {
             // Device offline or does not accept GENA on this port
@@ -353,13 +344,11 @@ class GenaSubscriptionManager(
         val record = subscriptionsByDeviceKey.remove(deviceKey) ?: return@withContext
         deviceKeyBySid.remove(record.sid)
         try {
-            val req = Request.Builder()
-                .url("http://${record.ipAddress}:${record.port}/upnp/event/basicevent1")
-                .method("UNSUBSCRIBE", "".toRequestBody(null))
-                .header("SID", record.sid)
-                .header("Connection", "close")
-                .build()
-            httpClient.newCall(req).execute().close()
+            httpClient.execute(
+                method = "UNSUBSCRIBE",
+                url = "http://${record.ipAddress}:${record.port}/upnp/event/basicevent1",
+                headers = mapOf("SID" to record.sid)
+            )
         } catch (_: Exception) {
             // Best effort
         }
