@@ -76,7 +76,6 @@ fun TopHeader(
     onEditClick: () -> Unit,
     onAddClick: () -> Unit,
     onWordmarkClick: () -> Unit,
-    onOpenTvModeClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "refreshSpin")
@@ -148,36 +147,6 @@ fun TopHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.White.copy(alpha = 0.16f),
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .clip(RoundedCornerShape(20.dp))
-                        .clickable(onClick = onOpenTvModeClick)
-                        .testTag("header_tv_mode_button")
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tv,
-                            contentDescription = "Launch Android TV Remote Mode",
-                            tint = Color.White,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "TV Remote",
-                            color = Color.White,
-                            fontFamily = WorkSansFontFamily,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = if (isEditMode) Color.White else Color.White.copy(alpha = 0.16f),

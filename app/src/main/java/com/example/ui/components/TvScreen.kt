@@ -101,7 +101,6 @@ fun TvDashboardScreen(
     onToggleRoomPower: (String) -> Unit,
     onApplyTvScene: (String) -> Unit,
     onScanSsdpClick: () -> Unit,
-    onExitTvMode: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val filteredDevices = remember(devices, selectedRoomFilter) {
@@ -243,26 +242,6 @@ fun TvDashboardScreen(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (showVirtualRemotePad) "Hide Remote Pad" else "Remote D-Pad",
-                        fontFamily = WorkSansFontFamily,
-                        fontSize = 12.sp
-                    )
-                }
-
-                OutlinedButton(
-                    onClick = onExitTvMode,
-                    border = BorderStroke(1.dp, TvTextSecondary.copy(alpha = 0.5f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    modifier = Modifier.testTag("tv_exit_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Exit TV Mode",
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "Phone View",
                         fontFamily = WorkSansFontFamily,
                         fontSize = 12.sp
                     )

@@ -290,40 +290,7 @@ class HardwareCujEndToEndTest {
                 val roomMasterBri = dimmerServer.dimmerBrightness.get()
                 assertTrue("Expected room master dimmer brightness in 40..60, got $roomMasterBri", roomMasterBri in 40..60)
 
-                // 10. Scale Dimmer in 10-Foot Android TV Mode (+10% / -10% Step Buttons & Movie Mode 20% Scene)
-                composeTestRule.onNodeWithTag("header_tv_mode_button").performClick()
-                composeTestRule.waitForIdle()
-                composeTestRule.onNodeWithTag("tv_dashboard_screen").assertIsDisplayed()
-
-                // Move TV D-Pad focus to Kitchen Under-Cabinet Dimmer (device 2 of 2)
-                composeTestRule.onNodeWithTag("tv_remote_dpad_next")
-                    .performScrollTo()
-                    .performClick()
-                composeTestRule.waitForIdle()
-
-                val beforeTvPlus = dimmerServer.dimmerBrightness.get()
-                composeTestRule.onNodeWithTag("tv_remote_dpad_dim_up")
-                    .performScrollTo()
-                    .performClick()
-                awaitLoopbackIo { dimmerServer.dimmerBrightness.get() == (beforeTvPlus + 10).coerceAtMost(100) }
-                assertEquals((beforeTvPlus + 10).coerceAtMost(100), dimmerServer.dimmerBrightness.get())
-
-                composeTestRule.onNodeWithTag("tv_remote_dpad_dim_down")
-                    .performScrollTo()
-                    .performClick()
-                awaitLoopbackIo { dimmerServer.dimmerBrightness.get() == beforeTvPlus }
-                assertEquals(beforeTvPlus, dimmerServer.dimmerBrightness.get())
-
-                composeTestRule.onNodeWithTag("tv_scene_movie")
-                    .performScrollTo()
-                    .performClick()
-                awaitLoopbackIo { dimmerServer.dimmerBrightness.get() == 20 }
-                assertEquals(20, dimmerServer.dimmerBrightness.get())
-
-                composeTestRule.onNodeWithTag("tv_exit_button").performClick()
-                composeTestRule.waitForIdle()
-
-                // 11. Toggle Dimmer Power OFF -> preserves 20% brightness in OFF standby
+                // 10. Toggle Dimmer Power OFF -> preserves 20% brightness in OFF standby
                 composeTestRule.onNodeWithTag("devices_list")
                     .performScrollToNode(hasText("Kitchen Under-Cabinet Dimmer"))
                 composeTestRule.onNodeWithContentDescription(
@@ -333,7 +300,7 @@ class HardwareCujEndToEndTest {
                 assertEquals(false, dimmerServer.relayStateOn.get())
                 awaitLoopbackIo {
                     runCatching {
-                        composeTestRule.onNodeWithText("OFF • 20%", useUnmergedTree = true).assertIsDisplayed()
+                        composeTestRule.onNodeWithText("OFF • ${roomMasterBri}%", useUnmergedTree = true).assertIsDisplayed()
                         true
                     }.getOrDefault(false)
                 }

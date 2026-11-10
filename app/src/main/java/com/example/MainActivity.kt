@@ -205,8 +205,7 @@ fun WeMiSwitchApp(
                             viewModel.openAddDeviceDialog()
                         }
                     },
-                    onWordmarkClick = { viewModel.toggleBrandWordmark() },
-                    onOpenTvModeClick = { viewModel.setTvMode(true) }
+                    onWordmarkClick = { viewModel.toggleBrandWordmark() }
                 )
             }
         },
@@ -243,8 +242,7 @@ fun WeMiSwitchApp(
                     onReconnectDevice = { viewModel.reconnectDevice(it) },
                     onToggleRoomPower = { viewModel.toggleRoomPower(it) },
                     onApplyTvScene = { viewModel.applyTvScene(it) },
-                    onScanSsdpClick = { viewModel.openSsdpScannerAndScan() },
-                    onExitTvMode = { viewModel.setTvMode(false) }
+                    onScanSsdpClick = { viewModel.openSsdpScannerAndScan() }
                 )
             } else {
                 Column(
