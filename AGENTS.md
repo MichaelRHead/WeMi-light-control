@@ -1,6 +1,6 @@
 # WeMi Light Control — Architecture & Agent Guide (`AGENTS.md`)
 
-**WeMi Light Control** (`com.example.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v20.0`) is an Android & Android TV local-LAN controller for Belkin's discontinued smart switch platform (switches, dimmers, and mini plugs). It pairs a 2013-era skeuomorphic smart switch interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with `pywemo`-grade local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
+**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v21.0`) is an Android & Android TV local-LAN controller for Belkin's discontinued smart switch platform (switches, dimmers, and mini plugs). It pairs a 2013-era skeuomorphic smart switch interface (`#73D41B` lime green header, brushed metallic rows, glowing power buttons, and custom hardware illustrations) with `pywemo`-grade local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
 
 Detailed agent instructions, UX design architecture, debugging & support architecture, device discovery & room grouping architecture, user guides, protocol specs, reverse-chronological change log, and upcoming features roadmap are packaged in:
 - [`UX_DESIGN.md`](UX_DESIGN.md) — **Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
@@ -43,7 +43,7 @@ The app supports four physical hardware families from Belkin's discontinued smar
 
 ## 2. Architecture & Source Layout
 
-### Package Structure (`app/src/main/java/com/example/`)
+### Package Structure (`app/src/main/java/org/suppressingfire/wemi/`)
 
 - **`MainActivity.kt`**:
   - Entry point (`WeMiSwitchApp`). Automatically detects Android TV (`UI_MODE_TYPE_TELEVISION`), renders the auto-detected `10.22.22.x` **Switch Setup AP Banner**, and hosts the mobile/tablet `Scaffold` and dialogs (`ProvisionApDialog`, `AddOrEditDeviceDialog`, `SsdpScannerModal`).
