@@ -15,7 +15,7 @@ Use this skill whenever multiple agent conversations or external tools (such as 
    - Never use `git push --force` or blindly accept `--ours` / `--theirs` during a rebase or merge.
    - Treat every incoming commit on `origin/main` as intentional work from a peer agent or the user that must be understood, preserved, and integrated with your own changes.
 2. **Audit for Accidental Overwrites ("Anti-Stomp Check")**:
-   - When two agents edit the same file around the same time, a later commit that rewrites or restructures a file (e.g., reframing `IMPLEMENTED.md`, renaming `docs/IMPLEMENTATION_PLAN.md` to `UPCOMING_FEATURES.md`, or refactoring a Compose dialog) can inadvertently drop lines added by an earlier commit.
+   - When two agents edit the same file around the same time, a later commit that rewrites or restructures a file (e.g., reframing `IMPLEMENTED.md`, repackaging to `org.suppressingfire.wemi`, or refactoring a Compose dialog) can inadvertently drop lines added by an earlier commit.
    - Always diff your recent commits against the latest `origin/main` to verify that none of your features, test tags, documentation sections, or links were lost.
 3. **Keep Code, Tests, User Guides, Change Log, and Skills Coherent**:
    - After integrating incoming commits, verify that version numbers (`versionCode` / `versionName` in `app/build.gradle.kts`), file line counts, `Modifier.testTag(...)` identifiers, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `AGENTS.md`, and `.agents/skills/*/SKILL.md` all agree with each other.
@@ -28,9 +28,12 @@ Use this skill whenever multiple agent conversations or external tools (such as 
 6. **Respect Exclusive Ownership of `DISCOVERY_AND_ROOM_GROUPING.md` & `wemi-discovery-and-room-grouping`**:
    - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../DISCOVERY_AND_ROOM_GROUPING.md) and [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md) are **owned exclusively by the Antigravity Device Discovery & Room Grouping Agent**.
    - Other agents must read and follow those files to preserve the SSDP/unicast discovery orchestration, 3-tier hardware identity resolution (`matchesDiscoveredDevice`), and automatic room inference/migration (`inferRoomFromName` & `resolveDeviceRoomAssignment`) invariants, **but must never edit, overwrite, or delete them**.
-7. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
-   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `LICENSE`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) live **exclusively at the repository root (`/`)**.
-   - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` — including `docs/user-guide/release-notes.md` — and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`.
+7. **Respect Exclusive Ownership of `LICENSE_GOVERNANCE.md`, `wemi-license-governance` & `LicenseAndBrandGovernanceTest.kt`**:
+   - [`LICENSE_GOVERNANCE.md`](../../LICENSE_GOVERNANCE.md), [`.agents/skills/wemi-license-governance/SKILL.md`](../wemi-license-governance/SKILL.md), and [`LicenseAndBrandGovernanceTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt) are **owned exclusively by the Antigravity License & Brand Governance Agent**.
+   - Other agents must read and follow those files to preserve MIT license parity, the permissive dependency allowlist, `org.suppressingfire.wemi` namespace/filename hygiene, and Play Store trademark boundaries, **but must never edit, overwrite, or delete them**.
+8. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
+   - All `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `LICENSE_GOVERNANCE.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) live **exclusively at the repository root (`/`)**.
+   - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` — including `docs/user-guide/release-notes.md` — and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`, and never recreate root `RELEASE_NOTES.md`.
 
 ---
 
@@ -56,10 +59,10 @@ git diff --name-status <your-earliest-commit>..origin/main
 ```
 Check specifically for:
 1. **Dropped Additions in Shared Files**:
-   - If an incoming commit rewrote a file you also edited (`IMPLEMENTED.md`, `AGENTS.md`, `USER_GUIDE.md`, `MainActivity.kt`, `ProvisionApDialog.kt`, etc.), inspect `git diff <your-commit>..origin/main -- <file>`.
+   - If an incoming commit rewrote a file you also edited (`IMPLEMENTED.md`, `AGENTS.md`, `USER_GUIDE.md`, `MainActivity.kt`, `MoreScreen.kt`, etc.), inspect `git diff <your-commit>..origin/main -- <file>`.
    - If any of your additions (such as a new section, test tag, bug fix, or skill link) were accidentally overwritten, **reapply them cleanly** into the new structure of the file.
 2. **File Renames or Deletions**:
-   - If an incoming commit renamed or deleted a file (for example, renaming `WeMo*.kt` or migrating `com.example` to `org.suppressingfire.wemi`), search the entire workspace for stale references:
+   - If an incoming commit renamed or deleted a file (for example, repackaging `com.example` to `org.suppressingfire.wemi` or removing `WeMo` filename prefixes), search the entire workspace for stale references:
      ```bash
      grep -rn "<old-file-name>" . .agents/
      ```
@@ -84,15 +87,15 @@ If Git reports a conflict in any file:
 ### Step 4: Verify Documentation Organization & Skill Synchronization
 Before committing or pushing your integrated changes:
 1. **Verify Single-Source Root `ALL_CAPS.md` Layout**:
-   - Confirm that all `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) exist only at the repository root (`/`) and are **not** duplicated inside `docs/`.
-   - Do not modify `UX_DESIGN.md` or `UX_DESIGN_AND_EXPERIENCE.md` unless you are the Google AI Studio Agent.
+   - Confirm that all `ALL_CAPS.md` files (`AGENTS.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `LICENSE_GOVERNANCE.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) exist only at the repository root (`/`) and are **not** duplicated inside `docs/`.
+   - Do not modify files exclusively owned by another agent.
 2. **Sync Repository Skills (`.agents/skills/`) with Persistent Agent Skills**:
    - Whenever any `.agents/skills/<skill-name>/SKILL.md` is added or updated in the repository, also call `save_skill(overwrite = true, skill_dir = "/home/antigravity/MichaelRHead/WeMi-light-control/.agents/skills/<skill-name>")` so the persistent skill registry stays in lockstep with GitHub.
 
 ### Step 5: Mandatory Pre-Push Verification & Atomic Push
 1. If any Kotlin source, resource, or test files were modified, run the mandatory build & test gate:
    ```bash
-   ./gradlew testDebugUnitTest assembleDebug
+   ./gradlew testDebugUnitTest --rerun-tasks assembleDebug
    ```
 2. Stage, commit, and push atomically, re-checking `git pull --rebase origin main` if another agent pushed in the meantime:
    ```bash

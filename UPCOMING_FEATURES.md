@@ -9,13 +9,15 @@ Related documents in this repository:
 - [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md) — Android & Android TV UX Design, Behavioral Model & Critical User Journeys *(Owned Exclusively by the Google AI Studio Agent)*
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
+- [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy, `pywemo` Attribution & Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v21.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v21.0`)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
-- [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — 4-Agent Autonomous Round-Robin Release Review & Sign-Off Coordinator Skill
+- [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — 5-Agent Autonomous Round-Robin Release Review & Sign-Off Coordinator Skill
 - [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md) — On-Device Screenshot & Recorded Telemetry File Debugging Skill *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
 - [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md) — Device Discovery Logic, 3-Tier Identity Resolution & Automatic Room Grouping Skill *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
+- [`.agents/skills/wemi-license-governance/SKILL.md`](.agents/skills/wemi-license-governance/SKILL.md) — Open-Source MIT License Parity, Permissive Dependency Allowlist & Trademark Governance Skill *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill
 - [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
 - [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
@@ -26,7 +28,7 @@ Related documents in this repository:
 
 ## 1. Upcoming Features Overview
 
-With the core local UPnP/SSDP/SOAP/GENA engine, 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3`), compact single-line-safe Room/Home cards, dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), one-tap LAN reset, `org.suppressingfire.wemi` package architecture, and 26 full-stack E2E tests complete in `v21.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
+With the core local UPnP/SSDP/SOAP/GENA engine, 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3`), compact single-line-safe Room/Home cards, dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), one-tap LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, and 29 full-stack E2E tests complete in `v21.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
 
 | Track | Upcoming Feature Area | Key Deliverables |
 | :--- | :--- | :--- |

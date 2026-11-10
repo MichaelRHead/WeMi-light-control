@@ -2,7 +2,7 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-The **More** tab and the **10-Foot Android TV Dashboard (`wemi TV`)** provide whole-home master switch actions, a live UPnP/SOAP packet inspector, a showcase Demo Mode, and full TV remote (D-Pad) support.
+The **More** tab and the **10-Foot Android TV Dashboard (`wemi TV`)** provide whole-home master switch actions, a live UPnP/SOAP packet inspector, a showcase Demo Mode, in-app open-source license and third-party notices, and native TV remote (D-Pad) support on Android TV devices.
 
 ---
 
@@ -19,23 +19,23 @@ At the top of the **More** tab, the **Master Switch Control** card shows how man
 Inside the **Offline Local UPnP / SOAP Engine** card on the **More** tab:
 
 - **Real LAN Mode (Default on Physical Hardware — `Demo Showroom Mode = OFF`)**:
-  - Starts with a clean slate on your local `/24` Wi-Fi subnet and only displays real physical Belkin WeMo switches that you discover via SSDP, provision via `10.22.22.1`, or add by IP.
+  - Starts with a clean slate on your local `/24` Wi-Fi subnet and only displays real physical smart switches that you discover via SSDP, provision via `10.22.22.1`, or add by IP.
   - If a physical switch is unplugged or unreachable on Wi-Fi, toggling it performs a 2-stage self-healing reconnect attempt and accurately marks the device **`Offline`** if it cannot be reached.
 - **Demo Showroom Mode (`Demo Showroom Mode = ON`)**:
-  - Populates **13 showcase switches, dimmers, fans, Christmas tree lights, and motion sensors** across 3 sample Wi-Fi Homes (`Main Home`, `Lake Cabin`, `Studio Office`) so you can explore room grouping, dimming, rules, and the Android TV interface without physical WeMo hardware on your LAN.
+  - Populates **13 showcase switches, dimmers, fans, Christmas tree lights, and motion sensors** across 3 sample Wi-Fi Homes (`Main Home`, `Lake Cabin`, `Studio Office`) so you can explore room grouping, dimming, rules, and the interface without physical hardware on your LAN.
   - Tapping **`Reset Preset`** restores the 13 classic showcase switches at any time.
 
 Other quick settings in this card:
 - **Header Logo Wordmark Switch**: Toggles the top header logo between **`wemi`** and classic **`wemo`**.
 - **`Scan LAN (SSDP)`**: Opens the SSDP network discovery sheet.
 - **`Reset Homes, Discovered Switches & Rooms`**: Clears all remembered Wi-Fi Homes, discovered switches, and room assignments in Real LAN Mode, resets your primary LAN profile back to a clean **`My Home`**, and triggers a fresh SSDP discovery scan.
-- **`Provision New WeMo AP (10.22.22.1)`**: Opens the zero-cloud Wi-Fi setup wizard.
+- **`Provision New Switch AP (10.22.22.1)`**: Opens the zero-cloud Wi-Fi setup wizard.
 
 ---
 
 ## 3. Live UPnP / SOAP Packet Log Inspector
 
-At the bottom of the **More** tab, the **UPnP / SOAP Packet Log** card records the most recent HTTP SOAP commands and GENA events exchanged with your switches:
+Near the bottom of the **More** tab, the **UPnP / SOAP Packet Log** card records the most recent HTTP SOAP commands and GENA events exchanged with your switches:
 - Each log entry displays:
   - **Device Name & SOAP Action** (e.g., `Front Porch Light • SetBinaryState (ON)` or `SSDP M-SEARCH • urn:Belkin:service:basicevent:1`)
   - **Timestamp** (`HH:mm:ss.SSS`)
@@ -46,9 +46,18 @@ At the bottom of the **More** tab, the **UPnP / SOAP Packet Log** card records t
 
 ---
 
-## 4. Android TV 10-Foot Dashboard (`wemi TV`)
+## 4. Open Source License & Third-Party Notices (`More` Tab)
 
-**WeMi Light Control** automatically launches in **Android TV Mode** when running on an Android TV / Google TV device (`UI_MODE_TYPE_TELEVISION`), and can also be opened on any phone or tablet by tapping the **`TV`** button in the top header bar.
+At the bottom of the **More** tab, the **Open Source License** card (`open_source_licenses_card`) summarizes **WeMi Light Control**'s open-source licensing (**MIT License • Permissive Open Source**):
+- Tap **`View MIT License`** (`toggle_license_details_button`) to expand:
+  1. **Full MIT License Text** (`mit_license_text_surface`), matching the root [`LICENSE`](../../LICENSE) file (`Copyright (c) 2026 Michael R. Head and WeMi Light Control Contributors`).
+  2. **Third-Party Open-Source Notices & Protocol Attribution** (`third_party_notices_surface`), listing the permissive runtime libraries (**AndroidX Jetpack Compose, Activity, Lifecycle & Room** under `Apache-2.0`, **Kotlin Stdlib & Coroutines** under `Apache-2.0`, **Square OkHttp** under `Apache-2.0`), clean-room UPnP/SSDP/SOAP/GENA protocol reference attribution to **`pywemo`** (`MIT License`), and the Belkin non-affiliation trademark notice.
+
+---
+
+## 5. Android TV 10-Foot Dashboard (`wemi TV`)
+
+**WeMi Light Control** automatically launches in **Android TV Mode** when running on an Android TV / Google TV device (`UI_MODE_TYPE_TELEVISION`).
 
 ### Key Features of `wemi TV`:
 1. **10-Foot High-Contrast Dark UI**:

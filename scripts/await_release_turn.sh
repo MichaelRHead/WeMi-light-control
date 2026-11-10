@@ -13,6 +13,7 @@
 #   - discovery_and_grouping
 #   - telemetry_and_debugging
 #   - code_quality_and_testing
+#   - license_governance
 #   - ai_studio_ux_cuj
 # ==============================================================================
 set -euo pipefail
@@ -22,12 +23,12 @@ POLL_INTERVAL_SEC="${2:-10}"
 MAX_WAIT_SEC="${3:-90}"
 
 if [[ -z "${ROLE}" ]]; then
-  echo "Usage: $0 <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|ai_studio_ux_cuj> [poll_interval_sec] [max_wait_sec]" >&2
+  echo "Usage: $0 <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj> [poll_interval_sec] [max_wait_sec]" >&2
   exit 2
 fi
 
 case "${ROLE}" in
-  discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|ai_studio_ux_cuj)
+  discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj)
     ;;
   *)
     echo "[ERROR] Invalid agent role '${ROLE}'." >&2

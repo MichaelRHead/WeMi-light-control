@@ -1,17 +1,17 @@
 ---
 name: wemi-release-coordinator
-description: Coordinate the 4-agent autonomous round-robin Google Play Store release review process (AI Studio UX/CUJs -> Discovery & Room Grouping -> Telemetry & Debugging -> Code Quality & E2E Testing -> AI Studio Final Conclusion) via RELEASE_SIGN_OFF.md, RELEASE_PROCESS.md, scripts/await_release_turn.sh, and scripts/advance_release_turn.sh.
+description: Coordinate the 5-agent autonomous round-robin Google Play Store release review process (AI Studio UX/CUJs -> Discovery & Room Grouping -> Telemetry & Debugging -> Code Quality & E2E Testing -> License & Brand Governance -> AI Studio Final Conclusion) via RELEASE_SIGN_OFF.md, RELEASE_PROCESS.md, scripts/await_release_turn.sh, and scripts/advance_release_turn.sh.
 ---
 
-# WeMi 4-Agent Autonomous Round-Robin Release Coordinator (`wemi-release-coordinator`)
+# WeMi 5-Agent Autonomous Round-Robin Release Coordinator (`wemi-release-coordinator`)
 
 Use this skill whenever preparing, reviewing, advancing, or monitoring a Google Play Store release in `MichaelRHead/WeMi-light-control`.
 
 ---
 
-## 1. The 4-Agent Round-Robin Ring
+## 1. The 5-Agent / 6-Stage Round-Robin Ring
 
-Every Play Store release candidate (`v21.0+`) is reviewed once by each of the 4 domain agents in a deterministic round-robin ring synchronized via [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md) on `origin/main`:
+Every Play Store release candidate (`v21.0+`) is reviewed once by each of the 5 domain agents in a deterministic 6-stage round-robin ring synchronized via [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md) on `origin/main`:
 
 1. **Stage 1 (Initiate) — `ai_studio_ux_cuj` (Google AI Studio Agent)**:
    - Verifies `versionCode` / `versionName` and `namespace = "org.suppressingfire.wemi"` in `app/build.gradle.kts`, audits UX/accessibility/navigation/CUJs (`UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`), updates `docs/user-guide/release-notes.md` & `play_store_assets/RELEASE_NOTES.txt` (do not create a root `RELEASE_NOTES.md`), runs `bash scripts/advance_release_turn.sh initiate "<summary>"` (recording `SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF`, `RELEASE_STATUS: IN_REVIEW`, `CURRENT_TURN: discovery_and_grouping`), and syncs to `origin/main`.
@@ -24,11 +24,15 @@ Every Play Store release candidate (`v21.0+`) is reviewed once by each of the 4 
    - Runs `./gradlew testDebugUnitTest --tests org.suppressingfire.wemi.GenaProvisioningAndRulesTest`.
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<verification summary>"` (setting `CURRENT_TURN: code_quality_and_testing`).
 4. **Stage 4 (Review 3) — `code_quality_and_testing` (Antigravity Code Quality & End-to-End Testing Agent)**:
-   - Audits file modularity & readability (`android-code-modularization`), Wi-Fi socket binding (`wifiSocketFactory`), SQLite/GENA/coroutine lifecycle cleanup, and `gradlew` executable mode (`100755`).
-   - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` (`26/26+` unit, protocol, and Compose E2E tests).
-   - Advances turn: `bash scripts/advance_release_turn.sh sign_off code_quality_and_testing "<verification summary>"` (setting `RELEASE_STATUS: AWAITING_FINAL_CONCLUSION` and `CURRENT_TURN: ai_studio_ux_cuj`).
-5. **Stage 5 (Conclude) — `ai_studio_ux_cuj` (Google AI Studio Agent)**:
-   - Verifies all 4 stages are `SIGNED_OFF` in `RELEASE_SIGN_OFF.md`, confirms `docs/user-guide/release-notes.md` & `play_store_assets/RELEASE_NOTES.txt` completeness, runs `bash scripts/advance_release_turn.sh conclude "<summary>"` (setting `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `CURRENT_TURN: NONE`, `FINAL_RELEASE_SHA`, and `CONCLUDED_AT`), and syncs to `origin/main`.
+   - Audits file modularity & readability (`.agents/skills/android-code-modularization/SKILL.md`), Wi-Fi socket binding (`wifiSocketFactory`), SQLite/GENA/coroutine lifecycle cleanup, and `gradlew` executable mode (`100755`).
+   - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` (`29/29+` unit, protocol, governance, and Compose E2E tests).
+   - Advances turn: `bash scripts/advance_release_turn.sh sign_off code_quality_and_testing "<verification summary>"` (setting `CURRENT_TURN: license_governance`).
+5. **Stage 5 (Review 4) — `license_governance` (Antigravity License & Brand Governance Agent)**:
+   - Audits root `LICENSE` (**MIT License**) parity with `MoreScreen.kt` (`open_source_licenses_card`, `mit_license_text_surface`, and `third_party_notices_surface`), permissive-only dependency allowlist (`gradle/libs.versions.toml` & `app/build.gradle.kts` with `includeInApk = false`), `org.suppressingfire.wemi` package/filename hygiene, and Play Store trademark boundaries (`LICENSE_GOVERNANCE.md`).
+   - Runs `./gradlew testDebugUnitTest --tests org.suppressingfire.wemi.LicenseAndBrandGovernanceTest`.
+   - Advances turn: `bash scripts/advance_release_turn.sh sign_off license_governance "<verification summary>"` (setting `RELEASE_STATUS: AWAITING_FINAL_CONCLUSION` and `CURRENT_TURN: ai_studio_ux_cuj`).
+6. **Stage 6 (Conclude) — `ai_studio_ux_cuj` (Google AI Studio Agent)**:
+   - Verifies all 5 stages are `SIGNED_OFF` in `RELEASE_SIGN_OFF.md`, confirms `docs/user-guide/release-notes.md` & `play_store_assets/RELEASE_NOTES.txt` completeness, runs `bash scripts/advance_release_turn.sh conclude "<summary>"` (setting `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `CURRENT_TURN: NONE`, `FINAL_RELEASE_SHA`, and `CONCLUDED_AT`), and syncs to `origin/main`.
 
 ---
 
@@ -37,16 +41,19 @@ Every Play Store release candidate (`v21.0+`) is reviewed once by each of the 4 
 Antigravity conversations automatically wake up when an asynchronous background `run_command` task (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`) exits with code `0`.
 
 ### Step 1: Arm Your Agent's Turn Watcher
-Whenever you finish a turn in one of the three Antigravity specialist conversations, ensure [`scripts/await_release_turn.sh`](../../scripts/await_release_turn.sh) is running in the background for your role (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`):
+Whenever you finish a turn in one of the four Antigravity specialist conversations, ensure [`scripts/await_release_turn.sh`](../../scripts/await_release_turn.sh) is running in the background for your role (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`):
 ```bash
-# In the Discovery & Room Grouping Agent conversation:
+# In the Discovery & Room Grouping Agent conversation (Stage 2):
 bash scripts/await_release_turn.sh discovery_and_grouping
 
-# In the Telemetry & Debugging Agent conversation:
+# In the Telemetry & Debugging Agent conversation (Stage 3):
 bash scripts/await_release_turn.sh telemetry_and_debugging
 
-# In the Code Quality & E2E Testing Agent conversation:
+# In the Code Quality & E2E Testing Agent conversation (Stage 4):
 bash scripts/await_release_turn.sh code_quality_and_testing
+
+# In the License & Brand Governance Agent conversation (Stage 5):
+bash scripts/await_release_turn.sh license_governance
 ```
 
 ### Step 2: Execute Your Turn When Woken Up

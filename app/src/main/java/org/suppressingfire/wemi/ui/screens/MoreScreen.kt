@@ -514,7 +514,9 @@ fun MoreScreen(
                         Surface(
                             color = Color(0xFFF3F6F8),
                             shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("mit_license_text_surface")
                         ) {
                             Text(
                                 text = """
@@ -526,6 +528,29 @@ fun MoreScreen(
                                     The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 
                                     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+                                """.trimIndent(),
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                color = WemoTextSecondary,
+                                modifier = Modifier.padding(10.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Surface(
+                            color = Color(0xFFF3F6F8),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("third_party_notices_surface")
+                        ) {
+                            Text(
+                                text = """
+                                    Third-Party Open Source Notices & Protocol Attribution:
+                                    • AndroidX, Jetpack Compose & Room — Apache License 2.0 (Copyright The Android Open Source Project)
+                                    • Kotlin & Kotlinx Coroutines — Apache License 2.0 (Copyright JetBrains s.r.o.)
+                                    • Square OkHttp — Apache License 2.0 (Copyright Square, Inc.)
+                                    • pywemo UPnP/SOAP/Crypto Protocol Reference — MIT License (Copyright pywemo contributors; clean-room Kotlin implementation)
+                                    • Trademark Notice: WeMi Light Control is an independent open-source project and is not affiliated with or endorsed by Belkin International, Inc.
                                 """.trimIndent(),
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,

@@ -4,7 +4,7 @@
 # ==============================================================================
 # Atomically updates RELEASE_SIGN_OFF.md, preserves +x on gradlew and scripts,
 # commits, rebases against origin/main, and pushes to GitHub to wake the next
-# agent in the 4-agent round-robin ring.
+# agent in the 5-agent / 6-stage round-robin ring.
 #
 # Usage:
 #   bash scripts/advance_release_turn.sh initiate "<summary>" [--no-push]
@@ -21,7 +21,7 @@ ACTION="${1:-}"
 if [[ -z "${ACTION}" ]]; then
   echo "Usage:" >&2
   echo "  $0 initiate \"<summary>\" [--no-push]" >&2
-  echo "  $0 sign_off <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|ai_studio_ux_cuj> \"<summary>\" [--no-push]" >&2
+  echo "  $0 sign_off <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj> \"<summary>\" [--no-push]" >&2
   echo "  $0 conclude \"<summary>\" [--no-push]" >&2
   echo "  $0 request_rereview <from_role> <target_role> \"<reason>\" [--no-push]" >&2
   exit 2
@@ -45,11 +45,12 @@ fi
 chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh 2>/dev/null || true
 
 PST_NOW="$(TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z")"
+STAGE5_SHA="$(sed -n 's/^SIGN_OFF_LICENSE_GOVERNANCE: SIGNED_OFF (\([^ )]*\).*/\1/p' RELEASE_SIGN_OFF.md | tr -d '\r' | head -n 1 || true)"
 STAGE4_SHA="$(sed -n 's/^SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (\([^ )]*\).*/\1/p' RELEASE_SIGN_OFF.md | tr -d '\r' | head -n 1 || true)"
 BASE_SHA="$(awk -F': *' '/^CANDIDATE_BASE_SHA:/ { print $2; exit }' RELEASE_SIGN_OFF.md | tr -d '\r' || true)"
-HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "${STAGE4_SHA:-${BASE_SHA:-ai-studio}}")"
+HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "${STAGE5_SHA:-${STAGE4_SHA:-${BASE_SHA:-ai-studio}}}")"
 if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "NONE" ]]; then
-  HEAD_SHA="v20.0-rc"
+  HEAD_SHA="v21.0-rc"
 fi
 
 python3 - "${ACTION}" "${PST_NOW}" "${HEAD_SHA}" "$@" <<'PYEOF'
@@ -65,8 +66,8 @@ raw_args = [a for a in sys.argv[4:] if a != "--no-push"]
 gradle_text = Path("app/build.gradle.kts").read_text(encoding="utf-8")
 ver_code_match = re.search(r"versionCode\s*=\s*(\d+)", gradle_text)
 ver_name_match = re.search(r'versionName\s*=\s*"([^"]+)"', gradle_text)
-gradle_ver_code = ver_code_match.group(1) if ver_code_match else "20"
-gradle_ver_name = f"v{ver_name_match.group(1)}" if ver_name_match else "v20.0"
+gradle_ver_code = ver_code_match.group(1) if ver_code_match else "21"
+gradle_ver_name = f"v{ver_name_match.group(1)}" if ver_name_match else "v21.0"
 
 sign_off_path = Path("RELEASE_SIGN_OFF.md")
 text = sign_off_path.read_text(encoding="utf-8")
@@ -108,6 +109,7 @@ if action == "initiate":
     text = set_state(text, "SIGN_OFF_DISCOVERY_AND_GROUPING", "PENDING")
     text = set_state(text, "SIGN_OFF_TELEMETRY_AND_DEBUGGING", "PENDING")
     text = set_state(text, "SIGN_OFF_CODE_QUALITY_AND_TESTING", "PENDING")
+    text = set_state(text, "SIGN_OFF_LICENSE_GOVERNANCE", "PENDING")
     text = set_state(text, "FINAL_RELEASE_SHA", "NONE")
     text = set_state(text, "CONCLUDED_AT", "NONE")
 
@@ -115,7 +117,8 @@ if action == "initiate":
     text = update_table_row(text, "2 (Review 1)", "PENDING", "-", "-", "Awaiting Discovery & Room Grouping Agent review.")
     text = update_table_row(text, "3 (Review 2)", "PENDING", "-", "-", "Awaiting Telemetry & Debugging Agent review.")
     text = update_table_row(text, "4 (Review 3)", "PENDING", "-", "-", "Awaiting Code Quality & E2E Testing Agent review.")
-    text = update_table_row(text, "5 (Conclude)", "PENDING", "-", "-", "Awaiting Stages 1-4 sign-off.")
+    text = update_table_row(text, "5 (Review 4)", "PENDING", "-", "-", "Awaiting License & Brand Governance Agent review.")
+    text = update_table_row(text, "6 (Conclude)", "PENDING", "-", "-", "Awaiting Stages 1-5 sign-off.")
     text = append_audit_row(text, "1", "ai_studio_ux_cuj", "INITIATED_RELEASE", "discovery_and_grouping", head_sha, summary)
 
 elif action == "sign_off":
@@ -128,7 +131,8 @@ elif action == "sign_off":
         "ai_studio_ux_cuj": ("SIGN_OFF_AI_STUDIO_UX_CUJ", "1 (Initiate)", "discovery_and_grouping", "IN_REVIEW"),
         "discovery_and_grouping": ("SIGN_OFF_DISCOVERY_AND_GROUPING", "2 (Review 1)", "telemetry_and_debugging", "IN_REVIEW"),
         "telemetry_and_debugging": ("SIGN_OFF_TELEMETRY_AND_DEBUGGING", "3 (Review 2)", "code_quality_and_testing", "IN_REVIEW"),
-        "code_quality_and_testing": ("SIGN_OFF_CODE_QUALITY_AND_TESTING", "4 (Review 3)", "ai_studio_ux_cuj", "AWAITING_FINAL_CONCLUSION"),
+        "code_quality_and_testing": ("SIGN_OFF_CODE_QUALITY_AND_TESTING", "4 (Review 3)", "license_governance", "IN_REVIEW"),
+        "license_governance": ("SIGN_OFF_LICENSE_GOVERNANCE", "5 (Review 4)", "ai_studio_ux_cuj", "AWAITING_FINAL_CONCLUSION"),
     }
     if role not in transitions:
         sys.exit(f"Unknown role: {role}")
@@ -141,12 +145,12 @@ elif action == "sign_off":
     text = append_audit_row(text, round_num, role, "SIGNED_OFF", next_turn, head_sha, summary)
 
 elif action == "conclude":
-    summary = raw_args[1] if len(raw_args) > 1 else f"All 4 agents signed off; {gradle_ver_name} approved for Google Play Store release."
+    summary = raw_args[1] if len(raw_args) > 1 else f"All 5 agents signed off; {gradle_ver_name} approved for Google Play Store release."
     text = set_state(text, "RELEASE_STATUS", "APPROVED_FOR_PLAY_STORE")
     text = set_state(text, "CURRENT_TURN", "NONE")
     text = set_state(text, "FINAL_RELEASE_SHA", head_sha)
     text = set_state(text, "CONCLUDED_AT", pst_now)
-    text = update_table_row(text, "5 (Conclude)", "SIGNED_OFF", head_sha, pst_now, summary)
+    text = update_table_row(text, "6 (Conclude)", "SIGNED_OFF", head_sha, pst_now, summary)
     text = append_audit_row(text, round_num, "ai_studio_ux_cuj", "APPROVED_FOR_PLAY_STORE", "NONE", head_sha, summary)
 
 elif action == "request_rereview":
@@ -160,11 +164,17 @@ elif action == "request_rereview":
     text = set_state(text, "RELEASE_STATUS", "IN_REVIEW")
     text = set_state(text, "CURRENT_TURN", target_role)
 
-    order = ["discovery_and_grouping", "telemetry_and_debugging", "code_quality_and_testing"]
+    order = [
+        "discovery_and_grouping",
+        "telemetry_and_debugging",
+        "code_quality_and_testing",
+        "license_governance",
+    ]
     key_map = {
         "discovery_and_grouping": ("SIGN_OFF_DISCOVERY_AND_GROUPING", "2 (Review 1)"),
         "telemetry_and_debugging": ("SIGN_OFF_TELEMETRY_AND_DEBUGGING", "3 (Review 2)"),
         "code_quality_and_testing": ("SIGN_OFF_CODE_QUALITY_AND_TESTING", "4 (Review 3)"),
+        "license_governance": ("SIGN_OFF_LICENSE_GOVERNANCE", "5 (Review 4)"),
     }
     if target_role in order:
         idx = order.index(target_role)
