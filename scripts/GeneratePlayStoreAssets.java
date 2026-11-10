@@ -8,15 +8,15 @@ import javax.imageio.ImageIO;
  * Deterministic, anti-aliased Graphics2D Play Store screenshot & graphic asset generator
  * for WeMi Switch Control (v22.0).
  *
- * Uses the exact bundled app fonts (app/src/main/res/font/comfortaa.ttf & work_sans.ttf),
+ * Uses the platform SansSerif typeface (matching FontFamily.SansSerif in Type.kt),
  * exact Color.kt / TvScreen.kt palette, and AutoShrinkSwitchName-style drawFittedString
  * so no text ever clips or overlaps adjacent buttons or card edges.
  */
 public class GeneratePlayStoreAssets {
 
     private static final File ROOT = new File(".").getAbsoluteFile();
-    private static Font comfortaaBase;
-    private static Font workSansBase;
+    private static Font brandBase;
+    private static Font uiBase;
 
     // Exact Color.kt Palette
     private static final Color C_CYAN_TOP = new Color(0x06, 0xB6, 0xD4);       // #06B6D4 WemoGreenTop
@@ -52,19 +52,17 @@ public class GeneratePlayStoreAssets {
     private static final Color C_TV_TEXT = new Color(0xF8, 0xFA, 0xFC);        // #F8FAFC TvTextPrimary
     private static final Color C_TV_SUBTEXT = new Color(0x94, 0xA3, 0xB8);     // #94A3B8 TvTextSecondary
 
-    private static void initFonts() throws Exception {
-        File f1 = new File(ROOT, "app/src/main/res/font/comfortaa.ttf");
-        File f2 = new File(ROOT, "app/src/main/res/font/work_sans.ttf");
-        comfortaaBase = f1.exists() ? Font.createFont(Font.TRUETYPE_FONT, f1) : new Font("SansSerif", Font.BOLD, 24);
-        workSansBase = f2.exists() ? Font.createFont(Font.TRUETYPE_FONT, f2) : new Font("SansSerif", Font.PLAIN, 16);
+    private static void initFonts() {
+        brandBase = new Font("SansSerif", Font.BOLD, 24);
+        uiBase = new Font("SansSerif", Font.PLAIN, 16);
     }
 
     private static Font fBrand(double sizePx, int style) {
-        return comfortaaBase.deriveFont(style, (float) Math.max(8.0, sizePx));
+        return brandBase.deriveFont(style, (float) Math.max(8.0, sizePx));
     }
 
     private static Font fUi(double sizePx, int style) {
-        return workSansBase.deriveFont(style, (float) Math.max(8.0, sizePx));
+        return uiBase.deriveFont(style, (float) Math.max(8.0, sizePx));
     }
 
     /**

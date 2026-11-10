@@ -545,10 +545,11 @@ fun MoreScreen(
                         ) {
                             Text(
                                 text = """
-                                    Third-Party Open Source Notices:
+                                    Third-Party Open Source Notices & Protocol Attribution:
                                     • AndroidX, Jetpack Compose & Room — Apache License 2.0 (Copyright The Android Open Source Project)
                                     • Kotlin & Kotlinx Coroutines — Apache License 2.0 (Copyright JetBrains s.r.o.)
-                                    • Comfortaa & Work Sans Typefaces — SIL Open Font License 1.1 (Copyright The Comfortaa Project Authors; Copyright The Work Sans Project Authors)
+                                    • Square OkHttp — Apache License 2.0 (Copyright Square, Inc.)
+                                    • pywemo UPnP/SOAP/Crypto Protocol Reference — MIT License (Copyright pywemo contributors; clean-room Kotlin implementation)
                                     • Trademark Notice: WeMi Light Control is an independent open-source project and is not affiliated with or endorsed by Belkin International, Inc.
                                 """.trimIndent(),
                                 fontFamily = FontFamily.Monospace,
