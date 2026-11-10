@@ -88,7 +88,7 @@ The app supports four physical hardware families from Belkin's discontinued smar
   - `SoapAndSelfHealingTest.kt`: 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, offline rollback, manual IP probing, soft-AP SSID startup DB sanitization, `resetLanHomesSwitchesAndRooms`, and multi-device startup state detection.
   - `GenaProvisioningAndRulesTest.kt`: UPnP GENA `SUBSCRIBE`, HTTP 412 recovery, embedded `NOTIFY` callback server, `RuleScheduler`, and full loopback `10.22.22.1` `WiFiSetup1` provisioning (including `NetworkStatus=0` failure & `CloseSetup` hold and `SetupDebugSnapshot` formatting).
   - `LicenseAndBrandGovernanceTest.kt`: Verifies root [`LICENSE`](LICENSE) parity with `MoreScreen.kt` (`mit_license_text_surface` & `third_party_notices_surface`), permissive dependency allowlist in `gradle/libs.versions.toml` & `app/build.gradle.kts`, `org.suppressingfire.wemi` package/filename hygiene, and Play Store `"WeMo"` trademark boundaries.
-  - `ExampleRobolectricTest.kt`, `EndToEndUiTest.kt` & `HardwareCujEndToEndTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeUpnpServer` End-to-End UI tests (`29/29` total tests passing), including the complete `Reset` -> `SSDP Discovery` -> `Adopt Switch & Dimmer` -> `Toggle Switch` -> `Toggle & Scale Dimmer Brightness` CUJ, 9-port Disconnected ring self-healing + GENA push UI transition + Live SOAP Log file export CUJ, and zero-cloud `10.22.22.1` Setup AP hardware scan + AES Method 2 provisioning + screenshot telemetry export CUJ.
+  - `ExampleRobolectricTest.kt`, `EndToEndUiTest.kt` & `HardwareCujEndToEndTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeUpnpServer` End-to-End UI tests (`30/30` total tests passing), including the complete `Reset` -> `SSDP Discovery` -> `Adopt Switch & Dimmer` -> `Toggle Switch` -> `Toggle & Scale Dimmer Brightness` CUJ, 9-port Disconnected ring self-healing + GENA push UI transition + Live SOAP Log file export CUJ, and zero-cloud `10.22.22.1` Setup AP hardware scan + AES Method 2 provisioning + screenshot telemetry export CUJ.
 
 ---
 
@@ -97,7 +97,7 @@ The app supports four physical hardware families from Belkin's discontinued smar
 > **CRITICAL RULE**: **Only push code to GitHub (`origin/main` or `origin/agent-docs`) after verifying that the full build and all automated tests pass with zero errors.** Never push unverified or non-compiling code.
 
 ```bash
-# Force-execute all 29 Robolectric unit, protocol, governance & E2E Compose UI tests
+# Force-execute all 30 Robolectric unit, protocol, governance & E2E Compose UI tests
 ./gradlew testDebugUnitTest --rerun-tasks
 
 # Assemble debug APK
