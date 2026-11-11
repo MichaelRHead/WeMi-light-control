@@ -142,6 +142,13 @@ class LicenseAndBrandGovernanceTest {
                 Regex("\\bWeMo\\b|\\bWemo\\b").containsMatchIn(content)
             )
         }
+
+        // 4. Google Play Store What's New release notes must fit within the 500-character Play Console limit
+        val releaseNotesText = File(repoRoot, "play_store_assets/RELEASE_NOTES.txt").readText().trim()
+        assertTrue(
+            "play_store_assets/RELEASE_NOTES.txt must be <= 500 characters (found ${releaseNotesText.length})",
+            releaseNotesText.length <= 500
+        )
     }
 
     @Test
