@@ -1,6 +1,6 @@
 # WeMi Light Control — Architecture & Agent Guide (`AGENTS.md`)
 
-**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v23.0`) is an Android & Android TV local-LAN controller for Belkin's discontinued smart switch platform (switches, dimmers, and mini plugs). It pairs a tactile Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), and Deep Sapphire (`#0F4C81`) smart switch interface (glowing cyan power rings, dark charcoal `#23272F` standby rings, red dashed offline reconnect rings, and custom 3-state hardware illustrations) with zero-third-party-HTTP local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
+**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v24.0`) is an Android & Android TV local-LAN controller for Belkin's discontinued smart switch platform (switches, dimmers, and mini plugs). It pairs a tactile Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), and Deep Sapphire (`#0F4C81`) smart switch interface (glowing cyan power rings, dark charcoal `#23272F` standby rings, red dashed offline reconnect rings, and custom 3-state hardware illustrations) with zero-third-party-HTTP local UPnP / SSDP / SOAP / GENA networking, zero-cloud `10.22.22.1` provisioning, and Room v5 persistence.
 
 Detailed agent instructions, UX design architecture, debugging & support architecture, device discovery & room grouping architecture, open-source license & brand governance, user guides, protocol specs, reverse-chronological change log, and upcoming features roadmap are packaged in:
 - [`UX_DESIGN.md`](UX_DESIGN.md) — **Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)
@@ -11,8 +11,8 @@ Detailed agent instructions, UX design architecture, debugging & support archite
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — **5-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine** (`ai_studio_ux_cuj` → `discovery_and_grouping` → `telemetry_and_debugging` → `code_quality_and_testing` → `license_governance` → `ai_studio_ux_cuj`)
 - [`LICENSE`](LICENSE) — **MIT License**
-- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v23.0`)
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v23.0`)
+- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — High-Level User-Facing Google Play Store Release Notes (`v1.0` → `v24.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature & Improvement Change Log (`v1.0` → `v24.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — **5-Agent Autonomous Round-Robin Release Review & Sign-Off Coordinator Skill**
 - [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md) — **UX Design, Behavioral Modeling & CUJ Skill** (**Owned Exclusively by the Google AI Studio Agent** — read-only for all other agents)

@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v23.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v24.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v23.0`)
+## Quick Release Summary (`v1.0` → `v24.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v24.0`](#version-240-versioncode--24--november-11-2026)** | `24` | Nov 11, 2026 | Smaller, faster R8-shrunk release App Bundle with embedded Play Console crash deobfuscation mapping (`proguard.map`) and pure Kotlin/DEX packaging |
 | **[`v23.0`](#version-230-versioncode--23--november-10-2026)** | `23` | Nov 10, 2026 | Redesigned 3-column Room-Grouped Android TV dashboard (`wemi TV`) with unmistakable 10-foot cursor focus & non-interfering Dimmer Adjust Mode, plus compact single-row phone/tablet `TopHeader` |
 | **[`v22.0`](#version-220-versioncode--22--november-10-2026)** | `22` | Nov 10, 2026 | Refreshed Google Play Store & in-app visual showcase across Phone, 7"/10" Tablets & Android TV matching the live Ocean Teal, Electric Cyan & Deep Sapphire UI, plus streamlined `MIT` + `Apache-2.0` runtime |
 | **[`v21.0`](#version-210-versioncode--21--november-910-2026)** | `21` | Nov 9–10, 2026 | Native Phone/Tablet vs. Android TV form-factor layouts, in-app Open Source MIT & Third-Party Notices card on the **More** tab, `org.suppressingfire.wemi` architecture & neutral hardware branding |
@@ -42,6 +43,12 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 24.0 (`versionCode = 24`) — November 11, 2026
+- **Smaller, Faster R8-Optimized Release App Bundle**: Enabled release R8 code minification and resource shrinking (`isMinifyEnabled = true`, `isShrinkResources = true`) with embedded Play Console crash/ANR deobfuscation mapping (`proguard.map`) and Room v5 / enum preservation rules (`proguard-rules.pro`).
+- **Pure Kotlin/DEX Packaging (`0` Un-Symbolicated Native `.so` Shims)**: Configured `ndk.debugSymbolLevel = "FULL"` and excluded the unused pre-stripped `libandroidx.graphics.path.so` shim from the release bundle so the app ships as a 100% pure Kotlin/DEX bundle with zero Google Play Console native-symbol warnings.
+
+---
 
 ### Version 23.0 (`versionCode = 23`) — November 10, 2026
 - **Redesigned 3-Column Room-Grouped Android TV Dashboard (`wemi TV`)**: Replaced the multi-row TV header chrome with a single compact top bar so over 90% of vertical screen height showcases your switches grouped by room (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc.) in a 3-column grid with one-click Room Master toggling.

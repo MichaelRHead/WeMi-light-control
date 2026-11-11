@@ -1,4 +1,5 @@
-WeMi Switch Control v23.0:
-• Redesigned Android TV (wemi TV) Dashboard: Full-height 3-column room-grouped switch grid with Electric Cyan cursor focus (FOCUSED • OK) and non-blocking LAN rescan.
-• Non-Interfering TV Dimmer Mode (DIM -/+): D-Pad Left/Right navigates freely across all 3 columns; press Play/Menu or Long-Press OK on a dimmer for -/+ brightness control.
+WeMi Switch Control v24.0:
+• Smaller, R8-shrunk pure Kotlin/DEX release bundle with embedded Play Console crash deobfuscation mapping.
+• Redesigned Android TV (wemi TV) 3-Column Room-Grouped Dashboard with Electric Cyan cursor focus (FOCUSED • OK) and non-interfering Dimmer Adjust Mode (DIM -/+).
 • Compact Single-Row Phone/Tablet Header: Refresh & Edit sit alongside wemi and '+' to save vertical space.
+

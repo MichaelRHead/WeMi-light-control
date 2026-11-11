@@ -1,6 +1,6 @@
 # WeMi Light Control — Android & Android TV UX Design, Behavioral Model & Critical User Journeys (`UX_DESIGN_AND_EXPERIENCE.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v23.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v24.0`)  
 **Document & Skill Owner**: **Google AI Studio Agent (`AI Studio Build`) — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md)
 
@@ -16,7 +16,7 @@ Related documentation:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — read-only for the Google AI Studio Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent — read-only for the Google AI Studio Agent)*
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v23.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v24.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
