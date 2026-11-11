@@ -56,7 +56,7 @@ WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`Botto
 4. **Bottom Navigation Bar (`BottomNavigationBar`)**:
    - **`Devices` Tab (`BottomTab.DEVICES`)**: Real-time switch & dimmer control, room groups, SSDP discovery, and hardware diagnostics.
    - **`Rules` Tab (`BottomTab.RULES`)**: Local schedule rules (`Daily Schedule`, `Sunset/Sunrise`, `Motion Trigger`, and `Auto-Off Timer` countdowns) with immediate enable/disable switches and CRUD dialogs.
-   - **`More` Tab (`BottomTab.MORE`)**: `10.22.22.1` factory-reset switch provisioning (`Provision New Switch AP`), `Showcase Demo Showroom` toggle, `Reset Homes, Discovered Switches & Rooms`, `Open Source License` & third-party notices card (`open_source_licenses_card`), and the live `UPnP / SOAP Packet Log` inspector.
+   - **`More` Tab (`BottomTab.MORE` — `MoreScreen.kt` & `MoreControlAndLogCards.kt`)**: `10.22.22.1` factory-reset switch provisioning (`Provision New Switch AP`), `Showcase Demo Showroom` toggle, `Reset Homes, Discovered Switches & Rooms`, `Open Source License` & third-party notices card (`open_source_licenses_card`), and the live `UPnP / SOAP Packet Log` inspector.
 
 ### 2.2 Progressive Disclosure: Inline Drawers vs. Modal Dialogs
 
@@ -67,10 +67,10 @@ To avoid overwhelming the primary control canvas, secondary controls and diagnos
   - **Dimmer Controls First**: For `LIGHTBULB_DIMMER` devices (`F7C059`, `WDS060`), the continuous `1%–100%` `Slider` (`brightness_slider_<id>`), quick-preset chips (`1%`, `21%`, `25%`, `50%`, `75%`, `100%`), and **Night Mode (`20%` hardware cap)** toggle appear **at the very top of the expanded drawer** before any network telemetry.
   - **Action Bar & Telemetry Below**: Quick-action buttons (`Ping RTT`, `Configure IP`) and UPnP/SOAP hardware telemetry (`IP:Port`, `MAC`, `Serial Number`, `Firmware`, `UDN`, `Wi-Fi Signal %`) sit cleanly below the primary controls.
 
-- **Tier 2 — Focused Modal Dialogs**:
-  - **`SsdpScannerModal`**: Live radar progress bar, subnet sweep status, and discovered device cards with `Adopt` / `Synced` badges.
-  - **`ProvisionApDialog`**: Step-by-step `10.22.22.1` factory-reset switch setup wizard with 2.4 GHz AP scanning, encryption method selection, and collapsible `SETUP DEBUG DETAILS (SCREENSHOT)` telemetry (`ProvisionDebugPanel`).
-  - **`AddOrEditDeviceDialog` & `AddRuleDialog`**: Structured form dialogs for manual IP probing, device renaming, category/room overrides, and rule scheduling.
+- **Tier 2 — Focused Modal Dialogs (`WeMiModalDialogs.kt`)**:
+  - **`SsdpScannerModal` (`SsdpScannerModal.kt` & `SsdpDiscoveryBanner.kt`)**: Live radar progress bar, subnet sweep status, and discovered device cards with `Adopt` / `Synced` badges.
+  - **`ProvisionApDialog` (`ProvisionApDialog.kt` & `ProvisionApFormSections.kt`)**: Step-by-step `10.22.22.1` factory-reset switch setup wizard with 2.4 GHz AP scanning, encryption method selection, and collapsible `SETUP DEBUG DETAILS (SCREENSHOT)` telemetry (`ProvisionDebugPanel`).
+  - **`AddOrEditDeviceDialog` & `AddRuleDialog` (`DeviceEditDialog.kt` & `RuleDialog.kt`)**: Structured form dialogs for manual IP probing, device renaming, category/room overrides, and rule scheduling.
 
 ### 2.3 Deterministic Back-Stack Priority (`MainActivity.kt`)
 
@@ -81,7 +81,7 @@ Because WeMi Light Control uses reactive state-driven navigation (`selectedTab`,
 3. **Active Room Filter (`selectedRoomFilter != null`)** -> Clears the single-room filter back to `All Rooms`.
 4. **Secondary Bottom Tabs (`selectedTab != BottomTab.DEVICES`)** -> Navigates from `Rules` or `More` back to the primary `Devices` tab before allowing the activity to finish.
 
-### 2.4 Native 10-Foot Android TV & D-Pad Navigation (`TvScreen.kt` & `TvCardsAndScenes.kt`)
+### 2.4 Native 10-Foot Android TV & D-Pad Navigation (`TvScreen.kt`, `TvHeadersAndScenes.kt` & `TvCardsAndScenes.kt`)
 
 When running on an Android TV (`Configuration.UI_MODE_TYPE_TELEVISION`), the app launches directly into a dedicated 10-foot dark slate theater interface (`TvDashboardScreen`, `#0A192F` -> `#060E1A`) tailored exclusively for TV remote D-Pad interaction (without a phone-mode switch button or touch-only popup modals):
 
@@ -211,4 +211,4 @@ Before committing any UI, ViewModel, or Repository change, verify that:
 - [ ] **Dimmer Controls First**: Expanded `LIGHTBULB_DIMMER` rows render the brightness slider, quick presets (`1%`–`100%`), and Night Mode toggle at the top of `ExpandedDrawer` before network metadata.
 - [ ] **Native Hardware Form-Factor Routing**: Phone/tablet (`Scaffold`) and Android TV (`TvDashboardScreen` under `UI_MODE_TYPE_TELEVISION`) remain tailored to their hardware form factors without manual Phone/TV mode switch buttons.
 - [ ] **48dp+ Touch Targets & Semantics**: All interactive controls meet `>= 48.dp` touch target minimums, include `Role` / `contentDescription` semantics, and carry deterministic `Modifier.testTag(...)` identifiers.
-- [ ] **End-to-End Tests Pass**: `./gradlew testDebugUnitTest --rerun-tasks` passes all 30 Robolectric unit, protocol, governance, and Compose E2E UI tests (`ExampleRobolectricTest`, `EndToEndUiTest`, `HardwareCujEndToEndTest`, `LicenseAndBrandGovernanceTest`, `SkuAndCryptoTest`, `SoapAndSelfHealingTest`, and `GenaProvisioningAndRulesTest`).
+- [ ] **End-to-End Tests Pass**: `./gradlew testDebugUnitTest --rerun-tasks` passes all 37 unit, protocol, governance, and Compose E2E UI tests across 10 suites (`ExampleUnitTest`, `ExampleRobolectricTest`, `EndToEndUiTest`, `HardwareCujEndToEndTest`, `TvAndHeaderLayoutE2ETest`, `LicenseAndBrandGovernanceTest`, `SkuAndCryptoTest`, `SoapAndSelfHealingTest`, `RepositorySelfHealingTest`, and `GenaProvisioningAndRulesTest`).

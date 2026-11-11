@@ -61,10 +61,11 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
 
 ---
 
-## 3. Automated E2E CUJ Verification (`EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt` & `ExampleRobolectricTest.kt`)
+## 3. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt` & `TvAndHeaderLayoutE2ETest.kt` — `37/37` Tests Across 10 Suites)
 
 Whenever UI components, ViewModel flows, or repository methods are touched, verify all 7 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
 
 ```bash
 ./gradlew testDebugUnitTest --rerun-tasks
 ```
+

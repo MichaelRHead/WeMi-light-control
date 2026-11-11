@@ -107,11 +107,11 @@ Every screen and component in **WeMi Light Control** must obey these five layout
   - The `"$activeCount/$totalControllable ON"` pill (`maxLines = 1, softWrap = false`) and `"$online/${roomDevices.size} Active • Avg ${avgLatency}ms"` subtitle (`maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis`) sit together on **Line 2**.
   - This prevents long room names from squeezing the `"0/1 ON"` pill into a 0dp-wide vertical character column.
 
-### Invariant 3: Compact, Single-Line Top Utility Bars (`WifiHomeBar` & `SsdpDiscoveryBanner`)
+### Invariant 3: Compact, Single-Line Top Utility Bars (`WifiHomeBar.kt` & `SsdpDiscoveryBanner.kt`)
 - **Rule**: Top chrome on the **Devices** tab must stay compact so rooms and switches remain the visual hero above the fold.
 - **Implementation**:
   - `WifiHomeBar` renders the active home name with `AutoShrinkSwitchName(..., initialFontSizeSp = 15f, singleLineOnly = true)`, single-line status (`maxLines = 1, softWrap = false`), a `32.dp`-high `Reconnect` button, and a horizontally scrollable row of `28.dp`-high chips (`Home (N)`, `Add Home`, `Reset`).
-  - `SsdpDiscoveryBanner` uses a single compact row (`32.dp` radar icon badge, `maxLines = 1` title/subtitle, and `32.dp` `Scan` button).
+  - `SsdpDiscoveryBanner` (`SsdpDiscoveryBanner.kt`) uses a single compact row (`32.dp` radar icon badge, `maxLines = 1` title/subtitle, and `32.dp` `Scan` button).
 
 ### Invariant 4: Top-First Primary Controls in Expandable Drawers (`ExpandedDrawer`)
 - **Rule**: When a user taps a dimmable light row to expand its inline drawer, the interactive controls they came for must appear **first**, before technical telemetry.
@@ -122,7 +122,7 @@ Every screen and component in **WeMi Light Control** must obey these five layout
 - **Rule**: Transient status banners must never block touches on underlying list items, and modal dialogs must close immediately when the user taps Save/Confirm.
 - **Implementation**:
   - `status_feedback_banner` in `MainActivity.kt` is a non-clickable `Box` overlay so taps pass straight through to switch rows and bottom navigation tabs.
-  - All ViewModel dialog save/confirm actions (`saveDevice`, `addWifiHomeNetwork`, `deleteDevice`, `addRule`) set their dialog `MutableStateFlow` to `false`/`null` **synchronously on the main thread** before launching background `Dispatchers.IO` network probes.
+  - All ViewModel and UI controller dialog save/confirm actions (`SwitchViewModel.kt`, `ProvisionApUiController.kt`, `HomeAndRulesUiController.kt`, and `WeMiModalDialogs.kt`: `saveDevice`, `addWifiHomeNetwork`, `deleteDevice`, `addRule`) set their dialog `MutableStateFlow` to `false`/`null` **synchronously on the main thread** before launching background `Dispatchers.IO` network probes.
 
 ---
 
@@ -170,7 +170,7 @@ Every screen and component in **WeMi Light Control** must obey these five layout
 ### CUJ 7: Native 10-Foot Living Room Android TV Experience (`wemi TV`)
 1. **Context**: User opens **WeMi Light Control** on an Android TV / Google TV device (`UI_MODE_TYPE_TELEVISION`).
 2. **Experience**:
-   - Automatically launches `TvDashboardScreen` (`tv_dashboard_screen`) with a single compact top header bar (`wemi TV`, active switch counter, focused switch status pill `tv_remote_dpad_ok`, quick scene chips `Movie 20%`, `Holiday ON`, `All OFF`, and `Rescan`) so over 90% of vertical screen height showcases the **3-Column Room-Grouped Switch Grid (`tv_device_grid`)**.
+   - Automatically launches `TvDashboardScreen` (`tv_dashboard_screen` across `TvScreen.kt`, `TvHeadersAndScenes.kt`, and `TvCardsAndScenes.kt`) with a single compact top header bar (`wemi TV`, active switch counter, focused switch status pill `tv_remote_dpad_ok`, quick scene chips `Movie 20%`, `Holiday ON`, `All OFF` via `TvScene`, and `Rescan`) so over 90% of vertical screen height showcases the **3-Column Room-Grouped Switch Grid (`tv_device_grid`)**.
    - **Room Section Headers (`TvRoomSectionHeader`, `tv_room_header_<RoomName>`)**: Group switches by room across all 3 columns (`span = { GridItemSpan(maxLineSpan) }`, with `"Unassigned"` sorted last) and allow one-click Room Master toggling when pressed with `OK`.
    - **Unmistakable 10-Foot Cursor Focus**: Initial focus (`FocusRequester`) automatically lands on the first switch card, rendering a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated surface (`#133B66`), `1.022f` scale lift, and a **`FOCUSED • OK`** badge.
    - **Predictable 3-Column Navigation & Non-Interfering Dimmer Adjust Mode**: In normal navigation mode, `D-Pad Up / Down / Left / Right` always moves freely between the 3 columns of switch cards and pressing `OK` toggles any card `ON` / `OFF`. Pressing `Play/Pause`, `Menu`, Long-Press `OK`, or clicking a dimmer card's dimmer strip (`tv_card_dim_mode_<id>`) enters a Gold (`#FBBF24`) **Dimmer Adjust Mode (`DIM -/+`)** where `Left / Right` steps brightness `-10%` / `+10%` and pressing `OK` or `Back` exits back to normal card navigation.
