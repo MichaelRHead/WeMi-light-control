@@ -40,19 +40,21 @@ To make hardware debugging fast, deterministic, and privacy-preserving, **WeMi L
 flowchart TD
     subgraph UI["Jetpack Compose Diagnostic Surfaces"]
         P["ProvisionDebugPanel\n(provision_debug_panel)"]
-        M["MoreScreen Packet Log\n(export_telemetry_file_button)"]
+        M["SoapPacketLogCard\n(export_telemetry_file_button)"]
         D["DeviceDiagnosticsDrawer\n(Ping RTT)"]
     end
 
     subgraph Core["Telemetry & Provisioning Engine"]
+        U["ProvisionApUiController\n(setupDebugSnapshot)"]
         S["SetupDebugSnapshot\n(SetupDiagnostics.kt)"]
         E["TelemetryFileExporter\n(files/wemi-telemetry-latest.txt)"]
-        C["ProvisionerClient\n(10.22.22.1 WiFiSetup1)"]
+        C["ProvisionerClient + LanHttpClient\n(10.22.22.1 WiFiSetup1)"]
         N["NetworkMonitor\n(Wi-Fi Socket Binding)"]
     end
 
-    C -->|Updates live trace| S
-    N -->|wlan0 / 10.22.22.x / wifiBound| S
+    C -->|Updates live trace| U
+    N -->|wlan0 / 10.22.22.x / wifiBound| U
+    U -->|StateFlow| S
     S -->|toClipboardText| P
     P -->|Copy / Save-Share| E
     M -->|Save/Share Log| E
@@ -64,11 +66,11 @@ flowchart TD
 | File | Key Types & Functions | Diagnostic Role |
 | :--- | :--- | :--- |
 | [`SetupDiagnostics.kt`](app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt) | `SetupDebugSnapshot`, `TelemetryFileExporter` | Immutable snapshot of `10.22.22.1` setup telemetry (`[NET]`, `[PROBE]`, `[XML]`, `[FLAGS]`, `[ID]`, `[SCAN]`, `[TARGET AP]`, `[STEP 1..6]`) plus `buildFullTelemetryReport`, `latestTelemetryFile`, `saveTelemetryReportToFile`, and `copyAndShareTelemetryReport`. |
-| [`ProvisionerClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt) & [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) | `probeSetupDevice`, `fetchAvailableApList`, `provisionDeviceToHomeWifi`, `LanHttpClient` | Byte-exact `Content-Length`-framed `10.22.22.1` HTTP/1.1 probing across ports `49151..49159` via zero-dependency `LanHttpClient` (`connectTimeoutMs = 1500`, `readTimeoutMs = 8500`), `GetMetaInfo` + `GetMacAddr`/`GetSerialNo` fallback, double-send `ConnectHomeNetwork`, 18-poll `GetNetworkStatus` loop, and non-destructive `CloseSetup` gating. |
+| [`ProvisionerClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt), [`NetworkModels.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) & [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) | `probeSetupDevice`, `fetchAvailableApList`, `provisionDeviceToHomeWifi`, `SetupDeviceDescriptor`, `ProvisionResult`, `LanHttpClient` | Byte-exact `Content-Length` / chunked / delayed-`FIN`-framed `10.22.22.1` HTTP/1.1 probing across ports `49151..49159` via zero-dependency `LanHttpClient` (`tcpNoDelay = true`, `connectTimeoutMs = 1500`, `readTimeoutMs = 8500`), `GetMetaInfo` + `GetMacAddr`/`GetSerialNo` fallback, double-send `ConnectHomeNetwork`, 18-poll `GetNetworkStatus` loop, and non-destructive `CloseSetup` gating. |
 | [`PasswordCrypto.kt`](app/src/main/java/org/suppressingfire/wemi/network/PasswordCrypto.kt) | `encryptWifiPassword`, `decryptWifiPassword` | Stateless first-party OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC encryption supporting all 6 permutations (`Method 1/2/3` × `addPasswordLengths = true/false`). |
 | [`NetworkMonitor.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkMonitor.kt) | `createWifiBoundSocketFactory`, `hasBoundWifiNetwork` | Binds HTTP/SOAP sockets directly to the active (even unvalidated/no-internet) `10.22.22.x` Wi-Fi `Network` handle so Android cellular data never hijacks setup traffic. |
-| [`ProvisionDebugPanel.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionDebugPanel.kt) & [`ProvisionApDialog.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionApDialog.kt) | `ProvisionDebugPanel`, `ProvisionApDialog` | Renders the `SETUP DEBUG DETAILS (SCREENSHOT)` terminal card (`provision_debug_panel`, `provision_debug_text`), **`Copy`** (`copy_provision_debug_button`), **`Save/Share`** (`share_provision_debug_button`), and **`Keep Dialog Open on Success`** (`keep_provision_dialog_open_chip`). |
-| [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) & [`DeviceDiagnosticsDrawer.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/DeviceDiagnosticsDrawer.kt) | `MoreScreen`, `ExpandedDrawer` | Renders the live `UPnP / SOAP Packet Log` card with one-tap **`Save/Share Log`** (`export_telemetry_file_button`) and **`Clear`**, plus the per-device inline RTT diagnostics drawer (`ping_device_<id>`). |
+| [`ProvisionApUiController.kt`](app/src/main/java/org/suppressingfire/wemi/ui/ProvisionApUiController.kt), [`ProvisionDebugPanel.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionDebugPanel.kt), [`ProvisionApDialog.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionApDialog.kt) & [`ProvisionApFormSections.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionApFormSections.kt) | `ProvisionApUiController`, `ProvisionDebugPanel`, `ProvisionApDialog`, `ProvisionCryptoOptionsSection` | Manages live `setupDebugSnapshot` state & dialog hold lifecycle, renders the `SETUP DEBUG DETAILS (SCREENSHOT)` terminal card (`provision_debug_panel`, `provision_debug_text`), **`Copy`** (`copy_provision_debug_button`), **`Save/Share`** (`share_provision_debug_button`), **`Keep Dialog Open on Success`** (`keep_provision_dialog_open_chip`), and the 6-permutation AES/length override chips (`provision_len_auto_chip`, `provision_len_true_chip`, `provision_len_false_chip`). |
+| [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt), [`MoreControlAndLogCards.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreControlAndLogCards.kt) & [`DeviceDiagnosticsDrawer.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/DeviceDiagnosticsDrawer.kt) | `MoreScreen`, `SoapPacketLogCard`, `ExpandedDrawer` | Renders the live `UPnP / SOAP Packet Log` card (`SoapPacketLogCard`) with one-tap **`Save/Share Log`** (`export_telemetry_file_button`) and **`Clear`**, plus the per-device inline RTT diagnostics drawer (`ping_device_<id>`). |
 
 ---
 
@@ -80,13 +82,13 @@ All agents modifying networking, repository, or UI code must preserve these five
    - In [`ProvisionerClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt), `overallSuccess` requires `httpSuccess && (netStatus == 1 || netStatus == 3)`.
    - Whenever `netStatus == 0` (still connecting / handshake timeout) or `netStatus == 2` (password/auth rejected), `CloseSetup` **must be skipped** (`[STEP 6 HOLD]`) so the switch's `10.22.22.1` setup AP stays open and the user can immediately retry another encryption method or password without factory-resetting the switch.
 2. **Never Auto-Dismiss `ProvisionApDialog` on Failure or When `keepDialogOpenOnSuccess` Is Enabled**:
-   - When provisioning fails (`!result.success`), or when the user toggles `keep_provision_dialog_open_chip` ON, `ProvisionApDialog` must remain open on screen so the user can screenshot `provision_debug_panel` or tap **`Save/Share`**.
+   - In [`ProvisionApUiController.kt`](app/src/main/java/org/suppressingfire/wemi/ui/ProvisionApUiController.kt), when provisioning fails (`!res.success`) or when the user toggles `keep_provision_dialog_open_chip` ON, `ProvisionApDialog` must remain open on screen so the user can screenshot `provision_debug_panel` or tap **`Save/Share`**.
 3. **Never Log Plaintext Wi-Fi Passwords in Screenshots or Telemetry Files**:
    - `SetupDebugSnapshot` and `TelemetryFileExporter` must only record `Method`, `addLengths`, `plainLen`, `encLen`, and `suffix` (`[STEP 4 CRYPTO] Method=1 addLengths=true plainLen=12 encLen=68 suffix=0c40`) — never the user's raw Wi-Fi password.
 4. **Preserve Diagnostic `Modifier.testTag(...)` Identifiers**:
-   - Keep `provision_debug_panel`, `provision_debug_text`, `copy_provision_debug_button`, `share_provision_debug_button`, `keep_provision_dialog_open_chip`, and `export_telemetry_file_button` intact and covered by [`GenaProvisioningAndRulesTest.kt`](app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt), [`EndToEndUiTest.kt`](app/src/test/java/org/suppressingfire/wemi/EndToEndUiTest.kt), and [`HardwareCujEndToEndTest.kt`](app/src/test/java/org/suppressingfire/wemi/HardwareCujEndToEndTest.kt).
-5. **Preserve `LanHttpClient` Byte-Exact `Content-Length` Framing & `8500ms` Site-Survey Read Timeout on `10.22.22.1`**:
-   - Embedded `uhttpd` / RTOS HTTP servers on `10.22.22.1` often keep TCP sockets open (`Connection: keep-alive`) after sending `/setup.xml` and take `3–6 seconds` to complete an 11-channel 2.4 GHz `GetApList` scan. Always use [`LanHttpClient`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) (`connectTimeoutMs = 1500`, `readTimeoutMs = 8500`) rather than raw `Socket.getInputStream().readText()` EOF reads.
+   - Keep `provision_debug_panel`, `provision_debug_text`, `copy_provision_debug_button`, `share_provision_debug_button`, `keep_provision_dialog_open_chip`, `provision_len_auto_chip`, `provision_len_true_chip`, `provision_len_false_chip`, `export_telemetry_file_button`, and `ping_device_<id>` intact and covered across the 10-suite `37/37` automated test gate ([`GenaProvisioningAndRulesTest.kt`](app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt), [`SoapAndSelfHealingTest.kt`](app/src/test/java/org/suppressingfire/wemi/SoapAndSelfHealingTest.kt), [`EndToEndUiTest.kt`](app/src/test/java/org/suppressingfire/wemi/EndToEndUiTest.kt), and [`HardwareCujEndToEndTest.kt`](app/src/test/java/org/suppressingfire/wemi/HardwareCujEndToEndTest.kt)).
+5. **Preserve `LanHttpClient` & `GenaSubscriptionManager` Byte-Exact UTF-8 `Content-Length` Framing, Delayed-`FIN` Recovery & `8500ms` Site-Survey Read Timeout**:
+   - Embedded `uhttpd` / RTOS HTTP servers on `10.22.22.1` often keep TCP sockets open (`Connection: keep-alive`) or delay TCP `FIN` after sending `/setup.xml` and take `3–6 seconds` to complete an 11-channel 2.4 GHz `GetApList` scan. Always use [`LanHttpClient`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) (`tcpNoDelay = true`, `connectTimeoutMs = 1500`, `readTimeoutMs = 8500`, buffered delayed-`FIN` recovery in `readUntilEof`) rather than raw `Socket.getInputStream().readText()` EOF reads, and preserve byte-exact UTF-8 `Content-Length` framing in [`GenaSubscriptionManager.kt`](app/src/main/java/org/suppressingfire/wemi/network/GenaSubscriptionManager.kt).
 
 ---
 

@@ -42,7 +42,7 @@ When a trace is longer than one screen or the user prefers sharing a text file:
 1. **Inside `ProvisionApDialog` (`SETUP DEBUG DETAILS` header — [`ProvisionDebugPanel.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionDebugPanel.kt))**:
    - Tap **`Save/Share`** (`share_provision_debug_button`) to write `/data/data/com.aistudio.wemiswitch.kxpqzr/files/wemi-telemetry-latest.txt`, copy the full report to the clipboard, and open Android's share sheet (to save to Google Drive / Files or paste directly into chat).
    - Or tap **`Copy`** (`copy_provision_debug_button`) to copy the `=== WeMi Setup AP Diagnostic Report ===` block to the clipboard and save `wemi-telemetry-latest.txt`.
-2. **Inside the `More` Tab (`UPnP / SOAP Packet Log` header — [`MoreScreen.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt))**:
+2. **Inside the `More` Tab (`UPnP / SOAP Packet Log` header — [`MoreScreen.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) & [`MoreControlAndLogCards.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreControlAndLogCards.kt))**:
    - Tap **`Save/Share Log`** (`export_telemetry_file_button`) to generate a complete 4-section report (`TelemetryFileExporter.buildFullTelemetryReport` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt)):
      - `--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`
      - `--- [2. REMEMBERED WI-FI HOMES] ---`
@@ -97,7 +97,7 @@ Format:
   - `Method 1` (`OpenWrt`, `rtos=0`): `key = MAC[0:6] + Serial + MAC[6:12]`.
   - `Method 2` (`RTOS`, `rtos=1`, e.g. `WLS040` / `WLS0403` / `WDS060` / `WSP080`): `key = MAC[0:6] + MAC[6:12] + Serial` (transposed) with `iot` shifts.
   - `Method 3` (`binaryOption=1` symmetric): fixed 24-char key from `GetMetaInfo`.
-  - Some transitional firmwares (`new_algo=1` or early RTOS builds) require toggling **Password Length Suffix (`xxyy` hex)** between **`Append +4 Hex Lengths`** (`addLengths=true`) and **`No Length Suffix`** (`addLengths=false`), or overriding **Hardware AES-128-CBC Key Derivation** (`Method 1: Gen 1 OpenWrt`, `Method 2: Gen 2 RTOS`, `Method 3: BinaryOption Symmetric`). All 6 combinations are selectable via chips in [`ProvisionApDialog.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionApDialog.kt).
+  - Some transitional firmwares (`new_algo=1` or early RTOS builds) require toggling **Password Length Suffix (`xxyy` hex)** between **`Append +4 Hex Lengths`** (`addLengths=true`) and **`No Length Suffix`** (`addLengths=false`), or overriding **Hardware AES-128-CBC Key Derivation** (`Method 1: Gen 1 OpenWrt`, `Method 2: Gen 2 RTOS`, `Method 3: BinaryOption Symmetric`). All 6 combinations are selectable via chips in [`ProvisionApFormSections.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionApFormSections.kt) (`ProvisionCryptoOptionsSection`) inside [`ProvisionApDialog.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionApDialog.kt).
 
 ### 2.4 `[SCAN]` & `[TARGET AP]` — 2.4 GHz Site Survey Match
 Format:
@@ -138,6 +138,6 @@ Format:
 ## 3. Expanding Telemetry When New Hardware Quirks Are Discovered
 
 Whenever a screenshot or exported telemetry file reveals a new firmware flag, SOAP tag, or hardware SKU quirk:
-1. Add the parsed field to `SetupDeviceDescriptor` in [`ProvisionerClient.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt) and surface it in `SetupDebugSnapshot.toDisplayLines` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt).
+1. Add the parsed field to `SetupDeviceDescriptor` in [`NetworkModels.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) (populated by `probeSetupDevice` in [`ProvisionerClient.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt)) and surface it in `SetupDebugSnapshot.toDisplayLines` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt).
 2. Add a deterministic loopback regression test in [`GenaProvisioningAndRulesTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt) using [`FakeUpnpServer.kt`](../../app/src/test/java/org/suppressingfire/wemi/FakeUpnpServer.kt).
-3. Run `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` before pushing.
+3. Run `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` (`37/37` tests across 10 suites) before pushing.
