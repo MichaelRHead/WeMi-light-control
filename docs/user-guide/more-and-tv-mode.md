@@ -22,8 +22,8 @@ Inside the **Offline Local UPnP / SOAP Engine** card on the **More** tab:
   - Starts with a clean slate on your local `/24` Wi-Fi subnet and only displays real physical smart switches that you discover via SSDP, provision via `10.22.22.1`, or add by IP.
   - If a physical switch is unplugged or unreachable on Wi-Fi, toggling it performs a 2-stage self-healing reconnect attempt and accurately marks the device **`Offline`** if it cannot be reached.
 - **Demo Showroom Mode (`Demo Showroom Mode = ON`)**:
-  - Populates **13 showcase switches, dimmers, fans, Christmas tree lights, and motion sensors** across 3 sample Wi-Fi Homes (`Main Home`, `Lake Cabin`, `Studio Office`) so you can explore room grouping, dimming, rules, and the interface without physical hardware on your LAN.
-  - Tapping **`Reset Preset`** restores the 13 classic showcase switches at any time.
+  - Populates **14 showcase switches, dimmers, fans, Christmas tree lights, and motion sensors** across 3 sample Wi-Fi Homes (`Main Home`, `Lake Cabin`, `Studio Office`) so you can explore room grouping, dimming, rules, and the interface without physical hardware on your LAN.
+  - Tapping **`Reset Preset`** restores the 14 classic showcase switches at any time.
 
 Other quick settings in this card:
 - **Header Logo Wordmark Switch**: Toggles the top header logo between **`wemi`** and classic **`wemo`**.

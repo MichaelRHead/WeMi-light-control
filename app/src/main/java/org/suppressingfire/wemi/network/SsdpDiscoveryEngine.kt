@@ -2,7 +2,6 @@ package org.suppressingfire.wemi.network
 
 import android.content.Context
 import android.net.wifi.WifiManager
-import android.os.Build
 import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
 import org.suppressingfire.wemi.data.DeviceEntity
@@ -49,7 +48,7 @@ internal class SsdpDiscoveryEngine(
      */
     suspend fun scanSubnetUnicast(
         subnetPrefix: String,
-        searchTarget: String = "urn:Belkin:service:basicevent:1"
+        searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT
     ): List<SsdpDiscoveredDevice> = coroutineScope {
         val cleanPrefix = subnetPrefix.trim().removeSuffix(".x").removeSuffix(".0/24")
         if (cleanPrefix.isBlank() || cleanPrefix.startsWith("10.0.2") || cleanPrefix.startsWith("127.")) {
@@ -96,7 +95,7 @@ internal class SsdpDiscoveryEngine(
      * `GetBinaryState` / `GetMetaInfo` telemetry.
      */
     suspend fun performSsdpDiscoveryScan(
-        searchTarget: String = "urn:Belkin:service:basicevent:1",
+        searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
         knownLocalDevices: List<DeviceEntity> = emptyList(),
         includeDemoFallbacks: Boolean = false
     ): SsdpScanReport = withContext(Dispatchers.IO) {
@@ -106,7 +105,7 @@ internal class SsdpDiscoveryEngine(
         val primaryMSearch = XmlAndSkuParser.buildSsdpMSearchPacket(searchTarget)
         val searchTargets = listOf(
             searchTarget,
-            "urn:Belkin:service:basicevent:1",
+            XmlAndSkuParser.URN_BASIC_EVENT,
             "upnp:rootdevice"
         ).distinct()
 
@@ -116,8 +115,7 @@ internal class SsdpDiscoveryEngine(
             runCatching { acquire() }
         }
 
-        val isRobolectric = Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
-            runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+        val isRobolectric = LanRuntimeUtils.isRunningInRobolectric()
 
         try {
             val loopbackPorts = loopbackSsdpUdpPorts.toList()
@@ -188,11 +186,7 @@ internal class SsdpDiscoveryEngine(
                         latencyMs,
                         true
                     )
-                    if (desc != null && liveDiscovered.none {
-                            (it.serialNumber.isNotBlank() && it.serialNumber.equals(desc.serialNumber, ignoreCase = true)) ||
-                                (it.ipAddress == desc.ipAddress && it.port == desc.port)
-                        }
-                    ) {
+                    if (desc != null && liveDiscovered.none { it.matchesEndpointOrSerial(desc) }) {
                         liveDiscovered.add(desc)
                     }
                 }

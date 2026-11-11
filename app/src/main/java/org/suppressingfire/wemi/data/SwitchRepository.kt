@@ -1,17 +1,18 @@
 package org.suppressingfire.wemi.data
 
 import android.content.Context
-import android.os.Build
 import org.suppressingfire.wemi.network.GenaEventNotification
-import org.suppressingfire.wemi.network.SoapCallResult
-import org.suppressingfire.wemi.network.SsdpScanReport
 import org.suppressingfire.wemi.network.GenaSubscriptionManager
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkClient
 import org.suppressingfire.wemi.network.NetworkMonitor
 import org.suppressingfire.wemi.network.ProvisionResult
 import org.suppressingfire.wemi.network.ProvisionerClient
 import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDeviceDescriptor
+import org.suppressingfire.wemi.network.SoapCallResult
+import org.suppressingfire.wemi.network.SsdpScanReport
+import org.suppressingfire.wemi.network.XmlAndSkuParser
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,11 +49,11 @@ data class HomeReconnectSummary(
  * - RTOS-safe LAN concurrency limiting (`Semaphore(3)`) and per-device `Mutex` serialization
  * - Unified optimistic SOAP command pipeline ([executeOptimisticDeviceCommand]) with 2-stage
  *   self-healing reconnect and offline rollback
- * - UPnP GENA push notification handling (`1200ms` echo-suppression window) and 30-second fallback polling
- * - Room v5 device, home-network, and rule CRUD
+ * - UPnP GENA push notification handling (`1200ms` echo-suppression window) and 30-second fallback polling (`2000ms` echo guard)
  *
  * Delegates SSDP discovery & startup probing to [DiscoveryCoordinator], `10.22.22.1` Setup AP
- * provisioning to [ProvisioningCoordinator], and showcase presets to [DemoFixtures].
+ * provisioning to [ProvisioningCoordinator], Room/rule CRUD & manual-IP enrichment to
+ * [DeviceCrudAndRulesCoordinator], and showcase presets to [DemoFixtures].
  */
 class SwitchRepository(
     private val dao: SwitchDao,
@@ -93,9 +94,8 @@ class SwitchRepository(
         _soapLogs.value = (listOf(entry) + _soapLogs.value).take(50)
     }
 
-    private fun nowFormatted(): String {
-        return SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
-    }
+    private fun nowFormatted(): String =
+        SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
 
     private fun mutexFor(device: DeviceEntity): Mutex {
         val key = device.serialNumber.takeIf { it.isNotBlank() } ?: "${device.ipAddress}:${device.port}"
@@ -123,6 +123,17 @@ class SwitchRepository(
         nowFormatted = ::nowFormatted
     )
 
+    private val crudCoordinator = DeviceCrudAndRulesCoordinator(
+        dao = dao,
+        networkClient = networkClient,
+        lanSemaphore = lanSemaphore,
+        isDemoShowroomMode = { _isDemoShowroomMode.value },
+        appendLog = ::appendLog,
+        nowFormatted = ::nowFormatted,
+        setDevicePowerExplicit = ::setDevicePowerExplicit,
+        updateDeviceBrightness = ::updateDeviceBrightness
+    )
+
     /**
      * Embedded UPnP GENA event manager for <100ms physical wall-switch push notifications.
      */
@@ -130,9 +141,7 @@ class SwitchRepository(
         localIpProvider = { detectCurrentLanIp() },
         wifiSocketFactory = NetworkMonitor.createWifiBoundSocketFactory(context),
         onNotification = { notification ->
-            repoScope.launch {
-                handleGenaNotification(notification)
-            }
+            repoScope.launch { handleGenaNotification(notification) }
         }
     )
 
@@ -169,15 +178,9 @@ class SwitchRepository(
      */
     suspend fun ensureSeeded(): String {
         return if (_isDemoShowroomMode.value) {
-            if (dao.getHomeNetworkCount() == 0) {
-                dao.insertHomeNetworks(defaultHomeNetworks())
-            }
-            if (dao.getDeviceCount() == 0) {
-                dao.insertDevices(defaultClassicDevices())
-            }
-            if (dao.getRuleCount() == 0) {
-                dao.insertRules(defaultClassicRules())
-            }
+            if (dao.getHomeNetworkCount() == 0) dao.insertHomeNetworks(defaultHomeNetworks())
+            if (dao.getDeviceCount() == 0) dao.insertDevices(defaultClassicDevices())
+            if (dao.getRuleCount() == 0) dao.insertRules(defaultClassicRules())
             initialSeedDone.value = true
             DEFAULT_MAIN_HOME_KEY
         } else {
@@ -188,7 +191,6 @@ class SwitchRepository(
     }
 
     suspend fun setDemoShowroomMode(enabled: Boolean): String {
-        _isDemoShowroomMode.value = enabled
         prefs?.edit()?.putBoolean(KEY_DEMO_SHOWROOM_MODE, enabled)?.apply()
         return if (enabled) {
             resetToClassicScreenshotPreset()
@@ -197,7 +199,10 @@ class SwitchRepository(
             dao.deleteAllDevices()
             dao.deleteAllRules()
             dao.deleteAllHomeNetworks()
-            ensureSeeded()
+            val activeKey = discoveryCoordinator.sanitizeAndResolveInitialLanHome(detectCurrentLanIp())
+            initialSeedDone.value = true
+            _isDemoShowroomMode.value = false
+            activeKey
         }
     }
 
@@ -205,14 +210,7 @@ class SwitchRepository(
      * Clears all remembered Wi-Fi Homes, discovered switches, room groupings, and rules in
      * Real LAN Mode, and re-initializes a single clean "My Home" profile on the active subnet.
      */
-    suspend fun resetLanHomesSwitchesAndRooms(): String {
-        _isDemoShowroomMode.value = false
-        prefs?.edit()?.putBoolean(KEY_DEMO_SHOWROOM_MODE, false)?.apply()
-        dao.deleteAllDevices()
-        dao.deleteAllRules()
-        dao.deleteAllHomeNetworks()
-        return ensureSeeded()
-    }
+    suspend fun resetLanHomesSwitchesAndRooms(): String = setDemoShowroomMode(false)
 
     suspend fun resetToClassicScreenshotPreset() {
         _isDemoShowroomMode.value = true
@@ -225,101 +223,71 @@ class SwitchRepository(
         dao.insertRules(defaultClassicRules())
     }
 
-    fun detectCurrentLanIp(): String {
-        return networkClient.resolveLocalIpv4Address()
-    }
+    fun detectCurrentLanIp(): String = networkClient.resolveLocalIpv4Address()
 
-    suspend fun detectStartupDeviceStates(networkKey: String): List<DeviceEntity> {
-        return discoveryCoordinator.detectStartupDeviceStates(networkKey)
-    }
+    suspend fun detectStartupDeviceStates(networkKey: String): List<DeviceEntity> =
+        discoveryCoordinator.detectStartupDeviceStates(networkKey)
 
-    suspend fun reconnectAndRediscoverHome(networkKey: String): HomeReconnectSummary {
-        return discoveryCoordinator.reconnectAndRediscoverHome(networkKey)
-    }
+    suspend fun reconnectAndRediscoverHome(networkKey: String): HomeReconnectSummary =
+        discoveryCoordinator.reconnectAndRediscoverHome(networkKey)
 
-    suspend fun reconnectDevice(device: DeviceEntity): DeviceEntity {
-        return discoveryCoordinator.reconnectDevice(device)
-    }
+    suspend fun reconnectDevice(device: DeviceEntity): DeviceEntity =
+        discoveryCoordinator.reconnectDevice(device)
 
-    suspend fun pingDeviceLatency(device: DeviceEntity): DeviceEntity {
-        return discoveryCoordinator.reconnectDevice(device)
-    }
+    suspend fun pingDeviceLatency(device: DeviceEntity): DeviceEntity =
+        discoveryCoordinator.reconnectDevice(device)
 
     suspend fun executeSsdpScan(
-        searchTarget: String = "urn:Belkin:service:basicevent:1",
+        searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
         autoAdoptNew: Boolean = false,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
-    ): SsdpScanReport {
-        return discoveryCoordinator.executeSsdpScan(
-            searchTarget = searchTarget,
-            autoAdoptNew = autoAdoptNew,
-            activeNetworkKey = activeNetworkKey,
-            activeWifiSsid = activeWifiSsid
-        )
-    }
+    ): SsdpScanReport = discoveryCoordinator.executeSsdpScan(
+        searchTarget = searchTarget,
+        autoAdoptNew = autoAdoptNew,
+        activeNetworkKey = activeNetworkKey,
+        activeWifiSsid = activeWifiSsid
+    )
 
     suspend fun adoptDiscoveredDevice(
         discovered: SsdpDiscoveredDevice,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
-    ): DeviceEntity {
-        return discoveryCoordinator.adoptDiscoveredDevice(
-            discovered = discovered,
-            activeNetworkKey = activeNetworkKey,
-            activeWifiSsid = activeWifiSsid
-        )
-    }
+    ): DeviceEntity = discoveryCoordinator.adoptDiscoveredDevice(
+        discovered = discovered,
+        activeNetworkKey = activeNetworkKey,
+        activeWifiSsid = activeWifiSsid
+    )
 
     suspend fun adoptDiscoveredDevices(
         discoveredList: List<SsdpDiscoveredDevice>,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
-    ): Int {
-        return discoveryCoordinator.adoptDiscoveredDevices(
-            discoveredList = discoveredList,
-            activeNetworkKey = activeNetworkKey,
-            activeWifiSsid = activeWifiSsid
-        )
-    }
+    ): Int = discoveryCoordinator.adoptDiscoveredDevices(
+        discoveredList = discoveredList,
+        activeNetworkKey = activeNetworkKey,
+        activeWifiSsid = activeWifiSsid
+    )
 
     suspend fun resolveOrCreateHomeForSubnet(
         subnetPrefix: String,
         gatewayIp: String = "$subnetPrefix.1"
-    ): HomeNetworkEntity? {
-        return discoveryCoordinator.resolveOrCreateHomeForSubnet(
-            subnetPrefix = subnetPrefix,
-            gatewayIp = gatewayIp
-        )
-    }
+    ): HomeNetworkEntity? = discoveryCoordinator.resolveOrCreateHomeForSubnet(
+        subnetPrefix = subnetPrefix,
+        gatewayIp = gatewayIp
+    )
 
     suspend fun saveOrUpdateHomeNetwork(
         existingKey: String?,
         homeName: String,
         ssidLabel: String,
         subnetPrefix: String
-    ): HomeNetworkEntity {
-        val cleanHome = homeName.trim().ifEmpty { "My Home Wi-Fi" }
-        val cleanSsid = ssidLabel.trim().ifEmpty { "Home-WiFi-5G" }
-        val cleanSubnet = subnetPrefix.trim()
-            .removeSuffix(".0/24")
-            .removeSuffix(".x")
-            .ifEmpty { "192.168.1" }
-        val key = existingKey ?: "wifi_custom_${cleanSubnet.replace('.', '_')}_${System.currentTimeMillis() % 10000}"
-        val currentNetworks = dao.getAllHomeNetworks().first()
-        val entity = HomeNetworkEntity(
-            networkKey = key,
-            homeName = cleanHome,
-            ssidLabel = cleanSsid,
-            subnetPrefix = cleanSubnet,
-            gatewayIp = "$cleanSubnet.1",
-            lastConnectedTime = "Connected now",
-            autoReconnectOnArrival = true,
-            sortOrder = currentNetworks.size
-        )
-        dao.insertHomeNetwork(entity)
-        return entity
-    }
+    ): HomeNetworkEntity = crudCoordinator.saveOrUpdateHomeNetwork(
+        existingKey = existingKey,
+        homeName = homeName,
+        ssidLabel = ssidLabel,
+        subnetPrefix = subnetPrefix
+    )
 
     /**
      * Unified optimistic SOAP state-transition pipeline shared by [toggleDevicePower],
@@ -457,77 +425,19 @@ class SwitchRepository(
         roomName: String,
         targetOn: Boolean,
         networkKey: String? = null
-    ): Int {
-        val demoMode = _isDemoShowroomMode.value
-        val currentDevices = dao.getAllDevices().first().let {
-            if (it.isEmpty() && demoMode) defaultClassicDevices() else it
-        }
-        val roomSwitches = currentDevices.filter {
-            (networkKey == null || it.networkKey == networkKey) &&
-                it.roomName.equals(roomName, ignoreCase = true) &&
-                it.isReachable &&
-                it.parsedType != DeviceType.MOTION_SENSOR
-        }
-        var succeeded = 0
-        for (dev in roomSwitches) {
-            val updated = setDevicePowerExplicit(dev, targetOn)
-            if (updated.isReachable) {
-                succeeded++
-            }
-        }
-        return succeeded
-    }
+    ): Int = crudCoordinator.toggleRoomPower(roomName, targetOn, networkKey)
 
     suspend fun updateRoomBrightness(
         roomName: String,
         newBrightness: Int,
         networkKey: String? = null
-    ): Int {
-        val clamped = newBrightness.coerceIn(1, 100)
-        val demoMode = _isDemoShowroomMode.value
-        val currentDevices = dao.getAllDevices().first().let {
-            if (it.isEmpty() && demoMode) defaultClassicDevices() else it
-        }
-        val roomBulbs = currentDevices.filter {
-            (networkKey == null || it.networkKey == networkKey) &&
-                it.roomName.equals(roomName, ignoreCase = true) &&
-                it.isReachable &&
-                it.parsedType == DeviceType.LIGHTBULB_DIMMER
-        }
-        roomBulbs.forEach { bulb ->
-            updateDeviceBrightness(bulb, clamped)
-        }
-        return roomBulbs.size
-    }
+    ): Int = crudCoordinator.updateRoomBrightness(roomName, newBrightness, networkKey)
 
-    suspend fun triggerMotionEvent(device: DeviceEntity) {
-        val now = nowFormatted()
-        val updated = device.copy(
-            lastMotionTime = now,
-            lastCheckedTime = now,
-            latencyMs = device.latencyMs.takeIf { it > 0 } ?: 15,
-            isReachable = true
-        )
-        dao.updateDevice(updated)
+    suspend fun triggerMotionEvent(device: DeviceEntity) =
+        crudCoordinator.triggerMotionEvent(device)
 
-        val rules = dao.getAllRules().first()
-        rules.filter { it.isEnabled && it.ruleType == "MOTION_TRIGGER" }.forEach { rule ->
-            val target = dao.getDeviceById(rule.targetDeviceId)
-            if (target != null) {
-                setDevicePowerExplicit(target, rule.targetStateOn)
-            }
-        }
-    }
-
-    suspend fun setDeviceReachableState(device: DeviceEntity, reachable: Boolean) {
-        dao.updateDevice(
-            device.copy(
-                isReachable = reachable,
-                latencyMs = if (reachable) (device.latencyMs.takeIf { it > 0 } ?: 14) else 0,
-                lastCheckedTime = nowFormatted()
-            )
-        )
-    }
+    suspend fun setDeviceReachableState(device: DeviceEntity, reachable: Boolean) =
+        crudCoordinator.setDeviceReachableState(device, reachable)
 
     /**
      * Handles incoming UPnP GENA `<e:propertyset>` push events from physical wall switches
@@ -566,9 +476,7 @@ class SwitchRepository(
             val rec = lanSemaphore.withPermit {
                 genaManager.subscribeOrRenew(dev, timeoutSeconds = 300)
             }
-            if (rec != null) {
-                subscribedCount++
-            }
+            if (rec != null) subscribedCount++
         }
         return subscribedCount
     }
@@ -698,16 +606,12 @@ class SwitchRepository(
     suspend fun probeSetupApDevice(
         apHost: String = "10.22.22.1",
         apPort: Int = 49152
-    ): SetupDeviceDescriptor? {
-        return provisioningCoordinator.probeSetupApDevice(apHost = apHost, apPort = apPort)
-    }
+    ): SetupDeviceDescriptor? = provisioningCoordinator.probeSetupApDevice(apHost = apHost, apPort = apPort)
 
     suspend fun scanSetupApNetworks(
         apHost: String = "10.22.22.1",
         apPort: Int = 49152
-    ): List<ScannedAp> {
-        return provisioningCoordinator.scanSetupApNetworks(apHost = apHost, apPort = apPort)
-    }
+    ): List<ScannedAp> = provisioningCoordinator.scanSetupApNetworks(apHost = apHost, apPort = apPort)
 
     suspend fun provisionSetupApDevice(
         apHost: String = "10.22.22.1",
@@ -726,143 +630,42 @@ class SwitchRepository(
         maxStatusPolls: Int = 18,
         statusPollDelayMs: Long = 1000L,
         onProgress: ((String) -> Unit)? = null
-    ): ProvisionResult {
-        return provisioningCoordinator.provisionSetupApDevice(
-            apHost = apHost,
-            apPort = apPort,
-            ssid = ssid,
-            plainPassword = plainPassword,
-            channel = channel,
-            authMode = authMode,
-            encryptionType = encryptionType,
-            encryptionMethod = encryptionMethod,
-            addPasswordLengths = addPasswordLengths,
-            customDeviceName = customDeviceName,
-            roomName = roomName,
-            deviceType = deviceType,
-            activeNetworkKey = activeNetworkKey,
-            maxStatusPolls = maxStatusPolls,
-            statusPollDelayMs = statusPollDelayMs,
-            onProgress = onProgress
-        )
-    }
+    ): ProvisionResult = provisioningCoordinator.provisionSetupApDevice(
+        apHost = apHost,
+        apPort = apPort,
+        ssid = ssid,
+        plainPassword = plainPassword,
+        channel = channel,
+        authMode = authMode,
+        encryptionType = encryptionType,
+        encryptionMethod = encryptionMethod,
+        addPasswordLengths = addPasswordLengths,
+        customDeviceName = customDeviceName,
+        roomName = roomName,
+        deviceType = deviceType,
+        activeNetworkKey = activeNetworkKey,
+        maxStatusPolls = maxStatusPolls,
+        statusPollDelayMs = statusPollDelayMs,
+        onProgress = onProgress
+    )
 
     suspend fun saveDevice(
         device: DeviceEntity,
         syncFriendlyNameToHardware: Boolean = false
-    ): DeviceEntity {
-        val isPlaceholderSerial = device.serialNumber.isBlank() ||
-            device.serialNumber == "221517K01018NEW" ||
-            device.serialNumber == "221517K01018AB"
+    ): DeviceEntity = crudCoordinator.saveDevice(device, syncFriendlyNameToHardware)
 
-        val liveDesc = if (device.id == 0 || isPlaceholderSerial) {
-            lanSemaphore.withPermit {
-                networkClient.probeAndFetchDeviceDescriptor(
-                    ipAddress = device.ipAddress,
-                    preferredPort = device.port
-                )
-            }
-        } else {
-            null
-        }
+    suspend fun deleteDevice(id: Int) = crudCoordinator.deleteDevice(id)
 
-        val enriched = if (liveDesc != null) {
-            val resolvedName = device.name.trim().ifBlank { liveDesc.name }
-            val resolvedRoom = if (device.name.isBlank() &&
-                (device.roomName == "Living Room" || device.roomName == "Unassigned")
-            ) {
-                liveDesc.roomName
-            } else {
-                device.roomName.ifBlank { liveDesc.roomName }
-            }
-            val resolvedType = if (device.name.isBlank()) {
-                liveDesc.deviceType.name
-            } else {
-                device.deviceType
-            }
-            device.copy(
-                name = resolvedName,
-                roomName = resolvedRoom,
-                deviceType = resolvedType,
-                port = liveDesc.port,
-                isReachable = true,
-                isOn = liveDesc.isOn,
-                brightness = liveDesc.brightness,
-                latencyMs = liveDesc.responseTimeMs.toInt().coerceAtLeast(1),
-                lastCheckedTime = nowFormatted(),
-                serialNumber = liveDesc.serialNumber.ifBlank { device.serialNumber },
-                firmwareVersion = liveDesc.firmwareVersion.ifBlank { device.firmwareVersion },
-                hardwareModel = liveDesc.hardwareSku.ifBlank { device.hardwareModel },
-                macAddress = liveDesc.macAddress.ifBlank { device.macAddress },
-                udn = liveDesc.usn.ifBlank { device.udn },
-                wifiSsid = liveDesc.wifiSsid.ifBlank { device.wifiSsid },
-                signalStrengthPercent = liveDesc.signalStrengthPercent
-            )
-        } else if (isPlaceholderSerial && !_isDemoShowroomMode.value) {
-            device.copy(serialNumber = "")
-        } else {
-            device
-        }
+    suspend fun moveDeviceOrder(device: DeviceEntity, moveUp: Boolean) =
+        crudCoordinator.moveDeviceOrder(device, moveUp)
 
-        val saved = if (enriched.id == 0) {
-            val count = dao.getDeviceCount()
-            val toInsert = enriched.copy(sortOrder = count)
-            val newId = dao.insertDevice(toInsert).toInt()
-            toInsert.copy(id = newId)
-        } else {
-            dao.updateDevice(enriched)
-            enriched
-        }
+    suspend fun toggleRule(rule: RuleEntity) = crudCoordinator.toggleRule(rule)
 
-        if (syncFriendlyNameToHardware) {
-            val renameResult = lanSemaphore.withPermit {
-                networkClient.changeFriendlyName(saved, saved.name)
-            }
-            appendLog(renameResult.logEntry)
-        }
-        return saved
-    }
+    suspend fun runRuleNow(rule: RuleEntity) = crudCoordinator.runRuleNow(rule)
 
-    suspend fun deleteDevice(id: Int) {
-        dao.deleteDeviceById(id)
-    }
+    suspend fun addRule(rule: RuleEntity) = crudCoordinator.addRule(rule)
 
-    suspend fun moveDeviceOrder(device: DeviceEntity, moveUp: Boolean) {
-        val list = dao.getAllDevices().first()
-        val index = list.indexOfFirst { it.id == device.id }
-        if (index == -1) return
-        val swapIndex = if (moveUp) index - 1 else index + 1
-        if (swapIndex !in list.indices) return
-        val current = list[index]
-        val neighbor = list[swapIndex]
-        dao.updateDevice(current.copy(sortOrder = swapIndex))
-        dao.updateDevice(neighbor.copy(sortOrder = index))
-    }
-
-    suspend fun toggleRule(rule: RuleEntity) {
-        dao.updateRule(rule.copy(isEnabled = !rule.isEnabled))
-    }
-
-    suspend fun runRuleNow(rule: RuleEntity) {
-        val devices = dao.getAllDevices().first()
-        val target = devices.find { it.id == rule.targetDeviceId }
-            ?: devices.find { it.name.equals(rule.targetDeviceName, ignoreCase = true) }
-        if (target != null) {
-            if (target.parsedType == DeviceType.LIGHTBULB_DIMMER && rule.targetStateOn) {
-                updateDeviceBrightness(target, rule.targetBrightness)
-            } else {
-                setDevicePowerExplicit(target, rule.targetStateOn)
-            }
-        }
-    }
-
-    suspend fun addRule(rule: RuleEntity) {
-        dao.insertRule(rule)
-    }
-
-    suspend fun deleteRule(id: Int) {
-        dao.deleteRuleById(id)
-    }
+    suspend fun deleteRule(id: Int) = crudCoordinator.deleteRule(id)
 
     fun clearLogs() {
         _soapLogs.value = emptyList()
@@ -877,10 +680,7 @@ class SwitchRepository(
         private const val PREFS_NAME = "wemi_controller_prefs"
         private const val KEY_DEMO_SHOWROOM_MODE = "demo_showroom_mode"
 
-        fun isRunningInRobolectric(): Boolean {
-            return Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
-                runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
-        }
+        fun isRunningInRobolectric(): Boolean = LanRuntimeUtils.isRunningInRobolectric()
 
         val DEFAULT_ROOMS: List<String> = DemoFixtures.DEFAULT_ROOMS
 

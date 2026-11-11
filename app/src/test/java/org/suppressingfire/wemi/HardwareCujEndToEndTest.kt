@@ -1,8 +1,5 @@
 package org.suppressingfire.wemi
 
-import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasTestTag
@@ -46,21 +43,8 @@ class HardwareCujEndToEndTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
-    private fun awaitLoopbackIo(timeoutMs: Long = 5_000L, condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            composeTestRule.waitForIdle()
-            if (condition()) return
-            Thread.sleep(20)
-        }
-        composeTestRule.waitForIdle()
-        assertTrue("Timed out waiting ${timeoutMs}ms for loopback IO condition", condition())
-    }
-
-    private fun hasTestTagPrefix(prefix: String): SemanticsMatcher =
-        SemanticsMatcher("TestTag starts with '$prefix'") { node ->
-            node.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true
-        }
+    private fun awaitLoopbackIo(timeoutMs: Long = 5_000L, condition: () -> Boolean) =
+        composeTestRule.awaitLoopbackIo(timeoutMs, condition)
 
     @Test
     fun `verify E2E Reset to SSDP Discovery, Adopt Switch and Dimmer, Toggle Switch, and Scale Dimmer Brightness CUJ`() {

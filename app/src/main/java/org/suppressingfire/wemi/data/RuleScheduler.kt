@@ -47,7 +47,7 @@ class RuleScheduler(
 
         val ruleMinutes = rules.firstOrNull { rule ->
             rule.isEnabled &&
-                rule.ruleType.startsWith("AUTO_OFF", ignoreCase = true) &&
+                rule.parsedRuleType == RuleType.AUTO_OFF &&
                 (rule.targetDeviceId == device.id || rule.targetDeviceName.equals(device.name, ignoreCase = true))
         }?.let { parseMinutesFromSummary(it.triggerSummary) } ?: 0
 
@@ -113,7 +113,7 @@ class RuleScheduler(
 
                 val rules = rulesProvider()
                 for (rule in rules) {
-                    if (!rule.isEnabled || rule.ruleType == "MOTION_TRIGGER") continue
+                    if (!rule.isEnabled || rule.parsedRuleType == RuleType.MOTION_TRIGGER) continue
                     val targetTime = parseScheduleTime24h(rule.triggerSummary) ?: continue
                     if (targetTime.first == hour24 && targetTime.second == minute) {
                         val prevKey = triggeredMinuteKeys[rule.id]

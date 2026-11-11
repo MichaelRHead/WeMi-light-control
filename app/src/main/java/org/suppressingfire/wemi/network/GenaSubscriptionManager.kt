@@ -259,30 +259,8 @@ class GenaSubscriptionManager(
      * Handles both plain and XML-entity-escaped inner payloads.
      */
     fun parseGenaPropertySetXml(rawXml: String): Pair<Boolean?, Int?> {
-        val unescaped = rawXml
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&amp;", "&")
-
-        val rawState = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
-            .find(unescaped)?.groupValues?.getOrNull(1)?.trim()
-
-        val parts = rawState?.split("|").orEmpty()
-        val firstToken = parts.firstOrNull()?.trim()
-        val binaryOn: Boolean? = when (firstToken) {
-            "1", "8" -> true
-            "0" -> false
-            else -> null
-        }
-
-        val brightness: Int? = parts.getOrNull(1)?.trim()?.toIntOrNull()
-            ?: Regex("<Brightness>(\\d+)</Brightness>", RegexOption.IGNORE_CASE)
-                .find(unescaped)?.groupValues?.getOrNull(1)?.toIntOrNull()
-            ?: Regex("<brightness>(\\d+)</brightness>", RegexOption.IGNORE_CASE)
-                .find(unescaped)?.groupValues?.getOrNull(1)?.toIntOrNull()
-
-        return Pair(binaryOn, brightness)
+        val parsed = XmlAndSkuParser.parseBinaryStatePayload(rawXml, unescapeEntities = true)
+        return Pair(parsed.binaryOn, parsed.brightness)
     }
 
     /**

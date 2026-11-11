@@ -11,9 +11,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.net.Inet4Address
 import java.net.InetAddress
-import java.net.NetworkInterface
 import java.net.Socket
-import java.util.Locale
 import javax.net.SocketFactory
 
 data class LanNetworkSnapshot(
@@ -144,37 +142,9 @@ class NetworkMonitor(
     }
 
     private fun computeSnapshotFromInterfaces(): LanNetworkSnapshot {
-        var resolvedIfName = "wlan0"
-        val ip = try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()?.toList().orEmpty()
-            val sorted = interfaces.sortedBy { nif ->
-                val name = nif.name.lowercase(Locale.US)
-                when {
-                    name.startsWith("wlan") -> 0
-                    name.startsWith("eth") || name.startsWith("en") -> 1
-                    else -> 2
-                }
-            }
-            var found: String? = null
-            for (nif in sorted) {
-                if (!nif.isUp || nif.isLoopback) continue
-                for (addr in nif.inetAddresses) {
-                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
-                        val h = addr.hostAddress ?: continue
-                        if (!h.startsWith("169.254.")) {
-                            found = h
-                            resolvedIfName = nif.name
-                            break
-                        }
-                    }
-                }
-                if (found != null) break
-            }
-            found ?: fallbackIpResolver()
-        } catch (_: Exception) {
-            fallbackIpResolver()
-        }
-
+        val (ip, resolvedIfName) = LanRuntimeUtils.resolvePreferredLanInterfaceIpv4(
+            fallbackIp = fallbackIpResolver()
+        )
         val prefix = ip.substringBeforeLast('.', "192.168.1")
         val cm = connectivityManager
         val boundNet = findPreferredWifiOrLanNetwork(cm)
@@ -237,8 +207,7 @@ class NetworkMonitor(
          */
         fun createWifiBoundSocketFactory(context: Context?): SocketFactory {
             val appCtx = context?.applicationContext
-            val isRobolectric = android.os.Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
-                runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+            val isRobolectric = LanRuntimeUtils.isRunningInRobolectric()
 
             return object : SocketFactory() {
                 private fun resolveWifiNetwork(): Network? {

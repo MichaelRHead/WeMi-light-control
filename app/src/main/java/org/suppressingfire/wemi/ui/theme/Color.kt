@@ -2,12 +2,20 @@ package org.suppressingfire.wemi.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// WeMi Signature Ocean Teal, Electric Cyan & Deep Azure Palette
+// WeMi Signature Ocean Teal, Electric Cyan & Deep Sapphire Palette.
+// Note: `WemoGreen*` token names are retained as internal theme identifiers for backwards
+// compatibility across existing UI composables; semantic `WeMi*` aliases are provided below.
 val WemoGreenTop = Color(0xFF06B6D4)       // Electric Cyan highlight
 val WemoGreenBottom = Color(0xFF0F4C81)    // Deep Sapphire / Ocean Blue
-val WemoGreenPrimary = Color(0xFF0891B2)   // Primary Cyan-Teal
+val WemoGreenPrimary = Color(0xFF0891B2)   // Primary Ocean Teal
 val WemoGreenDark = Color(0xFF0E7490)      // Deep Teal accent
 val WemoGreenSoft = Color(0xFFE0F7FA)      // Soft Cyan container tint
+
+val WeMiElectricCyanTop = WemoGreenTop
+val WeMiDeepSapphireBottom = WemoGreenBottom
+val WeMiOceanTealPrimary = WemoGreenPrimary
+val WeMiDeepTealAccent = WemoGreenDark
+val WeMiSoftCyanContainer = WemoGreenSoft
 
 // Cool Slate & Crisp Surface Palette
 val WemoBackgroundGray = Color(0xFFEEF2F6)

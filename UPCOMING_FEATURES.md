@@ -29,7 +29,7 @@ Related documents in this repository:
 
 ## 1. Upcoming Features Overview
 
-With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`), 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3`), compact single-row `TopHeader` and 3-column room-grouped Android TV dashboard (`wemi TV`), dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), one-tap LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, and 35 unit, protocol, governance, and full-stack E2E tests complete in `v23.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
+With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`), 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3`), compact single-row `TopHeader` and 3-column room-grouped Android TV dashboard (`wemi TV`), dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), one-tap LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, human-readable modularization across all layers, and 37 unit, protocol, governance, and full-stack E2E tests complete in `v23.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
 
 | Track | Upcoming Feature Area | Key Deliverables |
 | :--- | :--- | :--- |

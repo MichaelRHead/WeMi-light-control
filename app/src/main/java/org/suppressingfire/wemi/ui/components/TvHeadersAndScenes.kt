@@ -219,19 +219,19 @@ internal fun TvTopHeaderBar(
             TvSceneChip(
                 title = "Movie 20%",
                 icon = Icons.Default.Movie,
-                onClick = { onApplyTvScene("MOVIE_MODE") },
+                onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.MOVIE_MODE.wireKey) },
                 testTag = "tv_scene_movie"
             )
             TvSceneChip(
                 title = "Holiday ON",
                 icon = Icons.Default.Park,
-                onClick = { onApplyTvScene("HOLIDAY_ON") },
+                onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey) },
                 testTag = "tv_scene_holiday"
             )
             TvSceneChip(
                 title = "All OFF",
                 icon = Icons.Default.Bedtime,
-                onClick = { onApplyTvScene("BEDTIME_OFF") },
+                onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.BEDTIME_OFF.wireKey) },
                 testTag = "tv_scene_bedtime"
             )
 

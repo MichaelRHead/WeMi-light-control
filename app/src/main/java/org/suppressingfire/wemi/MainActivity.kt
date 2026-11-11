@@ -14,7 +14,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -24,11 +23,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -44,15 +40,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.suppressingfire.wemi.ui.BottomTab
 import org.suppressingfire.wemi.ui.SwitchViewModel
-import org.suppressingfire.wemi.ui.components.AddOrEditDeviceDialog
-import org.suppressingfire.wemi.ui.components.AddRuleDialog
-import org.suppressingfire.wemi.ui.components.AddWifiHomeNetworkDialog
-import org.suppressingfire.wemi.ui.components.ProvisionApDialog
 import org.suppressingfire.wemi.ui.components.BottomNavigationBar
-import org.suppressingfire.wemi.ui.components.SsdpScannerModal
 import org.suppressingfire.wemi.ui.components.TopHeader
 import org.suppressingfire.wemi.ui.components.TvDashboardScreen
+import org.suppressingfire.wemi.ui.components.WeMiModalDialogs
+import org.suppressingfire.wemi.ui.screens.DevicesTabActions
 import org.suppressingfire.wemi.ui.screens.DevicesTabScreen
+import org.suppressingfire.wemi.ui.screens.DevicesTabUiState
 import org.suppressingfire.wemi.ui.screens.MoreScreen
 import org.suppressingfire.wemi.ui.screens.RulesScreen
 import org.suppressingfire.wemi.ui.theme.WeMiTheme
@@ -91,14 +85,6 @@ fun WeMiSwitchApp(
     val homeNetworks by viewModel.homeNetworks.collectAsStateWithLifecycle()
     val activeNetworkKey by viewModel.activeNetworkKey.collectAsStateWithLifecycle()
     val isReconnectingHome by viewModel.isReconnectingHome.collectAsStateWithLifecycle()
-    val showAddHomeDialog by viewModel.showAddHomeDialog.collectAsStateWithLifecycle()
-    val showProvisionApDialog by viewModel.showProvisionApDialog.collectAsStateWithLifecycle()
-    val scannedSetupAps by viewModel.scannedSetupAps.collectAsStateWithLifecycle()
-    val detectedSetupDevice by viewModel.detectedSetupDevice.collectAsStateWithLifecycle()
-    val setupApStatusMessage by viewModel.setupApStatusMessage.collectAsStateWithLifecycle()
-    val setupDebugSnapshot by viewModel.setupDebugSnapshot.collectAsStateWithLifecycle()
-    val isScanningSetupAp by viewModel.isScanningSetupAp.collectAsStateWithLifecycle()
-    val isProvisioningAp by viewModel.isProvisioningAp.collectAsStateWithLifecycle()
     val lanNetworkState by viewModel.lanNetworkState.collectAsStateWithLifecycle()
     val activeAutoOffCountdownsSec by viewModel.activeAutoOffCountdownsSec.collectAsStateWithLifecycle()
     val rules by viewModel.rules.collectAsStateWithLifecycle()
@@ -112,48 +98,38 @@ fun WeMiSwitchApp(
     val isEditMode by viewModel.isEditMode.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val showSsdpScannerSheet by viewModel.showSsdpScannerSheet.collectAsStateWithLifecycle()
-    val selectedSearchTarget by viewModel.selectedSearchTarget.collectAsStateWithLifecycle()
+    val showAddHomeDialog by viewModel.showAddHomeDialog.collectAsStateWithLifecycle()
+    val showProvisionApDialog by viewModel.showProvisionApDialog.collectAsStateWithLifecycle()
     val expandedDeviceIds by viewModel.expandedDeviceIds.collectAsStateWithLifecycle()
     val togglingDeviceIds by viewModel.togglingDeviceIds.collectAsStateWithLifecycle()
-    val editingDevice by viewModel.editingDevice.collectAsStateWithLifecycle()
-    val showAddDeviceDialog by viewModel.showAddDeviceDialog.collectAsStateWithLifecycle()
-    val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
     val isDemoShowroomMode by viewModel.isDemoShowroomMode.collectAsStateWithLifecycle()
 
-    val homeDevices by remember(devices, activeNetworkKey) {
-        derivedStateOf {
-            devices.filter { it.networkKey == activeNetworkKey }
-        }
+    val homeDevices = remember(devices, activeNetworkKey) {
+        devices.filter { it.networkKey == activeNetworkKey }
     }
 
-    val availableRooms by remember(homeDevices) {
-        derivedStateOf {
+    val availableRooms = remember(homeDevices) {
+        homeDevices
+            .map { it.roomName }
+            .distinct()
+            .sortedBy { it.equals("Unassigned", ignoreCase = true) }
+    }
+
+    val filteredDevices = remember(homeDevices, selectedRoomFilter) {
+        if (selectedRoomFilter == null) {
             homeDevices
-                .map { it.roomName }
-                .distinct()
-                .sortedBy { it.equals("Unassigned", ignoreCase = true) }
+        } else {
+            homeDevices.filter { it.roomName.equals(selectedRoomFilter, ignoreCase = true) }
         }
     }
 
-    val filteredDevices by remember(homeDevices, selectedRoomFilter) {
-        derivedStateOf {
-            if (selectedRoomFilter == null) {
-                homeDevices
-            } else {
-                homeDevices.filter { it.roomName.equals(selectedRoomFilter, ignoreCase = true) }
-            }
-        }
-    }
-
-    val groupedDevicesByRoom by remember(filteredDevices) {
-        derivedStateOf {
-            val rawGroups = filteredDevices.groupBy { it.roomName }
-            val assigned = rawGroups.filterKeys { !it.equals("Unassigned", ignoreCase = true) }
-            val unassigned = rawGroups.filterKeys { it.equals("Unassigned", ignoreCase = true) }
-            assigned + unassigned
-        }
+    val groupedDevicesByRoom = remember(filteredDevices) {
+        val rawGroups = filteredDevices.groupBy { it.roomName }
+        val assigned = rawGroups.filterKeys { !it.equals("Unassigned", ignoreCase = true) }
+        val unassigned = rawGroups.filterKeys { it.equals("Unassigned", ignoreCase = true) }
+        assigned + unassigned
     }
 
     BackHandler(
@@ -236,6 +212,35 @@ fun WeMiSwitchApp(
                     onScanSsdpClick = { viewModel.refreshDevicesFromNetwork() }
                 )
             } else {
+                val devicesTabActions = remember(viewModel) {
+                    DevicesTabActions(
+                        onRefreshDevices = { viewModel.refreshDevicesFromNetwork() },
+                        onOpenProvisionApDialog = { viewModel.openProvisionApDialog() },
+                        onSelectHomeNetwork = { viewModel.selectHomeNetwork(it) },
+                        onReconnectCurrentHome = { viewModel.reconnectCurrentHomeNetwork() },
+                        onOpenAddHomeDialog = { viewModel.openAddHomeDialog() },
+                        onOpenScannerAndScan = { viewModel.openSsdpScannerAndScan() },
+                        onToggleGroupedByRoom = { viewModel.toggleGroupByRoom() },
+                        onSelectRoomFilter = { viewModel.selectRoomFilter(it) },
+                        onOpenAddDeviceDialog = { viewModel.openAddDeviceDialog() },
+                        onRestoreClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
+                        onToggleRoomPower = { viewModel.toggleRoomPower(it) },
+                        onToggleRoomCollapse = { viewModel.toggleRoomCollapse(it) },
+                        onUpdateRoomBrightness = { room, level -> viewModel.updateRoomBrightness(room, level) },
+                        onToggleDevicePower = { viewModel.toggleDevicePower(it) },
+                        onToggleExpandDevice = { viewModel.toggleExpandDevice(it) },
+                        onUpdateBrightness = { dev, level -> viewModel.updateBrightness(dev, level) },
+                        onTriggerMotion = { viewModel.simulateOrRefreshMotion(it) },
+                        onReconnectDevice = { viewModel.reconnectDevice(it) },
+                        onOpenEditDeviceDialog = { viewModel.openEditDeviceDialog(it) },
+                        onDeleteDevice = { viewModel.deleteDevice(it) },
+                        onMoveDevice = { dev, moveUp -> viewModel.moveDevice(dev, moveUp) },
+                        onPingDeviceLatency = { viewModel.pingDeviceLatency(it) },
+                        onToggleNightMode = { viewModel.toggleDimmerNightMode(it) },
+                        onResetHomesAndSwitches = { rescan -> viewModel.resetLanHomesSwitchesAndRooms(rescan) }
+                    )
+                }
+
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -244,55 +249,28 @@ fun WeMiSwitchApp(
                     when (selectedTab) {
                         BottomTab.DEVICES -> {
                             DevicesTabScreen(
-                                allDevices = devices,
-                                homeDevices = homeDevices,
-                                filteredDevices = filteredDevices,
-                                groupedDevicesByRoom = groupedDevicesByRoom,
-                                availableRooms = availableRooms,
-                                homeNetworks = homeNetworks,
-                                activeNetworkKey = activeNetworkKey,
-                                isReconnectingHome = isReconnectingHome,
-                                lanNetworkState = lanNetworkState,
-                                latestSsdpReport = latestSsdpReport,
-                                isRefreshing = isRefreshing,
-                                isGroupedByRoom = isGroupedByRoom,
-                                selectedRoomFilter = selectedRoomFilter,
-                                collapsedRooms = collapsedRooms,
-                                togglingRooms = togglingRooms,
-                                expandedDeviceIds = expandedDeviceIds,
-                                togglingDeviceIds = togglingDeviceIds,
-                                isEditMode = isEditMode,
-                                activeAutoOffCountdownsSec = activeAutoOffCountdownsSec,
-                                onRefreshDevices = { viewModel.refreshDevicesFromNetwork() },
-                                onOpenProvisionApDialog = { viewModel.openProvisionApDialog() },
-                                onSelectHomeNetwork = { viewModel.selectHomeNetwork(it) },
-                                onReconnectCurrentHome = { viewModel.reconnectCurrentHomeNetwork() },
-                                onOpenAddHomeDialog = { viewModel.openAddHomeDialog() },
-                                onOpenScannerAndScan = { viewModel.openSsdpScannerAndScan() },
-                                onToggleGroupedByRoom = { viewModel.toggleGroupByRoom() },
-                                onSelectRoomFilter = { viewModel.selectRoomFilter(it) },
-                                onOpenAddDeviceDialog = { viewModel.openAddDeviceDialog() },
-                                onRestoreClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
-                                onToggleRoomPower = { viewModel.toggleRoomPower(it) },
-                                onToggleRoomCollapse = { viewModel.toggleRoomCollapse(it) },
-                                onUpdateRoomBrightness = { room, level ->
-                                    viewModel.updateRoomBrightness(room, level)
-                                },
-                                onToggleDevicePower = { viewModel.toggleDevicePower(it) },
-                                onToggleExpandDevice = { viewModel.toggleExpandDevice(it) },
-                                onUpdateBrightness = { dev, level ->
-                                    viewModel.updateBrightness(dev, level)
-                                },
-                                onTriggerMotion = { viewModel.simulateOrRefreshMotion(it) },
-                                onReconnectDevice = { viewModel.reconnectDevice(it) },
-                                onOpenEditDeviceDialog = { viewModel.openEditDeviceDialog(it) },
-                                onDeleteDevice = { viewModel.deleteDevice(it) },
-                                onMoveDevice = { dev, moveUp -> viewModel.moveDevice(dev, moveUp) },
-                                onPingDeviceLatency = { viewModel.pingDeviceLatency(it) },
-                                onToggleNightMode = { viewModel.toggleDimmerNightMode(it) },
-                                onResetHomesAndSwitches = { rescan ->
-                                    viewModel.resetLanHomesSwitchesAndRooms(rescan)
-                                }
+                                state = DevicesTabUiState(
+                                    allDevices = devices,
+                                    homeDevices = homeDevices,
+                                    filteredDevices = filteredDevices,
+                                    groupedDevicesByRoom = groupedDevicesByRoom,
+                                    availableRooms = availableRooms,
+                                    homeNetworks = homeNetworks,
+                                    activeNetworkKey = activeNetworkKey,
+                                    isReconnectingHome = isReconnectingHome,
+                                    lanNetworkState = lanNetworkState,
+                                    latestSsdpReport = latestSsdpReport,
+                                    isRefreshing = isRefreshing,
+                                    isGroupedByRoom = isGroupedByRoom,
+                                    selectedRoomFilter = selectedRoomFilter,
+                                    collapsedRooms = collapsedRooms,
+                                    togglingRooms = togglingRooms,
+                                    expandedDeviceIds = expandedDeviceIds,
+                                    togglingDeviceIds = togglingDeviceIds,
+                                    isEditMode = isEditMode,
+                                    activeAutoOffCountdownsSec = activeAutoOffCountdownsSec
+                                ),
+                                actions = devicesTabActions
                             )
                         }
 
@@ -360,120 +338,11 @@ fun WeMiSwitchApp(
     }
 
     if (!isTvMode) {
-        if (showAddHomeDialog) {
-            AddWifiHomeNetworkDialog(
-                detectedLocalIp = viewModel.detectCurrentLanIp(),
-                onDismiss = { viewModel.closeAddHomeDialog() },
-                onSaveHome = { homeName, ssidLabel, subnetPrefix ->
-                    viewModel.addWifiHomeNetwork(homeName, ssidLabel, subnetPrefix)
-                }
-            )
-        }
-
-        if (showProvisionApDialog) {
-            val currentSsid = homeNetworks.find { it.networkKey == activeNetworkKey }?.ssidLabel.orEmpty()
-            ProvisionApDialog(
-                scannedAps = scannedSetupAps,
-                isScanning = isScanningSetupAp,
-                isProvisioning = isProvisioningAp,
-                defaultSsid = currentSsid,
-                detectedDevice = detectedSetupDevice,
-                statusMessage = setupApStatusMessage,
-                debugSnapshot = setupDebugSnapshot,
-                onScanApList = { apHost -> viewModel.scanSetupApNetworks(apHost) },
-                onProvision = { apHost, ssid, pwd, ch, auth, enc, method, customName, roomName ->
-                    viewModel.provisionSetupAp(
-                        apHost = apHost,
-                        ssid = ssid,
-                        password = pwd,
-                        channel = ch,
-                        authMode = auth,
-                        encryptionType = enc,
-                        encryptionMethod = method,
-                        customDeviceName = customName,
-                        roomName = roomName
-                    )
-                },
-                onProvisionAdvanced = { apHost, ssid, pwd, ch, auth, enc, method, addLengths, customName, roomName, keepOpen ->
-                    viewModel.provisionSetupAp(
-                        apHost = apHost,
-                        ssid = ssid,
-                        password = pwd,
-                        channel = ch,
-                        authMode = auth,
-                        encryptionType = enc,
-                        encryptionMethod = method,
-                        addPasswordLengths = addLengths,
-                        customDeviceName = customName,
-                        roomName = roomName,
-                        keepDialogOpenOnSuccess = keepOpen
-                    )
-                },
-                onDismiss = { viewModel.closeProvisionApDialog() }
-            )
-        }
-
-        if (showSsdpScannerSheet) {
-            SsdpScannerModal(
-                isScanning = isRefreshing,
-                selectedSearchTarget = selectedSearchTarget,
-                scanReport = latestSsdpReport,
-                existingDevices = homeDevices,
-                onSelectSearchTarget = { st -> viewModel.selectSearchTargetAndScan(st) },
-                onRescan = { viewModel.openSsdpScannerAndScan(selectedSearchTarget) },
-                onAdoptDevice = { item -> viewModel.adoptSsdpDevice(item) },
-                onAdoptAll = { viewModel.adoptAllSsdpDevices() },
-                onDismiss = { viewModel.closeSsdpScanner() }
-            )
-        }
-
-        if (showAddDeviceDialog || editingDevice != null) {
-            AddOrEditDeviceDialog(
-                initialDevice = editingDevice,
-                onDismiss = {
-                    viewModel.closeAddDeviceDialog()
-                    viewModel.closeEditDeviceDialog()
-                },
-                onSave = { id, name, roomName, type, ip, port, brightness, reachable, isOn, autoOff, syncHwName ->
-                    viewModel.saveDevice(
-                        id = id,
-                        name = name,
-                        roomName = roomName,
-                        deviceType = type,
-                        ipAddress = ip,
-                        port = port,
-                        brightness = brightness,
-                        isReachable = reachable,
-                        isOn = isOn,
-                        autoOffMinutes = autoOff,
-                        syncFriendlyNameToHardware = syncHwName
-                    )
-                },
-                onDelete = if (editingDevice != null) {
-                    { dev -> viewModel.deleteDevice(dev) }
-                } else {
-                    null
-                },
-                onScanNetwork = { viewModel.openSsdpScannerAndScan() },
-                onOpenProvisionWizard = { viewModel.openProvisionApDialog() }
-            )
-        }
-
-        if (showAddRuleDialog) {
-            AddRuleDialog(
-                devices = homeDevices,
-                onDismiss = { viewModel.closeAddRuleDialog() },
-                onCreateRule = { name, ruleType, targetDevice, triggerSummary, targetStateOn, brightness ->
-                    viewModel.addRule(
-                        name = name,
-                        ruleType = ruleType,
-                        targetDevice = targetDevice,
-                        triggerSummary = triggerSummary,
-                        targetStateOn = targetStateOn,
-                        targetBrightness = brightness
-                    )
-                }
-            )
-        }
+        WeMiModalDialogs(
+            viewModel = viewModel,
+            homeDevices = homeDevices,
+            homeNetworks = homeNetworks,
+            activeNetworkKey = activeNetworkKey
+        )
     }
 }

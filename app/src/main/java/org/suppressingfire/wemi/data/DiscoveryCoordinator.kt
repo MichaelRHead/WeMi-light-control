@@ -1,5 +1,6 @@
 package org.suppressingfire.wemi.data
 
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.SsdpScanReport
 import org.suppressingfire.wemi.network.NetworkClient
 import kotlinx.coroutines.async
@@ -35,48 +36,40 @@ internal class DiscoveryCoordinator(
     private val adoptMutex = Mutex()
 
     private fun mutexFor(device: DeviceEntity): Mutex {
-        val key = device.serialNumber.takeIf { it.isNotBlank() } ?: "${device.ipAddress}:${device.port}"
+        val key = device.serialNumber.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
+            ?: "${device.ipAddress}:${device.port}"
         return deviceMutexes.getOrPut(key) { Mutex() }
     }
 
     /**
      * 3-tier hardware identity matcher between a persisted [existing] device and a newly
      * discovered [discovered] SSDP/unicast device:
-     * 1. **Tier 1 (Hardware Serial Identity)**: If both devices carry a non-blank `<serialNumber>`,
-     *    they match if and only if the serial numbers are equal (case-insensitive). This prevents
-     *    DHCP IP swaps or multi-port loopback simulators from cross-matching different switches.
-     * 2. **Tier 2 (UPnP UDN / USN Identity)**: If serial numbers are not both present and both
+     * 1. **Tier 1 (Hardware Serial Identity)**: If both devices carry a real non-placeholder
+     *    `<serialNumber>`, they match if and only if the serial numbers are equal (case-insensitive).
+     *    This prevents DHCP IP swaps or multi-port loopback simulators from cross-matching switches.
+     * 2. **Tier 2 (UPnP UDN / USN Identity)**: If real serial numbers are not both present and both
      *    carry a UDN/USN, matches if `discovered.usn` contains `existing.udn`.
-     * 3. **Tier 3 (Endpoint / Friendly Name Fallback)**: When at least one serial number is blank
-     *    (e.g., an unprobed manual IP entry), matches by `(ipAddress, port)` (or `ipAddress` when
-     *    [requireSamePortWhenBlankSerial] is false) or case-insensitive `<friendlyName>`.
+     * 3. **Tier 3 (Endpoint / Friendly Name Fallback)**: When at least one serial number is blank or
+     *    a placeholder (e.g., an unprobed manual IP entry), matches by `(ipAddress, port)` (or
+     *    `ipAddress` when [requireSamePortWhenBlankSerial] is false) or case-insensitive `<friendlyName>`.
      */
     internal fun matchesDiscoveredDevice(
         existing: DeviceEntity,
         discovered: SsdpDiscoveredDevice,
         requireSamePortWhenBlankSerial: Boolean = true
-    ): Boolean {
-        if (existing.serialNumber.isNotBlank() && discovered.serialNumber.isNotBlank()) {
-            return existing.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
-        }
-        if (existing.udn.isNotBlank() && discovered.usn.isNotBlank() &&
-            discovered.usn.contains(existing.udn, ignoreCase = true)
-        ) {
-            return true
-        }
-        val endpointMatch = existing.ipAddress == discovered.ipAddress &&
-            (!requireSamePortWhenBlankSerial || existing.port == discovered.port)
-        return endpointMatch || existing.name.equals(discovered.name, ignoreCase = true)
-    }
+    ): Boolean = existing.matchesDiscovered(
+        discovered = discovered,
+        requireSamePortWhenBlankSerial = requireSamePortWhenBlankSerial
+    )
 
     internal fun findMatchingExistingDevice(
         existingDevices: List<DeviceEntity>,
         discovered: SsdpDiscoveredDevice,
         activeNetworkKey: String
     ): DeviceEntity? {
-        if (discovered.serialNumber.isNotBlank()) {
+        if (!LanRuntimeUtils.isPlaceholderSerial(discovered.serialNumber)) {
             existingDevices.find {
-                it.serialNumber.isNotBlank() &&
+                !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
                     it.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
             }?.let { return it }
         }

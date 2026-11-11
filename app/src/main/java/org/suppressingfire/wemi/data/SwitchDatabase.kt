@@ -1,10 +1,10 @@
 package org.suppressingfire.wemi.data
 
 import android.content.Context
-import android.os.Build
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 @Database(
     entities = [
@@ -37,8 +37,7 @@ abstract class SwitchDatabase : RoomDatabase() {
                     current
                 } else {
                     runCatching { current?.close() }
-                    val isRobolectric = Build.FINGERPRINT.contains("robolectric", ignoreCase = true) ||
-                        runCatching { Class.forName("org.robolectric.Robolectric"); true }.getOrDefault(false)
+                    val isRobolectric = LanRuntimeUtils.isRunningInRobolectric()
                     val instance = if (isRobolectric) {
                         Room.inMemoryDatabaseBuilder(appCtx, SwitchDatabase::class.java)
                             .allowMainThreadQueries()

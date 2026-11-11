@@ -1,31 +1,54 @@
 package org.suppressingfire.wemi.ui.components
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SoapLogEntry
@@ -227,6 +250,151 @@ fun TvDashboardScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun TvDeviceCardDimmerStrip(
+    device: DeviceEntity,
+    isDimmingMode: Boolean,
+    isHighlighted: Boolean,
+    onSelectFocus: () -> Unit,
+    onToggleDimmingMode: () -> Unit,
+    onStepBrightness: (Int) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = if (isDimmingMode) TvDimmerGold.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.06f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = when {
+                isDimmingMode -> TvDimmerGold
+                isHighlighted -> TvCyanFocusBorder.copy(alpha = 0.45f)
+                else -> Color.Transparent
+            }
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusProperties { canFocus = false }
+            .clickable {
+                onSelectFocus()
+                onToggleDimmingMode()
+            }
+            .testTag("tv_card_dim_mode_${device.id}")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 5.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TvDimmerStepCircleButton(
+                    icon = Icons.Default.Remove,
+                    contentDescription = "Decrease brightness",
+                    tint = if (isDimmingMode) TvDimmerGold else Color.White,
+                    testTag = "tv_card_dim_minus_${device.id}",
+                    onClick = {
+                        onSelectFocus()
+                        onStepBrightness(-10)
+                    }
+                )
+
+                LinearProgressIndicator(
+                    progress = { (device.brightness / 100f).coerceIn(0f, 1f) },
+                    color = if (isDimmingMode) TvDimmerGold else TvCyanFocusBorder,
+                    trackColor = Color.White.copy(alpha = 0.15f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(7.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                )
+
+                Text(
+                    text = "${device.brightness}%",
+                    color = if (isDimmingMode) TvDimmerGold else Color.White,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp
+                )
+
+                TvDimmerStepCircleButton(
+                    icon = Icons.Default.Add,
+                    contentDescription = "Increase brightness",
+                    tint = if (isDimmingMode) TvDimmerGold else Color.White,
+                    testTag = "tv_card_dim_plus_${device.id}",
+                    onClick = {
+                        onSelectFocus()
+                        onStepBrightness(10)
+                    }
+                )
+            }
+
+            if (isDimmingMode) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "Left: -10%  •  Right: +10%   (OK or Back = Done)",
+                    color = TvDimmerGold,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.5.sp,
+                    maxLines = 1
+                )
+            } else if (isHighlighted) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        tint = TvTextSecondary,
+                        modifier = Modifier.size(11.dp)
+                    )
+                    Text(
+                        text = "Long-press OK or press Play/Menu to adjust dimmer",
+                        color = TvTextSecondary,
+                        fontFamily = FontFamily.SansSerif,
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvDimmerStepCircleButton(
+    icon: ImageVector,
+    contentDescription: String,
+    tint: Color,
+    testTag: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = CircleShape,
+        color = Color.White.copy(alpha = 0.14f),
+        modifier = Modifier
+            .size(24.dp)
+            .clip(CircleShape)
+            .focusProperties { canFocus = false }
+            .clickable(onClick = onClick)
+            .testTag(testTag)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                tint = tint,
+                modifier = Modifier.size(14.dp)
+            )
         }
     }
 }

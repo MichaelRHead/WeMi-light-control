@@ -2,6 +2,7 @@ package org.suppressingfire.wemi.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 const val DEFAULT_MAIN_HOME_KEY = "wifi_home_192_168_1"
 const val DEFAULT_CABIN_HOME_KEY = "wifi_cabin_192_168_50"
@@ -67,7 +68,7 @@ data class DeviceEntity(
     val latencyMs: Int = 14,
     val lastCheckedTime: String = "Just now",
     val lastMotionTime: String = "4:15:15 PM",
-    val serialNumber: String = "221517K01018AB",
+    val serialNumber: String = LanRuntimeUtils.DEFAULT_PLACEHOLDER_SERIAL,
     val firmwareVersion: String = "WeMo_WW_2.00.11532.PVT",
     val hardwareModel: String = "LightSwitch",
     val macAddress: String = "",
@@ -99,6 +100,53 @@ data class DeviceEntity(
             ConnectionQuality.GOOD -> "Active • ${latencyMs}ms"
             ConnectionQuality.SLOW -> "Slow • ${latencyMs}ms"
         }
+
+    /**
+     * 3-tier hardware identity matcher between this persisted [DeviceEntity] and a [discovered]
+     * SSDP/unicast node:
+     * 1. **Tier 1 (Hardware Serial Identity)**: When both carry a real non-placeholder `<serialNumber>`,
+     *    they match if and only if the serial numbers are equal (case-insensitive).
+     * 2. **Tier 2 (UPnP UDN / USN Identity)**: When real serials are not both present and both carry
+     *    a UDN/USN, matches when `discovered.usn` contains `udn`.
+     * 3. **Tier 3 (Endpoint / Friendly Name Fallback)**: When at least one serial is blank or a
+     *    placeholder, matches by `(ipAddress, port)` (or `ipAddress` when [requireSamePortWhenBlankSerial]
+     *    is false) or case-insensitive `<friendlyName>`.
+     */
+    fun matchesDiscovered(
+        discovered: SsdpDiscoveredDevice,
+        requireSamePortWhenBlankSerial: Boolean = true
+    ): Boolean {
+        if (!LanRuntimeUtils.isPlaceholderSerial(serialNumber) &&
+            !LanRuntimeUtils.isPlaceholderSerial(discovered.serialNumber)
+        ) {
+            return serialNumber.equals(discovered.serialNumber, ignoreCase = true)
+        }
+        if (udn.isNotBlank() && discovered.usn.isNotBlank() &&
+            discovered.usn.contains(udn, ignoreCase = true)
+        ) {
+            return true
+        }
+        val endpointMatch = ipAddress == discovered.ipAddress &&
+            (!requireSamePortWhenBlankSerial || port == discovered.port)
+        return endpointMatch || name.equals(discovered.name, ignoreCase = true)
+    }
+}
+
+enum class RuleType {
+    SCHEDULE,
+    MOTION_TRIGGER,
+    AUTO_OFF;
+
+    companion object {
+        fun fromRaw(raw: String): RuleType {
+            val normalized = raw.trim().uppercase()
+            return when {
+                normalized.startsWith("AUTO_OFF") -> AUTO_OFF
+                normalized.startsWith("MOTION") -> MOTION_TRIGGER
+                else -> SCHEDULE
+            }
+        }
+    }
 }
 
 @Entity(tableName = "wemo_rules")
@@ -113,7 +161,10 @@ data class RuleEntity(
     val targetStateOn: Boolean = true,
     val targetBrightness: Int = 100,
     val isEnabled: Boolean = true
-)
+) {
+    val parsedRuleType: RuleType
+        get() = RuleType.fromRaw(ruleType)
+}
 
 data class SoapLogEntry(
     val id: Long = System.nanoTime(),
@@ -149,6 +200,13 @@ data class SsdpDiscoveredDevice(
 ) {
     val visualCategory: DeviceCategory
         get() = classifyDeviceCategory(name = name, deviceType = deviceType)
+
+    fun matchesEndpointOrSerial(other: SsdpDiscoveredDevice): Boolean {
+        val bothRealSerials = !LanRuntimeUtils.isPlaceholderSerial(serialNumber) &&
+            !LanRuntimeUtils.isPlaceholderSerial(other.serialNumber)
+        return (bothRealSerials && serialNumber.equals(other.serialNumber, ignoreCase = true)) ||
+            (ipAddress == other.ipAddress && port == other.port)
+    }
 }
 
 /**

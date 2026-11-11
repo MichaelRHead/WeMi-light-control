@@ -13,10 +13,103 @@ object XmlAndSkuParser {
     const val SKU_WLS040_3WAY = "WLS040 (2nd-Gen 3-Way Switch)"
     const val SKU_WDS060_DIMMER_V2 = "WDS060 (Gen-2 Smart Dimmer)"
 
+    const val URN_BASIC_EVENT = "urn:Belkin:service:basicevent:1"
+    const val URN_META_INFO = "urn:Belkin:service:metainfo:1"
+    const val URN_WIFI_SETUP = "urn:Belkin:service:WiFiSetup:1"
+
+    /**
+     * Escapes XML special characters (`&`, `<`, `>`, `"`, `'`) in user-supplied strings
+     * such as friendly names, SSIDs, and encrypted password payloads.
+     */
+    fun escapeXml(input: String): String {
+        return input
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&apos;")
+    }
+
+    /**
+     * Builds a standard UTF-8 UPnP SOAP 1.1 envelope for [serviceUrn] and [action],
+     * optionally embedding [innerXml] parameter tags inside `<u:$action>`.
+     */
+    fun buildSoapEnvelope(
+        serviceUrn: String,
+        action: String,
+        innerXml: String = ""
+    ): String {
+        val trimmedInner = innerXml.trim()
+        val bodyContent = if (trimmedInner.isEmpty()) {
+            ""
+        } else {
+            "\n" + trimmedInner.prependIndent("      ")
+        }
+        return """
+            <?xml version="1.0" encoding="utf-8"?>
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
+              <s:Body>
+                <u:$action xmlns:u="$serviceUrn">$bodyContent
+                </u:$action>
+              </s:Body>
+            </s:Envelope>
+        """.trimIndent()
+    }
+
+    /**
+     * Formats the quoted HTTP `SOAPACTION` header value `"<serviceUrn>#<action>"`.
+     */
+    fun soapActionHeader(serviceUrn: String, action: String): String =
+        "\"$serviceUrn#$action\""
+
+    /**
+     * Parses a `<BinaryState>` (and optional pipe-delimited `|brightness`, `<Brightness>`/`<brightness>`,
+     * and `<NightMode>`) XML payload returned by `SetBinaryState`, `GetBinaryState`, or GENA `NOTIFY`.
+     */
+    fun parseBinaryStatePayload(
+        rawXml: String,
+        unescapeEntities: Boolean = false
+    ): ParsedBinaryState {
+        val xml = if (unescapeEntities) {
+            rawXml
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&amp;", "&")
+        } else {
+            rawXml
+        }
+        val rawState = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
+            .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+        val parts = if (rawState.isEmpty()) emptyList() else rawState.split("|")
+        val firstToken = parts.firstOrNull()?.trim().orEmpty()
+        val isError = firstToken.equals("Error", ignoreCase = true)
+        val binaryOn: Boolean? = when {
+            firstToken == "1" || firstToken == "8" || firstToken.equals("true", ignoreCase = true) -> true
+            firstToken == "0" || firstToken.equals("false", ignoreCase = true) -> false
+            else -> null
+        }
+        val brightness: Int? = parts.getOrNull(1)?.trim()?.toIntOrNull()
+            ?: Regex("<Brightness>(\\d+)</Brightness>", RegexOption.IGNORE_CASE)
+                .find(xml)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: Regex("<brightness>(\\d+)</brightness>", RegexOption.IGNORE_CASE)
+                .find(xml)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        val nightMode: Boolean? = Regex("<NightMode>(\\d+)</NightMode>", RegexOption.IGNORE_CASE)
+            .find(xml)?.groupValues?.getOrNull(1)?.let { it == "1" }
+
+        return ParsedBinaryState(
+            rawFirstToken = firstToken,
+            binaryOn = binaryOn,
+            brightness = brightness,
+            nightModeEnabled = nightMode,
+            isIdempotentError = isError
+        )
+    }
+
     /**
      * Builds a standard UPnP SSDP M-SEARCH UDP multicast payload for Belkin WeMo / WeMi devices.
      */
-    fun buildSsdpMSearchPacket(searchTarget: String = "urn:Belkin:service:basicevent:1"): String {
+    fun buildSsdpMSearchPacket(searchTarget: String = URN_BASIC_EVENT): String {
         return buildString {
             append("M-SEARCH * HTTP/1.1\r\n")
             append("HOST: 239.255.255.250:1900\r\n")
@@ -92,7 +185,7 @@ object XmlAndSkuParser {
         val friendlyName = Regex("<friendlyName>([^<]+)</friendlyName>", RegexOption.IGNORE_CASE)
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "WeMi Smart Switch"
         val serial = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
-            .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "221517K01018LAN"
+            .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL
         val modelName = Regex("<modelName>([^<]+)</modelName>", RegexOption.IGNORE_CASE)
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "LightSwitch"
         val modelDescription = Regex("<modelDescription>([^<]+)</modelDescription>", RegexOption.IGNORE_CASE)
@@ -131,16 +224,9 @@ object XmlAndSkuParser {
             isRtos = isRtos
         )
 
-        val rawBinaryState = Regex("<binaryState>([^<]+)</binaryState>", RegexOption.IGNORE_CASE)
-            .find(xml)?.groupValues?.getOrNull(1)?.trim()
-        val parsedIsOn = if (rawBinaryState != null) {
-            val firstToken = rawBinaryState.substringBefore("|").trim()
-            firstToken == "1" || firstToken == "8" || firstToken.equals("true", ignoreCase = true)
-        } else {
-            true
-        }
-        val parsedBrightness = Regex("<brightness>\\s*(\\d+)\\s*</brightness>", RegexOption.IGNORE_CASE)
-            .find(xml)?.groupValues?.getOrNull(1)?.toIntOrNull()?.coerceIn(1, 100) ?: 100
+        val parsedBinary = parseBinaryStatePayload(xml)
+        val parsedIsOn = parsedBinary.binaryOn ?: true
+        val parsedBrightness = parsedBinary.brightness?.coerceIn(1, 100) ?: 100
 
         return SsdpDiscoveredDevice(
             name = friendlyName,
@@ -151,7 +237,7 @@ object XmlAndSkuParser {
             serialNumber = serial,
             firmwareVersion = firmware,
             usn = udn,
-            searchTarget = stHeader.ifEmpty { "urn:Belkin:service:basicevent:1" },
+            searchTarget = stHeader.ifEmpty { URN_BASIC_EVENT },
             locationUrl = locationUrl,
             responseTimeMs = responseTimeMs,
             isOn = parsedIsOn,

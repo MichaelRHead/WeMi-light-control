@@ -14,50 +14,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-data class ScannedAp(
-    val ssid: String,
-    val channel: Int,
-    val signalStrengthPercent: Int,
-    val authMode: String,
-    val encryptionType: String
-)
-
-data class SetupDeviceDescriptor(
-    val host: String,
-    val port: Int,
-    val friendlyName: String,
-    val modelName: String,
-    val hardwareSku: String,
-    val deviceType: DeviceType,
-    val serialNumber: String,
-    val macAddress: String,
-    val udn: String,
-    val firmwareVersion: String,
-    val isRtos: Boolean,
-    val isIot: Boolean,
-    val binaryOption: Boolean,
-    val recommendedEncryptionMethod: Int,
-    val recommendedAddLengths: Boolean,
-    val newAlgo: Boolean = false,
-    val setupXmlPath: String = "/setup.xml",
-    val macAndSerialSource: String = "GetMetaInfo",
-    val rawMetaInfo: String = "",
-    val probeTraceSummary: String = ""
-)
-
-data class ProvisionResult(
-    val success: Boolean,
-    val networkStatusCode: Int,
-    val statusMessage: String,
-    val encryptedPasswordPayload: String,
-    val logEntry: SoapLogEntry,
-    val closeSetupStatus: String = "",
-    val effectiveEncryptionMethod: Int = 1,
-    val addedLengthSuffix: Boolean = true,
-    val setupDevice: SetupDeviceDescriptor? = null,
-    val debugTraceLines: List<String> = emptyList()
-)
-
 /**
  * Zero-cloud smart-switch Wi-Fi setup provisioner (`10.22.22.1`).
  *
@@ -96,15 +52,6 @@ class ProvisionerClient(
     companion object {
         const val METHOD_2_RTOS_SALT_SUFFIX = PasswordCrypto.METHOD_2_RTOS_SALT_SUFFIX
         const val METHOD_3_BINARY_OPTION_EXTRA = PasswordCrypto.METHOD_3_BINARY_OPTION_EXTRA
-
-        private fun escapeXml(input: String): String {
-            return input
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&apos;")
-        }
     }
 
     private fun nowTime(): String {
@@ -236,8 +183,8 @@ class ProvisionerClient(
             else -> "MISSING(Fallback!)"
         }
 
-        val mac = metaMac ?: xmlMac.ifBlank { null } ?: basicMac ?: "EC1A59001122"
-        val serial = metaSerial ?: xmlSerial.ifBlank { null } ?: basicSerial ?: "221517K01018AB"
+        val mac = metaMac ?: xmlMac.ifBlank { null } ?: basicMac ?: LanRuntimeUtils.DEFAULT_FALLBACK_MAC
+        val serial = metaSerial ?: xmlSerial.ifBlank { null } ?: basicSerial ?: LanRuntimeUtils.DEFAULT_PLACEHOLDER_SERIAL
         val sku = meta?.deviceSku?.ifBlank { null } ?: modelName
         val firmware = meta?.firmwareVersion?.ifBlank { null } ?: xmlFirmware
 
@@ -288,20 +235,15 @@ class ProvisionerClient(
     }
 
     private fun fetchSetupMetaInfo(apHost: String, port: Int): Pair<String, SwitchMetaInfo?> {
-        val soapBody = """
-            <?xml version="1.0" encoding="utf-8"?>
-            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-              <s:Body>
-                <u:GetMetaInfo xmlns:u="urn:Belkin:service:metainfo:1">
-                </u:GetMetaInfo>
-              </s:Body>
-            </s:Envelope>
-        """.trimIndent()
+        val soapBody = XmlAndSkuParser.buildSoapEnvelope(
+            serviceUrn = XmlAndSkuParser.URN_META_INFO,
+            action = "GetMetaInfo"
+        )
         return try {
             val resp = httpClient.postXml(
                 url = "http://$apHost:$port/upnp/control/metainfo1",
                 soapBody = soapBody,
-                soapAction = "\"urn:Belkin:service:metainfo:1#GetMetaInfo\""
+                soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_META_INFO, "GetMetaInfo")
             )
             if (!resp.isSuccessful) {
                 return "HTTP_${resp.code}" to null
@@ -314,20 +256,15 @@ class ProvisionerClient(
     }
 
     private fun fetchBasicEventTag(apHost: String, port: Int, action: String, responseTag: String): String? {
-        val soapBody = """
-            <?xml version="1.0" encoding="utf-8"?>
-            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-              <s:Body>
-                <u:$action xmlns:u="urn:Belkin:service:basicevent:1">
-                </u:$action>
-              </s:Body>
-            </s:Envelope>
-        """.trimIndent()
+        val soapBody = XmlAndSkuParser.buildSoapEnvelope(
+            serviceUrn = XmlAndSkuParser.URN_BASIC_EVENT,
+            action = action
+        )
         return try {
             val resp = httpClient.postXml(
                 url = "http://$apHost:$port/upnp/control/basicevent1",
                 soapBody = soapBody,
-                soapAction = "\"urn:Belkin:service:basicevent:1#$action\""
+                soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_BASIC_EVENT, action)
             )
             if (!resp.isSuccessful) return null
             extractXmlTag(resp.body, responseTag)
@@ -351,22 +288,16 @@ class ProvisionerClient(
         val actionLogs = mutableListOf<String>()
 
         for (action in actions) {
-            val soapBody = """
-                <?xml version="1.0" encoding="utf-8"?>
-                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-                  <s:Body>
-                    <u:$action xmlns:u="urn:Belkin:service:WiFiSetup:1">
-                    </u:$action>
-                  </s:Body>
-                </s:Envelope>
-            """.trimIndent()
-
+            val soapBody = XmlAndSkuParser.buildSoapEnvelope(
+                serviceUrn = XmlAndSkuParser.URN_WIFI_SETUP,
+                action = action
+            )
             val startMs = System.currentTimeMillis()
             try {
                 val resp = httpClient.postXml(
                     url = "http://$apHost:$resolvedPort/upnp/control/WiFiSetup1",
                     soapBody = soapBody,
-                    soapAction = "\"urn:Belkin:service:WiFiSetup:1#$action\""
+                    soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_WIFI_SETUP, action)
                 )
                 val elapsed = System.currentTimeMillis() - startMs
                 val xml = resp.body
@@ -471,8 +402,10 @@ class ProvisionerClient(
             logStep("[STEP 1 PROBE] WARN: Probe failed on $apHost ($lastProbeDiagnosticSummary)")
         }
 
-        val mac = descriptor?.macAddress?.ifBlank { "EC1A59001122" } ?: "EC1A59001122"
-        val serial = descriptor?.serialNumber?.ifBlank { "221517K01018AB" } ?: "221517K01018AB"
+        val mac = descriptor?.macAddress?.ifBlank { LanRuntimeUtils.DEFAULT_FALLBACK_MAC }
+            ?: LanRuntimeUtils.DEFAULT_FALLBACK_MAC
+        val serial = descriptor?.serialNumber?.ifBlank { LanRuntimeUtils.DEFAULT_PLACEHOLDER_SERIAL }
+            ?: LanRuntimeUtils.DEFAULT_PLACEHOLDER_SERIAL
 
         val matchedAp = knownScannedAps.firstOrNull { it.ssid.equals(ssid.trim(), ignoreCase = true) }
         val effectiveChannel = matchedAp?.channel ?: channel
@@ -502,22 +435,18 @@ class ProvisionerClient(
 
         if (!customFriendlyName.isNullOrBlank() && descriptor != null) {
             runCatching {
-                val renameBody = """
-                    <?xml version="1.0" encoding="utf-8"?>
-                    <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-                      <s:Body>
-                        <u:ChangeFriendlyName xmlns:u="urn:Belkin:service:basicevent:1">
-                          <FriendlyName>${escapeXml(customFriendlyName.trim())}</FriendlyName>
-                        </u:ChangeFriendlyName>
-                      </s:Body>
-                    </s:Envelope>
-                """.trimIndent()
+                val cleanFriendly = customFriendlyName.trim()
+                val renameBody = XmlAndSkuParser.buildSoapEnvelope(
+                    serviceUrn = XmlAndSkuParser.URN_BASIC_EVENT,
+                    action = "ChangeFriendlyName",
+                    innerXml = "<FriendlyName>${XmlAndSkuParser.escapeXml(cleanFriendly)}</FriendlyName>"
+                )
                 val resp = httpClient.postXml(
                     url = "http://$apHost:$resolvedPort/upnp/control/basicevent1",
                     soapBody = renameBody,
-                    soapAction = "\"urn:Belkin:service:basicevent:1#ChangeFriendlyName\""
+                    soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_BASIC_EVENT, "ChangeFriendlyName")
                 )
-                logStep("[RENAME] ChangeFriendlyName(\"${customFriendlyName.trim()}\") -> HTTP_${resp.code}")
+                logStep("[RENAME] ChangeFriendlyName(\"$cleanFriendly\") -> HTTP_${resp.code}")
             }.onFailure { e ->
                 logStep("[RENAME] ChangeFriendlyName failed: ${e.javaClass.simpleName}")
             }
@@ -550,20 +479,17 @@ class ProvisionerClient(
             "[STEP 4 CRYPTO] Method=$effectiveMethod addLengths=$effectiveAddLengths plainLen=${plainPassword.length} encLen=${encryptedPwd.length} suffix=$lenSuffixPreview"
         )
 
-        val connectBody = """
-            <?xml version="1.0" encoding="utf-8"?>
-            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-              <s:Body>
-                <u:ConnectHomeNetwork xmlns:u="urn:Belkin:service:WiFiSetup:1">
-                  <ssid>${escapeXml(ssid)}</ssid>
-                  <auth>${escapeXml(resolvedAuth)}</auth>
-                  <password>${escapeXml(encryptedPwd)}</password>
-                  <encrypt>${escapeXml(resolvedEncrypt)}</encrypt>
-                  <channel>$effectiveChannel</channel>
-                </u:ConnectHomeNetwork>
-              </s:Body>
-            </s:Envelope>
-        """.trimIndent()
+        val connectBody = XmlAndSkuParser.buildSoapEnvelope(
+            serviceUrn = XmlAndSkuParser.URN_WIFI_SETUP,
+            action = "ConnectHomeNetwork",
+            innerXml = """
+                <ssid>${XmlAndSkuParser.escapeXml(ssid)}</ssid>
+                <auth>${XmlAndSkuParser.escapeXml(resolvedAuth)}</auth>
+                <password>${XmlAndSkuParser.escapeXml(encryptedPwd)}</password>
+                <encrypt>${XmlAndSkuParser.escapeXml(resolvedEncrypt)}</encrypt>
+                <channel>$effectiveChannel</channel>
+            """.trimIndent()
+        )
 
         val endpoint = "http://$apHost:$resolvedPort/upnp/control/WiFiSetup1"
         var httpSuccess = false
@@ -578,7 +504,7 @@ class ProvisionerClient(
                 val resp = httpClient.postXml(
                     url = endpoint,
                     soapBody = connectBody,
-                    soapAction = "\"urn:Belkin:service:WiFiSetup:1#ConnectHomeNetwork\""
+                    soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_WIFI_SETUP, "ConnectHomeNetwork")
                 )
                 val elapsed = System.currentTimeMillis() - sendStart
                 val respXml = resp.body
@@ -604,15 +530,11 @@ class ProvisionerClient(
         var closeStatus = ""
 
         if (httpSuccess) {
-            val statusBody = """
-                <?xml version="1.0" encoding="utf-8"?>
-                <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-                  <s:Body>
-                    <u:GetNetworkStatus xmlns:u="urn:Belkin:service:WiFiSetup:1">
-                    </u:GetNetworkStatus>
-                  </s:Body>
-                </s:Envelope>
-            """.trimIndent()
+            val statusBody = XmlAndSkuParser.buildSoapEnvelope(
+                serviceUrn = XmlAndSkuParser.URN_WIFI_SETUP,
+                action = "GetNetworkStatus"
+            )
+            val statusAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_WIFI_SETUP, "GetNetworkStatus")
 
             suspend fun pollOnce(pollIndex: Int): Int? {
                 val pollStart = System.currentTimeMillis()
@@ -620,7 +542,7 @@ class ProvisionerClient(
                     val resp = httpClient.postXml(
                         url = endpoint,
                         soapBody = statusBody,
-                        soapAction = "\"urn:Belkin:service:WiFiSetup:1#GetNetworkStatus\""
+                        soapAction = statusAction
                     )
                     val elapsed = System.currentTimeMillis() - pollStart
                     val body = resp.body
@@ -682,19 +604,14 @@ class ProvisionerClient(
             // switch's 10.22.22.1 soft-AP on a failed attempt and prevents retrying!
             if (netStatus == 1 || netStatus == 3) {
                 try {
-                    val closeBody = """
-                        <?xml version="1.0" encoding="utf-8"?>
-                        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-                          <s:Body>
-                            <u:CloseSetup xmlns:u="urn:Belkin:service:WiFiSetup:1">
-                            </u:CloseSetup>
-                          </s:Body>
-                        </s:Envelope>
-                    """.trimIndent()
+                    val closeBody = XmlAndSkuParser.buildSoapEnvelope(
+                        serviceUrn = XmlAndSkuParser.URN_WIFI_SETUP,
+                        action = "CloseSetup"
+                    )
                     val resp = httpClient.postXml(
                         url = endpoint,
                         soapBody = closeBody,
-                        soapAction = "\"urn:Belkin:service:WiFiSetup:1#CloseSetup\""
+                        soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_WIFI_SETUP, "CloseSetup")
                     )
                     closeStatus = extractXmlTag(resp.body, "status").orEmpty().ifBlank {
                         if (resp.isSuccessful) "success" else "HTTP ${resp.code}"
@@ -706,19 +623,14 @@ class ProvisionerClient(
                 }
 
                 runCatching {
-                    val doneBody = """
-                        <?xml version="1.0" encoding="utf-8"?>
-                        <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/" s:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">
-                          <s:Body>
-                            <u:SetSetupDoneStatus xmlns:u="urn:Belkin:service:basicevent:1">
-                            </u:SetSetupDoneStatus>
-                          </s:Body>
-                        </s:Envelope>
-                    """.trimIndent()
+                    val doneBody = XmlAndSkuParser.buildSoapEnvelope(
+                        serviceUrn = XmlAndSkuParser.URN_BASIC_EVENT,
+                        action = "SetSetupDoneStatus"
+                    )
                     val resp = httpClient.postXml(
                         url = "http://$apHost:$resolvedPort/upnp/control/basicevent1",
                         soapBody = doneBody,
-                        soapAction = "\"urn:Belkin:service:basicevent:1#SetSetupDoneStatus\""
+                        soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_BASIC_EVENT, "SetSetupDoneStatus")
                     )
                     logStep("[STEP 6 DONE] SetSetupDoneStatus -> HTTP_${resp.code}")
                 }

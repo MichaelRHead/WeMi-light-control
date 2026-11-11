@@ -32,21 +32,8 @@ class EndToEndUiTest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
-    /**
-     * Pumps the Compose / Robolectric main looper while allowing real wall-clock time for
-     * background `Dispatchers.IO` and loopback TCP/HTTP socket threads (`FakeUpnpServer`)
-     * to complete their round-trips and post continuations back to `Dispatchers.Main`.
-     */
-    private fun awaitLoopbackIo(timeoutMs: Long = 5_000L, condition: () -> Boolean) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            composeTestRule.waitForIdle()
-            if (condition()) return
-            Thread.sleep(20)
-        }
-        composeTestRule.waitForIdle()
-        assertTrue("Timed out waiting ${timeoutMs}ms for loopback IO condition", condition())
-    }
+    private fun awaitLoopbackIo(timeoutMs: Long = 5_000L, condition: () -> Boolean) =
+        composeTestRule.awaitLoopbackIo(timeoutMs, condition)
 
     @Test
     fun `verify E2E loopback hardware addition, FriendlyName SOAP sync, and live power toggle via Compose UI`() {

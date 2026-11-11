@@ -14,7 +14,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
 ## 1. Build, Test & Environment
 
 - **Toolchain**: AGP `9.1.0`, Kotlin `2.3.20`, KSP `2.3.6`, Compose BOM `2026.03.00`, Room `2.8.4` (`version = 5`), Robolectric `4.16.1`, `compileSdk = 36`, `minSdk = 24`.
-- **Unit, Protocol, Governance & E2E Compose UI Tests (`31/31` across 8 suites)**:
+- **Unit, Protocol, Governance & E2E Compose UI Tests (`37/37` across 10 suites)**:
   ```bash
   ./gradlew testDebugUnitTest --rerun-tasks
   ```
@@ -43,39 +43,39 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 
 ### Data & Scheduling Layer (`app/src/main/java/org/suppressingfire/wemi/data/`)
 - **`DeviceEntities.kt`**:
-  - `DeviceType`: `SWITCH_PLUG`, `MOTION_SENSOR`, `LIGHTBULB_DIMMER`.
-  - `DeviceCategory` (`classifyDeviceCategory`): `CHRISTMAS_TREE`, `FAN`, `LIGHT`, `MOTION_SENSOR`, `SWITCH_PLUG`.
+  - `DeviceType` (`SWITCH_PLUG`, `MOTION_SENSOR`, `LIGHTBULB_DIMMER`), `RuleType` (`SCHEDULE`, `MOTION_TRIGGER`, `AUTO_OFF`), and `DeviceCategory` (`classifyDeviceCategory`: `CHRISTMAS_TREE`, `FAN`, `LIGHT`, `MOTION_SENSOR`, `SWITCH_PLUG`).
+  - `DeviceEntity.matchesDiscovered` & `SsdpDiscoveredDevice.matchesEndpointOrSerial`: Shared 3-tier hardware identity matching (`serialNumber` with placeholder-serial fallthrough → `UDN`/`USN` → `(ipAddress, port)`/`friendlyName`).
   - `normalizeDeviceNameForInference`, `inferRoomFromName` & `resolveDeviceRoomAssignment`: Normalizes CamelCase/delimiters, infers rooms in specificity order (`"Ensuite"` before `"Bedroom"`, `"bed"`, `"bedside"`, `"nightstand"`, `"girls"`/`"boys"`/`"kids"` → `"Bedroom"`, `"stair"`/`"stairway"` → `"Hallway & Landing"`, word-bounded `"den"`/`"hall"`, and `"Unassigned"` fallback instead of `"Living Room"`), and non-destructively migrates switches stuck in `"Living Room"`.
   - `ConnectionQuality`: `EXCELLENT` (<= 28ms, 4 bars), `GOOD` (<= 65ms, 3 bars), `SLOW` (> 65ms, 2 bars), `OFFLINE` (0 bars).
-  - `HomeNetworkEntity` (`wemo_home_networks`): Persistent multi-home Wi-Fi profiles (`networkKey`, `homeName`, `ssidLabel`, `subnetPrefix`, `gatewayIp`, `lastConnectedTime`, `autoReconnectOnArrival`, `sortOrder`).
-  - `DeviceEntity` (`wemo_devices`): Persisted device state (`id`, `name`, `roomName`, `networkKey`, `wifiSsid`, `deviceType`, `ipAddress`, `port`, `isOn`, `isReachable`, `brightness`, `latencyMs`, `lastCheckedTime`, `lastMotionTime`, `serialNumber`, `firmwareVersion`, `hardwareModel`, `macAddress`, `udn`, `signalStrengthPercent`, `nightModeEnabled`, `sortOrder`, `autoOffMinutes`).
-  - `RuleEntity` (`wemo_rules`): Local automation rules (`SCHEDULE`, `MOTION_TRIGGER`, `AUTO_OFF`).
-- **`SwitchDao.kt` & `SwitchDatabase.kt`**: Room DB at `version = 5` (`wemo_control_database.db`, `.fallbackToDestructiveMigration(true)`), with per-`Application` in-memory isolation and automatic `SQLiteDatabase.close()` on test transitions under Robolectric.
-- **`SwitchRepository.kt`**, **`DiscoveryCoordinator.kt`**, **`ProvisioningCoordinator.kt`** & **`DemoFixtures.kt`**:
+  - `HomeNetworkEntity` (`wemo_home_networks`), `DeviceEntity` (`wemo_devices`), and `RuleEntity` (`wemo_rules`).
+- **`SwitchDao.kt` & `SwitchDatabase.kt`**: Room DB at `version = 5` (`wemi_switch_database`, `.fallbackToDestructiveMigration(true)`), with per-`Application` in-memory isolation and automatic `SQLiteDatabase.close()` on test transitions under Robolectric.
+- **`SwitchRepository.kt`**, **`DiscoveryCoordinator.kt`**, **`ProvisioningCoordinator.kt`**, **`DeviceCrudAndRulesCoordinator.kt`** & **`DemoFixtures.kt`**:
   - Coordinates `SwitchDao`, `NetworkClient`, `GenaSubscriptionManager`, and `ProvisionerClient`.
-  - Defaults to **Real LAN Mode** (`isDemoShowroomMode = false`) on physical Android devices and **Demo Showroom Mode** (`true`) inside Robolectric unless overridden.
-  - Enforces shared `Semaphore(3)` LAN concurrency + per-device `Mutex`, 3-tier hardware identity matching (`matchesDiscoveredDevice` & `findMatchingExistingDevice`), startup `GetBinaryState` detection (`detectStartupDeviceStates`), manual IP 9-port hardware probing (`saveDevice`), unified `executeOptimisticDeviceCommand` with 2-stage self-healing reconnect (9-port probe → targeted SSDP by `serialNumber`), and offline state revert (`isReachable = false, latencyMs = 0`, clearing `lastSetStateTimestampMs`).
+  - Defaults to **Real LAN Mode** (`isDemoShowroomMode = false`) on physical Android devices and **Demo Showroom Mode** (`true`) inside Robolectric unless overridden (`LanRuntimeUtils.isRunningInRobolectric()`).
+  - Enforces shared `Semaphore(3)` LAN concurrency + per-device `Mutex`, 3-tier hardware identity matching (`matchesDiscoveredDevice` & `findMatchingExistingDevice`), startup `GetBinaryState` detection (`detectStartupDeviceStates`), manual IP 9-port hardware probing (`DeviceCrudAndRulesCoordinator.saveDevice`), unified `executeOptimisticDeviceCommand` with 2-stage self-healing reconnect (9-port probe → targeted SSDP by `serialNumber`), and offline state revert (`isReachable = false, latencyMs = 0`, clearing `lastSetStateTimestampMs`).
   - Filters out Belkin soft-AP SSIDs (`WeMo.Switch.xxx`, `Wemo.LS3W.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`) from `metainfo1#GetMetaInfo` (`isWemoDeviceSetupSsid`), auto-sanitizes any previously polluted `homeName`/`ssidLabel` rows and re-infers legacy `"Living Room"` room assignments on startup (`sanitizeAndResolveInitialLanHome`), and provides one-tap `resetLanHomesSwitchesAndRooms()`.
 - **`RuleScheduler.kt`**:
   - Manages live per-device Auto-Off countdown timers (`activeCountdownsSec`) and evaluates daily `SCHEDULE` / Sunset / Sunrise rules.
 
 ### Network Layer (`app/src/main/java/org/suppressingfire/wemi/network/`)
-- **`LanHttpClient.kt`**, **`NetworkClient.kt`**, **`XmlAndSkuParser.kt`** & **`SsdpDiscoveryEngine.kt`**:
+- **`LanHttpClient.kt`**, **`LanRuntimeUtils.kt`**, **`NetworkModels.kt`**, **`NetworkClient.kt`**, **`XmlAndSkuParser.kt`** & **`SsdpDiscoveryEngine.kt`**:
   - Zero-dependency `LanHttpClient` built directly on `javax.net.SocketFactory` (`GET`, `POST`, `SUBSCRIBE`, `UNSUBSCRIBE` with `tcpNoDelay = true`, byte-exact `Content-Length` / chunked framing, and delayed-`FIN` recovery in `readUntilEof`).
+  - Shared wire DTOs (`NetworkModels.kt`), placeholder-serial/Robolectric/LAN IPv4 helpers (`LanRuntimeUtils.kt`), and centralized SOAP XML builders & `<BinaryState>` pipe-token parser (`XmlAndSkuParser.buildSoapEnvelope`, `soapActionHeader`, `parseBinaryStatePayload`).
   - 9-port `probeWemoPort` (`49153, 49152, 49154, 49151, 49155..49159`) with TCP connect timeout vs. `ECONNREFUSED` vs. HTTP read timeout separation and `<serialNumber>`/`<UDN>` verification.
   - Unified `executeWithPortHealing`, `setBinaryState` (with `<BinaryState>Error</BinaryState>` quirk handling), `getBinaryState`, `getMetaInfo` (filtering Belkin soft-AP SSIDs in `parseMetaInfoSoapResponse`), `getSignalStrength`, `changeFriendlyName`, `configureNightMode`, `scanSubnetUnicast`, and `performSsdpDiscoveryScan` (`MulticastLock` + 1s retransmit).
 - **`GenaSubscriptionManager.kt`**:
-  - Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery) bound to `wifiSocketFactory` for `<100ms` physical switch updates.
+  - Embedded HTTP `NOTIFY` listener (`SUBSCRIBE /upnp/event/basicevent1`, `TIMEOUT: Second-300`, HTTP 412 recovery, byte-exact multi-byte UTF-8 `Content-Length` framing) bound to `wifiSocketFactory` for `<100ms` physical switch updates.
 - **`NetworkMonitor.kt`**:
   - Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory` (caching unvalidated `NetworkCallback` Wi-Fi handles + loopback `127.0.0.1` & Robolectric aware).
 - **`ProvisionerClient.kt`**, **`SetupDiagnostics.kt`** & **`PasswordCrypto.kt`**:
   - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` (`8500ms` site-survey timeout), `LanHttpClient`-framed `probeSetupDevice`, `SetupDebugSnapshot` screenshot diagnostics, `TelemetryFileExporter` (`wemi-telemetry-latest.txt`), and first-party OpenSSL `EVP_BytesToKey` MD5 AES-128-CBC (Methods 1, 2 & 3 × `addPasswordLengths`) double-send `ConnectHomeNetwork` + 20s `GetNetworkStatus` poll + `CloseSetup` + `SetSetupDoneStatus` provisioner.
 
 ### UI & Test Layer (`app/src/main/java/org/suppressingfire/wemi/ui/` & `app/src/test/java/org/suppressingfire/wemi/`)
-- **`SwitchViewModel.kt`**, **`MainActivity.kt`**, **`ui/screens/*`** & **`ui/components/*`**:
-  - Compact single-row `TopHeader` (`HeaderAndNav.kt`) and 3-column room-grouped Android TV dashboard (`TvDashboardScreen`, `TvRoomSectionHeader`, and non-interfering Dimmer Adjust Mode in `TvScreen.kt` & `TvCardsAndScenes.kt`).
-  - Full-width `AutoShrinkSwitchName` on Line 1 of `DeviceRow`, `TvDeviceCard`, `RoomGroupHeaderCard`, and `WifiHomeBar` so long names (`"Hallway & Landing"`, `"My Home"`) never squeeze adjacent pills into vertical character columns.
+- **`SwitchViewModel.kt`**, **`ProvisionApUiController.kt`**, **`HomeAndRulesUiController.kt`**, **`MainActivity.kt`**, **`ui/screens/*`** & **`ui/components/*`**:
+  - All 33 UI composable/theme/activity files sit strictly under `500` lines (`DevicesTabUiState` & `DevicesTabActions` in `DevicesTabScreen.kt`, `WeMiModalDialogs.kt`, `MoreScreen.kt` + `MoreControlAndLogCards.kt`, `ProvisionApDialog.kt` + `ProvisionApFormSections.kt`, `SsdpScannerModal.kt` + `SsdpDiscoveryBanner.kt`).
+  - Compact single-row `TopHeader` (`HeaderAndNav.kt`) and 3-column room-grouped Android TV dashboard (`TvDashboardScreen`, `TvRoomSectionHeader`, and non-interfering Dimmer Adjust Mode in `TvScreen.kt`, `TvHeadersAndScenes.kt` & `TvCardsAndScenes.kt`).
+  - Full-width `AutoResizingDeviceNameText` on Line 1 of `DeviceRow`, `TvDeviceCard`, `RoomGroupHeaderCard`, and `WifiHomeBar` so long names (`"Hallway & Landing"`, `"My Home"`) never squeeze adjacent pills into vertical character columns.
   - Dark-gray IEC `"I/O"` power-off icon (`drawIecPowerSymbol` in `#23272F`/`#181B20`), red `DisconnectedRingButton` (`drawDisconnectedSymbol`), screenshot-ready `ProvisionDebugPanel` (`provision_debug_panel`, `provision_debug_text`) inside `ProvisionApDialog`, and `open_source_licenses_card` (`mit_license_text_surface` & `third_party_notices_surface`) in `MoreScreen`.
-  - One-tap `Reset` chip (`reset_lan_data_chip`) in `WifiHomeBar` and `more_reset_lan_homes_switches_button` on `MoreScreen`.
-- **`FakeUpnpServer.kt`**, **`SkuAndCryptoTest.kt`**, **`SoapAndSelfHealingTest.kt`**, **`GenaProvisioningAndRulesTest.kt`**, **`LicenseAndBrandGovernanceTest.kt`**, **`ExampleRobolectricTest.kt`**, **`EndToEndUiTest.kt`** & **`HardwareCujEndToEndTest.kt`**:
-  - 31 automated loopback UPnP/SOAP/GENA protocol, license governance, and full-stack Compose E2E tests.
+  - One-tap `Reset` chip (`reset_lan_data_chip`) in `WifiHomeBar` and `more_reset_lan_homes_switches_button` on `MoreControlAndLogCards`.
+- **`FakeUpnpServer.kt`**, **`ComposeLoopbackTestUtils.kt`**, **`ExampleUnitTest.kt`**, **`SkuAndCryptoTest.kt`**, **`SoapAndSelfHealingTest.kt`**, **`RepositorySelfHealingTest.kt`**, **`GenaProvisioningAndRulesTest.kt`**, **`LicenseAndBrandGovernanceTest.kt`**, **`ExampleRobolectricTest.kt`**, **`EndToEndUiTest.kt`**, **`HardwareCujEndToEndTest.kt`** & **`TvAndHeaderLayoutE2ETest.kt`**:
+  - 37 automated pure JVM, loopback UPnP/SOAP/GENA protocol, repository self-healing, license governance, and full-stack Compose + Android TV D-Pad E2E tests across 10 suites.

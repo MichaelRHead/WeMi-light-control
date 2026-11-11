@@ -55,63 +55,78 @@ import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 
+/**
+ * Immutable UI state snapshot for the primary `Devices` tab, bundling active Wi-Fi Home
+ * network selection, room-grouped device lists, and live per-row interaction state.
+ */
+data class DevicesTabUiState(
+    val allDevices: List<DeviceEntity>,
+    val homeDevices: List<DeviceEntity>,
+    val filteredDevices: List<DeviceEntity>,
+    val groupedDevicesByRoom: Map<String, List<DeviceEntity>>,
+    val availableRooms: List<String>,
+    val homeNetworks: List<HomeNetworkEntity>,
+    val activeNetworkKey: String,
+    val isReconnectingHome: Boolean,
+    val lanNetworkState: LanNetworkSnapshot,
+    val latestSsdpReport: SsdpScanReport?,
+    val isRefreshing: Boolean,
+    val isGroupedByRoom: Boolean,
+    val selectedRoomFilter: String?,
+    val collapsedRooms: Set<String>,
+    val togglingRooms: Set<String>,
+    val expandedDeviceIds: Set<Int>,
+    val togglingDeviceIds: Set<Int>,
+    val isEditMode: Boolean,
+    val activeAutoOffCountdownsSec: Map<Int, Int>
+)
+
+/**
+ * Cohesive callback bundle for user actions dispatched from [DevicesTabScreen].
+ */
+data class DevicesTabActions(
+    val onRefreshDevices: () -> Unit,
+    val onOpenProvisionApDialog: () -> Unit,
+    val onSelectHomeNetwork: (String) -> Unit,
+    val onReconnectCurrentHome: () -> Unit,
+    val onOpenAddHomeDialog: () -> Unit,
+    val onOpenScannerAndScan: () -> Unit,
+    val onToggleGroupedByRoom: () -> Unit,
+    val onSelectRoomFilter: (String?) -> Unit,
+    val onOpenAddDeviceDialog: () -> Unit,
+    val onRestoreClassicDevices: () -> Unit,
+    val onToggleRoomPower: (String) -> Unit,
+    val onToggleRoomCollapse: (String) -> Unit,
+    val onUpdateRoomBrightness: (String, Int) -> Unit,
+    val onToggleDevicePower: (DeviceEntity) -> Unit,
+    val onToggleExpandDevice: (Int) -> Unit,
+    val onUpdateBrightness: (DeviceEntity, Int) -> Unit,
+    val onTriggerMotion: (DeviceEntity) -> Unit,
+    val onReconnectDevice: (DeviceEntity) -> Unit,
+    val onOpenEditDeviceDialog: (DeviceEntity) -> Unit,
+    val onDeleteDevice: (DeviceEntity) -> Unit,
+    val onMoveDevice: (DeviceEntity, Boolean) -> Unit,
+    val onPingDeviceLatency: (DeviceEntity) -> Unit,
+    val onToggleNightMode: (DeviceEntity) -> Unit,
+    val onResetHomesAndSwitches: (Boolean) -> Unit = {}
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DevicesTabScreen(
-    allDevices: List<DeviceEntity>,
-    homeDevices: List<DeviceEntity>,
-    filteredDevices: List<DeviceEntity>,
-    groupedDevicesByRoom: Map<String, List<DeviceEntity>>,
-    availableRooms: List<String>,
-    homeNetworks: List<HomeNetworkEntity>,
-    activeNetworkKey: String,
-    isReconnectingHome: Boolean,
-    lanNetworkState: LanNetworkSnapshot,
-    latestSsdpReport: SsdpScanReport?,
-    isRefreshing: Boolean,
-    isGroupedByRoom: Boolean,
-    selectedRoomFilter: String?,
-    collapsedRooms: Set<String>,
-    togglingRooms: Set<String>,
-    expandedDeviceIds: Set<Int>,
-    togglingDeviceIds: Set<Int>,
-    isEditMode: Boolean,
-    activeAutoOffCountdownsSec: Map<Int, Int>,
-    onRefreshDevices: () -> Unit,
-    onOpenProvisionApDialog: () -> Unit,
-    onSelectHomeNetwork: (String) -> Unit,
-    onReconnectCurrentHome: () -> Unit,
-    onOpenAddHomeDialog: () -> Unit,
-    onOpenScannerAndScan: () -> Unit,
-    onToggleGroupedByRoom: () -> Unit,
-    onSelectRoomFilter: (String?) -> Unit,
-    onOpenAddDeviceDialog: () -> Unit,
-    onRestoreClassicDevices: () -> Unit,
-    onToggleRoomPower: (String) -> Unit,
-    onToggleRoomCollapse: (String) -> Unit,
-    onUpdateRoomBrightness: (String, Int) -> Unit,
-    onToggleDevicePower: (DeviceEntity) -> Unit,
-    onToggleExpandDevice: (Int) -> Unit,
-    onUpdateBrightness: (DeviceEntity, Int) -> Unit,
-    onTriggerMotion: (DeviceEntity) -> Unit,
-    onReconnectDevice: (DeviceEntity) -> Unit,
-    onOpenEditDeviceDialog: (DeviceEntity) -> Unit,
-    onDeleteDevice: (DeviceEntity) -> Unit,
-    onMoveDevice: (DeviceEntity, Boolean) -> Unit,
-    onPingDeviceLatency: (DeviceEntity) -> Unit,
-    onToggleNightMode: (DeviceEntity) -> Unit,
-    onResetHomesAndSwitches: (Boolean) -> Unit = {},
+    state: DevicesTabUiState,
+    actions: DevicesTabActions,
     modifier: Modifier = Modifier
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
     PullToRefreshBox(
-        isRefreshing = isRefreshing,
-        onRefresh = onRefreshDevices,
+        isRefreshing = state.isRefreshing,
+        onRefresh = actions.onRefreshDevices,
         state = pullToRefreshState,
         indicator = {
             PullToRefreshDefaults.Indicator(
                 state = pullToRefreshState,
-                isRefreshing = isRefreshing,
+                isRefreshing = state.isRefreshing,
                 containerColor = WemoRowSurface,
                 color = WemoGreenPrimary,
                 modifier = Modifier.align(Alignment.TopCenter)
@@ -128,21 +143,21 @@ fun DevicesTabScreen(
                 .testTag("devices_list"),
             contentPadding = PaddingValues(top = 6.dp, bottom = 36.dp)
         ) {
-            if (lanNetworkState.isWemoSetupApSubnet) {
+            if (state.lanNetworkState.isWemoSetupApSubnet) {
                 item(key = "wemo_setup_ap_detected_banner") {
                     Surface(
                         color = WemoGreenDark,
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .padding(horizontal = 10.dp, vertical = 4.dp)
-                            .clickable(onClick = onOpenProvisionApDialog)
+                            .clickable(onClick = actions.onOpenProvisionApDialog)
                             .testTag("wemo_setup_ap_banner")
                     ) {
                         Column(
                             modifier = Modifier.padding(14.dp)
                         ) {
                             Text(
-                                text = "Smart Switch Setup AP Detected (${lanNetworkState.localIpv4})",
+                                text = "Smart Switch Setup AP Detected (${state.lanNetworkState.localIpv4})",
                                 color = Color.White,
                                 fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
@@ -161,58 +176,58 @@ fun DevicesTabScreen(
 
             item(key = "wifi_home_selector_header") {
                 WifiHomeBar(
-                    homeNetworks = homeNetworks,
-                    activeNetworkKey = activeNetworkKey,
-                    allDevices = allDevices,
-                    isReconnectingHome = isReconnectingHome,
-                    onSelectHomeNetwork = onSelectHomeNetwork,
-                    onReconnectCurrentHome = onReconnectCurrentHome,
-                    onOpenAddHomeDialog = onOpenAddHomeDialog,
-                    onResetHomesAndSwitches = onResetHomesAndSwitches
+                    homeNetworks = state.homeNetworks,
+                    activeNetworkKey = state.activeNetworkKey,
+                    allDevices = state.allDevices,
+                    isReconnectingHome = state.isReconnectingHome,
+                    onSelectHomeNetwork = actions.onSelectHomeNetwork,
+                    onReconnectCurrentHome = actions.onReconnectCurrentHome,
+                    onOpenAddHomeDialog = actions.onOpenAddHomeDialog,
+                    onResetHomesAndSwitches = actions.onResetHomesAndSwitches
                 )
             }
 
             item(key = "ssdp_discovery_banner_header") {
                 SsdpDiscoveryBanner(
-                    isScanning = isRefreshing,
-                    latestReport = latestSsdpReport,
-                    savedDeviceCount = homeDevices.count { it.isReachable },
-                    onOpenScannerClick = onOpenScannerAndScan
+                    isScanning = state.isRefreshing,
+                    latestReport = state.latestSsdpReport,
+                    savedDeviceCount = state.homeDevices.count { it.isReachable },
+                    onOpenScannerClick = actions.onOpenScannerAndScan
                 )
             }
 
             item(key = "room_grouping_filter_bar") {
                 RoomFilterBar(
-                    rooms = availableRooms,
-                    isGroupedByRoom = isGroupedByRoom,
-                    selectedRoomFilter = selectedRoomFilter,
-                    onToggleGroupedByRoom = onToggleGroupedByRoom,
-                    onSelectRoomFilter = onSelectRoomFilter
+                    rooms = state.availableRooms,
+                    isGroupedByRoom = state.isGroupedByRoom,
+                    selectedRoomFilter = state.selectedRoomFilter,
+                    onToggleGroupedByRoom = actions.onToggleGroupedByRoom,
+                    onSelectRoomFilter = actions.onSelectRoomFilter
                 )
             }
 
-            if (homeDevices.isEmpty()) {
+            if (state.homeDevices.isEmpty()) {
                 item(key = "empty_home_devices_state") {
                     EmptyDevicesState(
-                        onAddClick = onOpenAddDeviceDialog,
-                        onScanSsdpClick = onOpenScannerAndScan,
-                        onOpenProvisionApClick = onOpenProvisionApDialog,
-                        onRestoreClassicClick = onRestoreClassicDevices
+                        onAddClick = actions.onOpenAddDeviceDialog,
+                        onScanSsdpClick = actions.onOpenScannerAndScan,
+                        onOpenProvisionApClick = actions.onOpenProvisionApDialog,
+                        onRestoreClassicClick = actions.onRestoreClassicDevices
                     )
                 }
-            } else if (isGroupedByRoom) {
-                groupedDevicesByRoom.forEach { (roomName, roomDevices) ->
-                    val isCollapsed = roomName in collapsedRooms
+            } else if (state.isGroupedByRoom) {
+                state.groupedDevicesByRoom.forEach { (roomName, roomDevices) ->
+                    val isCollapsed = roomName in state.collapsedRooms
                     item(key = "room_header_item_$roomName") {
                         RoomGroupHeaderCard(
                             roomName = roomName,
                             roomDevices = roomDevices,
                             isCollapsed = isCollapsed,
-                            isRoomToggling = roomName in togglingRooms,
-                            onToggleRoomPower = { onToggleRoomPower(roomName) },
-                            onToggleCollapse = { onToggleRoomCollapse(roomName) },
+                            isRoomToggling = roomName in state.togglingRooms,
+                            onToggleRoomPower = { actions.onToggleRoomPower(roomName) },
+                            onToggleCollapse = { actions.onToggleRoomCollapse(roomName) },
                             onRoomBrightnessChange = { brightness ->
-                                onUpdateRoomBrightness(roomName, brightness)
+                                actions.onUpdateRoomBrightness(roomName, brightness)
                             }
                         )
                     }
@@ -222,25 +237,10 @@ fun DevicesTabScreen(
                             items = roomDevices,
                             key = { "grouped_dev_${it.id}" }
                         ) { device ->
-                            DeviceRow(
+                            BoundDeviceRow(
                                 device = device,
-                                isExpanded = device.id in expandedDeviceIds,
-                                isEditMode = isEditMode,
-                                isToggling = device.id in togglingDeviceIds,
-                                onTogglePower = { onToggleDevicePower(device) },
-                                onToggleExpand = { onToggleExpandDevice(device.id) },
-                                onBrightnessChange = { level ->
-                                    onUpdateBrightness(device, level)
-                                },
-                                onTriggerMotion = { onTriggerMotion(device) },
-                                onReconnect = { onReconnectDevice(device) },
-                                onEditDevice = { onOpenEditDeviceDialog(device) },
-                                onDeleteDevice = { onDeleteDevice(device) },
-                                onMoveUp = { onMoveDevice(device, true) },
-                                onMoveDown = { onMoveDevice(device, false) },
-                                onPingLatency = { onPingDeviceLatency(device) },
-                                onToggleNightMode = { onToggleNightMode(device) },
-                                autoOffRemainingSeconds = activeAutoOffCountdownsSec[device.id],
+                                state = state,
+                                actions = actions,
                                 modifier = Modifier.padding(start = 10.dp)
                             )
                         }
@@ -248,33 +248,46 @@ fun DevicesTabScreen(
                 }
             } else {
                 items(
-                    items = filteredDevices,
+                    items = state.filteredDevices,
                     key = { "flat_dev_${it.id}" }
                 ) { device ->
-                    DeviceRow(
+                    BoundDeviceRow(
                         device = device,
-                        isExpanded = device.id in expandedDeviceIds,
-                        isEditMode = isEditMode,
-                        isToggling = device.id in togglingDeviceIds,
-                        onTogglePower = { onToggleDevicePower(device) },
-                        onToggleExpand = { onToggleExpandDevice(device.id) },
-                        onBrightnessChange = { level ->
-                            onUpdateBrightness(device, level)
-                        },
-                        onTriggerMotion = { onTriggerMotion(device) },
-                        onReconnect = { onReconnectDevice(device) },
-                        onEditDevice = { onOpenEditDeviceDialog(device) },
-                        onDeleteDevice = { onDeleteDevice(device) },
-                        onMoveUp = { onMoveDevice(device, true) },
-                        onMoveDown = { onMoveDevice(device, false) },
-                        onPingLatency = { onPingDeviceLatency(device) },
-                        onToggleNightMode = { onToggleNightMode(device) },
-                        autoOffRemainingSeconds = activeAutoOffCountdownsSec[device.id]
+                        state = state,
+                        actions = actions
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun BoundDeviceRow(
+    device: DeviceEntity,
+    state: DevicesTabUiState,
+    actions: DevicesTabActions,
+    modifier: Modifier = Modifier
+) {
+    DeviceRow(
+        device = device,
+        isExpanded = device.id in state.expandedDeviceIds,
+        isEditMode = state.isEditMode,
+        isToggling = device.id in state.togglingDeviceIds,
+        onTogglePower = { actions.onToggleDevicePower(device) },
+        onToggleExpand = { actions.onToggleExpandDevice(device.id) },
+        onBrightnessChange = { level -> actions.onUpdateBrightness(device, level) },
+        onTriggerMotion = { actions.onTriggerMotion(device) },
+        onReconnect = { actions.onReconnectDevice(device) },
+        onEditDevice = { actions.onOpenEditDeviceDialog(device) },
+        onDeleteDevice = { actions.onDeleteDevice(device) },
+        onMoveUp = { actions.onMoveDevice(device, true) },
+        onMoveDown = { actions.onMoveDevice(device, false) },
+        onPingLatency = { actions.onPingDeviceLatency(device) },
+        onToggleNightMode = { actions.onToggleNightMode(device) },
+        autoOffRemainingSeconds = state.activeAutoOffCountdownsSec[device.id],
+        modifier = modifier
+    )
 }
 
 @Composable

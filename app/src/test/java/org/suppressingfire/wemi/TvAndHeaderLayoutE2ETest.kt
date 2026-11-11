@@ -40,19 +40,8 @@ class TvAndHeaderLayoutE2ETest {
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
-    private fun awaitLoopbackIo(
-        timeoutMs: Long = 5_000L,
-        condition: () -> Boolean
-    ) {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            composeTestRule.waitForIdle()
-            if (condition()) return
-            Thread.sleep(20)
-        }
-        composeTestRule.waitForIdle()
-        assertTrue("Timed out after ${timeoutMs}ms waiting for loopback I/O condition", condition())
-    }
+    private fun awaitLoopbackIo(timeoutMs: Long = 5_000L, condition: () -> Boolean) =
+        composeTestRule.awaitLoopbackIo(timeoutMs, condition)
 
     @Test
     fun `verify v23_0 compact single-row TopHeader layout and brand wordmark toggle`() {
