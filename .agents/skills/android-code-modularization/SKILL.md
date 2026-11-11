@@ -73,7 +73,7 @@ Whenever refactoring ViewModels, Compose dialogs, network clients, or Room persi
    - Keeping modal dismissal inside `viewModelScope.launch` *after* a suspending network call leaves the `Dialog` covering the screen while TCP connect timeouts run against unreachable or demo IPs (`192.168.1.x`). This makes the **Save** button feel frozen in production and causes Compose UI tests (`createAndroidComposeRule`) to click into the modal scrim instead of the underlying screen.
    - *Exception*: Multi-step interactive wizards with an explicit in-dialog progress state machine (`ProvisionApDialog`) intentionally remain open while showing step-by-step progress and only auto-dismiss upon completion or Cancel.
 2. **Preserve `0`-Arg `SocketFactory.createSocket()` Loopback & Test Guards (`NetworkMonitor.createWifiBoundSocketFactory` Pattern)**:
-   - `OkHttpClient` invokes the **zero-argument** `SocketFactory.createSocket()` and subsequently calls `socket.connect(endpoint, timeout)`.
+   - `LanHttpClient` invokes the **zero-argument** `SocketFactory.createSocket()` and subsequently calls `socket.connect(endpoint, timeout)`.
    - Never bind a socket to a Wi-Fi `Network` unconditionally inside `createSocket()`. Wrap `Socket` and override `connect(endpoint, timeout)` so `wifiNet.bindSocket(this)` is **skipped** when `inetAddr.isLoopbackAddress` (`127.0.0.1` loopback test servers) or when running under Robolectric (`Build.FINGERPRINT == "robolectric"`).
 3. **Scope Singleton Room Databases Per `Application` Instance Under Robolectric (`SwitchDatabase.getDatabase` Pattern)**:
    - Robolectric creates a fresh `Application` instance for every `@Test` method while static singletons (`SwitchDatabase.INSTANCE`) persist across tests in the same JVM process.

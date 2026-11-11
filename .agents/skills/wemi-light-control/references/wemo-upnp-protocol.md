@@ -1,38 +1,38 @@
-# Belkin WeMo Local UPnP / SSDP / SOAP Protocol Reference (`pywemo` & Home Assistant Spec)
+# Belkin Smart Switch Local UPnP / SSDP / SOAP / GENA Protocol Reference
 
-This document details the local LAN protocol used by Belkin WeMo hardware, incorporating the exact discovery, port-probing, SOAP, MetaInfo, and GENA push-subscription mechanisms used by [`pywemo`](https://github.com/pywemo/pywemo) and Home Assistant's `wemo` integration.
+This document details the local LAN wire protocol used by Belkin's discontinued smart switch hardware platform, covering SSDP discovery, 9-port probing, SOAP control, `metainfo1`, GENA push subscriptions, and `10.22.22.1` `WiFiSetup1` provisioning.
 
 ---
 
 ## 1. Supported Hardware Models & UDN / SKU Classification
 
-| Hardware Device | Model SKUs | `<modelName>` in `setup.xml` | `<deviceType>` URN in `setup.xml` | `<UDN>` Prefix (`discovery.py`) |
+| Hardware Device | Model SKUs | `<modelName>` in `setup.xml` | `<deviceType>` URN in `setup.xml` | `<UDN>` Prefix |
 | :--- | :--- | :--- | :--- | :--- |
 | **WeMo Light Switch (1st Gen)** | `F7C030` | `LightSwitch` | `urn:Belkin:device:lightswitch:1` | `uuid:Lightswitch-1_0-...` |
 | **WeMo Light Switch (2nd Gen / 3-Way)** | `WLS040`, `WLS0403` | `LightSwitch` / `WLS040` / `WLS0403` | `urn:Belkin:device:lightswitch:1` | `uuid:Lightswitch-2_0-...`, `uuid:Lightswitch-3_0-...`, or SKU `WLS040`/`WLS0403` |
 | **WeMo Wi-Fi Smart Dimmer** | `F7C059` (Gen 1), `WDS060` (Gen 2 RTOS) | `Dimmer` / `WDS060` | `urn:Belkin:device:dimmer:1` | `uuid:Dimmer-1_0-...` (`F7C059`), `uuid:Dimmer-2_0-...` (`WDS060`) |
 | **WeMo Mini Smart Plug** | `F7C063` (Gen 1), `WSP080` (Gen 2) | `Socket` / `WSP080` | `urn:Belkin:device:controllee:1` | `uuid:Socket-1_0-...` |
 
-### `pywemo` Classification & Validation Rules
-1. **Manufacturer Check**: In `setup.xml` (or `/Lightsetup.xml` on certain `F7C030` firmwares), `<manufacturer>` is `Belkin International Inc.`. Validate this tag (or `urn:Belkin:` service/device URNs) so non-WeMo UPnP devices on the LAN (routers, TVs, Hue bridges, Sonos) are never misclassified as WeMo switches.
+### Hardware Classification & Validation Rules
+1. **Manufacturer Check**: In `setup.xml` (or `/Lightsetup.xml` on certain `F7C030` firmwares), `<manufacturer>` is `Belkin International Inc.`. Validate this tag (or `urn:Belkin:` service/device URNs) so non-Belkin UPnP devices on the LAN (routers, TVs, Hue bridges, Sonos) are never misclassified as smart switches.
 2. **Exact Hardware SKU & Wi-Fi SSID via `metainfo1#GetMetaInfo`**:
    - Calling `GetMetaInfo` on `/upnp/control/metainfo1` (`urn:Belkin:service:metainfo:1#GetMetaInfo`) returns `<MetaInfo>` formatted as 6 pipe-delimited fields:
      ```
      MAC|SerialNumber|DeviceSKU|FirmwareVersion|AccessPointSSID|ModelName
      ```
    - `DeviceSKU` (`values[2]`) identifies `F7C030` (Gen 1 Switch) vs `WLS040`/`WLS0403` (Gen 2 3-Way Switch) vs `F7C059`/`WDS060` (Dimmer) vs `F7C063`/`WSP080` (Mini Plug).
-   - `AccessPointSSID` (`values[4]`) reports the 2.4 GHz Wi-Fi SSID on some firmwares, **HOWEVER on many physical Belkin WeMo firmwares (including 2nd-Gen RTOS 3-Way switches `WLS040`/`WLS0403` reporting `Wemo.LS3W.xxx` and 1st-Gen switches reporting `WeMo.Switch.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`) `values[4]` returns the switch's own factory setup soft-AP SSID instead of the home router SSID!** Always filter out any SSID matching `wemo.*`, `wemo_*`, `wemo-*`, or `belkin.*` (`isWemoDeviceSetupSsid`) in `parseMetaInfoSoapResponse` and never overwrite a user's `homeName` with a device-reported SSID.
+   - `AccessPointSSID` (`values[4]`) reports the 2.4 GHz Wi-Fi SSID on some firmwares, **HOWEVER on many physical Belkin firmwares (including 2nd-Gen RTOS 3-Way switches `WLS040`/`WLS0403` reporting `Wemo.LS3W.xxx` and 1st-Gen switches reporting `WeMo.Switch.xxx`, `WeMo.Light.xxx`, `WeMo.Mini.xxx`) `values[4]` returns the switch's own factory setup soft-AP SSID instead of the home router SSID!** Always filter out any SSID matching `wemo.*`, `wemo_*`, `wemo-*`, or `belkin.*` (`isWemoDeviceSetupSsid`) in `parseMetaInfoSoapResponse` and never overwrite a user's `homeName` with a device-reported SSID.
 
 ---
 
-## 2. SSDP Multicast Discovery (`pywemo/ssdp.py`)
+## 2. SSDP Multicast Discovery (`SsdpDiscoveryEngine.kt`)
 
 ### Android & Socket Requirements
 - Acquire `WifiManager.MulticastLock` (`wifiManager.createMulticastLock("wemi_ssdp").apply { setReferenceCounted(false); acquire() }`) before scanning and release it in `finally`.
 - Bind the UDP `DatagramSocket` to the local IPv4 LAN interface address (`InetAddress.getByName(localIp)`) on an ephemeral port (`0`) so multicast packets route out the Wi-Fi interface rather than cellular/VPN.
 - **Periodic Retransmission During Scan Window**:
   - UDP multicast packets are unacknowledged and frequently dropped on Wi-Fi.
-  - `pywemo/ssdp.py` sets a `1000 ms` receive poll interval inside a `5000 ms` total discovery window: whenever a `1000 ms` slice finishes without exhausting the total timeout, re-send the `M-SEARCH` datagram to `239.255.255.250:1900`.
+  - Set a `1000 ms` receive poll interval inside a `5000 ms` total discovery window: whenever a `1000 ms` slice finishes without exhausting the total timeout, re-send the `M-SEARCH` datagram to `239.255.255.250:1900`.
 - **Deduplication Key**: Deduplicate SSDP responses by `(udn, location)` where `udn = usn.substringBefore("::")`.
 - **Follow `LOCATION` Path Literally**: Always fetch the exact URL in the `LOCATION:` header (some `F7C030` firmwares return `http://<ip>:<port>/Lightsetup.xml` rather than `/setup.xml`).
 
@@ -50,35 +50,35 @@ HOST: 239.255.255.250:1900
 
 ---
 
-## 3. Port Probing & Two-Stage Reconnection (`pywemo/ouimeaux_device/__init__.py`)
+## 3. Port Probing & Two-Stage Reconnection (`NetworkClient.kt` & `DiscoveryCoordinator.kt`)
 
-### Full WeMo Port Range (`PROBE_PORTS`)
-WeMo devices dynamically bind an HTTP server on one of 9 ports, ordered by frequency in `pywemo`:
+### Full Candidate Port Range (`PROBE_PORTS`)
+Belkin switches dynamically bind an HTTP server on one of 9 ports, ordered by binding frequency:
 ```kotlin
 val PROBE_PORTS = listOf(49153, 49152, 49154, 49151, 49155, 49156, 49157, 49158, 49159)
 ```
 
-### Smart Port Probing (`probe_wemo`)
+### Smart Port Probing (`probeWemoPort`)
 When probing `http://<host>:<port>/setup.xml` across `ports` (with the device's last-known `port` moved to index `0`):
-1. **UDN Verification (`matchUdn`)**: Parse `<UDN>` (or `<serialNumber>`) from `setup.xml`. If `matchUdn != null && device.udn != matchUdn`, skip and continue! This prevents toggling the wrong device if DHCP reassigned the IP address to another WeMo unit.
+1. **UDN / Serial Verification (`expectedSerialNumber` / `expectedUdn`)**: Parse `<UDN>` and `<serialNumber>` from `setup.xml`. If the expected identity is non-blank and does not match the responding device, skip and continue! This prevents toggling the wrong device if DHCP reassigned the IP address to another unit.
 2. **Distinguish `ConnectTimeoutException` vs. `ConnectException` vs. `SocketTimeoutException`**:
    - **`SocketTimeoutException` during TCP `connect()`**: The IP address itself is not reachable on the LAN (ARP/Wi-Fi timeout). Break early rather than waiting for 9 full timeouts on a dead IP.
    - **`ConnectException` (`ECONNREFUSED`)**: The host IP is alive and immediately sent a TCP `RST` on that port. Continue immediately to the next port in `PROBE_PORTS`.
-   - **`SocketTimeoutException` during HTTP `read()`**: As noted in `pywemo`, WeMo firmware occasionally gets into a wedged state where an old port still accepts TCP connections (`SYN/ACK`) but never responds to HTTP requests while a newly bound port works. Continue probing the next port!
+   - **`SocketTimeoutException` during HTTP `read()`**: Switch firmware occasionally gets into a wedged state where an old port still accepts TCP connections (`SYN/ACK`) but never responds to HTTP requests while a newly bound port works. Continue probing the next port!
 
-### Two-Stage Reconnect (`reconnect_with_device`)
+### Two-Stage Reconnect (`attemptTwoStageReconnect`)
 When a SOAP request to a known device fails:
-1. **Stage 1 — Port Re-Probing (`_reconnect_with_device_by_probing`)**: Probe `PROBE_PORTS` on the device's current IP address (verifying `serialNumber` / `UDN`).
-2. **Stage 2 — Targeted SSDP Rediscovery (`_reconnect_with_device_by_discovery`)**: If port probing fails (e.g., router DHCP assigned a new IP), run an SSDP scan matching the device's `UDN` / `serialNumber` (`matchUdn`) to discover its new `ipAddress` and `port`.
+1. **Stage 1 — Port Re-Probing**: Probe `PROBE_PORTS` on the device's current IP address (verifying `serialNumber` / `UDN`).
+2. **Stage 2 — Targeted SSDP Rediscovery**: If port probing fails (e.g., router DHCP assigned a new IP), run an SSDP scan matching the device's `UDN` / `serialNumber` to discover its new `ipAddress` and `port`.
 
 ---
 
-## 4. HTTP / TCP Session & Concurrency Constraints (`pywemo/ouimeaux_device/api/service.py`)
+## 4. HTTP / TCP Session & Concurrency Constraints (`LanHttpClient.kt` & `SwitchRepository.kt`)
 
 - **Disable HTTP Keep-Alive (`Connection: close`)**:
-  - WeMo embedded HTTP servers (OpenWrt `libupnp` and RTOS) have a very small thread pool and do not properly handle persistent HTTP keep-alive connections. Always send `Connection: close` and disconnect `HttpURLConnection` in `finally` to avoid exhausting TCP sockets on the switch.
+  - Embedded HTTP servers (OpenWrt `libupnp` and RTOS) have a very small thread pool and do not properly handle persistent HTTP keep-alive connections. Always send `Connection: close` and close the underlying `Socket` in `use {}` to avoid exhausting TCP sockets on the switch.
 - **Limit Concurrency (`MAX_CONCURRENCY = 3`) & Per-Device Mutex**:
-  - Never flood a single WeMo device with parallel requests, and cap concurrent LAN-wide device initialization/polling to `3` coroutines (`Semaphore(3)`) with a per-device `Mutex`.
+  - Never flood a single switch with parallel requests, and cap concurrent LAN-wide device initialization/polling to `3` coroutines (`Semaphore(3)`) with a per-device `Mutex`.
 
 ---
 
@@ -88,20 +88,20 @@ When a SOAP request to a known device fails:
 
 - **`GetBinaryState`**:
   - Returns `<BinaryState>` (`0` or `1`, or pipe-delimited `1|1492338954|...` — always take `.substringBefore("|").trim()`).
-  - On WeMo Dimmers (`IN_WALL_DIMMER`), also returns `<brightness>` (`1..100`) and `<fader>`.
+  - On Dimmers (`LIGHTBULB_DIMMER`), also returns `<brightness>` (`1..100`) and `<fader>`.
 - **`SetBinaryState`**:
   - For Switches / Mini Plugs: `<BinaryState>0</BinaryState>` or `<BinaryState>1</BinaryState>`.
-  - **Already-in-State `"Error"` Quirks (`pywemo/ouimeaux_device/switch.py`)**:
-    - If a switch is *already* ON and receives `SetBinaryState(1)` (or already OFF and receives `SetBinaryState(0)`), WeMo firmware returns HTTP 200 with `<BinaryState>Error</BinaryState>`. Treat HTTP 200 with `<BinaryState>Error</BinaryState>` as confirming the requested state (or verify via `GetBinaryState`), NOT as a failure!
-  - For Dimmers (`pywemo/ouimeaux_device/dimmer.py`):
-    - WeMo ignores `<brightness>0</brightness>`. To set brightness `1..100`, send:
+  - **Already-in-State `"Error"` Quirk**:
+    - If a switch is *already* ON and receives `SetBinaryState(1)` (or already OFF and receives `SetBinaryState(0)`), firmware returns HTTP 200 with `<BinaryState>Error</BinaryState>`. Treat HTTP 200 with `<BinaryState>Error</BinaryState>` as idempotent confirmation of the requested state (or verify via `GetBinaryState`), NOT as a failure!
+  - For Dimmers:
+    - Dimmer firmware ignores `<brightness>0</brightness>`. To set brightness `1..100`, send:
       ```xml
       <BinaryState>1</BinaryState>
       <brightness>75</brightness>
       ```
     - If brightness `0` is requested, send `<BinaryState>0</BinaryState>`.
 - **`GetSignalStrength`**:
-  - Returns `<SignalStrength>` (`0..100` percentage). `pywemo` converts this to RSSI dBm via:
+  - Returns `<SignalStrength>` (`0..100` percentage), which maps to approximate RSSI dBm via:
     - `>= 100` -> `-50 dBm`
     - `24..99` -> `round((percent - 24) * 10.0 / 26.0 - 80)`
     - `1..23` -> `round(percent * 10.0 / 26.0 - 90)`
@@ -117,7 +117,7 @@ When a SOAP request to a known device fails:
 
 ---
 
-## 6. Local Push Event Subscriptions (`pywemo/subscribe.py` — UPnP GENA)
+## 6. Local Push Event Subscriptions (`GenaSubscriptionManager.kt` — UPnP GENA)
 
 To receive instant push notifications when a physical wall switch, 3-way switch, dimmer, or mini plug button is pressed:
 
@@ -138,7 +138,7 @@ To receive instant push notifications when a physical wall switch, 3-way switch,
    - Before `TIMEOUT` expires (e.g. every `240s`), send `SUBSCRIBE` with `SID: <subscription_id>` and `TIMEOUT: Second-300` (no `CALLBACK` or `NT` header).
    - If the device responds with `HTTP/1.1 412 Precondition Failed` (e.g., after a reboot), send `UNSUBSCRIBE` with `SID`, clear `subscription_id`, and issue a fresh `SUBSCRIBE` with `CALLBACK` and `NT: upnp:event`.
 4. **Incoming `NOTIFY` Callback**:
-   - When state changes, the WeMo device sends an HTTP `NOTIFY` request to the callback path with XML body:
+   - When state changes, the switch sends an HTTP `NOTIFY` request to the callback path with XML body:
      ```xml
      <e:propertyset xmlns:e="urn:schemas-upnp-org:event-1-0">
        <e:property>
@@ -156,35 +156,35 @@ To receive instant push notifications when a physical wall switch, 3-way switch,
 
 ## 7. RTOS vs. OpenWrt Firmware Nuances & Reliability Safeguards
 
-### 7.1 2nd-Gen `WLS040` / `WLS0403` (3-Way) & `WDS060` RTOS Stack (`home-assistant/core#45904`, `#62224`)
+### 7.1 2nd-Gen `WLS040` / `WLS0403` (3-Way) & `WDS060` RTOS Stack
 - 1st-Gen devices (`F7C030`, `F7C059`, `F7C063`) run Linux/OpenWrt (`libupnp`), while newer 2nd-Gen devices (`WLS040`, `WLS0403` 3-Way Switch, `WDS060` Dimmer V2, `WSP080` Mini V2) run an embedded RTOS (`<rtos>1</rtos>` in `setup.xml`).
 - **Critical Reliability Rules for `WLS040` / `WLS0403`**:
-  1. **Never flood a device during reconnect (`#45904`)**: Sending 7+ rapid `/setup.xml` and SCPD requests when a single poll times out can exhaust the device's tiny socket pool and wedge its UPnP server. Always serialize requests per device (`Mutex`) and cap LAN-wide concurrency (`Semaphore(3)`).
+  1. **Never flood a device during reconnect**: Sending 7+ rapid `/setup.xml` and SCPD requests when a single poll times out can exhaust the device's tiny socket pool and wedge its UPnP server. Always serialize requests per device (`Mutex`) and cap LAN-wide concurrency (`Semaphore(3)`).
   2. **Always close TCP sockets (`Connection: close`)**: Persistent keep-alive sockets starve the embedded HTTP listener.
   3. **Confirm-Read Race After `SetBinaryState`**: On some firmwares, calling `GetBinaryState` within `100–1500 ms` after `SetBinaryState` returns the *pre-transition* state while the relay or dimmer fader is still ramping. Trust the HTTP 200 `SetBinaryState` result immediately and wait at least `1.5–2.0 s` before any follow-up `GetBinaryState` verification poll.
-  4. **Dimmer V2 (`WDS060`) Rules DB Limitation (`pywemo#296`)**: RTOS-based `WDS060` returns `HTTP 404` on `/rules.db` (`FetchRules`/`StoreRules` are unsupported), so schedules/timers for `WDS060` must be executed by the controller or via `basicevent1` (`ConfigureNightMode`, `SetBinaryState`).
+  4. **Dimmer V2 (`WDS060`) Rules DB Limitation**: RTOS-based `WDS060` returns `HTTP 404` on `/rules.db` (`FetchRules`/`StoreRules` are unsupported), so schedules/timers for `WDS060` must be executed by the controller or via `basicevent1` (`ConfigureNightMode`, `SetBinaryState`).
 
 ### 7.2 Post-2026 Cloud Shutdown & Blinking Amber Status LED
-- Belkin discontinued WeMo cloud servers on January 31, 2026. All local UPnP/SSDP/SOAP discovery and control operate 100% offline on the LAN without cloud authentication.
+- Belkin discontinued cloud servers on January 31, 2026. All local UPnP/SSDP/SOAP discovery and control operate 100% offline on the LAN without cloud authentication.
 - Devices that blink their amber/orange Wi-Fi LED due to cloud reachability checks probe `heartbeat.xwemo.com`, `heartbeat.lswf.net`, and `www.belkin.com` (plus NTP `0..3.linksys.pool.ntp.org`). Resolving `heartbeat.xwemo.com` and `heartbeat.lswf.net` to `127.0.0.1` in local router DNS (Pi-hole / dnsmasq / Unbound) silences the blinking amber indicator.
 
 ---
 
-## 8. Local Wi-Fi Provisioning (`WiFiSetup1` on `10.22.22.1:49152`)
+## 8. Local Wi-Fi Provisioning (`WiFiSetup1` on `10.22.22.1:49152` — `ProvisionerClient.kt` & `PasswordCrypto.kt`)
 
-Unconfigured or factory-reset WeMo devices broadcast an open 2.4 GHz setup AP (`WeMo.Light.xxx`, `WeMo.Dimmer.xxx`, `WeMo.Mini.xxx`) at `10.22.22.1` (port `49152` or `49153`, serving `/setup.xml` or `/Lightsetup.xml`).
+Unconfigured or factory-reset switches broadcast an open 2.4 GHz setup AP (`WeMo.Light.xxx`, `WeMo.Dimmer.xxx`, `WeMo.Mini.xxx`, `Wemo.LS3W.xxx`) at `10.22.22.1` (port `49152` or `49153`, serving `/setup.xml` or `/Lightsetup.xml`).
 
 1. **Scan Visible 2.4 GHz APs**:
    - `POST /upnp/control/WiFiSetup1` (`urn:Belkin:service:WiFiSetup:1#GetApList`) -> returns `<ApList>` lines of `SSID|Channel|SignalPercent|AuthMode/Encryption` (e.g. `MyHome24|6|88|WPA2PSK/AES`).
 2. **Fetch Device Metadata (`metainfo1#GetMetaInfo`)**:
    - Extracts `mac` (12 hex chars) and `serial_number`.
-3. **Encrypt Wi-Fi Password (`pywemo/ouimeaux_device/api/wifi_setup.py`)**:
+3. **Encrypt Wi-Fi Password (`PasswordCrypto.kt` — OpenSSL `EVP_BytesToKey` MD5 + AES-128-CBC)**:
    - Select keydata construction method from `setup.xml` extra tags:
      - **Method 1 (Default / OpenWrt)**: `keydata = mac[0..5] + serial + mac[6..11]`, append 2-byte hex lengths (`%02x%02x` of encrypted length and raw password length).
      - **Method 2 (RTOS `<rtos>1</rtos>` and `<iot>` != `1`)**: `keydata = mac[0..5] + serial + mac[6..11] + "b3{8t;80dIN{ra83eC1s?M70?683@2Yf"`, no length suffix.
      - **Method 3 (`<binaryOption>1</binaryOption>`)**: `keydata = mac[0..2] + mac[9..11] + serial + "bVduaWFyZkllaWVAb3RjbHAkcm9uT2Jh" + mac[6..8] + mac[3..5]`, with length suffix.
    - Derive 16-byte AES key: `MD5(keydata + keydata[0..7])`, IV = `keydata[0..15]`, encrypt UTF-8 password with `AES-128-CBC` (PKCS7 padding), Base64-encode, and append hex length suffix if applicable.
 4. **Join Home Network**:
-   - Call `WiFiSetup1#ConnectHomeNetwork(ssid, auth, password, encrypt, channel)` **twice** with a `100 ms` pause between calls (`pywemo` reliability workaround).
+   - Call `WiFiSetup1#ConnectHomeNetwork(ssid, auth, password, encrypt, channel)` **twice** with a `100 ms` pause between calls.
    - Poll `WiFiSetup1#GetNetworkStatus` until `<NetworkStatus>` is `1` (connected; `3` = handshake in progress, `2` = password too short).
    - Finalize with `WiFiSetup1#CloseSetup` and `basicevent1#SetSetupDoneStatus`.

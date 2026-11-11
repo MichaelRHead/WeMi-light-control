@@ -7,14 +7,14 @@ description: Architecture, Belkin WeMo UPnP/SSDP/SOAP/GENA protocol reference, R
 
 Use this skill when working on the **WeMi Light Control** Android & Android TV application in `/home/antigravity/MichaelRHead/WeMi-light-control`.
 
-For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin's discontinued smart switch platform, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../UX_DESIGN.md`](../../UX_DESIGN.md) and [`../../UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md) (AI Studio Agent-owned UX specifications), [`../../DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) (Antigravity Debugging & Support Agent-owned telemetry specification), [`../../DISCOVERY_AND_ROOM_GROUPING.md`](../../DISCOVERY_AND_ROOM_GROUPING.md) (Antigravity Device Discovery & Room Grouping Agent-owned specification), [`../../LICENSE_GOVERNANCE.md`](../../LICENSE_GOVERNANCE.md) (Antigravity License & Brand Governance Agent-owned specification), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md) (reverse-chronological Change Log), [`../../UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md) (upcoming features roadmap), and [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (plus [`../../docs/user-guide/`](../../docs/user-guide/)). For UX design, device discovery & room grouping, license & brand governance, human-readable code modularization, E2E testing standards, on-device screenshot/telemetry debugging, multi-agent Git synchronization, and Change Log maintenance, also consult [`../wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md), [`../wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md), [`../wemi-license-governance/SKILL.md`](../wemi-license-governance/SKILL.md), [`../android-code-modularization/SKILL.md`](../android-code-modularization/SKILL.md), [`../android-e2e-testing/SKILL.md`](../android-e2e-testing/SKILL.md), [`../wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md), [`../multi-agent-git-sync/SKILL.md`](../multi-agent-git-sync/SKILL.md), and [`../wemi-changelog-and-docs/SKILL.md`](../wemi-changelog-and-docs/SKILL.md). Always keep root `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified (do not duplicate `ALL_CAPS.md` files inside `docs/`).
+For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML schemas for Belkin's discontinued smart switch platform, read [`references/wemo-upnp-protocol.md`](references/wemo-upnp-protocol.md), [`../../UX_DESIGN.md`](../../UX_DESIGN.md) and [`../../UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md) (AI Studio Agent-owned UX specifications), [`../../DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) (Antigravity Debugging & Support Agent-owned telemetry specification), [`../../DISCOVERY_AND_ROOM_GROUPING.md`](../../DISCOVERY_AND_ROOM_GROUPING.md) (Antigravity Device Discovery & Room Grouping Agent-owned specification), [`../../LICENSE_GOVERNANCE.md`](../../LICENSE_GOVERNANCE.md) (Antigravity License & Brand Governance Agent-owned specification), [`../../IMPLEMENTED.md`](../../IMPLEMENTED.md) (reverse-chronological Change Log), [`../../UPCOMING_FEATURES.md`](../../UPCOMING_FEATURES.md) (upcoming features roadmap), and [`../../USER_GUIDE.md`](../../USER_GUIDE.md) (plus [`../../docs/user-guide/`](../../docs/user-guide/)). For UX design, device discovery & room grouping, license & brand governance, human-readable code modularization, E2E testing standards, on-device screenshot/telemetry debugging, multi-agent Git synchronization, agent commit attribution, and Change Log maintenance, also consult [`../wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md), [`../wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md), [`../wemi-license-governance/SKILL.md`](../wemi-license-governance/SKILL.md), [`../android-code-modularization/SKILL.md`](../android-code-modularization/SKILL.md), [`../android-e2e-testing/SKILL.md`](../android-e2e-testing/SKILL.md), [`../wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md), [`../multi-agent-git-sync/SKILL.md`](../multi-agent-git-sync/SKILL.md), [`../agent-commit-attribution/SKILL.md`](../agent-commit-attribution/SKILL.md), and [`../wemi-changelog-and-docs/SKILL.md`](../wemi-changelog-and-docs/SKILL.md). Always keep root `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, and `docs/user-guide/*.md` updated as features are added or modified (do not duplicate `ALL_CAPS.md` files inside `docs/`).
 
 ---
 
 ## 1. Build, Test & Environment
 
 - **Toolchain**: AGP `9.1.0`, Kotlin `2.3.20`, KSP `2.3.6`, Compose BOM `2026.03.00`, Room `2.8.4` (`version = 5`), Robolectric `4.16.1`, `compileSdk = 36`, `minSdk = 24`.
-- **Unit, Protocol, Governance & E2E Compose UI Tests (`30/30` across 7 suites)**:
+- **Unit, Protocol, Governance & E2E Compose UI Tests (`30/30` across 8 suites)**:
   ```bash
   ./gradlew testDebugUnitTest --rerun-tasks
   ```
@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
   ```bash
   ./gradlew assembleDebug
   ```
-- **Package / Namespace**: `org.suppressingfire.wemi` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "21.0"`, `versionCode = 21`).
+- **Package / Namespace**: `org.suppressingfire.wemi` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "22.0"`, `versionCode = 22`).
 
 ---
 
@@ -39,7 +39,7 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 
 ---
 
-## 3. Codebase Map (`v21.0` — `org.suppressingfire.wemi`)
+## 3. Codebase Map (`v22.0` — `org.suppressingfire.wemi`)
 
 ### Data & Scheduling Layer (`app/src/main/java/org/suppressingfire/wemi/data/`)
 - **`DeviceEntities.kt`**:
@@ -60,7 +60,8 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
   - Manages live per-device Auto-Off countdown timers (`activeCountdownsSec`) and evaluates daily `SCHEDULE` / Sunset / Sunrise rules.
 
 ### Network Layer (`app/src/main/java/org/suppressingfire/wemi/network/`)
-- **`NetworkClient.kt`**, **`XmlAndSkuParser.kt`** & **`SsdpDiscoveryEngine.kt`**:
+- **`LanHttpClient.kt`**, **`NetworkClient.kt`**, **`XmlAndSkuParser.kt`** & **`SsdpDiscoveryEngine.kt`**:
+  - Zero-dependency `LanHttpClient` built directly on `javax.net.SocketFactory` (`GET`, `POST`, `SUBSCRIBE`, `UNSUBSCRIBE` with byte-exact `Content-Length` / chunked framing).
   - 9-port `probeWemoPort` (`49153, 49152, 49154, 49151, 49155..49159`) with TCP connect timeout vs. `ECONNREFUSED` vs. HTTP read timeout separation and `<serialNumber>`/`<UDN>` verification.
   - Unified `executeWithPortHealing`, `setBinaryState` (with `<BinaryState>Error</BinaryState>` quirk handling), `getBinaryState`, `getMetaInfo` (filtering Belkin soft-AP SSIDs in `parseMetaInfoSoapResponse`), `getSignalStrength`, `changeFriendlyName`, `configureNightMode`, `scanSubnetUnicast`, and `performSsdpDiscoveryScan` (`MulticastLock` + 1s retransmit).
 - **`GenaSubscriptionManager.kt`**:
@@ -68,7 +69,7 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 - **`NetworkMonitor.kt`**:
   - Zero-Location-permission `ConnectivityManager.NetworkCallback` `/24` subnet & `10.22.22.x` Setup AP detector with `createWifiBoundSocketFactory` (caching unvalidated `NetworkCallback` Wi-Fi handles + loopback `127.0.0.1` & Robolectric aware).
 - **`ProvisionerClient.kt`**, **`SetupDiagnostics.kt`** & **`PasswordCrypto.kt`**:
-  - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` (`8500ms` site-survey timeout), OkHttp-framed `probeSetupDevice`, `SetupDebugSnapshot` screenshot diagnostics, `TelemetryFileExporter` (`wemi-telemetry-latest.txt`), and `pywemo`-exact OpenSSL `EVP_BytesToKey` MD5 AES-128-CBC (Methods 1, 2 & 3 × `addPasswordLengths`) double-send `ConnectHomeNetwork` + 20s `GetNetworkStatus` poll + `CloseSetup` + `SetSetupDoneStatus` provisioner.
+  - `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` (`8500ms` site-survey timeout), `LanHttpClient`-framed `probeSetupDevice`, `SetupDebugSnapshot` screenshot diagnostics, `TelemetryFileExporter` (`wemi-telemetry-latest.txt`), and first-party OpenSSL `EVP_BytesToKey` MD5 AES-128-CBC (Methods 1, 2 & 3 × `addPasswordLengths`) double-send `ConnectHomeNetwork` + 20s `GetNetworkStatus` poll + `CloseSetup` + `SetSetupDoneStatus` provisioner.
 
 ### UI & Test Layer (`app/src/main/java/org/suppressingfire/wemi/ui/` & `app/src/test/java/org/suppressingfire/wemi/`)
 - **`SwitchViewModel.kt`**, **`MainActivity.kt`**, **`ui/screens/*`** & **`ui/components/*`**:
@@ -76,4 +77,4 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
   - Dark-gray IEC `"I/O"` power-off icon (`drawIecPowerSymbol` in `#23272F`/`#181B20`), red `DisconnectedRingButton` (`drawDisconnectedSymbol`), screenshot-ready `ProvisionDebugPanel` (`provision_debug_panel`, `provision_debug_text`) inside `ProvisionApDialog`, and `open_source_licenses_card` (`mit_license_text_surface` & `third_party_notices_surface`) in `MoreScreen`.
   - One-tap `Reset` chip (`reset_lan_data_chip`) in `WifiHomeBar` and `more_reset_lan_homes_switches_button` on `MoreScreen`.
 - **`FakeUpnpServer.kt`**, **`SkuAndCryptoTest.kt`**, **`SoapAndSelfHealingTest.kt`**, **`GenaProvisioningAndRulesTest.kt`**, **`LicenseAndBrandGovernanceTest.kt`**, **`ExampleRobolectricTest.kt`**, **`EndToEndUiTest.kt`** & **`HardwareCujEndToEndTest.kt`**:
-  - 29 automated loopback UPnP/SOAP/GENA protocol, license governance, and full-stack Compose E2E tests.
+  - 30 automated loopback UPnP/SOAP/GENA protocol, license governance, and full-stack Compose E2E tests.

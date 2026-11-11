@@ -43,13 +43,14 @@ Never let a single test file grow into a 1,200+ line monolith. Organize tests by
    - Validates `classifyHardwareSku` across all 4 hardware families (`F7C030`, `WLS040`/`WLS0403`, `F7C059`/`WDS060`, `F7C063`/`WSP080`).
    - Validates `parseSetupXmlDescriptor` (`<binaryState>0</binaryState>` vs `<binaryState>1</binaryState>`, `<brightness>`, `<rtos>`).
    - Validates `classifyDeviceCategory` (`CHRISTMAS_TREE`, `FAN`, `LIGHT`, `MOTION_SENSOR`, `SWITCH_PLUG`) and `inferRoomFromName`.
-   - Validates `pywemo` OpenSSL AES-128-CBC round-trip `encryptWifiPassword` / `decryptWifiPassword` across Methods 1 (OpenWrt), 2 (RTOS), and 3 (`binaryOption`).
-3. **Tier 2 — Loopback SOAP Control, Self-Healing & Provisioning (`SoapAndSelfHealingTest.kt` & `GenaProvisioningAndRulesTest.kt`)**:
+   - Validates first-party OpenSSL `EVP_BytesToKey` AES-128-CBC round-trip `encryptWifiPassword` / `decryptWifiPassword` across Methods 1 (OpenWrt), 2 (RTOS), and 3 (`binaryOption`).
+3. **Tier 2 — Loopback SOAP Control, Self-Healing, Provisioning & License Governance (`SoapAndSelfHealingTest.kt`, `GenaProvisioningAndRulesTest.kt` & `LicenseAndBrandGovernanceTest.kt`)**:
    - **Startup State Detection**: Parallel `detectStartupDeviceStates` across `ON`, `OFF (Accessible Standby)`, and `Disconnected` switches.
    - **9-Port Probing & Port-Hop Healing**: Verifies `probeWemoPort` recovers when a switch hops from `49153` to `49154` and aborts when `<serialNumber>` mismatches.
    - **Real LAN Mode Offline Revert**: Verifies that toggling an unreachable switch in Real LAN Mode (`isDemoShowroomMode = false`) reverts `isOn` to its prior value and sets `isReachable = false, latencyMs = 0`.
    - **UPnP GENA Push & Echo Suppression**: Verifies `SUBSCRIBE`, HTTP 412 recovery, `<e:propertyset>` `NOTIFY` push updates (`<100ms`), and `1200ms` echo suppression after local `SetBinaryState`.
    - **Zero-Cloud `WiFiSetup1` Provisioning**: Full loopback flow from `probeSetupDevice` → `GetApList`/`GetNetworkList` → `ConnectHomeNetwork` double-send → `GetNetworkStatus` multi-poll → `CloseSetup` + `SetSetupDoneStatus` → automatic Room device insertion.
+   - **MIT License, Dependency Footprint & Brand Hygiene (`LicenseAndBrandGovernanceTest.kt`)**: Verifies root `LICENSE` parity with `MoreScreen.kt`, minimal `Apache-2.0` dependency footprint (zero external HTTP/font bloat), `org.suppressingfire.wemi` package/filename hygiene, and Play Store trademark boundaries.
 4. **Tier 3 — End-to-End Compose UI & User Journey Tests (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt` & `HardwareCujEndToEndTest.kt`)**:
    - Uses `createAndroidComposeRule<MainActivity>()` to validate complete human user journeys:
      - **Journey A (Multi-Home & Room Master Control)**: Switch between remembered Wi-Fi Homes, verify room grouping, trigger room-wide master power toggle and room brightness slider, and verify SOAP log telemetry.
