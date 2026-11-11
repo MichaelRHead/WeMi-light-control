@@ -83,14 +83,18 @@ Because WeMi Light Control uses reactive state-driven navigation (`selectedTab`,
 
 ### 2.4 Native 10-Foot Android TV & D-Pad Navigation (`TvScreen.kt` & `TvCardsAndScenes.kt`)
 
-When running on an Android TV (`Configuration.UI_MODE_TYPE_TELEVISION`), the app launches directly into a dedicated 10-foot dark slate theater interface (`TvDashboardScreen`, `#0D131A` -> `#151F2B`) tailored exclusively for TV remote D-Pad interaction (without a phone-mode switch button):
+When running on an Android TV (`Configuration.UI_MODE_TYPE_TELEVISION`), the app launches directly into a dedicated 10-foot dark slate theater interface (`TvDashboardScreen`, `#0A192F` -> `#060E1A`) tailored exclusively for TV remote D-Pad interaction (without a phone-mode switch button or touch-only popup modals):
 
-- **D-Pad Focus Ring & Scale**: Every interactive card and scene pill uses `onFocusChanged` to render a high-contrast `3.dp` glowing border (`#73D41B` when `ON`, `#38BDF8` sky-blue when `OFF`) and a subtle `1.04f` scale elevation so the user always knows where the remote cursor rests from 10 feet away.
-- **Remote Control Key Bindings (`onPreviewKeyEvent`)**:
-  - **`KEYCODE_DPAD_CENTER` / `KEYCODE_ENTER`**: Toggles the focused switch or dimmer `ON`/`OFF` (or triggers reconnect if offline).
-  - **`KEYCODE_MEDIA_PLAY_PAUSE`**: Instant room-wide master toggle for the room of the currently focused device card.
-- **TV Dimmer Step Buttons**: Focused dimmer cards expose D-Pad navigable `-15%` and `+15%` step buttons alongside a high-contrast progress bar so users never have to drag a touch slider with a TV remote.
-- **Top Quick-Scene Bar**: 1-click D-Pad buttons at the top of the screen for whole-home presets (`Movie Night`, `Holiday Lights`, `Bedtime All OFF`, and `SSDP Scan`).
+- **Single Compact Top Bar & Full-Height 3-Column Room-Grouped Grid**:
+  - A single compact top bar (`wemi TV`, active switch count, focused card status pill `tv_remote_dpad_ok`, scene chips `Movie 20%`, `Holiday ON`, `All OFF`, and `Rescan`) dedicates over 90% of vertical screen height to the 3-column (`GridCells.Fixed(3)`) switch grid.
+  - Switches are grouped by room under full-width focusable **Room Section Headers** (`TvRoomSectionHeader`, `span = { GridItemSpan(maxLineSpan) }`, `tv_room_header_<RoomName>`, with `"Unassigned"` sorted last). Pressing `OK / Select` on any room header toggles all switches in that room.
+- **Unmistakable 10-Foot Cursor Focus**:
+  - Initial hardware focus (`FocusRequester`) is requested automatically on the first switch card at launch.
+  - Focused cards render a high-contrast `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated surface (`#133B66`), `1.022f` scale lift, `12.dp` shadow elevation, and an explicit top-right **`FOCUSED • OK`** badge.
+- **Predictable 3-Column Navigation & Non-Interfering Dimmer Adjust Mode**:
+  - **Normal Navigation Mode**: `D-Pad Up / Down / Left / Right` **always** navigates freely between the 3 columns of switch and dimmer cards (never hijacking `Left / Right` on dimmers). Pressing `OK / Select / Enter` on any card immediately toggles power `ON` / `OFF` (or triggers a 9-port reconnect if offline).
+  - **Dimmer Adjust Mode (`isDimmingMode`)**: Activated on a focused dimmer card via `KEYCODE_MEDIA_PLAY_PAUSE`, `KEYCODE_MENU`, Long-Press `OK`, or clicking the dimmer strip (`tv_card_dim_mode_<id>`). While active, the card border turns glowing Gold (`#FBBF24`) with a **`DIM ◀/▶`** badge, capturing `Left / Right` (`-10%` / `+10%`) and `Up / Down` (`+20%` / `-20%`) until the user presses `OK` or `Back` to exit back to normal grid navigation.
+- **Zero Blocking Popup Modals on TV**: Clicking `Rescan` (`tv_scan_button`) runs a non-blocking background SSDP + state refresh with a bottom toast, and touch-only modal sheets are guarded by `if (!isTvMode)` so popups never trap TV remote focus.
 
 ---
 

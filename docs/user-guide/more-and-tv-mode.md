@@ -60,17 +60,18 @@ At the bottom of the **More** tab, the **Open Source License** card (`open_sourc
 **WeMi Light Control** automatically launches in **Android TV Mode** when running on an Android TV / Google TV device (`UI_MODE_TYPE_TELEVISION`).
 
 ### Key Features of `wemi TV`:
-1. **10-Foot High-Contrast Dark UI**:
-   - Designed for viewing across the living room with glowing cyan D-Pad focus rings (`#22D3EE`) and large hardware/category illustrations (`Tree Lights`, `Fan`, `Light`, `Motion`, `Switch`).
-2. **Hardware TV Remote (D-Pad) Shortcuts**:
-   - **D-Pad Arrows (`Up` / `Down` / `Left` / `Right`)**: Navigate between switch cards, room filters, and scene buttons.
-   - **D-Pad Center / `Enter`**: Toggle the focused switch **ON** or **OFF** (or trigger a reconnect if offline).
-   - **Media `Play / Pause` Button**: Instantly toggles **all switches in the currently selected/focused room ON or OFF**!
-   - **`-15%` / `+15%` Dimmer Buttons**: On dimmable light cards, step brightness down or up in 15% increments directly from the remote.
-3. **1-Click TV Lighting Scenes**:
-   - **`Movie Night`**: Dims Living Room lights to a soft `20%` glow and turns off bright overhead switches.
-   - **`Bright Room`**: Turns all switches in the current room **ON** at `100%` brightness.
-   - **`Nightlight`**: Sets dimmable lights to `20%` and turns non-dimmable switches **OFF**.
-   - **`All Off`**: Turns every switch in the home **OFF**.
-4. **Interactive On-Screen Virtual Remote Pad**:
-   - Toggle the **`Remote Pad`** button in the top-right corner of the TV dashboard to show or hide an on-screen D-Pad (`▲`, `▼`, `◀`, `▶`, `OK`, `Room I/O`, `-15%`, `+15%`) for touchscreens or air-mouse remotes.
+1. **Full-Height 3-Column Room-Grouped Switch Grid**:
+   - A single compact top bar (`wemi TV`, active switch count, focused switch status pill, quick scenes, and `Rescan`) dedicates over 90% of vertical screen height to your switches.
+   - Switches are grouped under full-width **Room Section Headers** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `Unassigned` last) inside a 3-column grid (`GridCells.Fixed(3)`). Pressing **`OK / Select`** on any Room Header toggles all switches in that room ON or OFF.
+2. **Unmistakable 10-Foot Cursor Focus**:
+   - The first switch card automatically receives D-Pad focus on launch.
+   - The focused card stands out across the living room with a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated card surface (`#133B66`), subtle scale lift (`1.022x`), and a **`FOCUSED • OK`** badge in the top-right corner.
+3. **Predictable Card Navigation & Non-Interfering Dimmer Adjust Mode**:
+   - **Normal Navigation Mode**: **D-Pad `Up / Down / Left / Right`** always moves freely across the 3 columns of switch and dimmer cards without getting stuck on dimmers. Pressing **`OK / Select`** on any card (switch or dimmer) immediately toggles power **ON** or **OFF** (or triggers a 9-port reconnect if offline).
+   - **Dimmer Adjust Mode**: To adjust a dimmer's brightness, press **`Play/Pause`**, **`Menu`**, or **Long-Press `OK`** on a focused dimmer card (or click its dimmer strip). The card border turns glowing Gold (`#FBBF24`) with a **`DIM ◀/▶`** badge: use **`◀ Left` / `▶ Right`** to step brightness `-10%` / `+10%` (or **`▲ Up` / `▼ Down`** for `±20%`), then press **`OK`** or **`Back`** to finish and return to normal card navigation.
+4. **1-Click TV Lighting Scenes & Non-Blocking LAN Rescan**:
+   - **`Movie 20%`**: Dims Living Room lights to a soft `20%` glow and turns off bright overhead switches.
+   - **`Holiday ON`**: Turns all holiday/tree switches **ON**.
+   - **`All OFF`**: Turns every switch in the home **OFF**.
+   - **`Rescan`**: Runs a background SSDP + state refresh with a bottom status toast—never popping up modal dialogs over the TV screen.
+

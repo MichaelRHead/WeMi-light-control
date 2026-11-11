@@ -312,14 +312,34 @@ class ExampleRobolectricTest {
     fun `verify native Android TV dashboard launches automatically under UI_MODE_TYPE_TELEVISION without manual layout toggle`() {
         composeTestRule.waitForIdle()
 
-        // Verify Android TV 10-foot dashboard launches automatically under UI_MODE_TYPE_TELEVISION
+        // Verify Android TV 10-foot dashboard launches automatically with 3-column room-grouped grid
         composeTestRule.onNodeWithTag("tv_dashboard_screen").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tv_device_grid").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tv_room_header_Living Room").assertIsDisplayed()
         composeTestRule.onNodeWithTag("tv_remote_dpad_ok").assertIsDisplayed()
         composeTestRule.onNodeWithTag("tv_scene_movie").assertIsDisplayed()
+
+        // Clicking a switch card toggles power directly
+        composeTestRule.onNodeWithTag("tv_device_card_1").performClick()
+        composeTestRule.waitForIdle()
+
+        // Scroll to reachable LIGHTBULB_DIMMER (id = 8, Lightbulb Bedroom), enter Dimmer Adjust Mode, and exit cleanly
+        composeTestRule.onNodeWithTag("tv_device_grid")
+            .performScrollToNode(hasTestTag("tv_device_card_8"))
+        composeTestRule.onNodeWithTag("tv_card_dim_mode_8").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle").performClick()
+        composeTestRule.waitForIdle()
 
         // Trigger Movie Night scene on Android TV
         composeTestRule.onNodeWithTag("tv_scene_movie").performClick()
         composeTestRule.waitForIdle()
+
+        // Verify Rescan triggers non-blocking refresh without popping up touch SsdpScannerModal
+        composeTestRule.onNodeWithTag("tv_scan_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("ssdp_scanner_modal").assertDoesNotExist()
     }
 }
 

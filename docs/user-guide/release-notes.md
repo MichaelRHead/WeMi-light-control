@@ -14,7 +14,7 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
-| **[`v23.0`](#version-230-versioncode--23--november-10-2026)** | `23` | Nov 10, 2026 | Compact single-row top header (`wemi` + `Refresh`, `Edit` & `+` on one line, removing the redundant `"LAN SWITCHES"` label) for more room & switch space on screen |
+| **[`v23.0`](#version-230-versioncode--23--november-10-2026)** | `23` | Nov 10, 2026 | Redesigned 3-column Room-Grouped Android TV dashboard (`wemi TV`) with unmistakable 10-foot cursor focus & non-interfering Dimmer Adjust Mode, plus compact single-row phone/tablet `TopHeader` |
 | **[`v22.0`](#version-220-versioncode--22--november-10-2026)** | `22` | Nov 10, 2026 | Refreshed Google Play Store & in-app visual showcase across Phone, 7"/10" Tablets & Android TV matching the live Ocean Teal, Electric Cyan & Deep Sapphire UI, plus streamlined `MIT` + `Apache-2.0` runtime |
 | **[`v21.0`](#version-210-versioncode--21--november-910-2026)** | `21` | Nov 9–10, 2026 | Native Phone/Tablet vs. Android TV form-factor layouts, in-app Open Source MIT & Third-Party Notices card on the **More** tab, `org.suppressingfire.wemi` architecture & neutral hardware branding |
 | **[`v20.0`](#version-200-versioncode--20--november-9-2026)** | `20` | Nov 9, 2026 | Unified 9-port self-healing reconnect, cellular-safe Wi-Fi binding, 3-tier hardware identity matching, CamelCase/`Ensuite` room grouping & instant offline reconnect recovery |
@@ -44,7 +44,9 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ## Release-by-Release Highlights (Newest to Oldest)
 
 ### Version 23.0 (`versionCode = 23`) — November 10, 2026
-- **Compact Single-Row Top Header for More Screen Space**: Moved the **Refresh** and **Edit** buttons down onto the same header row as the `wemi` wordmark and `+` button—replacing the static `"LAN SWITCHES"` badge—to save vertical space and fit more rooms and switches above the fold on phones and tablets.
+- **Redesigned 3-Column Room-Grouped Android TV Dashboard (`wemi TV`)**: Replaced the multi-row TV header chrome with a single compact top bar so over 90% of vertical screen height showcases your switches grouped by room (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc.) in a 3-column grid with one-click Room Master toggling.
+- **Unmistakable 10-Foot Cursor Focus & Non-Interfering Dimmer Control**: Automatic initial focus on the first switch card with a bright `3.5.dp` Electric Cyan border (`#22D3EE`), illuminated surface (`#133B66`), and `FOCUSED • OK` badge. D-Pad Left/Right now always navigates freely across the 3 columns without getting trapped on dimmers, while pressing `Play/Pause`, `Menu`, or Long-Pressing `OK` on a dimmer enters a dedicated Gold (`#FBBF24`) **Dimmer Adjust Mode** (`◀ -10% / +10% ▶`, `OK` or `Back` = Done). Also replaced blocking popup modals on TV with non-blocking background LAN rescan toasts.
+- **Compact Single-Row Top Header on Phones & Tablets**: Moved the **Refresh** and **Edit** buttons down onto the same header row as the `wemi` wordmark and `+` button—replacing the static `"LAN SWITCHES"` badge—to save vertical space and fit more rooms and switches above the fold.
 
 ---
 

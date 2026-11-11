@@ -1105,126 +1105,129 @@ public class GeneratePlayStoreAssets {
         g.setPaint(bgPaint);
         g.fillRect(0, 0, w, h);
 
-        int padX = (int) (22 * s);
-        int y = (int) (16 * s);
+        int padX = (int) (20 * s);
+        int y = (int) (12 * s);
+        boolean isDimmerMode = "dimmer".equals(mode);
+        boolean isScenesMode = "scenes".equals(mode);
 
-        // 1. 10-Foot Android TV Top Header Bar (NO Exit TV button!)
-        double bwLogo = 132 * s;
-        double bhLogo = 42 * s;
-        fillRoundRect(g, padX, y, bwLogo, bhLogo, 12 * s, new Color(0x08, 0x91, 0xB2, 65), C_TV_CYAN, 1.8 * s);
-        g.setColor(C_WHITE);
-        g.setFont(fBrand(20 * s, Font.BOLD));
-        g.drawString("wemi TV", (int) (padX + 20 * s), (int) (y + 28 * s));
-
-        int tx = (int) (padX + bwLogo + 14 * s);
-        g.setColor(C_TV_TEXT);
-        g.setFont(fUi(16 * s, Font.BOLD));
-        g.drawString("10-Foot Smart Switch Remote Control", tx, (int) (y + 18 * s));
-        g.setColor(C_TV_CYAN);
-        g.setFont(fUi(12 * s, Font.PLAIN));
-        g.drawString("14/18 Switches ON • UDP 239.255.255.250:1900 • GENA Real-Time Push", tx, (int) (y + 36 * s));
-
-        // Right button: 'Hide Remote Pad' ONLY
-        double rbW = 142 * s;
-        double rbH = 36 * s;
-        fillRoundRect(g, w - padX - rbW, y + 3 * s, rbW, rbH, 10 * s, new Color(0x08, 0x91, 0xB2, 65), C_TV_CYAN, 1.2 * s);
-        drawFittedString(g, "Hide Remote Pad", w - padX - rbW + 18 * s, y + 25 * s, rbW - 24 * s, 12.0 * s, Font.BOLD, C_WHITE);
-        y += (int) (bhLogo + 12 * s);
-
-        // 2. One-Click TV Remote Scenes Strip
-        String[][] scenes = {
-            {"Movie Mode (20%)", "scenes".equals(mode) ? "1" : "0"},
-            {"Holiday Lights ON", "focus".equals(mode) ? "1" : "0"},
-            {"Bedtime All OFF", "0"},
-            {"SSDP Scan", "dimmer".equals(mode) ? "1" : "0"}
-        };
+        // 1. Single Compact Top Header Bar (wemi TV + Active Count + Focused Pill + Scene Chips + Rescan)
+        double barH = 38 * s;
         double cx = padX;
-        double sh = 36 * s;
-        for (String[] sc : scenes) {
-            boolean scFocus = "1".equals(sc[1]);
-            g.setFont(fUi(13 * s, Font.BOLD));
-            int sw = g.getFontMetrics().stringWidth(sc[0]) + (int) (36 * s);
-            fillRoundRect(g, cx, y, sw, sh, 12 * s, scFocus ? C_TEAL_PRIMARY : new Color(0x10, 0x2A, 0x4C), scFocus ? C_WHITE : new Color(0x22, 0xD3, 0xEE, 120), (scFocus ? 2.0 : 1.0) * s);
-            g.setColor(C_WHITE);
-            g.drawString(sc[0], (int) (cx + 18 * s), (int) (y + 23 * s));
-            cx += sw + 10 * s;
-        }
-        y += (int) (sh + 10 * s);
 
-        // 3. Room Filter Rail + Master Room Toggle
-        String[][] rooms = {
-            {"All Rooms (18)", !"scenes".equals(mode) ? "1" : "0"},
-            {"Living Room (3/3)", "scenes".equals(mode) ? "1" : "0"},
-            {"Bedroom (1/3)", "0"},
-            {"Kitchen (2/2)", "0"},
-            {"Hallway & Landing (2/2)", "0"}
-        };
-        cx = padX;
-        double rhPill = 34 * s;
-        for (String[] rm : rooms) {
-            boolean rSel = "1".equals(rm[1]);
-            g.setFont(fUi(12.5 * s, rSel ? Font.BOLD : Font.PLAIN));
-            int rw = g.getFontMetrics().stringWidth(rm[0]) + (int) (28 * s);
-            fillRoundRect(g, cx, y, rw, rhPill, 17 * s, rSel ? C_TV_CYAN : new Color(0x0F, 0x25, 0x40), rSel ? C_WHITE : new Color(0x22, 0xD3, 0xEE, 95), 1.0 * s);
-            g.setColor(rSel ? C_TV_BG_TOP : C_WHITE);
-            g.drawString(rm[0], (int) (cx + 14 * s), (int) (y + 22 * s));
-            cx += rw + 8 * s;
-        }
-        String mtLbl = "Toggle All in Living Room";
-        g.setFont(fUi(12.5 * s, Font.BOLD));
-        int mtW = g.getFontMetrics().stringWidth(mtLbl) + (int) (30 * s);
-        fillRoundRect(g, cx, y, mtW, rhPill, 10 * s, C_TEAL_PRIMARY, null, 0);
+        double bwLogo = 104 * s;
+        fillRoundRect(g, cx, y, bwLogo, barH, 10 * s, new Color(0x08, 0x91, 0xB2, 65), C_TV_CYAN, 1.5 * s);
         g.setColor(C_WHITE);
-        g.drawString(mtLbl, (int) (cx + 15 * s), (int) (y + 22 * s));
-        y += (int) (rhPill + 10 * s);
+        g.setFont(fBrand(16.5 * s, Font.BOLD));
+        g.drawString("wemi TV", (int) (cx + 16 * s), (int) (y + 25 * s));
+        cx += bwLogo + 10 * s;
 
-        // 4. Interactive On-Screen Virtual TV Remote D-Pad Bar
-        double vbH = 78 * s;
-        fillRoundRect(g, padX, y, w - padX * 2, vbH, 14 * s, new Color(0x0E, 0x27, 0x44), new Color(0x22, 0xD3, 0xEE, 185), 1.5 * s);
-        String focusTitle = "dimmer".equals(mode)
-            ? "TV Remote Focus (2/18): Living Room Floor Lamp"
-            : "TV Remote Focus (1/18): Christmas Tree Living";
-        String focusSub = "dimmer".equals(mode)
-            ? "Living Room • 192.168.1.103:49153 • ON (80% Brightness)"
-            : "Living Room • 192.168.1.101:49153 • Switch ON";
-        drawFittedString(g, focusTitle, padX + 16 * s, y + 22 * s, w - padX * 2 - 32 * s, 14.0 * s, Font.BOLD, C_WHITE);
-        drawFittedString(g, focusSub, padX + 16 * s, y + 39 * s, w - padX * 2 - 32 * s, 12.0 * s, Font.PLAIN, C_TV_CYAN);
+        String cntTxt = "14/18 ON";
+        g.setFont(fUi(12 * s, Font.BOLD));
+        int cntW = g.getFontMetrics().stringWidth(cntTxt) + (int) (20 * s);
+        fillRoundRect(g, cx, y, cntW, barH, 8 * s, new Color(0x0F, 0x25, 0x40), new Color(0x1E, 0x3A, 0x5F), 1.0 * s);
+        g.setColor(C_TV_CYAN);
+        g.drawString(cntTxt, (int) (cx + 10 * s), (int) (y + 24 * s));
+        cx += cntW + 10 * s;
 
-        String[][] dpadBtns = {
-            {"Prev", "0"},
-            {"Next", "0"},
-            {"OK: Toggle Switch", "1"},
-            {"< -10%", "dimmer".equals(mode) ? "1" : "0"},
-            {"+10% >", "dimmer".equals(mode) ? "1" : "0"},
-            {"Room Toggle (Living Room)", "0"}
+        // Focused Switch Status Pill
+        String focusPillTxt = isDimmerMode
+            ? "Living Room Floor Lamp: 80% (◀/▶ Adjust • OK Done)"
+            : "Christmas Tree Living • OK Toggle";
+        Color focusPillBg = isDimmerMode ? new Color(0xFB, 0xBF, 0x24) : new Color(0x06, 0xB6, 0xD4, 52);
+        Color focusPillBorder = isDimmerMode ? new Color(0xFB, 0xBF, 0x24) : new Color(0x22, 0xD3, 0xEE, 175);
+        Color focusPillFg = isDimmerMode ? C_TV_BG_TOP : C_WHITE;
+        g.setFont(fUi(11.5 * s, Font.BOLD));
+        int fpW = Math.min((int) (295 * s), g.getFontMetrics().stringWidth(focusPillTxt) + (int) (24 * s));
+        fillRoundRect(g, cx, y, fpW, barH, 9 * s, focusPillBg, focusPillBorder, 1.2 * s);
+        drawFittedString(g, focusPillTxt, cx + 12 * s, y + 24 * s, fpW - 20 * s, 11.5 * s, Font.BOLD, focusPillFg);
+
+        // Right-aligned Scene Chips + Rescan Button
+        String[][] scenes = {
+            {"Movie 20%", isScenesMode ? "1" : "0"},
+            {"Holiday ON", "0"},
+            {"All OFF", "0"},
+            {"Rescan", "0"}
         };
-        double bx = padX + 16 * s;
-        double byDpad = y + 46 * s;
-        double bhDpad = 25 * s;
-        for (String[] db : dpadBtns) {
-            boolean bHi = "1".equals(db[1]);
-            g.setFont(fUi(11.5 * s, Font.BOLD));
-            int bwD = g.getFontMetrics().stringWidth(db[0]) + (int) (24 * s);
-            fillRoundRect(g, bx, byDpad, bwD, bhDpad, 7 * s, bHi ? C_CYAN_TOP : new Color(0x12, 0x31, 0x54), C_TV_CYAN, 1.0 * s);
-            g.setColor(bHi ? C_TV_BG_TOP : C_WHITE);
-            g.drawString(db[0], (int) (bx + 12 * s), (int) (byDpad + 17 * s));
-            bx += bwD + 8 * s;
+        double rx = w - padX;
+        for (int i = scenes.length - 1; i >= 0; i--) {
+            String[] sc = scenes[i];
+            boolean scFocus = "1".equals(sc[1]);
+            g.setFont(fUi(12 * s, Font.BOLD));
+            int sw = g.getFontMetrics().stringWidth(sc[0]) + (int) (24 * s);
+            rx -= sw;
+            fillRoundRect(
+                g, rx, y, sw, barH, 10 * s,
+                scFocus ? new Color(0x13, 0x3B, 0x66) : new Color(0x0F, 0x25, 0x40),
+                scFocus ? C_TV_CYAN : new Color(0x22, 0xD3, 0xEE, 95),
+                (scFocus ? 2.4 : 1.0) * s
+            );
+            g.setColor(C_WHITE);
+            g.drawString(sc[0], (int) (rx + 12 * s), (int) (y + 24 * s));
+            rx -= 8 * s;
         }
-        y += (int) (vbH + 12 * s);
+        y += (int) (barH + 12 * s);
 
-        // 5. 3-Column 10-Foot Focusable Smart Switch Grid (6 visible cards)
-        Object[][] cards = {
-            {"Christmas Tree Living", "Tree Lights", true, true, "Active • 11ms • ON (192.168.1.101)", null, !"dimmer".equals(mode)},
-            {"Living Room Floor Lamp", "Lightbulb", true, true, "Active • 14ms • ON (80%)", 80, "dimmer".equals(mode)},
-            {"Christmas Candle", "Lightbulb", true, true, "Active • 13ms • ON (192.168.1.102)", null, false},
-            {"Lightbulb Landing", "Lightbulb", true, true, "Active • 12ms • ON (75%)", 75, false},
-            {"Bedroom Ceiling Fan", "Fan / Vent", false, true, "Active • 15ms • OFF (Standby)", null, false},
-            {"Lightbulb Bedroom", "Lightbulb", false, false, "Disconnected • Press OK to Retry", null, false}
+        // 2. Room Section 1: LIVING ROOM (Full-width header + 3 cards across)
+        Object[][] livingRoomCards = {
+            {"Christmas Tree Living", "Tree Lights", true, true, "ON • Active • 11ms", "192.168.1.101", null, !isDimmerMode && !isScenesMode, false},
+            {"Living Room Floor Lamp", "Lightbulb", true, true, "ON • 80% Brightness", "192.168.1.103", 80, isDimmerMode, isDimmerMode},
+            {"Christmas Candle", "Lightbulb", true, true, "ON • Active • 13ms", "192.168.1.102", null, false, false}
         };
+        y = drawTvRoomSection(g, padX, y, w - padX * 2, "LIVING ROOM", "3/3 ON", "Dimmers: 80%", livingRoomCards, s);
+
+        // 3. Room Section 2: BEDROOM & HALLWAY (Full-width header + 3 cards across)
+        Object[][] bedroomCards = {
+            {"Lightbulb Landing", "Lightbulb", true, true, "ON • 75% Brightness", "192.168.1.105", 75, false, false},
+            {"Bedroom Ceiling Fan", "Fan / Vent", false, true, "OFF • Active • 15ms", "192.168.1.114", null, false, false},
+            {"Lightbulb Bedroom", "Lightbulb", false, false, "Disconnected • Press OK to Retry", "192.168.1.108", null, false, false}
+        };
+        y = drawTvRoomSection(g, padX, y, w - padX * 2, "BEDROOM & LANDING", "1/3 ON", "Dimmers: 75%", bedroomCards, s);
+
+        g.dispose();
+        return img;
+    }
+
+    private static int drawTvRoomSection(
+        Graphics2D g, int x0, int y0, int totalW,
+        String roomTitle, String countBadge, String dimmerSummary,
+        Object[][] cards, double s
+    ) {
+        int hdrH = (int) (34 * s);
+        fillRoundRect(g, x0, y0, totalW, hdrH, 10 * s, new Color(0x0B, 0x19, 0x2C), new Color(0x1E, 0x3A, 0x5F), 1.0 * s);
+
+        g.setColor(C_TV_CYAN);
+        double dotR = 4.5 * s;
+        g.fill(new Ellipse2D.Double(x0 + 14 * s - dotR, y0 + hdrH / 2.0 - dotR, dotR * 2, dotR * 2));
+
+        g.setColor(C_WHITE);
+        g.setFont(fUi(13 * s, Font.BOLD));
+        g.drawString(roomTitle, (int) (x0 + 26 * s), (int) (y0 + 22 * s));
+        int rtW = g.getFontMetrics().stringWidth(roomTitle);
+
+        double bx = x0 + 36 * s + rtW;
+        g.setFont(fUi(11 * s, Font.BOLD));
+        int cbW = g.getFontMetrics().stringWidth(countBadge) + (int) (16 * s);
+        fillRoundRect(g, bx, y0 + 6 * s, cbW, 22 * s, 6 * s, new Color(0x08, 0x91, 0xB2, 72), null, 0);
+        g.setColor(C_TV_CYAN);
+        g.drawString(countBadge, (int) (bx + 8 * s), (int) (y0 + 21 * s));
+
+        if (dimmerSummary != null) {
+            g.setColor(C_TV_SUBTEXT);
+            g.setFont(fUi(11 * s, Font.PLAIN));
+            g.drawString(dimmerSummary, (int) (bx + cbW + 12 * s), (int) (y0 + 21 * s));
+        }
+
+        g.setColor(C_TV_SUBTEXT);
+        g.setFont(fUi(11 * s, Font.PLAIN));
+        String rmRight = "Room Master • OK Toggle";
+        int rmW = g.getFontMetrics().stringWidth(rmRight);
+        g.drawString(rmRight, (int) (x0 + totalW - rmW - 14 * s), (int) (y0 + 21 * s));
+
+        int yCards = y0 + hdrH + (int) (10 * s);
         int cols = 3;
         int gap = (int) (12 * s);
-        int cardW = (w - padX * 2 - gap * (cols - 1)) / cols;
-        int cardH = (int) (126 * s);
+        int cardW = (totalW - gap * (cols - 1)) / cols;
+        int cardH = (int) (156 * s);
 
         for (int idx = 0; idx < cards.length; idx++) {
             Object[] cd = cards[idx];
@@ -1233,36 +1236,60 @@ public class GeneratePlayStoreAssets {
             boolean cOn = (Boolean) cd[2];
             boolean cReach = (Boolean) cd[3];
             String cStat = (String) cd[4];
-            Integer cDim = (Integer) cd[5];
-            boolean cFocused = (Boolean) cd[6];
+            String cIp = (String) cd[5];
+            Integer cDim = (Integer) cd[6];
+            boolean cFocused = (Boolean) cd[7];
+            boolean cDimming = (Boolean) cd[8];
 
-            int col = idx % cols;
-            int row = idx / cols;
-            int cx0 = padX + col * (cardW + gap);
-            int cy0 = y + row * (cardH + gap);
+            int cx0 = x0 + idx * (cardW + gap);
+            int cy0 = yCards;
 
-            Color bgCard = !cReach ? C_TV_CARD_OFFLINE : (cOn ? C_TV_CARD_ACTIVE : C_TV_CARD);
-            Color outCard = cFocused ? C_TV_CYAN : (cReach && cOn ? new Color(0x08, 0x91, 0xB2, 165) : new Color(0x1E, 0x29, 0x3B));
-            fillRoundRect(g, cx0, cy0, cardW, cardH, 16 * s, bgCard, outCard, (cFocused ? 3.2 : 1.4) * s);
+            Color bgCard = cDimming
+                ? new Color(0x23, 0x20, 0x14)
+                : (cFocused ? new Color(0x13, 0x3B, 0x66) : (!cReach ? C_TV_CARD_OFFLINE : (cOn ? C_TV_CARD_ACTIVE : C_TV_CARD)));
+            Color outCard = cDimming
+                ? new Color(0xFB, 0xBF, 0x24)
+                : (cFocused ? C_TV_CYAN : (cReach && cOn ? new Color(0x08, 0x91, 0xB2, 165) : new Color(0x1E, 0x29, 0x3B)));
+            double strokeW = (cFocused || cDimming) ? 3.6 * s : 1.3 * s;
 
-            drawFittedString(g, cName, cx0 + 14 * s, cy0 + 26 * s, cardW - 28 * s, 16.0 * s, Font.BOLD, C_TV_TEXT);
+            fillRoundRect(g, cx0, cy0, cardW, cardH, 14 * s, bgCard, outCard, strokeW);
 
-            drawCategoryIllustration(g, cx0 + 12 * s, cy0 + 36 * s, 38 * s, 44 * s, cCat, cOn, cReach, s);
+            // Top line: Switch Name + Focus / Dimming badge
+            double badgeW = 0;
+            if (cDimming || cFocused) {
+                String bTxt = cDimming ? "DIM ◀/▶" : "FOCUSED • OK";
+                Color bCol = cDimming ? new Color(0xFB, 0xBF, 0x24) : C_TV_CYAN;
+                g.setFont(fUi(9.8 * s, Font.BOLD));
+                badgeW = g.getFontMetrics().stringWidth(bTxt) + 14 * s;
+                fillRoundRect(g, cx0 + cardW - 12 * s - badgeW, cy0 + 10 * s, badgeW, 19 * s, 6 * s, bCol, null, 0);
+                g.setColor(C_TV_BG_TOP);
+                g.drawString(bTxt, (int) (cx0 + cardW - 12 * s - badgeW + 7 * s), (int) (cy0 + 23 * s));
+            }
+            drawFittedString(g, cName, cx0 + 13 * s, cy0 + 24 * s, cardW - 26 * s - badgeW, 15.5 * s, Font.BOLD, C_TV_TEXT);
 
-            double pr = 19 * s;
-            double pcx = cx0 + cardW - 14 * s - pr;
-            double pcy = cy0 + 58 * s;
+            // Second line: Illustration + Category + IP + Status + Power Ring
+            drawCategoryIllustration(g, cx0 + 12 * s, cy0 + 36 * s, 35 * s, 42 * s, cCat, cOn, cReach, s);
 
-            double mtx = cx0 + 58 * s;
+            double pr = 18 * s;
+            double pcx = cx0 + cardW - 13 * s - pr;
+            double pcy = cy0 + 57 * s;
+
+            double mtx = cx0 + 54 * s;
             double maxCardStatW = (pcx - pr - 8 * s) - mtx;
-            g.setFont(fUi(10.5 * s, Font.BOLD));
-            int catPw = g.getFontMetrics().stringWidth(cCat) + (int) (16 * s);
-            fillRoundRect(g, mtx, cy0 + 38 * s, catPw, 20 * s, 6 * s, cFocused ? new Color(0x22, 0xD3, 0xEE, 56) : new Color(255, 255, 255, 22), null, 0);
+            g.setFont(fUi(10.0 * s, Font.BOLD));
+            int catPw = g.getFontMetrics().stringWidth(cCat) + (int) (12 * s);
+            fillRoundRect(g, mtx, cy0 + 36 * s, catPw, 18 * s, 5 * s, cFocused ? new Color(0x22, 0xD3, 0xEE, 56) : new Color(255, 255, 255, 22), null, 0);
             g.setColor(C_TV_CYAN);
-            g.drawString(cCat, (int) (mtx + 8 * s), (int) (cy0 + 52 * s));
+            g.drawString(cCat, (int) (mtx + 6 * s), (int) (cy0 + 49 * s));
 
-            Color statCol = !cReach ? new Color(0xF8, 0x71, 0x71) : (cOn ? C_TV_CYAN : new Color(0xFB, 0xBF, 0x24));
-            drawFittedString(g, cStat, mtx, cy0 + 75 * s, maxCardStatW, 11.2 * s, Font.BOLD, statCol);
+            g.setColor(C_TV_SUBTEXT);
+            g.setFont(fUi(9.8 * s, Font.PLAIN));
+            g.drawString(cIp, (int) (mtx + catPw + 6 * s), (int) (cy0 + 49 * s));
+
+            Color statCol = !cReach
+                ? new Color(0xF8, 0x71, 0x71)
+                : (cDimming ? new Color(0xFB, 0xBF, 0x24) : (cOn ? C_TV_CYAN : C_TV_SUBTEXT));
+            drawFittedString(g, cStat, mtx, cy0 + 70 * s, maxCardStatW, 11.5 * s, Font.BOLD, statCol);
 
             if (!cReach) {
                 g.setColor(new Color(0x45, 0x0A, 0x0A));
@@ -1288,23 +1315,31 @@ public class GeneratePlayStoreAssets {
             }
 
             if (cDim != null && cReach) {
-                double byBar = cy0 + cardH - 22 * s;
-                double bx0B = cx0 + 14 * s;
-                double bx1B = cx0 + cardW - 14 * s;
+                double boxY = cy0 + 86 * s;
+                double boxH = 58 * s;
+                Color dimBoxBg = cDimming ? new Color(0xFB, 0xBF, 0x24, 48) : new Color(255, 255, 255, 16);
+                Color dimBoxBorder = cDimming ? new Color(0xFB, 0xBF, 0x24) : new Color(0x22, 0xD3, 0xEE, 95);
+                fillRoundRect(g, cx0 + 12 * s, boxY, cardW - 24 * s, boxH, 8 * s, dimBoxBg, dimBoxBorder, 1.0 * s);
+
+                double byBar = boxY + 14 * s;
+                double bx0B = cx0 + 22 * s;
+                double bx1B = cx0 + cardW - 58 * s;
+                Color barCol = cDimming ? new Color(0xFB, 0xBF, 0x24) : C_TV_CYAN;
                 fillRoundRect(g, bx0B, byBar, bx1B - bx0B, 8 * s, 4 * s, new Color(255, 255, 255, 38), null, 0);
-                fillRoundRect(g, bx0B, byBar, (bx1B - bx0B) * (cDim / 100.0), 8 * s, 4 * s, C_TV_CYAN, null, 0);
+                fillRoundRect(g, bx0B, byBar, (bx1B - bx0B) * (cDim / 100.0), 8 * s, 4 * s, barCol, null, 0);
+
+                g.setColor(barCol);
+                g.setFont(fUi(11 * s, Font.BOLD));
+                g.drawString(cDim + "%", (int) (bx1B + 8 * s), (int) (byBar + 8 * s));
+
+                String dimHint = cDimming
+                    ? "◀ -10%  •  +10% ▶   (OK or Back = Done)"
+                    : "Long-press OK or Play/Menu to adjust dimmer";
+                drawFittedString(g, dimHint, cx0 + 22 * s, boxY + 44 * s, cardW - 44 * s, 10.0 * s, Font.BOLD, cDimming ? new Color(0xFB, 0xBF, 0x24) : C_TV_SUBTEXT);
             }
         }
 
-        // 6. Bottom TV Remote Shortcut Legend & Live UPnP Status Ticker
-        double legH = 38 * s;
-        double ly0 = h - 14 * s - legH;
-        fillRoundRect(g, padX, ly0, w - padX * 2, legH, 12 * s, new Color(0x0A, 0x19, 0x2F), new Color(0x1E, 0x3A, 0x5F), 1.0 * s);
-        drawFittedString(g, "[OK / Select] Toggle Light   [Left / Right] Dimmer -/+10%   [Play] Room Master Toggle", padX + 14 * s, ly0 + 23 * s, (w - padX * 2) * 0.56, 11.5 * s, Font.BOLD, C_TV_CYAN);
-        drawFittedString(g, "SetBinaryState (1) • http://192.168.1.101:49153/upnp/control/basicevent1", w - padX - 385 * s, ly0 + 23 * s, 370 * s, 10.0 * s, Font.PLAIN, C_TV_SUBTEXT);
-
-        g.dispose();
-        return img;
+        return yCards + cardH + (int) (14 * s);
     }
 
     private static BufferedImage renderPlayStoreIcon(int sz) {

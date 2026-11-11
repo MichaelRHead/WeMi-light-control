@@ -1,14 +1,12 @@
 package org.suppressingfire.wemi.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -20,67 +18,67 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Bedtime
-import androidx.compose.material.icons.filled.Celebration
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Gamepad
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.suppressingfire.wemi.data.SoapLogEntry
+import androidx.compose.ui.platform.testTag
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
+import org.suppressingfire.wemi.data.SoapLogEntry
+import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenTop
 
-internal val TvDeepBackground = Color(0xFF071324)
-internal val TvSurfaceCard = Color(0xFF0D213B)
-internal val TvSurfaceCardActive = Color(0xFF0E345A)
+internal val TvDeepBackground = Color(0xFF060E1A)
+internal val TvSurfaceCard = Color(0xFF0C1829)
+internal val TvSurfaceCardActive = Color(0xFF0F2744)
 internal val TvCyanFocusBorder = Color(0xFF22D3EE)
 internal val TvTextPrimary = Color(0xFFF8FAFC)
 internal val TvTextSecondary = Color(0xFF94A3B8)
 
 /**
- * 10-Foot Android TV Interface for controlling smart switches with a TV Remote (D-Pad).
- * Supports both hardware Android TV remotes (DPAD_UP, DPAD_DOWN, DPAD_LEFT, DPAD_RIGHT, DPAD_CENTER,
- * ENTER, MEDIA_PLAY_PAUSE) and an interactive On-Screen TV Remote D-Pad controller.
+ * 10-foot Android TV & Large-Screen Landscape Dashboard (`wemi TV`).
+ *
+ * Designed around three core remote-control ergonomics principles:
+ * 1. Maximum Screen Real Estate: A single compact 42.dp top bar leaves ~90% of vertical screen height
+ *    for the 3-column Room-Grouped Switch Grid (`GridCells.Fixed(3)`).
+ * 2. Unmistakable 10-Foot Cursor Focus: Automatic initial hardware focus (`FocusRequester`) on the first
+ *    switch card, paired with a high-contrast 3.5.dp Electric Cyan border (`#22D3EE`), bright illuminated
+ *    card surface (`#133B66`), subtle scale (`1.022f`), and explicit `"FOCUSED • OK"` badge.
+ * 3. Non-Interfering Dimmer Control: D-Pad Up/Down/Left/Right always navigates freely between the 3 columns
+ *    of switch cards, and pressing OK on any card toggles power ON/OFF. Dimmer brightness is adjusted via
+ *    an explicit Dimmer Adjust Mode (activated with Long-Press OK, Play/Pause, Menu, or clicking the dimmer
+ *    strip) and exited immediately with OK or Back.
  */
 @Composable
 fun TvDashboardScreen(
@@ -98,517 +96,353 @@ fun TvDashboardScreen(
     onReconnectDevice: (DeviceEntity) -> Unit,
     onToggleRoomPower: (String) -> Unit,
     onApplyTvScene: (String) -> Unit,
-    onScanSsdpClick: () -> Unit,
-    modifier: Modifier = Modifier
+    onScanSsdpClick: () -> Unit
 ) {
-    val filteredDevices = remember(devices, selectedRoomFilter) {
-        if (selectedRoomFilter == null) {
+    // Group switches by room (with "Unassigned" placed last) while preserving user sortOrder within each room
+    val groupedByRoom: List<Pair<String, List<DeviceEntity>>> = remember(devices, selectedRoomFilter) {
+        val base = if (selectedRoomFilter == null) {
             devices
         } else {
-            devices.filter { it.roomName.equals(selectedRoomFilter, ignoreCase = true) }
+            devices.filter { it.roomName == selectedRoomFilter }
+        }
+        base.groupBy { it.roomName.ifBlank { "Unassigned" } }
+            .entries
+            .sortedWith(
+                compareBy<Map.Entry<String, List<DeviceEntity>>> {
+                    if (it.key.equals("Unassigned", ignoreCase = true)) 1 else 0
+                }.thenBy { entry ->
+                    entry.value.minOfOrNull { it.sortOrder } ?: Int.MAX_VALUE
+                }
+            )
+            .map { it.key to it.value }
+    }
+
+    val orderedDevices: List<DeviceEntity> = remember(groupedByRoom) {
+        groupedByRoom.flatMap { it.second }
+    }
+
+    var focusedDeviceId by remember(orderedDevices.size) {
+        mutableStateOf(orderedDevices.firstOrNull()?.id)
+    }
+    var dimmingDeviceId by remember { mutableStateOf<Int?>(null) }
+
+    val firstCardFocusRequester = remember { FocusRequester() }
+    val firstDeviceId = orderedDevices.firstOrNull()?.id
+
+    // Automatically request initial hardware D-Pad focus on the first switch card when TV dashboard loads
+    LaunchedEffect(firstDeviceId) {
+        if (firstDeviceId != null) {
+            if (focusedDeviceId == null || orderedDevices.none { it.id == focusedDeviceId }) {
+                focusedDeviceId = firstDeviceId
+            }
+            runCatching { firstCardFocusRequester.requestFocus() }
         }
     }
 
-    var focusedIndex by remember(filteredDevices.size, selectedRoomFilter) {
-        mutableIntStateOf(0)
-    }
-    var showVirtualRemotePad by remember { mutableStateOf(true) }
+    val focusedDevice = orderedDevices.firstOrNull { it.id == focusedDeviceId }
+        ?: orderedDevices.firstOrNull()
 
-    val focusedDevice = filteredDevices.getOrNull(
-        focusedIndex.coerceIn(0, (filteredDevices.size - 1).coerceAtLeast(0))
-    )
+    // Pressing Back on the TV remote while in Dimmer Adjust Mode cleanly exits Dimmer Adjust Mode
+    BackHandler(enabled = dimmingDeviceId != null) {
+        dimmingDeviceId = null
+    }
 
-    val activeSwitchCount = devices.count {
-        it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR && it.isOn
+    val triggerPrimaryAction: (DeviceEntity) -> Unit = { target ->
+        when {
+            !target.isReachable -> onReconnectDevice(target)
+            target.parsedType == DeviceType.MOTION_SENSOR -> onTriggerMotion(target)
+            else -> onToggleDevicePower(target)
+        }
     }
-    val totalSwitchCount = devices.count {
-        it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR
-    }
+
+    val controllableDevices = devices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
+    val activeSwitchCount = controllableDevices.count { it.isOn && it.isReachable }
+    val totalSwitchCount = controllableDevices.size
 
     Column(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        TvDeepBackground,
-                        Color(0xFF0A1B33),
-                        Color(0xFF050E1B)
-                    )
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF0A192F), TvDeepBackground)
                 )
             )
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown) {
-                    when (event.key) {
-                        Key.MediaPlayPause, Key.MediaPlay -> {
-                            val targetRoom = selectedRoomFilter
-                                ?: focusedDevice?.roomName
-                                ?: rooms.firstOrNull()
-                            if (targetRoom != null) {
-                                onToggleRoomPower(targetRoom)
-                            }
-                            true
-                        }
-                        else -> false
-                    }
-                } else {
-                    false
-                }
-            }
-            .padding(horizontal = 20.dp, vertical = 14.dp)
+            .padding(horizontal = 20.dp, vertical = 10.dp)
             .testTag("tv_dashboard_screen")
     ) {
-        // 1. 10-Foot Android TV Top Header Bar
+        // Single Compact Top Header Bar: Brand + Active Count + Focused Card Pill + Scene & Rescan Chips
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = WemoGreenPrimary.copy(alpha = 0.22f),
+                    shape = RoundedCornerShape(10.dp),
+                    color = WemoGreenPrimary.copy(alpha = 0.25f),
                     border = BorderStroke(1.5.dp, TvCyanFocusBorder)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Tv,
-                            contentDescription = null,
+                            contentDescription = "Android TV Mode",
                             tint = TvCyanFocusBorder,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(16.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "wemi TV",
-                            color = Color.White,
+                            color = TvTextPrimary,
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
+                            fontSize = 15.sp
                         )
                     }
                 }
 
-                Column {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFF0F2540),
+                    border = BorderStroke(1.dp, Color(0xFF1E3A5F))
+                ) {
                     Text(
-                        text = "10-Foot Smart Switch Remote Control",
-                        color = TvTextPrimary,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp
-                    )
-                    Text(
-                        text = "$activeSwitchCount/$totalSwitchCount Switches ON • UDP 239.255.255.250:1900",
+                        text = "$activeSwitchCount/$totalSwitchCount ON",
                         color = TvCyanFocusBorder,
                         fontFamily = FontFamily.SansSerif,
-                        fontSize = 12.sp
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
                     )
+                }
+
+                // Focused Card Status & Quick Toggle Pill (non-focusable so D-Pad stays in the grid/scenes)
+                if (focusedDevice != null) {
+                    val isFocusedDimmer =
+                        focusedDevice.parsedType == DeviceType.LIGHTBULB_DIMMER && focusedDevice.isReachable
+                    val isDimmingFocused = dimmingDeviceId == focusedDevice.id && isFocusedDimmer
+
+                    Surface(
+                        shape = RoundedCornerShape(9.dp),
+                        color = if (isDimmingFocused) TvDimmerGold else WemoGreenTop.copy(alpha = 0.20f),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            color = if (isDimmingFocused) TvDimmerGold else TvCyanFocusBorder.copy(alpha = 0.65f)
+                        ),
+                        modifier = Modifier
+                            .focusProperties { canFocus = false }
+                            .clickable {
+                                if (isDimmingFocused) {
+                                    dimmingDeviceId = null
+                                } else {
+                                    triggerPrimaryAction(focusedDevice)
+                                }
+                            }
+                            .testTag("tv_remote_dpad_ok")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PowerSettingsNew,
+                                contentDescription = null,
+                                tint = if (isDimmingFocused) TvDeepBackground else TvCyanFocusBorder,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = if (isDimmingFocused) {
+                                    "${focusedDevice.name}: ${focusedDevice.brightness}% (◀/▶ Adjust • OK Done)"
+                                } else {
+                                    "${focusedDevice.name} • OK Toggle"
+                                },
+                                color = if (isDimmingFocused) TvDeepBackground else Color.White,
+                                fontFamily = FontFamily.SansSerif,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    if (isFocusedDimmer) {
+                        Surface(
+                            shape = RoundedCornerShape(9.dp),
+                            color = if (isDimmingFocused) TvDimmerGold else Color(0xFF132D4E),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                color = TvDimmerGold.copy(alpha = 0.8f)
+                            ),
+                            modifier = Modifier
+                                .focusProperties { canFocus = false }
+                                .clickable {
+                                    dimmingDeviceId = if (isDimmingFocused) null else focusedDevice.id
+                                }
+                                .testTag("tv_dimmer_mode_toggle")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Tune,
+                                    contentDescription = "Toggle Dimmer Adjust Mode",
+                                    tint = if (isDimmingFocused) TvDeepBackground else TvDimmerGold,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Text(
+                                    text = if (isDimmingFocused) "Done Dimming" else "Dimmer ${focusedDevice.brightness}%",
+                                    color = if (isDimmingFocused) TvDeepBackground else TvDimmerGold,
+                                    fontFamily = FontFamily.SansSerif,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.5.sp
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
+            // Right: Compact Scene Shortcuts + Background LAN Rescan
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OutlinedButton(
-                    onClick = { showVirtualRemotePad = !showVirtualRemotePad },
-                    border = BorderStroke(
-                        1.dp,
-                        if (showVirtualRemotePad) TvCyanFocusBorder else TvTextSecondary.copy(alpha = 0.5f)
-                    ),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = if (showVirtualRemotePad) {
-                            WemoGreenPrimary.copy(alpha = 0.25f)
-                        } else {
-                            Color.Transparent
-                        },
-                        contentColor = Color.White
-                    ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                    modifier = Modifier.testTag("tv_virtual_remote_toggle")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Gamepad,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (showVirtualRemotePad) "Hide Remote Pad" else "Remote D-Pad",
-                        fontFamily = FontFamily.SansSerif,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 2. One-Click TV Remote Living Room Scenes & Room Filter Strip
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TvSceneChip(
-                title = "Movie Mode (20%)",
-                icon = Icons.Default.Movie,
-                onClick = { onApplyTvScene("MOVIE_MODE") },
-                testTag = "tv_scene_movie"
-            )
-            TvSceneChip(
-                title = "Holiday Lights ON",
-                icon = Icons.Default.Celebration,
-                onClick = { onApplyTvScene("HOLIDAY_ON") },
-                testTag = "tv_scene_holiday"
-            )
-            TvSceneChip(
-                title = "Bedtime All OFF",
-                icon = Icons.Default.Bedtime,
-                onClick = { onApplyTvScene("BEDTIME_OFF") },
-                testTag = "tv_scene_bedtime"
-            )
-            TvSceneChip(
-                title = if (isRefreshing) "Scanning LAN..." else "SSDP Scan",
-                icon = Icons.Default.Radar,
-                onClick = onScanSsdpClick,
-                testTag = "tv_scan_button"
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // 3. Room Filter Rail for TV Remote
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .testTag("tv_room_rail"),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TvRoomPill(
-                label = "All Rooms (${devices.size})",
-                isSelected = selectedRoomFilter == null,
-                onClick = {
-                    onSelectRoomFilter(null)
-                    focusedIndex = 0
-                },
-                testTag = "tv_room_pill_All"
-            )
-
-            rooms.forEach { room ->
-                val roomDevs = devices.filter { it.roomName.equals(room, ignoreCase = true) }
-                val onCount = roomDevs.count {
-                    it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR && it.isOn
-                }
-                TvRoomPill(
-                    label = "$room ($onCount/${roomDevs.size})",
-                    isSelected = selectedRoomFilter.equals(room, ignoreCase = true),
-                    onClick = {
-                        onSelectRoomFilter(room)
-                        focusedIndex = 0
-                    },
-                    testTag = "tv_room_pill_$room"
+                TvSceneChip(
+                    title = "Movie 20%",
+                    icon = Icons.Default.Movie,
+                    onClick = { onApplyTvScene("MOVIE_MODE") },
+                    testTag = "tv_scene_movie"
                 )
-            }
+                TvSceneChip(
+                    title = "Holiday ON",
+                    icon = Icons.Default.Park,
+                    onClick = { onApplyTvScene("HOLIDAY_ON") },
+                    testTag = "tv_scene_holiday"
+                )
+                TvSceneChip(
+                    title = "All OFF",
+                    icon = Icons.Default.Bedtime,
+                    onClick = { onApplyTvScene("BEDTIME_OFF") },
+                    testTag = "tv_scene_bedtime"
+                )
 
-            val currentMasterRoom = selectedRoomFilter ?: focusedDevice?.roomName
-            if (currentMasterRoom != null) {
-                Button(
-                    onClick = { onToggleRoomPower(currentMasterRoom) },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = WemoGreenPrimary,
-                        contentColor = Color.White
-                    ),
+                var isScanFocused by remember { mutableStateOf(false) }
+                Surface(
                     shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                    modifier = Modifier.testTag("tv_master_room_toggle")
+                    color = if (isScanFocused) WemoGreenPrimary else WemoGreenDark,
+                    border = BorderStroke(
+                        width = if (isScanFocused) 2.5.dp else 1.dp,
+                        color = if (isScanFocused) Color.White else TvCyanFocusBorder.copy(alpha = 0.65f)
+                    ),
+                    modifier = Modifier
+                        .onFocusChanged { isScanFocused = it.isFocused }
+                        .focusable()
+                        .clickable { onScanSsdpClick() }
+                        .testTag("tv_scan_button")
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.PowerSettingsNew,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Toggle All in $currentMasterRoom",
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Radar,
+                            contentDescription = "Rescan LAN Switches",
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isRefreshing) "Scanning..." else "Rescan",
+                            color = Color.White,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // 4. Interactive On-Screen Virtual TV Remote D-Pad Controller (for testing D-Pad actions anywhere)
-        AnimatedVisibility(
-            visible = showVirtualRemotePad && focusedDevice != null,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut()
-        ) {
-            if (focusedDevice != null) {
-                VirtualTvRemoteBar(
-                    focusedDevice = focusedDevice,
-                    focusedIndex = focusedIndex,
-                    totalCount = filteredDevices.size,
-                    onPrevDevice = {
-                        if (filteredDevices.isNotEmpty()) {
-                            focusedIndex = (focusedIndex - 1 + filteredDevices.size) % filteredDevices.size
-                        }
-                    },
-                    onNextDevice = {
-                        if (filteredDevices.isNotEmpty()) {
-                            focusedIndex = (focusedIndex + 1) % filteredDevices.size
-                        }
-                    },
-                    onPressOkToggle = {
-                        when {
-                            !focusedDevice.isReachable -> onReconnectDevice(focusedDevice)
-                            focusedDevice.parsedType == DeviceType.MOTION_SENSOR ->
-                                onTriggerMotion(focusedDevice)
-                            else -> onToggleDevicePower(focusedDevice)
-                        }
-                    },
-                    onStepDimmer = { delta ->
-                        onStepDeviceBrightness(focusedDevice, delta)
-                    },
-                    onToggleFocusedRoom = {
-                        onToggleRoomPower(focusedDevice.roomName)
-                    }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // 5. 10-Foot Focusable Smart Switch Grid
+        // Main Area: Full-Bleed 3-Column Room-Grouped Switch Grid
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(minSize = 240.dp),
+            columns = GridCells.Fixed(3),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(bottom = 12.dp),
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .testTag("tv_devices_grid"),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(bottom = 12.dp)
+                .testTag("tv_device_grid")
         ) {
-            itemsIndexed(
-                items = filteredDevices,
-                key = { _, dev -> "tv_card_${dev.id}" }
-            ) { index, device ->
-                val isSelectedByRemote = index == focusedIndex
-                TvDeviceCard(
-                    device = device,
-                    isFocusedByRemote = isSelectedByRemote,
-                    isToggling = device.id in togglingDeviceIds || device.roomName in togglingRooms,
-                    onSelectFocus = { focusedIndex = index },
-                    onPrimaryAction = {
-                        focusedIndex = index
-                        when {
-                            !device.isReachable -> onReconnectDevice(device)
-                            device.parsedType == DeviceType.MOTION_SENSOR -> onTriggerMotion(device)
-                            else -> onToggleDevicePower(device)
+            groupedByRoom.forEach { (roomName, roomDevices) ->
+                item(
+                    key = "room_header_$roomName",
+                    span = { GridItemSpan(maxLineSpan) }
+                ) {
+                    val roomDimmers = roomDevices.filter {
+                        it.parsedType == DeviceType.LIGHTBULB_DIMMER && it.isReachable
+                    }
+                    TvRoomSectionHeader(
+                        roomName = roomName,
+                        roomDevices = roomDevices,
+                        isTogglingRoom = togglingRooms.contains(roomName),
+                        onToggleRoomPower = { onToggleRoomPower(roomName) },
+                        onStepRoomBrightness = if (roomDimmers.isNotEmpty()) {
+                            { delta ->
+                                roomDimmers.forEach { dimmer ->
+                                    onStepDeviceBrightness(dimmer, delta)
+                                }
+                            }
+                        } else {
+                            null
                         }
-                    },
-                    onStepBrightness = { delta ->
-                        focusedIndex = index
-                        onStepDeviceBrightness(device, delta)
-                    }
-                )
-            }
-        }
-
-        // 6. Bottom TV Remote Shortcut Legend & Live UPnP Status Ticker
-        Surface(
-            color = Color(0xFF0A192F),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color(0xFF1E3A5F)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "[OK / Select] Toggle Light   [◀ / ▶] Dimmer -/+10%   [Play] Room Master Toggle",
-                    color = TvCyanFocusBorder,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                if (latestSoapLog != null) {
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        text = "${latestSoapLog.soapAction} • ${latestSoapLog.endpoint}",
-                        color = TvTextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VirtualTvRemoteBar(
-    focusedDevice: DeviceEntity,
-    focusedIndex: Int,
-    totalCount: Int,
-    onPrevDevice: () -> Unit,
-    onNextDevice: () -> Unit,
-    onPressOkToggle: () -> Unit,
-    onStepDimmer: (Int) -> Unit,
-    onToggleFocusedRoom: () -> Unit
-) {
-    Surface(
-        color = Color(0xFF0E2744),
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.5.dp, TvCyanFocusBorder.copy(alpha = 0.7f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("tv_virtual_remote_bar")
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "TV Remote Focus (${focusedIndex + 1}/$totalCount): ${focusedDevice.name}",
-                        color = Color.White,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${focusedDevice.roomName} • ${focusedDevice.ipAddress}:${focusedDevice.port} • " +
-                            if (!focusedDevice.isReachable) "Offline (Press OK to Reconnect)"
-                            else if (focusedDevice.parsedType == DeviceType.LIGHTBULB_DIMMER)
-                                "${if (focusedDevice.isOn) "ON" else "OFF"} (${focusedDevice.brightness}% Brightness)"
-                            else if (focusedDevice.parsedType == DeviceType.MOTION_SENSOR)
-                                "Motion: ${focusedDevice.lastMotionTime ?: "Active"}"
-                            else if (focusedDevice.isOn) "Switch ON" else "Switch OFF",
-                        color = TvCyanFocusBorder,
-                        fontFamily = FontFamily.SansSerif,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedButton(
-                    onClick = onPrevDevice,
-                    border = BorderStroke(1.dp, TvCyanFocusBorder.copy(alpha = 0.6f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag("tv_remote_dpad_prev")
-                ) {
-                    Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Previous Switch", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Prev", fontSize = 12.sp)
-                }
-
-                OutlinedButton(
-                    onClick = onNextDevice,
-                    border = BorderStroke(1.dp, TvCyanFocusBorder.copy(alpha = 0.6f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag("tv_remote_dpad_next")
-                ) {
-                    Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Next Switch", modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Next", fontSize = 12.sp)
-                }
-
-                Button(
-                    onClick = onPressOkToggle,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = WemoGreenTop,
-                        contentColor = TvDeepBackground
-                    ),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag("tv_remote_dpad_ok")
-                ) {
-                    Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "OK: Toggle Switch",
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
                     )
                 }
 
-                if (focusedDevice.parsedType == DeviceType.LIGHTBULB_DIMMER && focusedDevice.isReachable) {
-                    OutlinedButton(
-                        onClick = { onStepDimmer(-10) },
-                        border = BorderStroke(1.dp, TvCyanFocusBorder),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TvCyanFocusBorder),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        modifier = Modifier.testTag("tv_remote_dpad_dim_down")
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Text("-10%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                items(
+                    items = roomDevices,
+                    key = { it.id }
+                ) { device ->
+                    val isFirstCard = device.id == firstDeviceId
+                    val isFocused = focusedDevice?.id == device.id
+                    val isDimmingThisCard = dimmingDeviceId == device.id
 
-                    OutlinedButton(
-                        onClick = { onStepDimmer(10) },
-                        border = BorderStroke(1.dp, TvCyanFocusBorder),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TvCyanFocusBorder),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                        modifier = Modifier.testTag("tv_remote_dpad_dim_up")
-                    ) {
-                        Text("+10%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-                }
-
-                OutlinedButton(
-                    onClick = onToggleFocusedRoom,
-                    border = BorderStroke(1.dp, WemoGreenPrimary),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                    modifier = Modifier.testTag("tv_remote_room_toggle")
-                ) {
-                    Text(
-                        text = "Room Toggle (${focusedDevice.roomName})",
-                        fontFamily = FontFamily.SansSerif,
-                        fontSize = 12.sp
+                    TvDeviceCard(
+                        device = device,
+                        isFocusedByRemote = isFocused,
+                        isDimmingMode = isDimmingThisCard,
+                        isToggling = togglingDeviceIds.contains(device.id),
+                        focusRequester = if (isFirstCard) firstCardFocusRequester else null,
+                        onSelectFocus = {
+                            focusedDeviceId = device.id
+                            if (dimmingDeviceId != null && dimmingDeviceId != device.id) {
+                                dimmingDeviceId = null
+                            }
+                        },
+                        onPrimaryAction = { triggerPrimaryAction(device) },
+                        onToggleDimmingMode = {
+                            focusedDeviceId = device.id
+                            dimmingDeviceId = if (dimmingDeviceId == device.id) null else device.id
+                        },
+                        onExitDimmingMode = {
+                            if (dimmingDeviceId == device.id) {
+                                dimmingDeviceId = null
+                            }
+                        },
+                        onStepBrightness = { delta ->
+                            onStepDeviceBrightness(device, delta)
+                        }
                     )
                 }
             }
