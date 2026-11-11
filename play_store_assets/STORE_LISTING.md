@@ -18,7 +18,7 @@ WeMi Switch Control brings reliable, instant local-network control back to Belki
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
 ### What's New in Version 23.0
-- **Redesigned Android TV (`wemi TV`) 3-Column Room-Grouped Dashboard:** Full-height 3-column switch grid organized by Room Section Headers (`LIVING ROOM`, `BEDROOM`, `KITCHEN`) with unmistakable 10-foot Electric Cyan cursor focus (`FOCUSED • OK`), non-interfering `DIM ◀/▶` brightness mode, and non-blocking LAN rescan.
+- **Redesigned Android TV (`wemi TV`) 3-Column Room-Grouped Dashboard:** Full-height 3-column switch grid organized by Room Section Headers (`LIVING ROOM`, `BEDROOM`, `KITCHEN`) with unmistakable 10-foot Electric Cyan cursor focus (`FOCUSED • OK`), non-interfering `DIM -/+` brightness mode, and non-blocking LAN rescan.
 - **Compact Single-Row Phone & Tablet Header:** Moved `Refresh` and `Edit` alongside the `wemi` wordmark and `+` button to maximize vertical screen space for room and switch cards.
 - **Streamlined First-Party UPnP/HTTP Engine & `MIT` + `Apache-2.0` Footprint:** Replaced external HTTP libraries and bundled font files with a zero-dependency local-LAN HTTP/1.1 & UPnP GENA client (`LanHttpClient`) over JDK `SocketFactory` and platform `FontFamily.SansSerif` typography—keeping runtime dependencies strictly to AndroidX & Kotlin (`Apache-2.0`) under the `MIT` License (`includeInApk = false`).
 - **Dedicated Native Phone/Tablet & Android TV Layouts:** Automatically runs the touch-first dashboard on phones/tablets and the 10-foot D-Pad dashboard (`wemi TV`) on Android TV / Google TV (`UI_MODE_TYPE_TELEVISION`) without manual Phone/TV mode switch buttons.
@@ -28,7 +28,7 @@ WeMi Switch Control communicates directly with your switches over your home Wi-F
 
 ### Key Features
 - **Instant One-Tap Cyan Power Ring Toggles:** Turn individual switches or entire room groups ON or OFF directly over your local Wi-Fi network.
-- **Android TV D-Pad & Remote Shortcuts:** Includes native Leanback launcher support (`LEANBACK_LAUNCHER`), high-contrast 10-foot switch cards with glowing cyan focus rings, and an interactive on-screen TV remote D-Pad bar.
+- **Android TV 3-Column Room Grid & Dimmer Adjust Mode:** Includes native Leanback launcher support (`LEANBACK_LAUNCHER`), room-grouped 3-column switch cards with glowing cyan `"FOCUSED • OK"` focus rings, focusable room master headers, and non-interfering `DIM -/+` brightness control.
 - **Inline Brightness & Dimmer Drawer:** Smoothly dim smart bulbs and dimmer switches from 1% to 100%, or jump to quick brightness presets (21%, 50%, 75%, 100%).
 - **Interactive SSDP Local Wi-Fi Scanner:** Broadcast `M-SEARCH` packets over `239.255.255.250:1900` across `urn:Belkin:service:basicevent:1`, `urn:Belkin:device:**`, and `upnp:rootdevice` to automatically discover switches, inspect their `/setup.xml` descriptors, and infer room assignments.
 - **Motion Sensor Status & Triggers:** View the latest motion detection timestamps and link motion events to turn on bedroom or hallway lights automatically.
@@ -42,9 +42,9 @@ WeMi Switch Control communicates directly with your switches over your home Wi-F
    - `tv/tv_banner_1280x720.png`: 1280 × 720 px, 24-bit PNG (Google Play Console Android TV Banner upload).
    - `tv/tv_banner_320x180.png`: 320 × 180 px, 24-bit PNG (also bundled in APK at `res/drawable-xhdpi/tv_banner.png`).
 4. **Android TV 16:9 Screenshots (`screenshots/android_tv/` — 1920 × 1080 px, 16:9 PNG):**
-   - `tv_1_room_groups_and_remote_focus.png` (10-Foot Room Groups & Glowing Cyan D-Pad Remote Focus)
-   - `tv_2_dimmer_and_ssdp_discovery.png` (TV Remote Left/Right Dimmer Bar & SSDP Multicast Discovery)
-   - `tv_3_living_room_scenes_and_rules.png` (TV Remote Quick Scenes — Movie Mode 20%, Holiday Lights ON, Bedtime All OFF & Local Rules)
+   - `tv_1_room_groups_and_remote_focus.png` (3-Column Room-Grouped TV Grid & Glowing Cyan `"FOCUSED • OK"` D-Pad Remote Focus)
+   - `tv_2_dimmer_and_ssdp_discovery.png` (Non-Interfering `"DIM -/+"` Dimmer Adjust Mode & Background LAN Rescan)
+   - `tv_3_living_room_scenes_and_rules.png` (TV Remote Quick Scenes — Movie Mode 20%, Holiday Lights ON, All OFF & Room Master Toggle)
 5. **Phone Screenshots (`screenshots/phone/` — 1080 × 1920 px, 9:16 PNG):**
    - `phone_1_devices_and_power_rings.png` (Room Grouping System & Master Room Power Rings)
    - `phone_2_ssdp_network_scanner.png` (Pull-to-Refresh & SSDP Network Discovery Scanner)

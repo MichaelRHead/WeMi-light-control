@@ -1,6 +1,6 @@
 # WeMi Light Control — Android & Android TV UX Design, Behavioral Model & Critical User Journeys (`UX_DESIGN_AND_EXPERIENCE.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v22.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v23.0`)  
 **Document & Skill Owner**: **Google AI Studio Agent (`AI Studio Build`) — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md)
 
@@ -16,7 +16,7 @@ Related documentation:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — read-only for the Google AI Studio Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent — read-only for the Google AI Studio Agent)*
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v22.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v23.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -173,5 +173,5 @@ Every screen and component in **WeMi Light Control** must obey these five layout
    - Automatically launches `TvDashboardScreen` (`tv_dashboard_screen`) with a single compact top header bar (`wemi TV`, active switch counter, focused switch status pill `tv_remote_dpad_ok`, quick scene chips `Movie 20%`, `Holiday ON`, `All OFF`, and `Rescan`) so over 90% of vertical screen height showcases the **3-Column Room-Grouped Switch Grid (`tv_device_grid`)**.
    - **Room Section Headers (`TvRoomSectionHeader`, `tv_room_header_<RoomName>`)**: Group switches by room across all 3 columns (`span = { GridItemSpan(maxLineSpan) }`, with `"Unassigned"` sorted last) and allow one-click Room Master toggling when pressed with `OK`.
    - **Unmistakable 10-Foot Cursor Focus**: Initial focus (`FocusRequester`) automatically lands on the first switch card, rendering a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated surface (`#133B66`), `1.022f` scale lift, and a **`FOCUSED • OK`** badge.
-   - **Predictable 3-Column Navigation & Non-Interfering Dimmer Adjust Mode**: In normal navigation mode, `D-Pad Up / Down / Left / Right` always moves freely between the 3 columns of switch cards and pressing `OK` toggles any card `ON` / `OFF`. Pressing `Play/Pause`, `Menu`, Long-Press `OK`, or clicking a dimmer card's dimmer strip (`tv_card_dim_mode_<id>`) enters a Gold (`#FBBF24`) **Dimmer Adjust Mode (`DIM ◀/▶`)** where `◀ / ▶` steps brightness `-10%` / `+10%` and pressing `OK` or `Back` exits back to normal card navigation.
+   - **Predictable 3-Column Navigation & Non-Interfering Dimmer Adjust Mode**: In normal navigation mode, `D-Pad Up / Down / Left / Right` always moves freely between the 3 columns of switch cards and pressing `OK` toggles any card `ON` / `OFF`. Pressing `Play/Pause`, `Menu`, Long-Press `OK`, or clicking a dimmer card's dimmer strip (`tv_card_dim_mode_<id>`) enters a Gold (`#FBBF24`) **Dimmer Adjust Mode (`DIM -/+`)** where `Left / Right` steps brightness `-10%` / `+10%` and pressing `OK` or `Back` exits back to normal card navigation.
 

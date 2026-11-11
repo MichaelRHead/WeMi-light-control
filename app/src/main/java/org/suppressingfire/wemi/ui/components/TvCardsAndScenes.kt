@@ -237,7 +237,7 @@ internal fun TvDeviceCard(
                         color = TvDimmerGold
                     ) {
                         Text(
-                            text = "DIM ◀/▶",
+                            text = "DIM -/+",
                             color = TvDeepBackground,
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.ExtraBold,
@@ -479,7 +479,7 @@ internal fun TvDeviceCard(
                         if (isDimmingMode) {
                             Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = "◀ -10%  •  +10% ▶   (OK or Back = Done)",
+                                text = "Left: -10%  •  Right: +10%   (OK or Back = Done)",
                                 color = TvDimmerGold,
                                 fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.Bold,

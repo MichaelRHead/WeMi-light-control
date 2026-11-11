@@ -258,7 +258,7 @@ fun TvDashboardScreen(
                             )
                             Text(
                                 text = if (isDimmingFocused) {
-                                    "${focusedDevice.name}: ${focusedDevice.brightness}% (◀/▶ Adjust • OK Done)"
+                                    "${focusedDevice.name}: ${focusedDevice.brightness}% (Left/Right Adjust • OK Done)"
                                 } else {
                                     "${focusedDevice.name} • OK Toggle"
                                 },

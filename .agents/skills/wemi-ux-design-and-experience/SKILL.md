@@ -34,7 +34,7 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
 
 4. **Native Hardware Form-Factor Routing (Phone/Tablet vs. Android TV)**:
    - Phone/tablet (`Scaffold` with compact single-row `TopHeader` and `BottomNavigationBar`) and Android TV (`TvDashboardScreen` under `Configuration.UI_MODE_TYPE_TELEVISION`) are strictly native to their hardware form factor and interaction model. Do not add manual Phone/TV mode switch buttons to either layout.
-   - On Android TV (`wemi TV`), use a single compact top header row paired with a full-height **3-Column Room-Grouped Switch Grid (`GridCells.Fixed(3)`)** with full-span `TvRoomSectionHeader` headers (`tv_room_header_<Room>`), unmistakable 10-foot cursor focus (`3.5.dp` `#22D3EE` border, `#133B66` surface, `FOCUSED • OK` badge), and a dedicated **Dimmer Adjust Mode (`DIM ◀/▶`)** so `D-Pad Left / Right` never gets trapped on dimmer cards during normal 3-column navigation.
+   - On Android TV (`wemi TV`), use a single compact top header row paired with a full-height **3-Column Room-Grouped Switch Grid (`GridCells.Fixed(3)`)** with full-span `TvRoomSectionHeader` headers (`tv_room_header_<Room>`), unmistakable 10-foot cursor focus (`3.5.dp` `#22D3EE` border, `#133B66` surface, `FOCUSED • OK` badge), and a dedicated **Dimmer Adjust Mode (`DIM -/+`)** so `D-Pad Left / Right` never gets trapped on dimmer cards during normal 3-column navigation.
 
 ---
 

@@ -1131,15 +1131,25 @@ public class GeneratePlayStoreAssets {
 
         // Focused Switch Status Pill
         String focusPillTxt = isDimmerMode
-            ? "Living Room Floor Lamp: 80% (◀/▶ Adjust • OK Done)"
-            : "Christmas Tree Living • OK Toggle";
+            ? "Floor Lamp: 80% (Left/Right Dim)"
+            : (isScenesMode ? "Movie 20% • OK Apply Scene" : "Christmas Tree Living • OK Toggle");
         Color focusPillBg = isDimmerMode ? new Color(0xFB, 0xBF, 0x24) : new Color(0x06, 0xB6, 0xD4, 52);
         Color focusPillBorder = isDimmerMode ? new Color(0xFB, 0xBF, 0x24) : new Color(0x22, 0xD3, 0xEE, 175);
         Color focusPillFg = isDimmerMode ? C_TV_BG_TOP : C_WHITE;
         g.setFont(fUi(11.5 * s, Font.BOLD));
-        int fpW = Math.min((int) (295 * s), g.getFontMetrics().stringWidth(focusPillTxt) + (int) (24 * s));
+        int fpW = Math.min((int) (215 * s), g.getFontMetrics().stringWidth(focusPillTxt) + (int) (22 * s));
         fillRoundRect(g, cx, y, fpW, barH, 9 * s, focusPillBg, focusPillBorder, 1.2 * s);
-        drawFittedString(g, focusPillTxt, cx + 12 * s, y + 24 * s, fpW - 20 * s, 11.5 * s, Font.BOLD, focusPillFg);
+        drawFittedString(g, focusPillTxt, cx + 11 * s, y + 24 * s, fpW - 18 * s, 11.5 * s, Font.BOLD, focusPillFg);
+        cx += fpW + 8 * s;
+
+        if (isDimmerMode) {
+            String doneTxt = "Done Dimming";
+            g.setFont(fUi(11.0 * s, Font.BOLD));
+            int dw = g.getFontMetrics().stringWidth(doneTxt) + (int) (18 * s);
+            fillRoundRect(g, cx, y + 3 * s, dw, barH - 6 * s, 8 * s, new Color(0xFB, 0xBF, 0x24), C_WHITE, 1.2 * s);
+            g.setColor(C_TV_BG_TOP);
+            g.drawString(doneTxt, (int) (cx + 9 * s), (int) (y + 23 * s));
+        }
 
         // Right-aligned Scene Chips + Rescan Button
         String[][] scenes = {
@@ -1167,21 +1177,36 @@ public class GeneratePlayStoreAssets {
         }
         y += (int) (barH + 12 * s);
 
+        int livingLampDim = isScenesMode ? 20 : 80;
+        String livingLampStat = "ON • " + livingLampDim + "% Brightness";
         // 2. Room Section 1: LIVING ROOM (Full-width header + 3 cards across)
         Object[][] livingRoomCards = {
             {"Christmas Tree Living", "Tree Lights", true, true, "ON • Active • 11ms", "192.168.1.101", null, !isDimmerMode && !isScenesMode, false},
-            {"Living Room Floor Lamp", "Lightbulb", true, true, "ON • 80% Brightness", "192.168.1.103", 80, isDimmerMode, isDimmerMode},
+            {"Living Room Floor Lamp", "Lightbulb", true, true, livingLampStat, "192.168.1.103", livingLampDim, isDimmerMode, isDimmerMode},
             {"Christmas Candle", "Lightbulb", true, true, "ON • Active • 13ms", "192.168.1.102", null, false, false}
         };
-        y = drawTvRoomSection(g, padX, y, w - padX * 2, "LIVING ROOM", "3/3 ON", "Dimmers: 80%", livingRoomCards, s);
+        y = drawTvRoomSection(g, padX, y, w - padX * 2, "LIVING ROOM", "3/3 ON", "Dimmers: " + livingLampDim + "%", livingRoomCards, s);
 
-        // 3. Room Section 2: BEDROOM & HALLWAY (Full-width header + 3 cards across)
+        int landingDim = isScenesMode ? 20 : 75;
+        String landingStat = "ON • " + landingDim + "% Brightness";
+        // 3. Room Section 2: BEDROOM & LANDING (Full-width header + 3 cards across)
         Object[][] bedroomCards = {
-            {"Lightbulb Landing", "Lightbulb", true, true, "ON • 75% Brightness", "192.168.1.105", 75, false, false},
+            {"Lightbulb Landing", "Lightbulb", true, true, landingStat, "192.168.1.105", landingDim, false, false},
             {"Bedroom Ceiling Fan", "Fan / Vent", false, true, "OFF • Active • 15ms", "192.168.1.114", null, false, false},
             {"Lightbulb Bedroom", "Lightbulb", false, false, "Disconnected • Press OK to Retry", "192.168.1.108", null, false, false}
         };
-        y = drawTvRoomSection(g, padX, y, w - padX * 2, "BEDROOM & LANDING", "1/3 ON", "Dimmers: 75%", bedroomCards, s);
+        y = drawTvRoomSection(g, padX, y, w - padX * 2, "BEDROOM & LANDING", "1/3 ON", "Dimmers: " + landingDim + "%", bedroomCards, s);
+
+        if (isScenesMode) {
+            String toastTxt = "TV Movie Mode: Dimmed 2 smart bulb(s) to 20%";
+            g.setFont(fUi(12 * s, Font.BOLD));
+            int tw = g.getFontMetrics().stringWidth(toastTxt) + (int) (32 * s);
+            double tx0 = (w - tw) / 2.0;
+            double ty0 = h - 38 * s;
+            fillRoundRect(g, tx0, ty0, tw, 28 * s, 9 * s, new Color(0x0F, 0x25, 0x40, 235), C_TV_CYAN, 1.5 * s);
+            g.setColor(C_TV_CYAN);
+            g.drawString(toastTxt, (int) (tx0 + 16 * s), (int) (ty0 + 19 * s));
+        }
 
         g.dispose();
         return img;
@@ -1257,7 +1282,7 @@ public class GeneratePlayStoreAssets {
             // Top line: Switch Name + Focus / Dimming badge
             double badgeW = 0;
             if (cDimming || cFocused) {
-                String bTxt = cDimming ? "DIM ◀/▶" : "FOCUSED • OK";
+                String bTxt = cDimming ? "DIM -/+" : "FOCUSED • OK";
                 Color bCol = cDimming ? new Color(0xFB, 0xBF, 0x24) : C_TV_CYAN;
                 g.setFont(fUi(9.8 * s, Font.BOLD));
                 badgeW = g.getFontMetrics().stringWidth(bTxt) + 14 * s;
@@ -1321,21 +1346,37 @@ public class GeneratePlayStoreAssets {
                 Color dimBoxBorder = cDimming ? new Color(0xFB, 0xBF, 0x24) : new Color(0x22, 0xD3, 0xEE, 95);
                 fillRoundRect(g, cx0 + 12 * s, boxY, cardW - 24 * s, boxH, 8 * s, dimBoxBg, dimBoxBorder, 1.0 * s);
 
+                // Left '-' circle button + progress bar + '%' + right '+' circle button
+                double btnR = 9.5 * s;
+                double btnCy = boxY + 18 * s;
+                double minusCx = cx0 + 28 * s;
+                double plusCx = cx0 + cardW - 28 * s;
+                Color btnBg = cDimming ? new Color(0xFB, 0xBF, 0x24) : new Color(255, 255, 255, 34);
+                Color btnFg = cDimming ? C_TV_BG_TOP : C_WHITE;
+
+                g.setColor(btnBg);
+                g.fill(new Ellipse2D.Double(minusCx - btnR, btnCy - btnR, btnR * 2, btnR * 2));
+                g.fill(new Ellipse2D.Double(plusCx - btnR, btnCy - btnR, btnR * 2, btnR * 2));
+                g.setColor(btnFg);
+                g.setFont(fUi(12 * s, Font.BOLD));
+                g.drawString("-", (int) (minusCx - 3 * s), (int) (btnCy + 4 * s));
+                g.drawString("+", (int) (plusCx - 4 * s), (int) (btnCy + 4 * s));
+
                 double byBar = boxY + 14 * s;
-                double bx0B = cx0 + 22 * s;
-                double bx1B = cx0 + cardW - 58 * s;
+                double bx0B = minusCx + btnR + 8 * s;
+                double bx1B = plusCx - btnR - 38 * s;
                 Color barCol = cDimming ? new Color(0xFB, 0xBF, 0x24) : C_TV_CYAN;
                 fillRoundRect(g, bx0B, byBar, bx1B - bx0B, 8 * s, 4 * s, new Color(255, 255, 255, 38), null, 0);
                 fillRoundRect(g, bx0B, byBar, (bx1B - bx0B) * (cDim / 100.0), 8 * s, 4 * s, barCol, null, 0);
 
                 g.setColor(barCol);
                 g.setFont(fUi(11 * s, Font.BOLD));
-                g.drawString(cDim + "%", (int) (bx1B + 8 * s), (int) (byBar + 8 * s));
+                g.drawString(cDim + "%", (int) (bx1B + 6 * s), (int) (byBar + 8 * s));
 
                 String dimHint = cDimming
-                    ? "◀ -10%  •  +10% ▶   (OK or Back = Done)"
+                    ? "Left: -10%  •  Right: +10%   (OK or Back = Done)"
                     : "Long-press OK or Play/Menu to adjust dimmer";
-                drawFittedString(g, dimHint, cx0 + 22 * s, boxY + 44 * s, cardW - 44 * s, 10.0 * s, Font.BOLD, cDimming ? new Color(0xFB, 0xBF, 0x24) : C_TV_SUBTEXT);
+                drawFittedString(g, dimHint, cx0 + 20 * s, boxY + 46 * s, cardW - 40 * s, 10.0 * s, Font.BOLD, cDimming ? new Color(0xFB, 0xBF, 0x24) : C_TV_SUBTEXT);
             }
         }
 
@@ -1398,7 +1439,7 @@ public class GeneratePlayStoreAssets {
         drawFittedString(g, "WeMi Switch Control", lx, 150 * s, maxLeftW, 28.0 * s, Font.BOLD, C_TV_CYAN);
         drawFittedString(g, "Local UPnP / SSDP / SOAP / GENA Smart Switch Controller", lx, 180 * s, maxLeftW, 14.0 * s, Font.PLAIN, new Color(226, 232, 240));
 
-        String[] pills = {"Zero-Cloud 10.22.22.1 Setup", "9-Port Self-Healing", "Auto Room Grouping", "10-Foot TV D-Pad"};
+        String[] pills = {"Zero-Cloud 10.22.22.1 Setup", "9-Port Self-Healing", "Auto Room Grouping", "3-Col Room TV Grid"};
         double py = 208 * s;
         double px = lx;
         for (String p : pills) {
@@ -1423,14 +1464,37 @@ public class GeneratePlayStoreAssets {
             drawFittedString(g, (String) ringStates[i][0], rcx + 33 * s, ry + 5 * s, 100 * s, 12.5 * s, Font.BOLD, C_WHITE);
         }
 
-        // Right: Live UI Card Preview matching actual app look & feel
+        // Right: Live UI Card Preview matching actual v23.0 single-row TopHeader look & feel
         int cx0 = (int) (556 * s), cy0 = (int) (26 * s), cx1 = (int) (992 * s), cy1 = (int) (474 * s);
         fillRoundRect(g, cx0, cy0, cx1 - cx0, cy1 - cy0, 20 * s, C_BG_GRAY, C_TV_CYAN, 2.0 * s);
         fillRoundRect(g, cx0 + 2, cy0 + 2, cx1 - cx0 - 4, 52 * s, 18 * s, C_TEAL_PRIMARY, null, 0);
         g.setColor(C_WHITE);
         g.setFont(fBrand(24 * s, Font.BOLD));
         g.drawString("wemi", (int) (cx0 + 18 * s), (int) (cy0 + 36 * s));
-        drawFittedString(g, "17/18 Active • LAN", cx1 - 135 * s, cy0 + 34 * s, 120 * s, 12.0 * s, Font.BOLD, C_CYAN_SOFT);
+
+        // Compact single-row header controls: Refresh circle + Edit pill + '+' circle
+        double hcy = cy0 + 28 * s;
+        double addCx = cx1 - 24 * s;
+        g.setColor(C_WHITE);
+        g.fill(new Ellipse2D.Double(addCx - 12 * s, hcy - 12 * s, 24 * s, 24 * s));
+        g.setColor(C_TEAL_DARK);
+        g.setStroke(new BasicStroke((float) (2.0 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(new Line2D.Double(addCx - 5 * s, hcy, addCx + 5 * s, hcy));
+        g.draw(new Line2D.Double(addCx, hcy - 5 * s, addCx, hcy + 5 * s));
+
+        double editW = 46 * s, editH = 24 * s;
+        double editX = addCx - 18 * s - editW;
+        fillRoundRect(g, editX, hcy - editH / 2.0, editW, editH, 12 * s, new Color(255, 255, 255, 42), new Color(255, 255, 255, 95), 1.0 * s);
+        g.setColor(C_WHITE);
+        g.setFont(fUi(11 * s, Font.BOLD));
+        g.drawString("Edit", (int) (editX + 12 * s), (int) (hcy + 4 * s));
+
+        double refCx = editX - 18 * s;
+        g.setColor(new Color(255, 255, 255, 42));
+        g.fill(new Ellipse2D.Double(refCx - 12 * s, hcy - 12 * s, 24 * s, 24 * s));
+        g.setColor(C_WHITE);
+        g.setStroke(new BasicStroke((float) (1.8 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(new Arc2D.Double(refCx - 5.5 * s, hcy - 5.5 * s, 11 * s, 11 * s, 35, 275, Arc2D.OPEN));
 
         int cyRow = cy0 + (int) (60 * s);
         cyRow = drawRoomGroupHeader(g, cx0 + (int) (10 * s), cyRow, cx1 - (int) (10 * s), "Living Room", 3, 3, "3/3 Active • Avg 12ms", true, false, 80, s * 0.78);
@@ -1480,7 +1544,7 @@ public class GeneratePlayStoreAssets {
 
         double sy = 388 * s;
         double sx = tx;
-        for (String chip : new String[]{"Movie Mode (20%)", "Holiday Lights ON", "Bedtime All OFF", "SSDP Local LAN"}) {
+        for (String chip : new String[]{"3-Col Room Grid", "Movie 20% Scene", "Dimmer Mode", "Local LAN UPnP"}) {
             g.setFont(fUi(16 * s, Font.BOLD));
             int cw = g.getFontMetrics().stringWidth(chip) + (int) (30 * s);
             if (sx + cw > w - 36 * s) break;
