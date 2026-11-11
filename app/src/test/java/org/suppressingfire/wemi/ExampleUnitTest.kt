@@ -122,4 +122,38 @@ class ExampleUnitTest {
         assertEquals(TvScene.HOLIDAY_ON, TvScene.fromWireKey("holiday_on"))
         assertNull(TvScene.fromWireKey("INVALID_SCENE"))
     }
+
+    @Test
+    fun `verify release App Bundle R8 deobfuscation and native symbol Play Console guards`() {
+        val cwd = java.io.File(System.getProperty("user.dir") ?: ".")
+        val repoRoot = if (java.io.File(cwd, "LICENSE").exists()) cwd else (cwd.parentFile ?: cwd)
+
+        val buildGradle = java.io.File(repoRoot, "app/build.gradle.kts").readText()
+        assertTrue(
+            "Release buildType must enable R8 minification so Play App Bundles embed proguard.map",
+            buildGradle.contains("isMinifyEnabled = true")
+        )
+        assertTrue(
+            "Release buildType must enable resource shrinking alongside R8",
+            buildGradle.contains("isShrinkResources = true")
+        )
+        assertTrue(
+            "Release buildType must configure debugSymbolLevel = \"FULL\" for any unstripped native code",
+            buildGradle.contains("debugSymbolLevel = \"FULL\"")
+        )
+        assertTrue(
+            "Packaging jniLibs must exclude unused pre-stripped libandroidx.graphics.path.so",
+            buildGradle.contains("**/libandroidx.graphics.path.so")
+        )
+
+        val proguardRules = java.io.File(repoRoot, "app/proguard-rules.pro").readText()
+        assertTrue(
+            "proguard-rules.pro must preserve SourceFile,LineNumberTable for Play Console stack traces",
+            proguardRules.contains("-keepattributes SourceFile,LineNumberTable")
+        )
+        assertTrue(
+            "proguard-rules.pro must preserve domain enum constant names for Room valueOf lookups",
+            proguardRules.contains("-keep enum org.suppressingfire.wemi.**")
+        )
+    }
 }

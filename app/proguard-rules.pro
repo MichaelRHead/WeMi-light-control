@@ -12,10 +12,18 @@
 #   public *;
 #}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Preserve line number information so Play Console deobfuscates R8 stack traces cleanly.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Preserve domain enums whose constant names are persisted in Room SQLite (e.g. DeviceType.valueOf).
+-keep enum org.suppressingfire.wemi.** { *; }
+
+# Preserve Room v5 database, DAO, generated *_Impl classes, and @Entity models.
+-keep @androidx.room.Entity class org.suppressingfire.wemi.data.** { *; }
+-keep @androidx.room.Database class org.suppressingfire.wemi.data.** { *; }
+-keep @androidx.room.Dao class org.suppressingfire.wemi.data.** { *; }
+-keep class org.suppressingfire.wemi.data.**_Impl { *; }
+
+# LanRuntimeUtils.isRunningInRobolectric() probes org.robolectric.Robolectric via runCatching.
+-dontwarn org.robolectric.**

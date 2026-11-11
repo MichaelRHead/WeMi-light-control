@@ -39,7 +39,11 @@ android {
   buildTypes {
     release {
       isCrunchPngs = false
-      isMinifyEnabled = false
+      isMinifyEnabled = true
+      isShrinkResources = true
+      ndk {
+        debugSymbolLevel = "FULL"
+      }
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
@@ -49,6 +53,14 @@ android {
       // Do not remove or modify this signingConfig assignment. It is necessary for Android apps in
       // AI Studio.
       signingConfig = signingConfigs.getByName("debugConfig")
+    }
+  }
+  packaging {
+    jniLibs {
+      // Exclude unused pre-stripped PathIterator native shim from androidx.graphics:graphics-path
+      // (never invoked by WeMi Light Control or Compose UI) so the release App Bundle ships 100%
+      // pure Kotlin/DEX without un-symbolicated third-party .so binaries.
+      excludes += "**/libandroidx.graphics.path.so"
     }
   }
   compileOptions {
