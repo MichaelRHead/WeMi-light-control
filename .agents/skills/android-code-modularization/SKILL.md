@@ -56,11 +56,12 @@ Separate **stateless wire parsing / cryptography** from **stateful socket & HTTP
    - Never bundle unrelated modal dialogs (`AddOrEditDeviceDialog`, `AddRuleDialog`, `ProvisionApDialog`) into a single `Dialogs.kt` monolith. Give each dialog its own file named after its workflow (`DeviceEditDialog.kt`, `RuleDialog.kt`, `ProvisionApDialog.kt`).
 2. **Separate Custom Canvas Illustrations by Category (`ui/components/`)**:
    - Custom `Canvas` / vector artwork is line-heavy (~150–250 lines per 3-state illustration). Group illustrations into dedicated files (e.g., `SwitchAndPlugIllustration.kt`, `LightAndSensorIllustrations.kt`, `ChristmasTreeIllustration.kt`, `FanIllustration.kt`, and `HardwareIllustrations.kt` for the category router and shared badges).
-3. **Keep `MainActivity.kt` as a Thin App Shell (`< 300` Lines)**:
+3. **Keep `MainActivity.kt` & `TvScreen.kt` as Thin Orchestration Shells (`< 500` Lines)**:
    - `MainActivity` / `WeMiSwitchApp` should only handle edge-to-edge system bars, TV vs. Mobile mode routing, top/bottom scaffold bars, `BackHandler`, and modal dialog hosting.
-   - Extract each bottom-navigation tab's body into `ui/screens/` (e.g., `DevicesTabScreen.kt`, `RulesScreen.kt`, `MoreScreen.kt`) and TV dashboard into `ui/components/TvScreen.kt`.
-4. **Cohesive UI State Slices in ViewModels**:
-   - Avoid exposing 25–35 independent `StateFlow` properties that force the root composable to write 35 `.collectAsStateWithLifecycle()` lines. Group related UI state into immutable data classes (e.g., `ProvisioningUiState`, `DeviceListUiState`) or cohesive screen state holders.
+   - Extract each bottom-navigation tab's body into `ui/screens/` (`DevicesTabScreen.kt`, `RulesScreen.kt`, `MoreScreen.kt`) and split the Android TV 10-foot dashboard across `ui/components/TvScreen.kt` (focus/grid orchestration), `ui/components/TvHeadersAndScenes.kt` (`TvTopHeaderBar`, `TvRoomSectionHeader`, `TvSceneChip`), and `ui/components/TvCardsAndScenes.kt` (`TvDeviceCard` 3-state D-Pad `DIM -/+` card).
+4. **Cohesive UI State Controllers in ViewModels (`ProvisionApUiController` Pattern)**:
+   - Avoid letting a single `AndroidViewModel` accumulate 1,000+ lines by mixing core switch/room orchestration with multi-step wizard state machines (such as `10.22.22.1` fresh-switch provisioning).
+   - Extract self-contained wizard state flows and coroutine workflows into internal ViewModel-scoped controllers (e.g., `ProvisionApUiController.kt`) while delegating public `StateFlow` properties and action methods on `SwitchViewModel` so external callers and E2E tests experience zero API churn.
 
 ---
 

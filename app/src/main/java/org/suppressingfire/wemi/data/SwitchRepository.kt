@@ -579,53 +579,105 @@ class SwitchRepository(
         if (devices.isEmpty()) return
         val checkedAt = nowFormatted()
         for (dev in devices) {
-            val recentSetMs = lastSetStateTimestampMs[dev.id] ?: 0L
-            if ((System.currentTimeMillis() - recentSetMs) < 2000L) continue
+            mutexFor(dev).withLock {
+                val recentSetMs = lastSetStateTimestampMs[dev.id] ?: 0L
+                if ((System.currentTimeMillis() - recentSetMs) < 2000L) return@withLock
 
-            val probe = lanSemaphore.withPermit {
-                networkClient.getBinaryState(dev)
-            }
-            if (probe.reachableOnLan) {
-                dao.updateDevice(
-                    dev.copy(
-                        port = probe.resolvedPort,
-                        isReachable = true,
-                        isOn = probe.binaryStateOn ?: dev.isOn,
-                        brightness = probe.brightness ?: dev.brightness,
-                        latencyMs = probe.latencyMs.coerceAtLeast(1),
-                        lastCheckedTime = checkedAt
+                val latest = dao.getDeviceById(dev.id) ?: return@withLock
+                val probe = lanSemaphore.withPermit {
+                    networkClient.getBinaryState(latest)
+                }
+
+                val postProbeSetMs = lastSetStateTimestampMs[dev.id] ?: 0L
+                if ((System.currentTimeMillis() - postProbeSetMs) < 2000L) return@withLock
+
+                val current = dao.getDeviceById(dev.id) ?: latest
+                if (probe.reachableOnLan) {
+                    dao.updateDevice(
+                        current.copy(
+                            port = probe.resolvedPort,
+                            isReachable = true,
+                            isOn = probe.binaryStateOn ?: current.isOn,
+                            brightness = probe.brightness ?: current.brightness,
+                            latencyMs = probe.latencyMs.coerceAtLeast(1),
+                            lastCheckedTime = checkedAt
+                        )
                     )
-                )
-            } else {
-                dao.updateDevice(
-                    dev.copy(
-                        isReachable = false,
-                        latencyMs = 0,
-                        lastCheckedTime = "Offline • Timeout"
+                } else {
+                    dao.updateDevice(
+                        current.copy(
+                            isReachable = false,
+                            latencyMs = 0,
+                            lastCheckedTime = "Offline • Timeout"
+                        )
                     )
-                )
+                }
             }
         }
     }
 
     suspend fun toggleDimmerNightMode(device: DeviceEntity): DeviceEntity {
-        val targetNightMode = !device.nightModeEnabled
-        val nextBrightness = if (targetNightMode && device.brightness > 20) 20 else device.brightness
+        val priorNightMode = device.nightModeEnabled
+        val priorBrightness = device.brightness
+        val targetNightMode = !priorNightMode
+        val nextBrightness = if (targetNightMode && priorBrightness > 20) 20 else priorBrightness
 
         return mutexFor(device).withLock {
-            val result = lanSemaphore.withPermit {
+            var activeDevice = device
+            var result = lanSemaphore.withPermit {
                 networkClient.configureNightMode(
-                    device = device,
+                    device = activeDevice,
                     enabled = targetNightMode,
                     nightBrightness = 20
                 )
             }
+
+            if (!result.reachableOnLan && !_isDemoShowroomMode.value) {
+                val healedDevice = discoveryCoordinator.attemptTwoStageReconnect(activeDevice)
+                if (healedDevice != null) {
+                    activeDevice = healedDevice
+                    result = lanSemaphore.withPermit {
+                        networkClient.configureNightMode(
+                            device = activeDevice,
+                            enabled = targetNightMode,
+                            nightBrightness = 20
+                        )
+                    }
+                }
+            }
+
             appendLog(result.logEntry)
-            val updated = device.copy(
-                nightModeEnabled = targetNightMode,
-                brightness = nextBrightness,
-                lastCheckedTime = nowFormatted()
-            )
+            val updated = when {
+                result.reachableOnLan -> {
+                    lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+                    activeDevice.copy(
+                        nightModeEnabled = targetNightMode,
+                        brightness = nextBrightness,
+                        isReachable = true,
+                        port = result.resolvedPort,
+                        latencyMs = result.latencyMs.coerceAtLeast(1),
+                        lastCheckedTime = nowFormatted()
+                    )
+                }
+                _isDemoShowroomMode.value -> {
+                    lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+                    activeDevice.copy(
+                        nightModeEnabled = targetNightMode,
+                        brightness = nextBrightness,
+                        isReachable = true,
+                        port = result.resolvedPort,
+                        latencyMs = device.latencyMs.takeIf { it > 0 } ?: 14,
+                        lastCheckedTime = nowFormatted()
+                    )
+                }
+                else -> activeDevice.copy(
+                    nightModeEnabled = priorNightMode,
+                    brightness = priorBrightness,
+                    isReachable = false,
+                    latencyMs = 0,
+                    lastCheckedTime = "Offline • Timeout"
+                )
+            }
             dao.updateDevice(updated)
             updated
         }

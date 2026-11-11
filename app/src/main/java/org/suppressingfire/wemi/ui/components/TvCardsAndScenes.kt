@@ -3,7 +3,6 @@ package org.suppressingfire.wemi.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
@@ -16,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,7 +42,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -511,207 +508,6 @@ internal fun TvDeviceCard(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-internal fun TvRoomSectionHeader(
-    roomName: String,
-    roomDevices: List<DeviceEntity>,
-    isTogglingRoom: Boolean,
-    onToggleRoomPower: () -> Unit,
-    onStepRoomBrightness: ((Int) -> Unit)? = null
-) {
-    var isFocused by remember { mutableStateOf(false) }
-    val controllable = roomDevices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
-    val onCount = controllable.count { it.isOn && it.isReachable }
-    val dimmers = roomDevices.filter { it.parsedType == DeviceType.LIGHTBULB_DIMMER && it.isReachable }
-    val avgBrightness = if (dimmers.isNotEmpty()) {
-        dimmers.map { it.brightness }.average().toInt()
-    } else {
-        null
-    }
-
-    Surface(
-        color = if (isFocused) Color(0xFF133B66) else Color(0xFF0B192C),
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(
-            width = if (isFocused) 2.5.dp else 1.dp,
-            color = if (isFocused) TvCyanFocusBorder else Color(0xFF1E3A5F)
-        ),
-        modifier = Modifier
-            .fillMaxWidth()
-            .onFocusChanged { isFocused = it.isFocused }
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)
-                ) {
-                    onToggleRoomPower()
-                    true
-                } else {
-                    false
-                }
-            }
-            .focusable()
-            .clickable { onToggleRoomPower() }
-            .testTag("tv_room_header_$roomName")
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(9.dp)
-                        .clip(CircleShape)
-                        .background(if (onCount > 0) TvCyanFocusBorder else Color(0xFF475569))
-                )
-                Text(
-                    text = roomName.uppercase(),
-                    color = Color.White,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 13.sp,
-                    letterSpacing = 0.8.sp
-                )
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = if (onCount > 0) WemoGreenPrimary.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.08f)
-                ) {
-                    Text(
-                        text = if (isTogglingRoom) {
-                            "Switching..."
-                        } else {
-                            "$onCount/${controllable.size} ON"
-                        },
-                        color = if (onCount > 0) TvCyanFocusBorder else TvTextSecondary,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
-                    )
-                }
-                if (avgBrightness != null) {
-                    Text(
-                        text = "Dimmers: $avgBrightness%",
-                        color = TvTextSecondary,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 11.sp
-                    )
-                }
-            }
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (avgBrightness != null && onStepRoomBrightness != null) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color.White.copy(alpha = 0.10f),
-                        modifier = Modifier
-                            .focusProperties { canFocus = false }
-                            .clickable { onStepRoomBrightness(-10) }
-                            .testTag("tv_room_dim_minus_$roomName")
-                    ) {
-                        Text(
-                            text = "-10%",
-                            color = Color.White,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.5.sp,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                        )
-                    }
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = Color.White.copy(alpha = 0.10f),
-                        modifier = Modifier
-                            .focusProperties { canFocus = false }
-                            .clickable { onStepRoomBrightness(10) }
-                            .testTag("tv_room_dim_plus_$roomName")
-                    ) {
-                        Text(
-                            text = "+10%",
-                            color = Color.White,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 10.5.sp,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                        )
-                    }
-                }
-
-                Text(
-                    text = if (isFocused) "OK: Toggle Room" else "Room Master",
-                    color = if (isFocused) TvCyanFocusBorder else TvTextSecondary,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 11.sp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-internal fun TvSceneChip(
-    title: String,
-    icon: ImageVector,
-    onClick: () -> Unit,
-    testTag: String
-) {
-    var isFocused by remember { mutableStateOf(false) }
-    Surface(
-        color = if (isFocused) Color(0xFF133B66) else Color(0xFF0F2540),
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(
-            width = if (isFocused) 2.5.dp else 1.dp,
-            color = if (isFocused) TvCyanFocusBorder else TvCyanFocusBorder.copy(alpha = 0.35f)
-        ),
-        modifier = Modifier
-            .onFocusChanged { isFocused = it.isFocused }
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)
-                ) {
-                    onClick()
-                    true
-                } else {
-                    false
-                }
-            }
-            .focusable()
-            .clickable(onClick = onClick)
-            .testTag(testTag)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = TvCyanFocusBorder,
-                modifier = Modifier.size(15.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = title,
-                color = Color.White,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp
-            )
         }
     }
 }

@@ -603,4 +603,71 @@ class SoapAndSelfHealingTest {
             acceptLoop.join(1000)
         }
     }
+
+    @Test
+    fun `verify toggleDimmerNightMode 9-port self-healing and Real LAN offline revert plus pollActiveHomeStates echo suppression`() = runBlocking {
+        FakeUpnpServer(
+            initialFriendlyName = "Master Bedroom Dimmer",
+            deviceTypeUrn = "urn:Belkin:device:dimmer:1",
+            modelName = "WDS060",
+            serialNumber = "WDS060NIGHT77",
+            udn = "uuid:Dimmer-2_0-WDS060NIGHT77",
+            initialRelayOn = true,
+            initialBrightness = 85,
+            registerAsCandidatePort = true
+        ).use { server ->
+            val client = NetworkClient(extraCandidatePorts = listOf(server.port))
+            val repo = SwitchRepository(
+                dao = database.switchDao(),
+                networkClient = client,
+                initialDemoModeOverride = false
+            )
+            repo.ensureSeeded()
+
+            val staleDimmerId = database.switchDao().insertDevice(
+                DeviceEntity(
+                    name = "Master Bedroom Dimmer",
+                    roomName = "Bedroom",
+                    networkKey = "wifi_lan_192_168_1",
+                    wifiSsid = "HeadFamily-2.4G",
+                    deviceType = DeviceType.LIGHTBULB_DIMMER.name,
+                    ipAddress = "127.0.0.1",
+                    port = 49159, // Stale port; must heal onto server.port
+                    isOn = true,
+                    isReachable = true,
+                    brightness = 85,
+                    nightModeEnabled = false,
+                    serialNumber = "WDS060NIGHT77",
+                    hardwareModel = "WDS060"
+                )
+            ).toInt()
+            val staleDimmer = database.switchDao().getDeviceById(staleDimmerId)!!
+
+            // 1. Toggling Night Mode ON heals from stale port 49159 -> server.port and caps brightness 85% -> 20%
+            val healed = repo.toggleDimmerNightMode(staleDimmer)
+            assertTrue(healed.isReachable)
+            assertEquals(server.port, healed.port)
+            assertTrue(healed.nightModeEnabled)
+            assertEquals(20, healed.brightness)
+            assertTrue(server.nightModeEnabled.get())
+
+            // 2. Immediate background poll within 2000ms echo-suppression window must NOT overwrite local state
+            server.relayStateOn.set(false)
+            server.dimmerBrightness.set(99)
+            repo.pollActiveHomeStates("wifi_lan_192_168_1")
+            val afterSuppressedPoll = database.switchDao().getDeviceById(staleDimmerId)!!
+            assertTrue(afterSuppressedPoll.isOn)
+            assertEquals(20, afterSuppressedPoll.brightness)
+            assertTrue(afterSuppressedPoll.nightModeEnabled)
+
+            // 3. Close server to simulate offline dimmer in Real LAN Mode -> Night Mode toggle must revert and mark OFFLINE
+            server.close()
+            val reverted = repo.toggleDimmerNightMode(afterSuppressedPoll)
+            assertFalse(reverted.isReachable)
+            assertEquals(0, reverted.latencyMs)
+            assertTrue(reverted.nightModeEnabled)
+            assertEquals(20, reverted.brightness)
+            assertEquals("Offline • Timeout", reverted.lastCheckedTime)
+        }
+    }
 }

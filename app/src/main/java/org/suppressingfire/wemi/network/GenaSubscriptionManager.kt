@@ -10,8 +10,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
+import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.io.OutputStreamWriter
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -143,8 +143,8 @@ class GenaSubscriptionManager(
         clientSocket.use { sock ->
             sock.soTimeout = 1500
             val sourceIp = sock.inetAddress?.hostAddress.orEmpty()
-            val reader = BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.UTF_8))
-            val requestLine = reader.readLine() ?: return
+            val input = BufferedInputStream(sock.getInputStream())
+            val requestLine = readHttpHeaderLine(input) ?: return
             if (!requestLine.startsWith("NOTIFY", ignoreCase = true)) {
                 sendHttp200(sock)
                 return
@@ -153,41 +153,51 @@ class GenaSubscriptionManager(
             val path = requestLine.split(" ").getOrNull(1).orEmpty()
             val pathDeviceKey = path.substringAfterLast("/gena/", "").trim()
 
-            var contentLength = 0
+            var contentLength = -1
             var sidHeader = ""
             while (true) {
-                val line = reader.readLine() ?: break
+                val line = readHttpHeaderLine(input) ?: break
                 if (line.isEmpty()) break
                 val colon = line.indexOf(':')
                 if (colon > 0) {
                     val k = line.substring(0, colon).trim().uppercase(Locale.US)
                     val v = line.substring(colon + 1).trim()
                     when (k) {
-                        "CONTENT-LENGTH" -> contentLength = v.toIntOrNull() ?: 0
+                        "CONTENT-LENGTH" -> contentLength = v.toIntOrNull() ?: -1
                         "SID" -> sidHeader = v
                     }
                 }
             }
 
-            val xmlBody = if (contentLength > 0) {
-                val buf = CharArray(contentLength.coerceAtMost(16384))
-                var readTotal = 0
-                while (readTotal < buf.size) {
-                    val n = reader.read(buf, readTotal, buf.size - readTotal)
-                    if (n == -1) break
-                    readTotal += n
-                }
-                String(buf, 0, readTotal)
-            } else {
-                buildString {
-                    while (reader.ready()) {
-                        val line = reader.readLine() ?: break
-                        appendLine(line)
+            val xmlBody = when {
+                contentLength > 0 -> {
+                    val targetBytes = contentLength.coerceAtMost(16384)
+                    val buf = ByteArray(targetBytes)
+                    var readTotal = 0
+                    while (readTotal < targetBytes) {
+                        val n = input.read(buf, readTotal, targetBytes - readTotal)
+                        if (n == -1) break
+                        readTotal += n
                     }
+                    String(buf, 0, readTotal, Charsets.UTF_8)
+                }
+                contentLength == 0 -> ""
+                else -> {
+                    sock.soTimeout = 150
+                    val out = ByteArrayOutputStream()
+                    val buf = ByteArray(2048)
+                    runCatching {
+                        while (out.size() < 16384) {
+                            val n = input.read(buf)
+                            if (n == -1) break
+                            out.write(buf, 0, n)
+                        }
+                    }
+                    out.toString(Charsets.UTF_8.name())
                 }
             }
 
-            // Always reply HTTP 200 OK immediately so WeMo RTOS socket is freed
+            // Always reply HTTP 200 OK immediately so the embedded RTOS socket is freed
             sendHttp200(sock)
 
             val parsed = parseGenaPropertySetXml(xmlBody)
@@ -219,6 +229,21 @@ class GenaSubscriptionManager(
                 )
             }
         }
+    }
+
+    private fun readHttpHeaderLine(input: BufferedInputStream): String? {
+        val out = ByteArrayOutputStream(128)
+        while (out.size() < 8192) {
+            val b = input.read()
+            if (b == -1) {
+                return if (out.size() == 0) null else out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
+            }
+            if (b == '\n'.code) {
+                return out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
+            }
+            out.write(b)
+        }
+        return out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
     }
 
     private fun sendHttp200(socket: Socket) {

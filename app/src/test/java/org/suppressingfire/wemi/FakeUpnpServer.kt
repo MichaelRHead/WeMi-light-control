@@ -1,7 +1,9 @@
 package org.suppressingfire.wemi
 
 import org.suppressingfire.wemi.network.NetworkClient
+import java.io.BufferedInputStream
 import java.io.BufferedReader
+import java.io.ByteArrayOutputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.DatagramPacket
@@ -139,13 +141,14 @@ class FakeUpnpServer(
     }
 
     private fun handleConnection(sock: Socket) {
-        val reader = BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.UTF_8))
-        val requestLine = reader.readLine() ?: return
+        sock.soTimeout = 2000
+        val input = BufferedInputStream(sock.getInputStream())
+        val requestLine = readHttpLine(input) ?: return
         var contentLength = 0
         var soapAction = ""
         var hasCallback = false
         while (true) {
-            val header = reader.readLine() ?: break
+            val header = readHttpLine(input) ?: break
             if (header.isEmpty()) break
             when {
                 header.startsWith("Content-Length:", ignoreCase = true) -> {
@@ -163,14 +166,14 @@ class FakeUpnpServer(
                 }
             }
         }
-        val bodyChars = CharArray(contentLength)
+        val bodyBytes = ByteArray(contentLength.coerceAtLeast(0))
         var readTotal = 0
-        while (readTotal < contentLength) {
-            val n = reader.read(bodyChars, readTotal, contentLength - readTotal)
+        while (readTotal < bodyBytes.size) {
+            val n = input.read(bodyBytes, readTotal, bodyBytes.size - readTotal)
             if (n == -1) break
             readTotal += n
         }
-        val reqBody = String(bodyChars, 0, readTotal)
+        val reqBody = String(bodyBytes, 0, readTotal, Charsets.UTF_8)
         if (soapAction.isNotBlank()) {
             receivedSoapActions.add(soapAction.trim('"'))
         }
@@ -411,32 +414,57 @@ class FakeUpnpServer(
         writer.flush()
     }
 
+    private fun readHttpLine(input: BufferedInputStream): String? {
+        val out = ByteArrayOutputStream(128)
+        while (out.size() < 8192) {
+            val b = input.read()
+            if (b == -1) {
+                return if (out.size() == 0) null else out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
+            }
+            if (b == '\n'.code) {
+                return out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
+            }
+            out.write(b)
+        }
+        return out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
+    }
+
     fun pushGenaNotify(
         callbackPort: Int,
         deviceKey: String = serialNumber,
         binaryStatePayload: String = "1|78",
-        sid: String = "uuid:sub-wls0403-102"
+        sid: String = "uuid:sub-wls0403-102",
+        extraPropertyXml: String = ""
     ): String {
-        val propertysetXml = """
-            <e:propertyset xmlns:e="urn:schemas-upnp-org:event-1-0">
-              <e:property>
-                <BinaryState>$binaryStatePayload</BinaryState>
-              </e:property>
-            </e:propertyset>
-        """.trimIndent()
+        val propertysetXml = buildString {
+            appendLine("<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\">")
+            appendLine("  <e:property>")
+            appendLine("    <BinaryState>$binaryStatePayload</BinaryState>")
+            appendLine("  </e:property>")
+            if (extraPropertyXml.isNotBlank()) {
+                appendLine("  <e:property>")
+                appendLine("    $extraPropertyXml")
+                appendLine("  </e:property>")
+            }
+            append("</e:propertyset>")
+        }
         val bodyBytes = propertysetXml.toByteArray(Charsets.UTF_8)
         Socket("127.0.0.1", callbackPort).use { sock ->
-            val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
-            writer.write("NOTIFY /gena/$deviceKey HTTP/1.1\r\n")
-            writer.write("HOST: 127.0.0.1:$callbackPort\r\n")
-            writer.write("CONTENT-TYPE: text/xml; charset=\"utf-8\"\r\n")
-            writer.write("NT: upnp:event\r\n")
-            writer.write("NTS: upnp:propchange\r\n")
-            writer.write("SID: $sid\r\n")
-            writer.write("CONTENT-LENGTH: ${bodyBytes.size}\r\n\r\n")
-            writer.write(propertysetXml)
-            writer.flush()
-            return BufferedReader(InputStreamReader(sock.getInputStream())).readLine().orEmpty()
+            sock.soTimeout = 1500
+            val out = sock.getOutputStream()
+            val headerBytes = buildString {
+                append("NOTIFY /gena/$deviceKey HTTP/1.1\r\n")
+                append("HOST: 127.0.0.1:$callbackPort\r\n")
+                append("CONTENT-TYPE: text/xml; charset=\"utf-8\"\r\n")
+                append("NT: upnp:event\r\n")
+                append("NTS: upnp:propchange\r\n")
+                append("SID: $sid\r\n")
+                append("CONTENT-LENGTH: ${bodyBytes.size}\r\n\r\n")
+            }.toByteArray(Charsets.ISO_8859_1)
+            out.write(headerBytes)
+            out.write(bodyBytes)
+            out.flush()
+            return BufferedReader(InputStreamReader(sock.getInputStream(), Charsets.ISO_8859_1)).readLine().orEmpty()
         }
     }
 

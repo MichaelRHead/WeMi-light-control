@@ -310,5 +310,71 @@ class GenaProvisioningAndRulesTest {
             assertEquals(0, savedDevices.size)
         }
     }
+
+    @Test
+    fun `verify multi-byte UTF-8 GENA NOTIFY propertyset and ChangeFriendlyName byte-exact Content-Length framing`() = runBlocking {
+        val receivedNotification = AtomicReference<GenaEventNotification?>(null)
+        val genaManager = GenaSubscriptionManager(
+            localIpProvider = { "127.0.0.1" },
+            preferredListenPort = 0,
+            onNotification = { receivedNotification.set(it) }
+        )
+
+        FakeUpnpServer(
+            initialFriendlyName = "Cafe Sconce",
+            serialNumber = "WLS0403UTF8"
+        ).use { server ->
+            try {
+                val client = NetworkClient(extraCandidatePorts = listOf(server.port))
+                val utf8Name = "Café • Crème — Sconce"
+                val device = DeviceEntity(
+                    id = 91,
+                    name = "Cafe Sconce",
+                    roomName = "Dining Room",
+                    ipAddress = "127.0.0.1",
+                    port = server.port,
+                    serialNumber = "WLS0403UTF8"
+                )
+
+                // 1. Verify multi-byte UTF-8 SOAP ChangeFriendlyName round-trips cleanly without stalling
+                val renameResult = client.changeFriendlyName(device, utf8Name)
+                assertTrue(renameResult.reachableOnLan)
+                assertEquals(utf8Name, server.friendlyName.get())
+
+                // 2. Verify embedded GENA NOTIFY listener reads exact UTF-8 byte length without hitting 1500ms soTimeout
+                val sub = genaManager.subscribeOrRenew(device.copy(name = utf8Name), timeoutSeconds = 300)
+                assertNotNull(sub)
+                val callbackPort = genaManager.activeListenPort
+                val startMs = System.currentTimeMillis()
+                val respLine = server.pushGenaNotify(
+                    callbackPort = callbackPort,
+                    deviceKey = "WLS0403UTF8",
+                    binaryStatePayload = "1|64",
+                    sid = sub!!.sid,
+                    extraPropertyXml = "<FriendlyName>$utf8Name</FriendlyName>"
+                )
+                val elapsedMs = System.currentTimeMillis() - startMs
+
+                assertTrue(respLine.contains("200 OK"))
+                assertTrue(
+                    "Expected byte-exact UTF-8 GENA NOTIFY response well below 1500ms soTimeout, took ${elapsedMs}ms",
+                    elapsedMs < 800L
+                )
+
+                var attempts = 0
+                while (receivedNotification.get() == null && attempts < 25) {
+                    delay(20L)
+                    attempts++
+                }
+                val event = receivedNotification.get()
+                assertNotNull(event)
+                assertEquals(true, event?.binaryStateOn)
+                assertEquals(64, event?.brightness)
+                assertTrue(event?.rawXml.orEmpty().contains(utf8Name))
+            } finally {
+                genaManager.stopServer()
+            }
+        }
+    }
 }
 

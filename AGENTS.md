@@ -77,20 +77,20 @@ The app supports four physical hardware families from Belkin's discontinued smar
   - `ProvisionerClient.kt` & `SetupDiagnostics.kt`: `10.22.22.1` zero-cloud `WiFiSetup1#GetApList` / `GetNetworkList` (`8500ms` site-survey timeout), `LanHttpClient`-framed `probeSetupDevice`, and double-send `ConnectHomeNetwork` + 20s `GetNetworkStatus` poll + `CloseSetup` + `SetSetupDoneStatus` provisioner with `SetupDebugSnapshot` screenshot diagnostics and `TelemetryFileExporter` (`wemi-telemetry-latest.txt`).
   - `PasswordCrypto.kt`: Stateless OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC Wi-Fi password encryption/decryption (Methods 1, 2 & 3 × `addPasswordLengths`).
 - **`ui/` (Jetpack Compose Skeuomorphic UI)**:
-  - `SwitchViewModel.kt`: UI state holder, `setupDebugSnapshot`, background health polling, synchronous modal dismissal, and coroutine dispatchers.
+  - `SwitchViewModel.kt` & `ProvisionApUiController.kt`: UI state holder, delegated `10.22.22.1` Setup AP wizard controller (`setupDebugSnapshot`), background health polling, synchronous modal dismissal, and coroutine dispatchers.
   - `screens/DevicesTabScreen.kt` (with `EmptyDevicesState`), `screens/RulesScreen.kt`, and `screens/MoreScreen.kt` (with `open_source_licenses_card`, `mit_license_text_surface`, and `third_party_notices_surface`).
   - `components/WifiHomeBar.kt`, `components/RoomGroupCard.kt`, `components/SsdpScannerModal.kt`, and `components/HeaderAndNav.kt`.
   - `components/DeviceRow.kt` (with `AutoShrinkSwitchName`), `components/DeviceStatusBadges.kt` (with `PowerStatePill`), and `components/DeviceDiagnosticsDrawer.kt`.
   - `components/DeviceEditDialog.kt`, `components/RuleDialog.kt`, `components/ProvisionApDialog.kt`, and `components/ProvisionDebugPanel.kt`.
-  - `components/TvScreen.kt` and `components/TvCardsAndScenes.kt`.
+  - `components/TvScreen.kt`, `components/TvHeadersAndScenes.kt`, and `components/TvCardsAndScenes.kt`.
   - `components/HardwareIllustrations.kt` (`drawIecPowerSymbol`, `drawDisconnectedSymbol`, `PowerRingButton`, `DisconnectedRingButton`), `components/SwitchAndPlugIllustration.kt`, `components/LightAndSensorIllustrations.kt`, `components/ChristmasTreeIllustration.kt`, and `components/FanIllustration.kt`.
 - **`test/` (Loopback UPnP/SOAP Hardware Simulator, Protocol Unit Tests, License Governance & Compose E2E Tests — `app/src/test/java/org/suppressingfire/wemi/`)**:
-  - `FakeUpnpServer.kt`: Reusable `AutoCloseable` loopback HTTP/UPnP/SOAP/GENA/`WiFiSetup1` + UDP SSDP `M-SEARCH` responder server on `127.0.0.1` (`ServerSocket(0)` & `DatagramSocket(0)`).
+  - `FakeUpnpServer.kt`: Reusable `AutoCloseable` byte-exact HTTP/UPnP/SOAP/GENA/`WiFiSetup1` + UDP SSDP `M-SEARCH` responder server on `127.0.0.1` (`ServerSocket(0)` & `DatagramSocket(0)`).
   - `SkuAndCryptoTest.kt`: Hardware SKU classification (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`), `/setup.xml` parsing, `GetMetaInfo` soft-AP SSID filtering (`isWemoDeviceSetupSsid`), semantic device categorization, and OpenSSL AES-128-CBC encryption/decryption (Methods 1, 2 & 3).
-  - `SoapAndSelfHealingTest.kt`: `LanHttpClient` wire-framing (`Content-Length`, `Transfer-Encoding: chunked`, and missing-`Content-Length` + delayed-`FIN` recovery), 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, offline rollback, manual IP probing, soft-AP SSID startup DB sanitization, `resetLanHomesSwitchesAndRooms`, and multi-device startup state detection.
-  - `GenaProvisioningAndRulesTest.kt`: UPnP GENA `SUBSCRIBE`, HTTP 412 recovery, embedded `NOTIFY` callback server, `RuleScheduler`, and full loopback `10.22.22.1` `WiFiSetup1` provisioning (including `NetworkStatus=0` failure & `CloseSetup` hold and `SetupDebugSnapshot` formatting).
+  - `SoapAndSelfHealingTest.kt`: `LanHttpClient` wire-framing (`Content-Length`, `Transfer-Encoding: chunked`, and missing-`Content-Length` + delayed-`FIN` recovery), 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, `toggleDimmerNightMode` port-heal + offline revert, `pollActiveHomeStates` echo suppression, offline rollback, manual IP probing, soft-AP SSID startup DB sanitization, `resetLanHomesSwitchesAndRooms`, and multi-device startup state detection.
+  - `GenaProvisioningAndRulesTest.kt`: UPnP GENA `SUBSCRIBE`, HTTP 412 recovery, byte-exact multi-byte UTF-8 `NOTIFY` callback server, `RuleScheduler`, and full loopback `10.22.22.1` `WiFiSetup1` provisioning (including `NetworkStatus=0` failure & `CloseSetup` hold and `SetupDebugSnapshot` formatting).
   - `LicenseAndBrandGovernanceTest.kt`: Verifies root [`LICENSE`](LICENSE) parity with `MoreScreen.kt` (`mit_license_text_surface` & `third_party_notices_surface`), minimal permissive dependency footprint in `gradle/libs.versions.toml` & `app/build.gradle.kts` (zero `OkHttp`/`pywemo`), `org.suppressingfire.wemi` package/filename hygiene, and Play Store `"WeMo"` trademark boundaries.
-  - `ExampleRobolectricTest.kt`, `EndToEndUiTest.kt` & `HardwareCujEndToEndTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeUpnpServer` End-to-End UI tests (`31/31` total tests passing), including the complete `Reset` -> `SSDP Discovery` -> `Adopt Switch & Dimmer` -> `Toggle Switch` -> `Toggle & Scale Dimmer Brightness` CUJ, 9-port Disconnected ring self-healing + GENA push UI transition + Live SOAP Log file export CUJ, and zero-cloud `10.22.22.1` Setup AP hardware scan + AES Method 2 provisioning + screenshot telemetry export CUJ.
+  - `ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt` & `TvAndHeaderLayoutE2ETest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeUpnpServer` End-to-End UI tests (`35/35` total tests passing), including single-row `TopHeader` geometry, Android TV 3-column room-grouped D-Pad `KeyEvent` + `DIM -/+` loopback SOAP control, `Reset` -> `SSDP Discovery` -> `Adopt Switch & Dimmer` -> `Toggle Switch` -> `Toggle & Scale Dimmer Brightness` CUJ, 9-port Disconnected ring self-healing + GENA push UI transition + Live SOAP Log file export CUJ, and zero-cloud `10.22.22.1` Setup AP hardware scan + AES Method 2 provisioning + screenshot telemetry export CUJ.
 
 ---
 
@@ -99,7 +99,7 @@ The app supports four physical hardware families from Belkin's discontinued smar
 > **CRITICAL RULE**: **Only push code to GitHub (`origin/main` or `origin/agent-docs`) after verifying that the full build and all automated tests pass with zero errors.** Never push unverified or non-compiling code.
 
 ```bash
-# Force-execute all 31 Robolectric unit, protocol, governance & E2E Compose UI tests
+# Force-execute all 35 Robolectric unit, protocol, governance & E2E Compose UI tests
 ./gradlew testDebugUnitTest --rerun-tasks
 
 # Assemble debug APK
