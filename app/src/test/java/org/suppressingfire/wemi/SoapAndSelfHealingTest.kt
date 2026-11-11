@@ -521,4 +521,86 @@ class SoapAndSelfHealingTest {
         assertEquals("My Home", homeAfterRealRouter.homeName)
         assertEquals("HeadFamily-2.4G", homeAfterRealRouter.ssidLabel)
     }
+
+    @Test
+    fun `verify LanHttpClient frames Content-Length, chunked transfer-encoding, and missing Content-Length with delayed FIN`() {
+        val client = org.suppressingfire.wemi.network.LanHttpClient(
+            connectTimeoutMs = 400,
+            readTimeoutMs = 80
+        )
+
+        java.net.ServerSocket(0, 8, java.net.InetAddress.getByName("127.0.0.1")).use { server ->
+            val port = server.localPort
+            val reqIndex = java.util.concurrent.atomic.AtomicInteger(0)
+            val acceptLoop = Thread {
+                repeat(3) {
+                    val sock = runCatching { server.accept() }.getOrNull() ?: return@repeat
+                    val idx = reqIndex.incrementAndGet()
+                    Thread {
+                        sock.use { s ->
+                            // Consume request line so TCP RST is not sent on close
+                            val reader = s.getInputStream()
+                            val buf = ByteArray(1024)
+                            runCatching { reader.read(buf) }
+                            when (idx) {
+                                1 -> {
+                                    // Request 1: Exact Content-Length with delayed FIN
+                                    val body = "<root><binaryState>1</binaryState></root>"
+                                    val resp = "HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: ${body.length}\r\n\r\n$body"
+                                    s.getOutputStream().write(resp.toByteArray(Charsets.UTF_8))
+                                    s.getOutputStream().flush()
+                                    Thread.sleep(250)
+                                }
+                                2 -> {
+                                    // Request 2: Transfer-Encoding: chunked with chunk extension
+                                    val chunk1 = "<BinaryState>"
+                                    val chunk2 = "1|85</BinaryState>"
+                                    val resp = buildString {
+                                        append("HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n")
+                                        append("${chunk1.length.toString(16)};ext=1\r\n$chunk1\r\n")
+                                        append("${chunk2.length.toString(16)}\r\n$chunk2\r\n")
+                                        append("0\r\n\r\n")
+                                    }
+                                    s.getOutputStream().write(resp.toByteArray(Charsets.UTF_8))
+                                    s.getOutputStream().flush()
+                                }
+                                3 -> {
+                                    // Request 3: Missing Content-Length + delayed FIN (recovered on readTimeoutMs via readUntilEof)
+                                    val body = "<device><friendlyName>Porch Switch</friendlyName></device>"
+                                    val resp = "HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\n\r\n$body"
+                                    s.getOutputStream().write(resp.toByteArray(Charsets.UTF_8))
+                                    s.getOutputStream().flush()
+                                    Thread.sleep(250)
+                                }
+                            }
+                        }
+                    }.apply {
+                        isDaemon = true
+                        start()
+                    }
+                }
+            }.apply {
+                isDaemon = true
+                start()
+            }
+
+            val r1 = client.get("http://127.0.0.1:$port/setup.xml")
+            assertTrue(r1.isSuccessful)
+            assertEquals("<root><binaryState>1</binaryState></root>", r1.body)
+
+            val r2 = client.postXml(
+                url = "http://127.0.0.1:$port/upnp/control/basicevent1",
+                soapBody = "<u:GetBinaryState/>",
+                soapAction = "\"urn:Belkin:service:basicevent:1#GetBinaryState\""
+            )
+            assertTrue(r2.isSuccessful)
+            assertEquals("<BinaryState>1|85</BinaryState>", r2.body)
+
+            val r3 = client.get("http://127.0.0.1:$port/Lightsetup.xml")
+            assertTrue(r3.isSuccessful)
+            assertEquals("<device><friendlyName>Porch Switch</friendlyName></device>", r3.body)
+
+            acceptLoop.join(1000)
+        }
+    }
 }

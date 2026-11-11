@@ -109,6 +109,7 @@ internal class LanHttpClient(
         }
 
         return socketFactory.createSocket().use { socket ->
+            socket.tcpNoDelay = true
             socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
             socket.soTimeout = readTimeoutMs
 
@@ -222,7 +223,11 @@ internal class LanHttpClient(
         val out = ByteArrayOutputStream()
         val buf = ByteArray(4096)
         while (out.size() < MAX_RESPONSE_BODY_BYTES) {
-            val n = input.read(buf, 0, minOf(buf.size, MAX_RESPONSE_BODY_BYTES - out.size()))
+            val n = try {
+                input.read(buf, 0, minOf(buf.size, MAX_RESPONSE_BODY_BYTES - out.size()))
+            } catch (timeout: java.net.SocketTimeoutException) {
+                if (out.size() > 0) break else throw timeout
+            }
             if (n == -1) break
             out.write(buf, 0, n)
         }

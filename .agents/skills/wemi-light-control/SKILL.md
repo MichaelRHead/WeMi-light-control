@@ -14,7 +14,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
 ## 1. Build, Test & Environment
 
 - **Toolchain**: AGP `9.1.0`, Kotlin `2.3.20`, KSP `2.3.6`, Compose BOM `2026.03.00`, Room `2.8.4` (`version = 5`), Robolectric `4.16.1`, `compileSdk = 36`, `minSdk = 24`.
-- **Unit, Protocol, Governance & E2E Compose UI Tests (`30/30` across 8 suites)**:
+- **Unit, Protocol, Governance & E2E Compose UI Tests (`31/31` across 8 suites)**:
   ```bash
   ./gradlew testDebugUnitTest --rerun-tasks
   ```
@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
   ```bash
   ./gradlew assembleDebug
   ```
-- **Package / Namespace**: `org.suppressingfire.wemi` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "22.0"`, `versionCode = 22`).
+- **Package / Namespace**: `org.suppressingfire.wemi` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "23.0"`, `versionCode = 23`).
 
 ---
 
@@ -39,7 +39,7 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 
 ---
 
-## 3. Codebase Map (`v22.0` — `org.suppressingfire.wemi`)
+## 3. Codebase Map (`v23.0` — `org.suppressingfire.wemi`)
 
 ### Data & Scheduling Layer (`app/src/main/java/org/suppressingfire/wemi/data/`)
 - **`DeviceEntities.kt`**:
@@ -61,7 +61,7 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 
 ### Network Layer (`app/src/main/java/org/suppressingfire/wemi/network/`)
 - **`LanHttpClient.kt`**, **`NetworkClient.kt`**, **`XmlAndSkuParser.kt`** & **`SsdpDiscoveryEngine.kt`**:
-  - Zero-dependency `LanHttpClient` built directly on `javax.net.SocketFactory` (`GET`, `POST`, `SUBSCRIBE`, `UNSUBSCRIBE` with byte-exact `Content-Length` / chunked framing).
+  - Zero-dependency `LanHttpClient` built directly on `javax.net.SocketFactory` (`GET`, `POST`, `SUBSCRIBE`, `UNSUBSCRIBE` with `tcpNoDelay = true`, byte-exact `Content-Length` / chunked framing, and delayed-`FIN` recovery in `readUntilEof`).
   - 9-port `probeWemoPort` (`49153, 49152, 49154, 49151, 49155..49159`) with TCP connect timeout vs. `ECONNREFUSED` vs. HTTP read timeout separation and `<serialNumber>`/`<UDN>` verification.
   - Unified `executeWithPortHealing`, `setBinaryState` (with `<BinaryState>Error</BinaryState>` quirk handling), `getBinaryState`, `getMetaInfo` (filtering Belkin soft-AP SSIDs in `parseMetaInfoSoapResponse`), `getSignalStrength`, `changeFriendlyName`, `configureNightMode`, `scanSubnetUnicast`, and `performSsdpDiscoveryScan` (`MulticastLock` + 1s retransmit).
 - **`GenaSubscriptionManager.kt`**:
@@ -73,8 +73,9 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 
 ### UI & Test Layer (`app/src/main/java/org/suppressingfire/wemi/ui/` & `app/src/test/java/org/suppressingfire/wemi/`)
 - **`SwitchViewModel.kt`**, **`MainActivity.kt`**, **`ui/screens/*`** & **`ui/components/*`**:
+  - Compact single-row `TopHeader` (`HeaderAndNav.kt`) and 3-column room-grouped Android TV dashboard (`TvDashboardScreen`, `TvRoomSectionHeader`, and non-interfering Dimmer Adjust Mode in `TvScreen.kt` & `TvCardsAndScenes.kt`).
   - Full-width `AutoShrinkSwitchName` on Line 1 of `DeviceRow`, `TvDeviceCard`, `RoomGroupHeaderCard`, and `WifiHomeBar` so long names (`"Hallway & Landing"`, `"My Home"`) never squeeze adjacent pills into vertical character columns.
   - Dark-gray IEC `"I/O"` power-off icon (`drawIecPowerSymbol` in `#23272F`/`#181B20`), red `DisconnectedRingButton` (`drawDisconnectedSymbol`), screenshot-ready `ProvisionDebugPanel` (`provision_debug_panel`, `provision_debug_text`) inside `ProvisionApDialog`, and `open_source_licenses_card` (`mit_license_text_surface` & `third_party_notices_surface`) in `MoreScreen`.
   - One-tap `Reset` chip (`reset_lan_data_chip`) in `WifiHomeBar` and `more_reset_lan_homes_switches_button` on `MoreScreen`.
 - **`FakeUpnpServer.kt`**, **`SkuAndCryptoTest.kt`**, **`SoapAndSelfHealingTest.kt`**, **`GenaProvisioningAndRulesTest.kt`**, **`LicenseAndBrandGovernanceTest.kt`**, **`ExampleRobolectricTest.kt`**, **`EndToEndUiTest.kt`** & **`HardwareCujEndToEndTest.kt`**:
-  - 30 automated loopback UPnP/SOAP/GENA protocol, license governance, and full-stack Compose E2E tests.
+  - 31 automated loopback UPnP/SOAP/GENA protocol, license governance, and full-stack Compose E2E tests.

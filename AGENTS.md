@@ -87,10 +87,10 @@ The app supports four physical hardware families from Belkin's discontinued smar
 - **`test/` (Loopback UPnP/SOAP Hardware Simulator, Protocol Unit Tests, License Governance & Compose E2E Tests — `app/src/test/java/org/suppressingfire/wemi/`)**:
   - `FakeUpnpServer.kt`: Reusable `AutoCloseable` loopback HTTP/UPnP/SOAP/GENA/`WiFiSetup1` + UDP SSDP `M-SEARCH` responder server on `127.0.0.1` (`ServerSocket(0)` & `DatagramSocket(0)`).
   - `SkuAndCryptoTest.kt`: Hardware SKU classification (`F7C030`, `WLS0403`, `F7C059`, `WDS060`, `F7C063`, `WSP080`), `/setup.xml` parsing, `GetMetaInfo` soft-AP SSID filtering (`isWemoDeviceSetupSsid`), semantic device categorization, and OpenSSL AES-128-CBC encryption/decryption (Methods 1, 2 & 3).
-  - `SoapAndSelfHealingTest.kt`: 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, offline rollback, manual IP probing, soft-AP SSID startup DB sanitization, `resetLanHomesSwitchesAndRooms`, and multi-device startup state detection.
+  - `SoapAndSelfHealingTest.kt`: `LanHttpClient` wire-framing (`Content-Length`, `Transfer-Encoding: chunked`, and missing-`Content-Length` + delayed-`FIN` recovery), 9-port `probeWemoPort` port-shift healing, `<BinaryState>Error</BinaryState>` quirk, `GetMetaInfo`, `ChangeFriendlyName`, offline rollback, manual IP probing, soft-AP SSID startup DB sanitization, `resetLanHomesSwitchesAndRooms`, and multi-device startup state detection.
   - `GenaProvisioningAndRulesTest.kt`: UPnP GENA `SUBSCRIBE`, HTTP 412 recovery, embedded `NOTIFY` callback server, `RuleScheduler`, and full loopback `10.22.22.1` `WiFiSetup1` provisioning (including `NetworkStatus=0` failure & `CloseSetup` hold and `SetupDebugSnapshot` formatting).
   - `LicenseAndBrandGovernanceTest.kt`: Verifies root [`LICENSE`](LICENSE) parity with `MoreScreen.kt` (`mit_license_text_surface` & `third_party_notices_surface`), minimal permissive dependency footprint in `gradle/libs.versions.toml` & `app/build.gradle.kts` (zero `OkHttp`/`pywemo`), `org.suppressingfire.wemi` package/filename hygiene, and Play Store `"WeMo"` trademark boundaries.
-  - `ExampleRobolectricTest.kt`, `EndToEndUiTest.kt` & `HardwareCujEndToEndTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeUpnpServer` End-to-End UI tests (`30/30` total tests passing), including the complete `Reset` -> `SSDP Discovery` -> `Adopt Switch & Dimmer` -> `Toggle Switch` -> `Toggle & Scale Dimmer Brightness` CUJ, 9-port Disconnected ring self-healing + GENA push UI transition + Live SOAP Log file export CUJ, and zero-cloud `10.22.22.1` Setup AP hardware scan + AES Method 2 provisioning + screenshot telemetry export CUJ.
+  - `ExampleRobolectricTest.kt`, `EndToEndUiTest.kt` & `HardwareCujEndToEndTest.kt`: Full-stack Jetpack Compose + Robolectric + `FakeUpnpServer` End-to-End UI tests (`31/31` total tests passing), including the complete `Reset` -> `SSDP Discovery` -> `Adopt Switch & Dimmer` -> `Toggle Switch` -> `Toggle & Scale Dimmer Brightness` CUJ, 9-port Disconnected ring self-healing + GENA push UI transition + Live SOAP Log file export CUJ, and zero-cloud `10.22.22.1` Setup AP hardware scan + AES Method 2 provisioning + screenshot telemetry export CUJ.
 
 ---
 
@@ -99,7 +99,7 @@ The app supports four physical hardware families from Belkin's discontinued smar
 > **CRITICAL RULE**: **Only push code to GitHub (`origin/main` or `origin/agent-docs`) after verifying that the full build and all automated tests pass with zero errors.** Never push unverified or non-compiling code.
 
 ```bash
-# Force-execute all 30 Robolectric unit, protocol, governance & E2E Compose UI tests
+# Force-execute all 31 Robolectric unit, protocol, governance & E2E Compose UI tests
 ./gradlew testDebugUnitTest --rerun-tasks
 
 # Assemble debug APK
