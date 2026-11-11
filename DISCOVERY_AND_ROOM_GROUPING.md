@@ -40,20 +40,20 @@ The **Antigravity Device Discovery & Room Grouping Agent** is responsible for tw
 flowchart TD
     subgraph Network["LAN Discovery & XML Parsing Layer (org.suppressingfire.wemi.network)"]
         SSDP["SsdpDiscoveryEngine\nUDP M-SEARCH (239.255.255.250:1900)\n+ /24 Unicast Sweep + Loopback Mirror"]
-        XML["XmlAndSkuParser\nparseSetupXmlDescriptor + classifyHardwareSku\n+ parseMetaInfoSoapResponse (isWemoDeviceSetupSsid)"]
+        XML["XmlAndSkuParser & LanRuntimeUtils\nparseSetupXmlDescriptor + classifyHardwareSku\n+ isWemoDeviceSetupSsid + isPlaceholderSerial"]
         PORT["LanHttpClient & NetworkClient\nprobeWemoPort (9 ports: 49153..49159)\n+ GetBinaryState + GetMetaInfo"]
     end
 
     subgraph Coordinator["Discovery Coordinator & Room Engine (org.suppressingfire.wemi.data)"]
-        COORD["DiscoveryCoordinator\nexecuteSsdpScan / adoptDiscoveredDevice\nreconnectAndRediscoverHome / attemptTwoStageReconnect"]
-        MATCH["3-Tier Identity Matcher\nmatchesDiscoveredDevice & findMatchingExistingDevice\n1. SerialNumber  2. UDN/USN  3. (IP, Port) or Name"]
+        COORD["DiscoveryCoordinator & DeviceCrudAndRulesCoordinator\nexecuteSsdpScan / adoptDiscoveredDevice / saveDevice\nreconnectAndRediscoverHome / attemptTwoStageReconnect"]
+        MATCH["3-Tier Identity Matcher (DeviceEntity.matchesDiscovered)\nmatchesDiscoveredDevice & findMatchingExistingDevice\n1. Real Serial (!isPlaceholderSerial)  2. UDN/USN  3. Endpoint/Name"]
         ROOM["Room Inference & Migration Engine\nnormalizeDeviceNameForInference -> inferRoomFromName\n-> resolveDeviceRoomAssignment"]
         HOME["Zero-Permission Home & SSID Sync\nsanitizeAndResolveInitialLanHome\nresolveOrCreateHomeForSubnet / syncHomeSsidFromDeviceSsid"]
     end
 
     subgraph StorageUI["Room v5 SQLite & Spatial UI Grouping"]
         DB["SwitchDao (wemo_devices & wemo_home_networks)"]
-        SORT["MainActivity.kt & TvScreen.kt Spatial Room Sorters\nNamed Rooms -> 'Unassigned' at Bottom"]
+        SORT["MainActivity.kt, TvScreen.kt & TvHeadersAndScenes.kt\nNamed Rooms -> 'Unassigned' at Bottom"]
     end
 
     SSDP --> XML
@@ -72,12 +72,13 @@ flowchart TD
 
 | File | Key Functions & Types | Role in Discovery & Room Grouping |
 | :--- | :--- | :--- |
-| [`DeviceEntities.kt`](app/src/main/java/org/suppressingfire/wemi/data/DeviceEntities.kt) | `normalizeDeviceNameForInference`, `inferRoomFromName`, `resolveDeviceRoomAssignment`, `classifyDeviceCategory` | Normalizes CamelCase/underscores/hyphens, applies specificity-ordered room inference (`"Ensuite"` before `"Bedroom"`, word-bounded `"bed"`/`"hall"`/`"den"`, `"Unassigned"` fallback), and resolves non-destructive room migrations. |
-| [`DiscoveryCoordinator.kt`](app/src/main/java/org/suppressingfire/wemi/data/DiscoveryCoordinator.kt) | `matchesDiscoveredDevice`, `findMatchingExistingDevice`, `executeSsdpScan`, `adoptDiscoveredDevice`, `attemptTwoStageReconnect`, `detectStartupDeviceStates`, `reconnectAndRediscoverHome`, `sanitizeAndResolveInitialLanHome` | Orchestrates startup `GetBinaryState` probes, 2-stage self-healing reconnects, SSDP/unicast discovery scans, `adoptMutex`-serialized device adoption, 3-tier identity matching, and soft-AP SSID / legacy room sanitization. |
+| [`DeviceEntities.kt`](app/src/main/java/org/suppressingfire/wemi/data/DeviceEntities.kt) | `DeviceEntity.matchesDiscovered`, `SsdpDiscoveredDevice.matchesEndpointOrSerial`, `normalizeDeviceNameForInference`, `inferRoomFromName`, `resolveDeviceRoomAssignment`, `classifyDeviceCategory` | Implements canonical 3-tier hardware identity matching & discovery deduplication, normalizes CamelCase/delimiters, applies specificity-ordered room inference (`"Ensuite"` before `"Bedroom"`, word-bounded `"bed"`/`"hall"`/`"den"`, `"Unassigned"` fallback), and resolves non-destructive room migrations. |
+| [`DiscoveryCoordinator.kt`](app/src/main/java/org/suppressingfire/wemi/data/DiscoveryCoordinator.kt) & [`DeviceCrudAndRulesCoordinator.kt`](app/src/main/java/org/suppressingfire/wemi/data/DeviceCrudAndRulesCoordinator.kt) | `matchesDiscoveredDevice`, `findMatchingExistingDevice`, `executeSsdpScan`, `adoptDiscoveredDevice`, `attemptTwoStageReconnect`, `detectStartupDeviceStates`, `reconnectAndRediscoverHome`, `sanitizeAndResolveInitialLanHome`, `saveDevice`, `toggleRoomPower`, `updateRoomBrightness` | Orchestrates startup `GetBinaryState` probes, 2-stage self-healing reconnects, SSDP/unicast discovery scans, `adoptMutex`-serialized device adoption, manual-IP 9-port enrichment, room batch power/brightness fan-out, and soft-AP SSID / legacy room sanitization. |
 | [`SsdpDiscoveryEngine.kt`](app/src/main/java/org/suppressingfire/wemi/network/SsdpDiscoveryEngine.kt) | `performSsdpDiscoveryScan`, `scanSubnetUnicast`, `registerLoopbackSsdpPort` | Sends dual UDP `M-SEARCH` bursts (`urn:Belkin:service:basicevent:1` & `upnp:rootdevice`) with `MulticastLock` + retransmit, mirrors probes to loopback test servers, and sweeps `/24` subnets with Wi-Fi-bound `Semaphore(24)`. |
-| [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) & [`NetworkClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkClient.kt) | `probeWemoPort`, `executeWithPortHealing`, `getBinaryState`, `getMetaInfo`, `getSignalStrength` | Zero-dependency `SocketFactory` HTTP/1.1 client and 9-port UPnP endpoint prober verifying `<serialNumber>`/`<UDN>` across ports `49153, 49152, 49154, 49151, 49155..49159`. |
+| [`LanRuntimeUtils.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanRuntimeUtils.kt) & [`NetworkModels.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) | `PLACEHOLDER_SERIALS`, `isPlaceholderSerial`, `isRunningInRobolectric`, `resolvePreferredLanInterfaceIpv4`, `SsdpScanReport`, `SwitchMetaInfo` | Distinguishes synthetic placeholder serials (`221517K01018AB` / `LAN` / `NEW`) from real hardware serials, selects `wlan*`-preferred IPv4 interfaces, and defines shared discovery/SOAP wire models. |
+| [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) & [`NetworkClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkClient.kt) | `probeWemoPort`, `executeWithPortHealing`, `getBinaryState`, `getMetaInfo`, `getSignalStrength` | Zero-dependency `SocketFactory` HTTP/1.1 client (with `tcpNoDelay` & delayed-`FIN` recovery) and 9-port UPnP endpoint prober verifying `<serialNumber>`/`<UDN>` across ports `49153, 49152, 49154, 49151, 49155..49159`. |
 | [`XmlAndSkuParser.kt`](app/src/main/java/org/suppressingfire/wemi/network/XmlAndSkuParser.kt) | `parseSetupXmlDescriptor`, `classifyHardwareSku`, `parseMetaInfoSoapResponse`, `isWemoDeviceSetupSsid` | Extracts `<friendlyName>`, `<modelName>`, `<serialNumber>`, `<UDN>`, `<binaryState>`, and `<brightness>` from `/setup.xml`, classifies Belkin SKUs, and filters out Belkin soft-AP SSIDs (`WeMo.*` / `Wemo.LS3W.*`). |
-| [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt) & [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt) | `availableRooms`, `groupedDevicesByRoom`, `groupedByRoom` (`TvRoomSectionHeader`) | Groups active home devices by `roomName` on Phone/Tablet (`RoomGroupCard`) and Android TV's 3-column grid (`TvRoomSectionHeader`), sorting `"Unassigned"` after all named rooms while preserving `sortOrder` within each room. |
+| [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt), [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt), [`TvHeadersAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvHeadersAndScenes.kt) & [`SsdpDiscoveryBanner.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/SsdpDiscoveryBanner.kt) | `availableRooms`, `groupedDevicesByRoom`, `groupedByRoom`, `TvRoomSectionHeader`, `SsdpDiscoveryBannerCard` | Groups active home devices by `roomName` on Phone/Tablet (`RoomGroupCard`) and Android TV's 3-column grid (`TvRoomSectionHeader`), sorting `"Unassigned"` after all named rooms while preserving `sortOrder` within each room. |
 
 ---
 
@@ -86,8 +87,8 @@ flowchart TD
 ### 3.1 Multi-Path Discovery Pipeline (`SsdpDiscoveryEngine.kt`)
 When `executeSsdpScan` or `reconnectAndRediscoverHome` runs:
 1. **Stage A — UDP Multicast `M-SEARCH` (`239.255.255.250:1900`)**:
-   - Acquires `WifiManager.MulticastLock("wemi_ssdp_multicast_lock")`, binds an ephemeral UDP socket on the active Wi-Fi IPv4 interface, and transmits two `M-SEARCH` bursts separated by a `550ms` retransmit interval (`90ms` in `fastMode` under Robolectric/loopback) to defeat Wi-Fi multicast packet loss.
-   - Simultaneously mirrors `M-SEARCH` datagrams to any registered loopback `FakeUpnpServer` UDP ports (`127.0.0.1`) for deterministic E2E testing.
+   - Acquires `WifiManager.MulticastLock("wemi_ssdp_multicast_lock")`, binds an ephemeral UDP socket on the active Wi-Fi IPv4 interface (`LanRuntimeUtils.resolvePreferredLanInterfaceIpv4`), and transmits two `M-SEARCH` bursts separated by a `550ms` retransmit interval (`90ms` in `fastMode` under Robolectric/loopback) to defeat Wi-Fi multicast packet loss.
+   - Simultaneously mirrors `M-SEARCH` datagrams to any registered loopback `FakeUpnpServer` UDP ports (`127.0.0.1`) for deterministic E2E testing, deduplicating responses via `SsdpDiscoveredDevice.matchesEndpointOrSerial`.
 2. **Stage B — Known-Device Unicast Verification**:
    - Probes all remembered switches for the active home across the 9 Belkin UPnP ports (`49153, 49152, 49154, 49151, 49155..49159`) so switches on APs that drop UDP multicast are still discovered immediately.
 3. **Stage C — `/24` Subnet Unicast Sweep (`scanSubnetUnicast`)**:
@@ -95,16 +96,16 @@ When `executeSsdpScan` or `reconnectAndRediscoverHome` runs:
 4. **Stage D — Live State & Metadata Enrichment**:
    - For each discovered `/setup.xml` endpoint, queries `basicevent1#GetBinaryState`, `metainfo1#GetMetaInfo` (filtering out soft-AP SSIDs via `isWemoDeviceSetupSsid`), and `WiFiSetup1#GetSignalStrength`.
 
-### 3.2 Deterministic 3-Tier Hardware Identity Matcher (`matchesDiscoveredDevice`)
-To prevent duplicate database rows when a switch changes IP/port and to prevent cross-matching when DHCP swaps IPs between two switches (or when multiple loopback servers run on `127.0.0.1`), `DiscoveryCoordinator.matchesDiscoveredDevice` enforces a strict 3-tier priority order:
+### 3.2 Deterministic 3-Tier Hardware Identity Matcher (`DeviceEntity.matchesDiscovered` & `matchesDiscoveredDevice`)
+To prevent duplicate database rows when a switch changes IP/port and to prevent cross-matching when DHCP swaps IPs between two switches (or when multiple loopback servers run on `127.0.0.1`), `DeviceEntity.matchesDiscovered` (delegated from `DiscoveryCoordinator.matchesDiscoveredDevice` and `findMatchingExistingDevice`) enforces a strict 3-tier priority order:
 
-1. **Tier 1 — Hardware `<serialNumber>` Identity (Authoritative)**:
-   - If **both** `existing.serialNumber` and `discovered.serialNumber` are non-blank, they match **if and only if** `existing.serialNumber.equals(discovered.serialNumber, ignoreCase = true)`.
-   - Two switches with different non-blank serial numbers will **never** match each other even if they share the same IP address or friendly name.
+1. **Tier 1 — Real Hardware `<serialNumber>` Identity (Authoritative)**:
+   - If **both** `!LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber)` and `!LanRuntimeUtils.isPlaceholderSerial(discovered.serialNumber)` are true, they match **if and only if** `existing.serialNumber.equals(discovered.serialNumber, ignoreCase = true)`.
+   - Two switches with different real hardware serial numbers will **never** match each other even if they share the same IP address or friendly name, while synthetic placeholder serials (`221517K01018AB`, `221517K01018LAN`, `221517K01018NEW`) cleanly fall through to Tiers 2 and 3 so manual IP entries upgrade to their real hardware serial upon discovery.
 2. **Tier 2 — UPnP `<UDN>` / `USN` Identity**:
-   - If serial numbers are not both present and both `existing.udn` and `discovered.usn` are non-blank, matches if `discovered.usn.contains(existing.udn, ignoreCase = true)`.
+   - If real serial numbers are not both present and both `existing.udn` and `discovered.usn` are non-blank, matches if `discovered.usn.contains(existing.udn, ignoreCase = true)`.
 3. **Tier 3 — Endpoint (`ipAddress`, `port`) or `<friendlyName>` Fallback**:
-   - Used **only** when at least one device has a blank `serialNumber` (for example, a manually entered IP address before its first hardware probe completes).
+   - Used **only** when at least one device has a blank or placeholder `serialNumber` (for example, a manually entered IP address before its first hardware probe completes).
 
 ---
 
@@ -148,12 +149,12 @@ Whenever an existing switch is inspected during app startup (`sanitizeAndResolve
 All agents modifying data, network, or UI code must preserve these five invariants:
 
 1. **Never Default Unrecognized Switch Names to `"Living Room"`**:
-   - `inferRoomFromName` must always return `"Unassigned"` as its `else` fallback, and both [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt) (`availableRooms`, `groupedDevicesByRoom`) and [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt) (`groupedByRoom` / `TvRoomSectionHeader`) must sort `"Unassigned"` after all named rooms.
+   - `inferRoomFromName` must always return `"Unassigned"` as its `else` fallback, and both [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt) (`availableRooms`, `groupedDevicesByRoom`) and [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt) / [`TvHeadersAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvHeadersAndScenes.kt) (`groupedByRoom` / `TvRoomSectionHeader`) must sort `"Unassigned"` after all named rooms.
 2. **Evaluate Specific Functional Rooms (`"Ensuite"`) Before Broad Modifiers (`"Bedroom"`)**:
    - Keep `"Ensuite"` above `"Bedroom"` in `inferRoomFromName` so `"Master Bath"`, `"Guest Bathroom"`, `"Primary Bath"`, and `"Kids Bath"` never get misclassified into `"Bedroom"`.
 3. **Enforce Word Boundaries on Short Ambiguous Tokens (`\bbed\b`, `\bhall\b`, `\bden\b`, `\bgirl\b`, `\bboy\b`, `\bkid\b`, `\bwc\b`)**:
    - Never use raw substring checks for `"den"` (which false-matches `"Garden"` or `"Credenza"`), `"hall"` (which false-matches `"Marshall"` or `"Shallow"`), or `"bed"` (which false-matches `"Embedded"`).
-4. **Always Use `matchesDiscoveredDevice` & `resolveDeviceRoomAssignment` in `DiscoveryCoordinator.kt`**:
-   - Never write ad-hoc IP-only matching that ignores non-blank `<serialNumber>` mismatches, and never overwrite a user's custom `roomName` during SSDP scans.
+4. **Always Use `DeviceEntity.matchesDiscovered` (`!LanRuntimeUtils.isPlaceholderSerial`) & `resolveDeviceRoomAssignment` in `DiscoveryCoordinator.kt`**:
+   - Never write ad-hoc IP-only matching that ignores real `<serialNumber>` mismatches, never treat synthetic placeholder serials (`221517K01018AB` / `LAN` / `NEW`) as real hardware serials, and never overwrite a user's custom `roomName` during SSDP scans.
 5. **Filter Out Belkin Soft-AP SSIDs (`isWemoDeviceSetupSsid`) Before Updating Home or Device SSIDs**:
    - Never allow `WeMo.Switch.xxx`, `Wemo.LS3W.xxx`, `WeMo.Light.xxx`, or `WeMo.Mini.xxx` from `GetMetaInfo` to rename a `HomeNetworkEntity` or overwrite `device.wifiSsid`.
