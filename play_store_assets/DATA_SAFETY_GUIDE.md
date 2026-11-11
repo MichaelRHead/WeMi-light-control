@@ -14,6 +14,11 @@
 | **7" Tablet Screenshot 2** | 1200 × 1920 px (PNG) | `play_store_assets/screenshots/tablet_7_inch/tablet7_2_ssdp_and_rules.png` | `1200 × 1920` |
 | **10" Tablet Screenshot 1** | 1600 × 2560 px (PNG) | `play_store_assets/screenshots/tablet_10_inch/tablet10_1_devices_dashboard.png` | `1600 × 2560` |
 | **10" Tablet Screenshot 2** | 1600 × 2560 px (PNG) | `play_store_assets/screenshots/tablet_10_inch/tablet10_2_ssdp_and_rules.png` | `1600 × 2560` |
+| **Android TV Play Banner** | 1280 × 720 px, 24-bit PNG | `play_store_assets/tv/tv_banner_1280x720.png` | `1280 × 720` |
+| **APK Leanback TV Banner** | 320 × 180 px, 24-bit PNG | `play_store_assets/tv/tv_banner_320x180.png` (`res/drawable-xhdpi/tv_banner.png`) | `320 × 180` |
+| **Android TV Screenshot 1** | 1920 × 1080 px (16:9 PNG) | `play_store_assets/screenshots/android_tv/tv_1_room_groups_and_remote_focus.png` | `1920 × 1080` |
+| **Android TV Screenshot 2** | 1920 × 1080 px (16:9 PNG) | `play_store_assets/screenshots/android_tv/tv_2_dimmer_and_ssdp_discovery.png` | `1920 × 1080` |
+| **Android TV Screenshot 3** | 1920 × 1080 px (16:9 PNG) | `play_store_assets/screenshots/android_tv/tv_3_living_room_scenes_and_rules.png` | `1920 × 1080` |
 
 ---
 
