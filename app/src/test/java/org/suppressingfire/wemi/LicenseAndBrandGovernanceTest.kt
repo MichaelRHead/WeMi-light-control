@@ -112,12 +112,21 @@ class LicenseAndBrandGovernanceTest {
         assertTrue("No Kotlin files may remain in app/src/main/java/com/example", legacyMainFiles.isEmpty())
         assertTrue("No Kotlin files may remain in app/src/test/java/com/example", legacyTestFiles.isEmpty())
 
-        // 2. No source or test filenames may start with WeMo*
+        // 2. Every Kotlin source/test file must declare package org.suppressingfire.wemi... and never use a WeMo* filename prefix
         val srcRoot = File(repoRoot, "app/src")
-        val wemoNamedFiles = srcRoot.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" && it.name.startsWith("WeMo", ignoreCase = true) }
+        val allKotlinFiles = srcRoot.walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+        val wrongPackageFiles = allKotlinFiles.filter { ktFile ->
+            val pkgLine = ktFile.useLines { lines -> lines.firstOrNull { it.trimStart().startsWith("package ") } } ?: ""
+            !pkgLine.trim().startsWith("package org.suppressingfire.wemi")
+        }.map { it.relativeTo(repoRoot).path }
+        assertTrue(
+            "Every Kotlin file must declare package org.suppressingfire.wemi..., found: $wrongPackageFiles",
+            wrongPackageFiles.isEmpty()
+        )
+
+        val wemoNamedFiles = allKotlinFiles
+            .filter { it.name.startsWith("WeMo", ignoreCase = true) }
             .map { it.relativeTo(repoRoot).path }
-            .toList()
         assertTrue(
             "No Kotlin source/test files may use a WeMo* filename prefix, found: $wemoNamedFiles",
             wemoNamedFiles.isEmpty()
@@ -143,7 +152,36 @@ class LicenseAndBrandGovernanceTest {
             )
         }
 
-        // 4. Google Play Store What's New release notes must fit within the 500-character Play Console limit
+        // 4. Modular UI composables & controllers (MainActivity.kt + ui/**/*.kt) must not expose user-visible "WeMo" string literals
+        val allowedUiProtocolOrTagTokens = setOf(
+            "WeMo_WW_2.00.11532.PVT",
+            "wemo_setup_ap_detected_banner",
+            "wemo_setup_ap_banner",
+            "more_provision_wemo_ap_button"
+        )
+        val uiFiles = listOf(File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/MainActivity.kt")) +
+            File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/ui")
+                .walkTopDown()
+                .filter { it.isFile && it.extension == "kt" }
+                .toList()
+        val stringLiteralRegex = Regex("\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"")
+        val disallowedUiStrings = mutableListOf<String>()
+        for (uiFile in uiFiles) {
+            uiFile.readLines().forEachIndexed { idx, line ->
+                stringLiteralRegex.findAll(line).forEach { match ->
+                    val literal = match.groupValues[1]
+                    if (literal.contains("wemo", ignoreCase = true) && literal !in allowedUiProtocolOrTagTokens) {
+                        disallowedUiStrings += "${uiFile.relativeTo(repoRoot).path}:${idx + 1} -> \"$literal\""
+                    }
+                }
+            }
+        }
+        assertTrue(
+            "UI files must not expose user-visible 'WeMo' brand literals, found: $disallowedUiStrings",
+            disallowedUiStrings.isEmpty()
+        )
+
+        // 5. Google Play Store What's New release notes must fit within the 500-character Play Console limit
         val releaseNotesText = File(repoRoot, "play_store_assets/RELEASE_NOTES.txt").readText().trim()
         assertTrue(
             "play_store_assets/RELEASE_NOTES.txt must be <= 500 characters (found ${releaseNotesText.length})",
