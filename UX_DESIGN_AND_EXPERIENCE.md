@@ -94,23 +94,23 @@ When a user taps a power ring:
 
 Every screen and component in **WeMi Light Control** must obey these five layout invariants to prevent visual regressions across compact phones, large font scales, foldables, and 10-foot TVs:
 
-### Invariant 1: Dedicated Full-Width Title Line (`AutoShrinkSwitchName`)
+### Invariant 1: Dedicated Full-Width Title Line (`AutoResizingDeviceNameText` / `AutoShrinkSwitchName`)
 - **Rule**: Never place secondary badges, status pills, or action buttons on the same horizontal line as a dynamic device name, room title, or Wi-Fi Home title if they can compete for width.
 - **Implementation**:
-  - In `DeviceRow.kt`, `device.name` occupies **Line 1** across the full width of the card (`Modifier.fillMaxWidth().testTag("device_name_${device.id}")`) using `AutoShrinkSwitchName(initialFontSizeSp = 17.5f, minFontSizeSp = 11f)`. All secondary pills (`connection_status_badge`, `power_state_badge`, IP/Auto-Off, `category_badge`) live in a `FlowRow` on **Line 2** alongside the hardware illustration and 64dp Power/Disconnected ring.
+  - In `DeviceRow.kt`, `device.name` occupies **Line 1** across the full width of the card (`Modifier.fillMaxWidth().testTag("device_name_${device.id}")`) using `AutoResizingDeviceNameText(initialFontSizeSp = 17.5f, minFontSizeSp = 11f)` (`AutoShrinkSwitchName`). All secondary pills (`connection_status_badge`, `power_state_badge`, IP/Auto-Off, `category_badge`) live in a `FlowRow` on **Line 2** alongside the hardware illustration and 64dp Power/Disconnected ring.
   - Redundant room badges are omitted inside `DeviceRow` and `TvDeviceCard` because room context is already established by `RoomGroupCard` / room filters.
 
 ### Invariant 2: Uniform Card Height Across All Room Group Headers
 - **Rule**: Every collapsed `RoomGroupHeaderCard` (e.g., `"Hallway & Landing"` vs. `"Living Room"`) must render at the **exact same height** regardless of room name length (`abs(heightA - heightB) <= 2f`).
 - **Implementation**:
-  - `roomName` sits on **Line 1** of the center column with `AutoShrinkSwitchName(..., singleLineOnly = true)`.
+  - `roomName` sits on **Line 1** of the center column with `AutoResizingDeviceNameText(..., singleLineOnly = true)`.
   - The `"$activeCount/$totalControllable ON"` pill (`maxLines = 1, softWrap = false`) and `"$online/${roomDevices.size} Active • Avg ${avgLatency}ms"` subtitle (`maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis`) sit together on **Line 2**.
   - This prevents long room names from squeezing the `"0/1 ON"` pill into a 0dp-wide vertical character column.
 
 ### Invariant 3: Compact, Single-Line Top Utility Bars (`WifiHomeBar.kt` & `SsdpDiscoveryBanner.kt`)
 - **Rule**: Top chrome on the **Devices** tab must stay compact so rooms and switches remain the visual hero above the fold.
 - **Implementation**:
-  - `WifiHomeBar` renders the active home name with `AutoShrinkSwitchName(..., initialFontSizeSp = 15f, singleLineOnly = true)`, single-line status (`maxLines = 1, softWrap = false`), a `32.dp`-high `Reconnect` button, and a horizontally scrollable row of `28.dp`-high chips (`Home (N)`, `Add Home`, `Reset`).
+  - `WifiHomeBar` renders the active home name with `AutoResizingDeviceNameText(..., initialFontSizeSp = 15f, singleLineOnly = true)`, single-line status (`maxLines = 1, softWrap = false`), a `32.dp`-high `Reconnect` button, and a horizontally scrollable row of `28.dp`-high chips (`Home (N)`, `Add Home`, `Reset`).
   - `SsdpDiscoveryBanner` (`SsdpDiscoveryBanner.kt`) uses a single compact row (`32.dp` radar icon badge, `maxLines = 1` title/subtitle, and `32.dp` `Scan` button).
 
 ### Invariant 4: Top-First Primary Controls in Expandable Drawers (`ExpandedDrawer`)

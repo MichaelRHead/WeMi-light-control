@@ -24,7 +24,7 @@ Related documentation:
 Smart-home control apps fail when they treat physical wall switches like generic cloud database rows. Our UX design is anchored on four core principles:
 1. **Sub-Frame Tactile Responsiveness (`<16ms`)**: Tapping a light switch in the app must feel as instantaneous as flipping a physical paddle on the wall, backed by optimistic state projection and `1200ms` UPnP GENA echo suppression.
 2. **Honest 3-State Hardware Telemetry**: Never conflate a reachable switch that is turned `OFF` (`Accessible Standby`) with a switch that has lost Wi-Fi or power (`Disconnected`). Every state is communicated simultaneously via color, iconography, border geometry, and text labels.
-3. **Zero-Truncation Spatial Clarity**: Device names are the primary anchor of human recognition (`"Kids Bedroom Bedside Lamp"`, `"Front Porch String Lights"`). Every row guarantees a dedicated, full-width auto-resizing title line (`AutoShrinkSwitchName`) that never collides with status badges or truncates into ambiguity.
+3. **Zero-Truncation Spatial Clarity**: Device names are the primary anchor of human recognition (`"Kids Bedroom Bedside Lamp"`, `"Front Porch String Lights"`). Every row guarantees a dedicated, full-width auto-resizing title line (`AutoResizingDeviceNameText` / `AutoShrinkSwitchName`) that never collides with status badges or truncates into ambiguity.
 4. **Native Hardware Form-Factor Ergonomics**: Phone/tablet touchscreens and 10-foot Android TV devices (`Configuration.UI_MODE_TYPE_TELEVISION`) have fundamentally different interaction models. Each device class automatically renders its dedicated native layout—touch-first `Scaffold` on handhelds/tablets and D-Pad-first `TvDashboardScreen` on Android TV—without cross-mode layout toggle buttons.
 
 ---
@@ -49,7 +49,7 @@ WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`Botto
 3. **Room Filter Strip (`RoomFilterBar`) & Collapsible Room Cards (`RoomGroupCard.kt`)**:
    - Horizontal filter chips (`All Rooms`, `Living Room`, `Bedroom`, `Kitchen`, etc.) with live active/total badges (`e.g., 2/3 ON`) allow instant single-room focus, paired with a **`Grouped` / `Flat List`** toggle chip (`toggle_group_by_room_chip`).
    - In **Grouped by Room** mode, rooms render as collapsible cards:
-     - **Uniform Collapsed Card Height**: All collapsed room headers share a locked single-line title (`AutoShrinkSwitchName(..., singleLineOnly = true)`) and single-line status pills (`"2/3 ON"` or `"0/1 ON"`) so vertical scanning is rhythmically consistent across short and long room names.
+     - **Uniform Collapsed Card Height**: All collapsed room headers share a locked single-line title (`AutoResizingDeviceNameText(..., singleLineOnly = true)`) and single-line status pills (`"2/3 ON"` or `"0/1 ON"`) so vertical scanning is rhythmically consistent across short and long room names.
      - **Room Master Power Button (`room_power_toggle_<Room>`)**: Toggles every reachable switch and dimmer in that room in parallel without expanding the card.
      - **Room Master Dimmer Bar (`room_dimmer_button_<Room>` / `room_dimmer_slider_<Room>`)**: Surfaces inside rooms that contain at least one `LIGHTBULB_DIMMER`, offering a room-wide master brightness slider and quick presets (`10%`, `25%`, `50%`, `75%`, `100%`) while preserving binary switches in the same room.
 
@@ -134,10 +134,10 @@ Every custom `Canvas` or composite control exposes explicit `androidx.compose.ui
 - **Deterministic `testTag` Instrumentation**:
   - Every interactive element carries a unique, stable `Modifier.testTag(...)` in `snake_case` (e.g., `device_row_<id>`, `power_button_<id>`, `brightness_slider_<id>`, `room_power_toggle_<Room>`, `refresh_button`, `reset_lan_data_chip`) enabling both automated UI accessibility audits and Robolectric E2E verification.
 
-### 3.4 Dynamic Typography & Anti-Truncation Guarantees (`AutoShrinkSwitchName`)
+### 3.4 Dynamic Typography & Anti-Truncation Guarantees (`AutoResizingDeviceNameText` / `AutoShrinkSwitchName`)
 
 - **Full-Width Dedicated Name Line**: Inside `DeviceRow.kt`, the device's `<friendlyName>` occupies its own dedicated top horizontal row across the full card width—never sharing horizontal width with `Switch`/`Light`/`Tree Lights` category badges.
-- **Reactive Font Scaling (`AutoShrinkSwitchName`)**:
+- **Reactive Font Scaling (`AutoResizingDeviceNameText` / `AutoShrinkSwitchName`)**:
   - Starts at `17.5.sp` (`FontWeight.SemiBold`) and uses `onTextLayout { layoutResult -> if (layoutResult.didOverflowWidth) ... }` to step down smoothly to `11.sp` before ever allowing `TextOverflow.Ellipsis`.
   - Respects system font scaling (`sp` units throughout) while preventing multi-word room/appliance names from clipping on compact phones.
 
@@ -206,7 +206,7 @@ When the user taps a switch's power ring or adjusts a dimmer slider/preset (`Swi
 ## 5. UX Verification Checklist for All Agents
 
 Before committing any UI, ViewModel, or Repository change, verify that:
-- [ ] **No Truncated Device Names**: `AutoShrinkSwitchName` remains on its own full-width top line inside `DeviceRow.kt`.
+- [ ] **No Truncated Device Names**: `AutoResizingDeviceNameText` (`AutoShrinkSwitchName`) remains on its own full-width top line inside `DeviceRow.kt`.
 - [ ] **3-State Visual Redundancy**: `ON`, `OFF (Accessible Standby)`, and `Disconnected` remain visually distinct across color, center `Canvas` icon (`"I/O"` vs. diagonal slash), border style (solid vs. dashed), and status pill text.
 - [ ] **Dimmer Controls First**: Expanded `LIGHTBULB_DIMMER` rows render the brightness slider, quick presets (`1%`–`100%`), and Night Mode toggle at the top of `ExpandedDrawer` before network metadata.
 - [ ] **Native Hardware Form-Factor Routing**: Phone/tablet (`Scaffold`) and Android TV (`TvDashboardScreen` under `UI_MODE_TYPE_TELEVISION`) remain tailored to their hardware form factors without manual Phone/TV mode switch buttons.

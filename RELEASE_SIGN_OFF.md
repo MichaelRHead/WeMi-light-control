@@ -10,34 +10,34 @@ This file is the live synchronization state machine for the **5-Agent Autonomous
 ## 1. Live Release State Machine Header (Machine & Human Readable)
 
 <!-- RELEASE_STATE_BEGIN -->
-RELEASE_VERSION: v22.0
-VERSION_CODE: 22
+RELEASE_VERSION: v23.0
+VERSION_CODE: 23
 ROUND_NUMBER: 1
-RELEASE_STATUS: APPROVED_FOR_PLAY_STORE
-CURRENT_TURN: NONE
+RELEASE_STATUS: IN_REVIEW
+CURRENT_TURN: discovery_and_grouping
 CANDIDATE_BASE_SHA: 7f27af5
-SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (7f27af5 @ 2026-11-10 17:35 PST)
-SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (7f27af5 @ 2026-11-10 17:38 PST)
-SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (7f27af5 @ 2026-11-10 17:38 PST)
-SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (7f27af5 @ 2026-11-10 17:38 PST)
-SIGN_OFF_LICENSE_GOVERNANCE: SIGNED_OFF (7f27af5 @ 2026-11-10 17:38 PST)
-FINAL_RELEASE_SHA: 7f27af5
-CONCLUDED_AT: 2026-11-10 17:38 PST
+SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (7f27af5 @ 2026-11-11 13:08 PST)
+SIGN_OFF_DISCOVERY_AND_GROUPING: PENDING
+SIGN_OFF_TELEMETRY_AND_DEBUGGING: PENDING
+SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
+SIGN_OFF_LICENSE_GOVERNANCE: PENDING
+FINAL_RELEASE_SHA: NONE
+CONCLUDED_AT: NONE
 <!-- RELEASE_STATE_END -->
 
 ---
 
-## 2. Current Release Candidate Sign-Off Status (`v22.0` / `versionCode = 22`)
+## 2. Current Release Candidate Sign-Off Status (`v23.0` / `versionCode = 23`)
 
 <!-- SIGN_OFF_TABLE_BEGIN -->
 | Stage | Role ID | Agent | Status | Verified Commit SHA | Timestamp (PST) | Verification Summary |
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
-| **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `7f27af5` | `2026-11-10 17:35 PST` | Initiated v22.0 (versionCode=22, org.suppressingfire.wemi) release review: verified system sans-serif typography (FontFamily.SansSerif across 14 UI/theme files, zero bundled .ttf fonts), refreshed 21 Play Store & in-app PNG screenshots/graphics, native Phone/Tablet vs. Android TV (UI_MODE_TYPE_TELEVISION) routing, 5 Compose layout invariants, 48dp+ accessibility targets, TalkBack labels, Back navigation, Play Store metadata (STORE_LISTING.md & RELEASE_NOTES.txt), and docs/user-guide/release-notes.md; 30/30 unit, protocol, governance & Compose E2E tests passing. |
-| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `7f27af5` | `2026-11-10 17:38 PST` | Audited Stage 2 (discovery_and_grouping) for v22.0 (versionCode=22, org.suppressingfire.wemi): verified SSDP M-SEARCH & /24 unicast discovery (SsdpDiscoveryEngine.kt, DiscoveryCoordinator.kt), 3-tier hardware identity matching (matchesDiscoveredDevice: <serialNumber> -> <UDN>/USN -> endpoint/<friendlyName>), CamelCase normalization & specificity-ordered room inference (inferRoomFromName: Ensuite before Bedroom, Unassigned fallback in DeviceEntities.kt), non-destructive migration (resolveDeviceRoomAssignment), and soft-AP SSID shielding (isWemoDeviceSetupSsid in XmlAndSkuParser.kt); SkuAndCryptoTest & SoapAndSelfHealingTest passing. |
-| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `SIGNED_OFF` | `7f27af5` | `2026-11-10 17:38 PST` | Audited Stage 3 (telemetry_and_debugging) for v22.0 (versionCode=22, org.suppressingfire.wemi): verified LanHttpClient-framed 10.22.22.1 zero-cloud setup diagnostics ([NET], [PROBE], [XML], [FLAGS], [ID], [SCAN], [TARGET AP], [STEP 1..6] in SetupDiagnostics.kt, ProvisionerClient.kt & ProvisionDebugPanel.kt), wemi-telemetry-latest.txt Copy/Save-Share export (TelemetryFileExporter & MoreScreen.kt), inline RTT diagnostics drawer (DeviceDiagnosticsDrawer.kt), strict Wi-Fi password privacy (plainLen/encLen only), and non-destructive CloseSetup hold on NetworkStatus=0/2; GenaProvisioningAndRulesTest passing. |
-| **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `SIGNED_OFF` | `7f27af5` | `2026-11-10 17:38 PST` | Audited Stage 4 (code_quality_and_testing) for v22.0 (versionCode=22, org.suppressingfire.wemi): verified 40-file modular package layout across data/, network/, ui/, and test/ (including zero-dependency LanHttpClient.kt and FontFamily.SansSerif across 14 UI/theme files), Semaphore(3) RTOS concurrency & per-device Mutex discipline, single-SDK (sdk = [36]) Robolectric classloader isolation, executable 100755 permissions on gradlew & scripts/*.sh, :app:assembleDebug APK build, and 30/30 unit, protocol, governance & Compose E2E tests passing across all 8 test suites with --rerun-tasks. |
-| **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `SIGNED_OFF` | `7f27af5` | `2026-11-10 17:38 PST` | Audited Stage 5 (license_governance) for v22.0 (versionCode=22, org.suppressingfire.wemi): verified root MIT LICENSE parity with MoreScreen.kt (open_source_licenses_card, mit_license_text_surface & third_party_notices_surface), pure MIT + Apache-2.0 dependency footprint in gradle/libs.versions.toml & app/build.gradle.kts (includeInApk = false, zero OkHttp/pywemo & zero bundled custom .ttf fonts), org.suppressingfire.wemi package/filename hygiene, and Play Store trademark boundaries across strings.xml, metadata.json, STORE_LISTING.md & RELEASE_NOTES.txt via LicenseAndBrandGovernanceTest (30/30 total tests passing). |
-| **6 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `SIGNED_OFF` | `7f27af5` | `2026-11-10 17:38 PST` | All 5 domain stages (ai_studio_ux_cuj, discovery_and_grouping, telemetry_and_debugging, code_quality_and_testing, license_governance) signed off Round 1 for v22.0 (versionCode = 22, org.suppressingfire.wemi); verified zero-dependency LanHttpClient, FontFamily.SansSerif system typography, refreshed 21 Play Store & in-app PNG screenshots/graphics, native Phone/Tablet vs. Android TV routing, discovery & room grouping, 10.22.22.1 telemetry, pure MIT + Apache-2.0 dependency governance, 30/30 --rerun-tasks tests, and release notes. Approved for Google Play Store release. |
+| **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `7f27af5` | `2026-11-11 13:08 PST` | Initiated v23.0 (versionCode=23, org.suppressingfire.wemi) release review: verified compact single-row TopHeader, 3-column room-grouped Android TV dashboard (wemi TV) with 10-foot Electric Cyan cursor focus (FOCUSED • OK) & non-interfering Dimmer Adjust Mode (DIM -/+), modular UI (<500 lines per Composable file), 5 Compose layout invariants (AutoResizingDeviceNameText, 3-state hardware icons, uniform 68.dp room cards, top-first dimmer drawer, non-blocking toast), 48dp+ accessibility targets, TalkBack semantics, Back navigation, 21 refreshed Play Store & in-app PNG/JPG assets, STORE_LISTING.md, RELEASE_NOTES.txt (<=500 chars), and docs/user-guide/release-notes.md; 37/37 unit, protocol, governance & Compose E2E tests passing across 10 suites. |
+| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `PENDING` | `-` | `-` | Awaiting Discovery & Room Grouping Agent review. |
+| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `PENDING` | `-` | `-` | Awaiting Telemetry & Debugging Agent review. |
+| **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
+| **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
+| **6 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `PENDING` | `-` | `-` | Awaiting Stages 1-5 sign-off. |
 <!-- SIGN_OFF_TABLE_END -->
 
 ---
@@ -66,4 +66,5 @@ CONCLUDED_AT: 2026-11-10 17:38 PST
 | 2026-11-10 17:38 PST | `1` | `code_quality_and_testing` | `SIGNED_OFF` | `license_governance` | `7f27af5` | Audited Stage 4 (code_quality_and_testing) for v22.0 (versionCode=22, org.suppressingfire.wemi): verified 40-file modular package layout across data/, network/, ui/, and test/ (including zero-dependency LanHttpClient.kt and FontFamily.SansSerif across 14 UI/theme files), Semaphore(3) RTOS concurrency & per-device Mutex discipline, single-SDK (sdk = [36]) Robolectric classloader isolation, executable 100755 permissions on gradlew & scripts/*.sh, :app:assembleDebug APK build, and 30/30 unit, protocol, governance & Compose E2E tests passing across all 8 test suites with --rerun-tasks. |
 | 2026-11-10 17:38 PST | `1` | `license_governance` | `SIGNED_OFF` | `ai_studio_ux_cuj` | `7f27af5` | Audited Stage 5 (license_governance) for v22.0 (versionCode=22, org.suppressingfire.wemi): verified root MIT LICENSE parity with MoreScreen.kt (open_source_licenses_card, mit_license_text_surface & third_party_notices_surface), pure MIT + Apache-2.0 dependency footprint in gradle/libs.versions.toml & app/build.gradle.kts (includeInApk = false, zero OkHttp/pywemo & zero bundled custom .ttf fonts), org.suppressingfire.wemi package/filename hygiene, and Play Store trademark boundaries across strings.xml, metadata.json, STORE_LISTING.md & RELEASE_NOTES.txt via LicenseAndBrandGovernanceTest (30/30 total tests passing). |
 | 2026-11-10 17:38 PST | `1` | `ai_studio_ux_cuj` | `APPROVED_FOR_PLAY_STORE` | `NONE` | `7f27af5` | All 5 domain stages (ai_studio_ux_cuj, discovery_and_grouping, telemetry_and_debugging, code_quality_and_testing, license_governance) signed off Round 1 for v22.0 (versionCode = 22, org.suppressingfire.wemi); verified zero-dependency LanHttpClient, FontFamily.SansSerif system typography, refreshed 21 Play Store & in-app PNG screenshots/graphics, native Phone/Tablet vs. Android TV routing, discovery & room grouping, 10.22.22.1 telemetry, pure MIT + Apache-2.0 dependency governance, 30/30 --rerun-tasks tests, and release notes. Approved for Google Play Store release. |
+| 2026-11-11 13:08 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `7f27af5` | Initiated v23.0 (versionCode=23, org.suppressingfire.wemi) release review: verified compact single-row TopHeader, 3-column room-grouped Android TV dashboard (wemi TV) with 10-foot Electric Cyan cursor focus (FOCUSED • OK) & non-interfering Dimmer Adjust Mode (DIM -/+), modular UI (<500 lines per Composable file), 5 Compose layout invariants (AutoResizingDeviceNameText, 3-state hardware icons, uniform 68.dp room cards, top-first dimmer drawer, non-blocking toast), 48dp+ accessibility targets, TalkBack semantics, Back navigation, 21 refreshed Play Store & in-app PNG/JPG assets, STORE_LISTING.md, RELEASE_NOTES.txt (<=500 chars), and docs/user-guide/release-notes.md; 37/37 unit, protocol, governance & Compose E2E tests passing across 10 suites. |
 <!-- AUDIT_LOG_END -->

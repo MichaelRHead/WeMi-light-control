@@ -40,7 +40,7 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
 
 ## 2. Five Mandatory Layout & Interaction Invariants
 
-1. **Dedicated Full-Width Title Line (`AutoShrinkSwitchName`)**:
+1. **Dedicated Full-Width Title Line (`AutoResizingDeviceNameText` / `AutoShrinkSwitchName`)**:
    - In `DeviceRow.kt`, `device.name` must occupy **Line 1** across the full card width (`Modifier.fillMaxWidth().testTag("device_name_${device.id}")`).
    - All secondary badges (`connection_status_badge`, `power_state_badge`, IP/Auto-Off, `category_badge`) must sit in a wrapping `FlowRow` on **Line 2** alongside the hardware icon and 64dp Power/Disconnected ring.
    - Omit redundant room badges inside `DeviceRow` and `TvDeviceCard`.
