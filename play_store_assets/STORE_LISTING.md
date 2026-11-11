@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v22.0 — Phone, Tablet & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v23.0 — Phone, Tablet & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `22.0` (`versionCode = 22`)
+- **Version:** `23.0` (`versionCode = 23`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,8 +17,9 @@ WeMi Switch Control brings reliable, instant local-network control back to Belki
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
-### What's New in Version 22.0
-- **Refreshed Google Play Store & In-App Visual Showcase:** Updated all Phone, 7-Inch Tablet, 10-Inch Tablet, and Android TV (`wemi TV`) screenshots, banners, and in-app preview graphics to match the live Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), and Deep Sapphire (`#0F4C81`) interface, full-width auto-shrinking switch titles, 3-state hardware icons (`ON`, `OFF` Standby `#23272F`, and Offline `Disconnected` `#DC2626`), and native form-factor headers.
+### What's New in Version 23.0
+- **Redesigned Android TV (`wemi TV`) 3-Column Room-Grouped Dashboard:** Full-height 3-column switch grid organized by Room Section Headers (`LIVING ROOM`, `BEDROOM`, `KITCHEN`) with unmistakable 10-foot Electric Cyan cursor focus (`FOCUSED • OK`), non-interfering `DIM ◀/▶` brightness mode, and non-blocking LAN rescan.
+- **Compact Single-Row Phone & Tablet Header:** Moved `Refresh` and `Edit` alongside the `wemi` wordmark and `+` button to maximize vertical screen space for room and switch cards.
 - **Streamlined First-Party UPnP/HTTP Engine & `MIT` + `Apache-2.0` Footprint:** Replaced external HTTP libraries and bundled font files with a zero-dependency local-LAN HTTP/1.1 & UPnP GENA client (`LanHttpClient`) over JDK `SocketFactory` and platform `FontFamily.SansSerif` typography—keeping runtime dependencies strictly to AndroidX & Kotlin (`Apache-2.0`) under the `MIT` License (`includeInApk = false`).
 - **Dedicated Native Phone/Tablet & Android TV Layouts:** Automatically runs the touch-first dashboard on phones/tablets and the 10-foot D-Pad dashboard (`wemi TV`) on Android TV / Google TV (`UI_MODE_TYPE_TELEVISION`) without manual Phone/TV mode switch buttons.
 - **Streamlined `org.suppressingfire.wemi` Architecture & 9-Port Self-Healing Reconnect:** Automatically recovers from firmware port shifts (`49151–49159`) across power toggles, dimmer sliders, friendly-name updates, and Night Mode while keeping sockets bound to Wi-Fi even when cellular data is active.
