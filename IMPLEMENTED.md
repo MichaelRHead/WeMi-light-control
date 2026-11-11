@@ -1,7 +1,7 @@
 # WeMi Light Control — Implemented Features & Change Log (`IMPLEMENTED.md`)
 
 **Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
-**Current Version**: `v22.0` (`versionCode = 22`)  
+**Current Version**: `v23.0` (`versionCode = 23`)  
 **Target Platforms**: Android Phones, Tablets, and Android TV (`UI_MODE_TYPE_TELEVISION` 10-foot D-Pad interface)
 
 Related documentation:
@@ -12,7 +12,7 @@ Related documentation:
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Minimal Permissive Dependency Policy (`Apache-2.0` AndroidX/Kotlin Only; Zero External HTTP/Font Bloat) & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — 5-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine
-- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v22.0`)
+- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v23.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
 - [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — 5-Agent Autonomous Round-Robin Release Review & Sign-Off Coordinator Skill
@@ -36,6 +36,7 @@ Related documentation:
 
 | Landed (PST) | Version / Commit | Feature or Improvement | Primary Files |
 | :--- | :--- | :--- | :--- |
+| **2026-11-10 20:26 PST** | `v23.0` | **Compact Single-Row `TopHeader` (`HeaderAndNav.kt`): Moved `Refresh` & `Edit` Buttons Down Alongside the `wemi` Wordmark & `+` Button and Removed Redundant `"LAN SWITCHES"` Badge to Maximize Vertical Screen Space** | [`HeaderAndNav.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/HeaderAndNav.kt), [`scripts/GeneratePlayStoreAssets.java`](scripts/GeneratePlayStoreAssets.java), [`UX_DESIGN.md`](UX_DESIGN.md), [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md), [`play_store_assets/RELEASE_NOTES.txt`](play_store_assets/RELEASE_NOTES.txt) |
 | **2026-11-10 13:19 PST** | `v22.0` | **Mandatory Agent Commit Description Attribution Skill (`agent-commit-attribution`), Helper & Hook Validator Scripts (`commit_as_agent.sh`, `validate_commit_msg.sh`) & Attributed Release State-Machine Commits (`scripts/advance_release_turn.sh`)** | [`.agents/skills/agent-commit-attribution/SKILL.md`](.agents/skills/agent-commit-attribution/SKILL.md), [`.agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh`](.agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh), [`.agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh`](.agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh), [`scripts/advance_release_turn.sh`](scripts/advance_release_turn.sh), [`AGENTS.md`](AGENTS.md), [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md), [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) |
 | **2026-11-10 13:06 PST** | `v22.0` (`19247b4`) | **Multi-Agent Anti-Stomp Sync: Removed Orphaned `res/font/*.ttf` Files Left by AI Studio Sync, Restored `97d422e` Minimal-Dependency & Zero-`OkHttp`/`pywemo` Governance Gates (`LicenseAndBrandGovernanceTest.kt`), Updated `LICENSE_GOVERNANCE.md` & `wemi-license-governance` for Pure `MIT` + `Apache-2.0` Runtime, and Restored `+x` Script Permissions (`30/30` Passing)** | [`LicenseAndBrandGovernanceTest.kt`](app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt), [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt), [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md), [`.agents/skills/wemi-license-governance/SKILL.md`](.agents/skills/wemi-license-governance/SKILL.md), [`docs/user-guide/more-and-tv-mode.md`](docs/user-guide/more-and-tv-mode.md), [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md), [`gradlew`](gradlew), [`scripts/advance_release_turn.sh`](scripts/advance_release_turn.sh), [`scripts/await_release_turn.sh`](scripts/await_release_turn.sh) |
 | **2026-11-10 12:52 PST** | `v22.0` (`b458fca`, `084def5`) | **Replaced Custom `Comfortaa` & `Work Sans` Font Families Across All UI Screens & Play Store Asset Generator with Platform `FontFamily.SansSerif` (`Type.kt`)** | [`Type.kt`](app/src/main/java/org/suppressingfire/wemi/ui/theme/Type.kt), [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt), [`MoreScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt), [`DevicesTabScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/DevicesTabScreen.kt), [`RulesScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/screens/RulesScreen.kt), [`scripts/GeneratePlayStoreAssets.java`](scripts/GeneratePlayStoreAssets.java), [`play_store_assets/`](play_store_assets/) |
@@ -91,6 +92,13 @@ Related documentation:
 ---
 
 ## 2. Detailed Change Log (Newest to Oldest)
+
+### [2026-11-10 20:26 PST] — Compact Single-Row `TopHeader` (`HeaderAndNav.kt`): Moved `Refresh` & `Edit` Alongside `wemi` Wordmark & Removed `"LAN SWITCHES"` Badge (`v23.0`)
+- **Single-Row Top Header Consolidation ([`HeaderAndNav.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/HeaderAndNav.kt), [`scripts/GeneratePlayStoreAssets.java`](scripts/GeneratePlayStoreAssets.java))**:
+  - Removed the redundant `"LAN SWITCHES"` subtitle badge next to the `wemi` wordmark and moved the `Refresh` (`refresh_devices_button`) and `Edit` / `Done` (`edit_devices_button`) controls down into the same horizontal header row alongside the `wemi` wordmark (`brand_wordmark_text`) and `+` button (`add_device_button`).
+  - Reclaims ~54dp of vertical screen real estate above the fold on phones and tablets while preserving all `48.dp` `minimumInteractiveComponentSize()` accessibility touch targets and semantic `testTag` identifiers, and regenerated all 21 Play Store & in-app PNG screenshots to match.
+
+---
 
 ### [2026-11-10 13:19 PST] — Mandatory Agent Commit Description Attribution Skill (`agent-commit-attribution`), Helper/Hook Scripts & Attributed Release Commits (`v22.0`)
 - **Shared `agent-commit-attribution` Skill & Validator/Helper Scripts ([`.agents/skills/agent-commit-attribution/SKILL.md`](.agents/skills/agent-commit-attribution/SKILL.md), [`commit_as_agent.sh`](.agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh), [`validate_commit_msg.sh`](.agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh))**:

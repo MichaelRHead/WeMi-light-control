@@ -19,7 +19,7 @@ Related documentation:
 
 ## 1. Executive Summary & UX Philosophy
 
-**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v22.0`) reimagines the tactile, unmistakable physical affordances of a dedicated smart-home switch interface (Ocean Teal `#0891B2`, Electric Cyan `#06B6D4`, and Deep Sapphire `#0F4C81` header gradient, crisp white device rows, glowing cyan power rings, and skeuomorphic appliance illustrations) for Belkin's discontinued smart switch platform while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
+**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v23.0`) reimagines the tactile, unmistakable physical affordances of a dedicated smart-home switch interface (Ocean Teal `#0891B2`, Electric Cyan `#06B6D4`, and Deep Sapphire `#0F4C81` header gradient, crisp white device rows, glowing cyan power rings, and skeuomorphic appliance illustrations) for Belkin's discontinued smart switch platform while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
 
 Smart-home control apps fail when they treat physical wall switches like generic cloud database rows. Our UX design is anchored on four core principles:
 1. **Sub-Frame Tactile Responsiveness (`<16ms`)**: Tapping a light switch in the app must feel as instantaneous as flipping a physical paddle on the wall, backed by optimistic state projection and `1200ms` UPnP GENA echo suppression.
@@ -33,14 +33,14 @@ Smart-home control apps fail when they treat physical wall switches like generic
 
 ### 2.1 Primary Phone & Tablet Navigation (`HeaderAndNav.kt`)
 
-WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`BottomNavigationBar`) paired with a contextual top header (`TopHeader`):
+WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`BottomNavigationBar`) paired with a compact single-row top header (`TopHeader`):
 
-1. **Top Header (`TopHeader`)**:
-   - **Brand Wordmark**: Displays the iconic `wemi` / `wemo` wordmark (`header_wordmark_toggle`).
-   - **Contextual Primary Actions**:
-     - **Edit / Done Toggle (`edit_mode_button`)**: Switches the device list between normal operation and management mode (exposing inline reorder, `Edit`, and `Delete` actions).
+1. **Compact Single-Row Top Header (`TopHeader`)**:
+   - **Brand Wordmark**: Displays the `wemi` / `wemo` wordmark (`brand_wordmark_text`) on the left, omitting redundant static subtitle pills (`"LAN SWITCHES"`) so all top-bar actions fit on a single compact row and maximize vertical screen space for room and switch cards.
+   - **Inline Action Cluster (Right)**:
+     - **Refresh / SSDP Scan Button (`refresh_devices_button`)**: Launches the live `SsdpScannerModal` and triggers background `GetBinaryState` verification across all saved switches.
+     - **Edit / Done Toggle (`edit_devices_button`)**: Switches the device list between normal operation and management mode (exposing inline reorder, `Edit`, and `Delete` actions).
      - **Add Button (`add_device_button`)**: Opens `AddOrEditDeviceDialog` on the `Devices` tab or `AddRuleDialog` on the `Rules` tab.
-     - **Refresh / SSDP Scan Button (`refresh_button`)**: Launches the live `SsdpScannerModal` and triggers background `GetBinaryState` verification across all saved switches.
 
 2. **Wi-Fi Home Context Bar (`WifiHomeBar.kt`)**:
    - Situated immediately below the top header on the `Devices` tab, providing persistent awareness of the active Wi-Fi home profile (`"My Home"` vs. `"Main Home"` in Demo Showroom Mode), live online/offline switch counts, a one-tap **`Reconnect`** button, and a horizontally scrollable chip strip (`Home` chips, `Add Home`, and `Reset`).

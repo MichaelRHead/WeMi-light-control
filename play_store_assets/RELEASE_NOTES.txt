@@ -1,4 +1,4 @@
-WeMi Switch Control v22.0:
-• Refreshed Play Store & In-App Visuals: Updated all Phone, 7"/10" Tablet & Android TV screenshots, banners, and icons to match the live Ocean Teal & Sapphire interface, auto-shrinking switch names, and 3-state power/reconnect rings.
+WeMi Switch Control v23.0:
+• Compact Single-Row Top Header: Moved Refresh & Edit alongside the wemi wordmark and '+' button (removing the redundant 'LAN SWITCHES' label) to maximize vertical screen space for your rooms and switches.
 • Streamlined Local Engine & Footprint: First-party SocketFactory HTTP/GENA client (LanHttpClient) & platform SansSerif typography—pure MIT + Apache-2.0 with zero external HTTP or custom font bloat.
-• Native Phone/Tablet & Android TV D-Pad Layouts.
+• Refreshed Phone, Tablet & Android TV D-Pad Visuals.

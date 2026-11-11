@@ -275,7 +275,7 @@ public class GeneratePlayStoreAssets {
     }
 
     private static int drawTopHeader(Graphics2D g, int w, double s, boolean isEdit) {
-        int headerH = (int) (104 * s);
+        int headerH = (int) (68 * s);
         LinearGradientPaint lg = new LinearGradientPaint(
             new Point2D.Double(0, 0),
             new Point2D.Double(w * 0.9, headerH),
@@ -301,45 +301,16 @@ public class GeneratePlayStoreAssets {
         fillRoundRect(g, w - 38 * s, 7 * s, 20 * s, 10 * s, 2 * s, null, C_WHITE, 1.4 * s);
         fillRoundRect(g, w - 36 * s, 9 * s, 14 * s, 6 * s, 1 * s, C_WHITE, null, 0);
 
-        // Row 1: Left Refresh circle button (48dp), Right Edit pill (NO TV toggle button!)
-        double yR1 = 22 * s;
-        double btnR = 17 * s;
-        double cxRef = 16 * s + btnR;
-        double cyRef = yR1 + btnR;
-        g.setColor(new Color(255, 255, 255, 38));
-        g.fill(new Ellipse2D.Double(cxRef - btnR, cyRef - btnR, btnR * 2, btnR * 2));
+        // Single compact row: 'wemi' wordmark on left; Refresh, Edit/Done, and white '+' button on right
+        double cy = 44 * s;
         g.setColor(C_WHITE);
-        g.setStroke(new BasicStroke((float) (2.2 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        double ar = 8.0 * s;
-        g.draw(new Arc2D.Double(cxRef - ar, cyRef - ar, ar * 2, ar * 2, 40, 280, Arc2D.OPEN));
+        g.setFont(fBrand(30 * s, Font.BOLD));
+        g.drawString("wemi", (int) (18 * s), (int) (cy + 10 * s));
 
-        // Right Edit pill
-        double editW = 64 * s;
-        double editH = 30 * s;
-        double ex0 = w - 16 * s - editW;
-        double ey0 = cyRef - editH / 2.0;
-        fillRoundRect(g, ex0, ey0, editW, editH, 15 * s, isEdit ? C_WHITE : new Color(255, 255, 255, 42), null, 0);
-        g.setColor(isEdit ? C_SAPPHIRE_BOT : C_WHITE);
-        g.setFont(fUi(14.0 * s, Font.BOLD));
-        g.drawString(isEdit ? "Done" : "Edit", (int) (ex0 + 18 * s), (int) (ey0 + 20 * s));
-
-        // Row 2: 'wemi' wordmark + 'LAN SWITCHES' pill on left, white '+' button on right
-        double yR2 = 90 * s;
-        g.setColor(C_WHITE);
-        g.setFont(fBrand(32 * s, Font.BOLD));
-        g.drawString("wemi", (int) (20 * s), (int) yR2);
-
-        double px0 = 122 * s;
-        double py0 = yR2 - 19 * s;
-        fillRoundRect(g, px0, py0, 96 * s, 20 * s, 6 * s, new Color(0x22, 0xD3, 0xEE, 58), null, 0);
-        g.setColor(C_CYAN_SOFT);
-        g.setFont(fUi(9.5 * s, Font.BOLD));
-        g.drawString("LAN SWITCHES", (int) (px0 + 8 * s), (int) (py0 + 14 * s));
-
-        // White '+' button on right
+        // White '+' button on far right
         double addSz = 31 * s;
-        double ax0 = w - 18 * s - addSz;
-        double ay0 = yR2 - 25 * s;
+        double ax0 = w - 16 * s - addSz;
+        double ay0 = cy - addSz / 2.0;
         fillRoundRect(g, ax0, ay0, addSz, addSz, 10 * s, C_WHITE, null, 0);
         g.setColor(C_TEAL_DARK);
         g.setStroke(new BasicStroke((float) (2.5 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
@@ -348,6 +319,27 @@ public class GeneratePlayStoreAssets {
         double arm = 7.2 * s;
         g.draw(new Line2D.Double(acx - arm, acy, acx + arm, acy));
         g.draw(new Line2D.Double(acx, acy - arm, acx, acy + arm));
+
+        // Edit / Done pill to the left of '+'
+        double editW = 60 * s;
+        double editH = 30 * s;
+        double ex0 = ax0 - 10 * s - editW;
+        double ey0 = cy - editH / 2.0;
+        fillRoundRect(g, ex0, ey0, editW, editH, 15 * s, isEdit ? C_WHITE : new Color(255, 255, 255, 42), null, 0);
+        g.setColor(isEdit ? C_SAPPHIRE_BOT : C_WHITE);
+        g.setFont(fUi(13.5 * s, Font.BOLD));
+        g.drawString(isEdit ? "Done" : "Edit", (int) (ex0 + 16 * s), (int) (ey0 + 20 * s));
+
+        // Refresh circle button to the left of Edit pill
+        double btnR = 16 * s;
+        double cxRef = ex0 - 10 * s - btnR;
+        double cyRef = cy;
+        g.setColor(new Color(255, 255, 255, 42));
+        g.fill(new Ellipse2D.Double(cxRef - btnR, cyRef - btnR, btnR * 2, btnR * 2));
+        g.setColor(C_WHITE);
+        g.setStroke(new BasicStroke((float) (2.1 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        double ar = 7.5 * s;
+        g.draw(new Arc2D.Double(cxRef - ar, cyRef - ar, ar * 2, ar * 2, 40, 280, Arc2D.OPEN));
 
         return headerH;
     }

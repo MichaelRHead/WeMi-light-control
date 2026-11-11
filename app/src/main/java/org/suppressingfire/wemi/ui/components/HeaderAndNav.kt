@@ -116,77 +116,20 @@ fun TopHeader(
                 )
             }
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
     ) {
-        // Top Row: Refresh button on left, TV Remote Mode + Edit pills on right
+        // Single compact row: "wemi" wordmark on left; Refresh, Edit/Done, and "+" buttons on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(
-                onClick = onRefreshClick,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(Color.White.copy(alpha = 0.14f))
-                    .testTag("refresh_devices_button")
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = stringResource(R.string.action_refresh),
-                    tint = Color.White,
-                    modifier = Modifier
-                        .size(26.dp)
-                        .rotate(if (isRefreshing) rotation else 0f)
-                )
-            }
-
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (isEditMode) Color.White else Color.White.copy(alpha = 0.16f),
-                    modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .clip(RoundedCornerShape(20.dp))
-                        .clickable(onClick = onEditClick)
-                        .testTag("edit_devices_button")
-                ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = if (isEditMode) stringResource(R.string.action_done) else stringResource(R.string.action_edit),
-                            color = if (isEditMode) WemoGreenBottom else Color.White,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 16.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        // Second Row: "wemi" wordmark + subtitle on left, glowing cyan/white "+" button on right
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.Bottom,
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
                     .clickable(onClick = onWordmarkClick)
-                    .padding(horizontal = 4.dp)
+                    .padding(horizontal = 4.dp, vertical = 2.dp)
                     .testTag("brand_wordmark_text")
             ) {
                 Text(
@@ -198,47 +141,78 @@ fun TopHeader(
                     color = Color.White,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 35.sp,
+                    fontSize = 32.sp,
                     letterSpacing = (-0.8).sp
                 )
-                Spacer(modifier = Modifier.width(10.dp))
-                Surface(
-                    color = Color(0x3322D3EE),
-                    shape = RoundedCornerShape(6.dp),
-                    modifier = Modifier.padding(bottom = 6.dp)
-                ) {
-                    Text(
-                        text = "LAN SWITCHES",
-                        color = Color(0xFFE0F7FA),
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 10.sp,
-                        letterSpacing = 0.8.sp,
-                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                    )
-                }
             }
 
-            Box(
-                modifier = Modifier
-                    .minimumInteractiveComponentSize()
-                    .clickable(onClick = onAddClick)
-                    .testTag("add_device_button"),
-                contentAlignment = Alignment.Center
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = Color.White,
-                    shadowElevation = 2.dp,
-                    modifier = Modifier.size(34.dp)
+                IconButton(
+                    onClick = onRefreshClick,
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.16f))
+                        .testTag("refresh_devices_button")
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = stringResource(R.string.action_add_device),
-                            tint = WemoGreenDark,
-                            modifier = Modifier.size(24.dp)
+                    Icon(
+                        imageVector = Icons.Default.Refresh,
+                        contentDescription = stringResource(R.string.action_refresh),
+                        tint = Color.White,
+                        modifier = Modifier
+                            .size(22.dp)
+                            .rotate(if (isRefreshing) rotation else 0f)
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (isEditMode) Color.White else Color.White.copy(alpha = 0.16f),
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clip(RoundedCornerShape(18.dp))
+                        .clickable(onClick = onEditClick)
+                        .testTag("edit_devices_button")
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (isEditMode) stringResource(R.string.action_done) else stringResource(R.string.action_edit),
+                            color = if (isEditMode) WemoGreenBottom else Color.White,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp
                         )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .minimumInteractiveComponentSize()
+                        .clickable(onClick = onAddClick)
+                        .testTag("add_device_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = Color.White,
+                        shadowElevation = 2.dp,
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = stringResource(R.string.action_add_device),
+                                tint = WemoGreenDark,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }
