@@ -1,6 +1,6 @@
 # WeMi Light Control — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture (`DISCOVERY_AND_ROOM_GROUPING.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v22.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v23.0`)  
 **Document & Skill Owner**: **Antigravity Device Discovery & Room Grouping Agent — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md)  
 **Companion User Guides**: [`docs/user-guide/room-grouping.md`](docs/user-guide/room-grouping.md) & [`docs/user-guide/switch-discovery.md`](docs/user-guide/switch-discovery.md)
@@ -8,7 +8,7 @@
 > [!CAUTION]
 > **EXCLUSIVE AGENT OWNERSHIP NOTICE (READ-ONLY FOR OTHER AGENTS)**
 > - **Owner**: **Antigravity Device Discovery & Room Grouping Agent** is the **sole author and maintainer** of [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) and [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md).
-> - **Policy for All Other Agents (including the Google AI Studio Agent, the Antigravity Debugging & Support Agent, CLI agents, and external coding assistants)**: **DO NOT MODIFY, OVERWRITE, RENAME, OR DELETE THESE TWO FILES.** All other agents **must** read, preserve, and respect the device discovery orchestration, 3-tier identity matching (`matchesDiscoveredDevice`), and automatic room grouping/migration (`inferRoomFromName` & `resolveDeviceRoomAssignment`) invariants defined here when editing repository, network, or UI code, but must treat these two files as **strictly read-only**.
+> - **Policy for All Other Agents (including the Google AI Studio Agent, the Antigravity Telemetry & Debugging Agent, the Antigravity Code Quality & E2E Testing Agent, the Antigravity License & Brand Governance Agent, CLI agents, and external coding assistants)**: **DO NOT MODIFY, OVERWRITE, RENAME, OR DELETE THESE TWO FILES.** All other agents **must** read, preserve, and respect the device discovery orchestration, 3-tier identity matching (`matchesDiscoveredDevice`), and automatic room grouping/migration (`inferRoomFromName` & `resolveDeviceRoomAssignment`) invariants defined here when editing repository, network, or UI code, but must treat these two files as **strictly read-only**.
 
 Related documentation:
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
@@ -16,7 +16,7 @@ Related documentation:
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry & `10.22.22.1` Provisioning Diagnostics *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source Licensing, Third-Party Attribution & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — 5-Agent Autonomous Round-Robin Release Process & Sign-Off Ledger
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v22.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v23.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -41,7 +41,7 @@ flowchart TD
     subgraph Network["LAN Discovery & XML Parsing Layer (org.suppressingfire.wemi.network)"]
         SSDP["SsdpDiscoveryEngine\nUDP M-SEARCH (239.255.255.250:1900)\n+ /24 Unicast Sweep + Loopback Mirror"]
         XML["XmlAndSkuParser\nparseSetupXmlDescriptor + classifyHardwareSku\n+ parseMetaInfoSoapResponse (isWemoDeviceSetupSsid)"]
-        PORT["NetworkClient\nprobeWemoPort (9 ports: 49153..49159)\n+ GetBinaryState + GetMetaInfo"]
+        PORT["LanHttpClient & NetworkClient\nprobeWemoPort (9 ports: 49153..49159)\n+ GetBinaryState + GetMetaInfo"]
     end
 
     subgraph Coordinator["Discovery Coordinator & Room Engine (org.suppressingfire.wemi.data)"]
@@ -53,7 +53,7 @@ flowchart TD
 
     subgraph StorageUI["Room v5 SQLite & Spatial UI Grouping"]
         DB["SwitchDao (wemo_devices & wemo_home_networks)"]
-        SORT["MainActivity.kt Spatial Room Sorter\nNamed Rooms (A..Z) -> 'Unassigned' at Bottom"]
+        SORT["MainActivity.kt & TvScreen.kt Spatial Room Sorters\nNamed Rooms -> 'Unassigned' at Bottom"]
     end
 
     SSDP --> XML
@@ -75,8 +75,9 @@ flowchart TD
 | [`DeviceEntities.kt`](app/src/main/java/org/suppressingfire/wemi/data/DeviceEntities.kt) | `normalizeDeviceNameForInference`, `inferRoomFromName`, `resolveDeviceRoomAssignment`, `classifyDeviceCategory` | Normalizes CamelCase/underscores/hyphens, applies specificity-ordered room inference (`"Ensuite"` before `"Bedroom"`, word-bounded `"bed"`/`"hall"`/`"den"`, `"Unassigned"` fallback), and resolves non-destructive room migrations. |
 | [`DiscoveryCoordinator.kt`](app/src/main/java/org/suppressingfire/wemi/data/DiscoveryCoordinator.kt) | `matchesDiscoveredDevice`, `findMatchingExistingDevice`, `executeSsdpScan`, `adoptDiscoveredDevice`, `attemptTwoStageReconnect`, `detectStartupDeviceStates`, `reconnectAndRediscoverHome`, `sanitizeAndResolveInitialLanHome` | Orchestrates startup `GetBinaryState` probes, 2-stage self-healing reconnects, SSDP/unicast discovery scans, `adoptMutex`-serialized device adoption, 3-tier identity matching, and soft-AP SSID / legacy room sanitization. |
 | [`SsdpDiscoveryEngine.kt`](app/src/main/java/org/suppressingfire/wemi/network/SsdpDiscoveryEngine.kt) | `performSsdpDiscoveryScan`, `scanSubnetUnicast`, `registerLoopbackSsdpPort` | Sends dual UDP `M-SEARCH` bursts (`urn:Belkin:service:basicevent:1` & `upnp:rootdevice`) with `MulticastLock` + retransmit, mirrors probes to loopback test servers, and sweeps `/24` subnets with Wi-Fi-bound `Semaphore(24)`. |
+| [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) & [`NetworkClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkClient.kt) | `probeWemoPort`, `executeWithPortHealing`, `getBinaryState`, `getMetaInfo`, `getSignalStrength` | Zero-dependency `SocketFactory` HTTP/1.1 client and 9-port UPnP endpoint prober verifying `<serialNumber>`/`<UDN>` across ports `49153, 49152, 49154, 49151, 49155..49159`. |
 | [`XmlAndSkuParser.kt`](app/src/main/java/org/suppressingfire/wemi/network/XmlAndSkuParser.kt) | `parseSetupXmlDescriptor`, `classifyHardwareSku`, `parseMetaInfoSoapResponse`, `isWemoDeviceSetupSsid` | Extracts `<friendlyName>`, `<modelName>`, `<serialNumber>`, `<UDN>`, `<binaryState>`, and `<brightness>` from `/setup.xml`, classifies Belkin SKUs, and filters out Belkin soft-AP SSIDs (`WeMo.*` / `Wemo.LS3W.*`). |
-| [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt) | `availableRooms`, `groupedDevicesByRoom` | Groups active home devices by `roomName` and sorts `"Unassigned"` after all named rooms so unassigned switches never displace primary household rooms. |
+| [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt) & [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt) | `availableRooms`, `groupedDevicesByRoom`, `groupedByRoom` (`TvRoomSectionHeader`) | Groups active home devices by `roomName` on Phone/Tablet (`RoomGroupCard`) and Android TV's 3-column grid (`TvRoomSectionHeader`), sorting `"Unassigned"` after all named rooms while preserving `sortOrder` within each room. |
 
 ---
 
@@ -147,7 +148,7 @@ Whenever an existing switch is inspected during app startup (`sanitizeAndResolve
 All agents modifying data, network, or UI code must preserve these five invariants:
 
 1. **Never Default Unrecognized Switch Names to `"Living Room"`**:
-   - `inferRoomFromName` must always return `"Unassigned"` as its `else` fallback, and [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt) must sort `"Unassigned"` after all named rooms.
+   - `inferRoomFromName` must always return `"Unassigned"` as its `else` fallback, and both [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt) (`availableRooms`, `groupedDevicesByRoom`) and [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt) (`groupedByRoom` / `TvRoomSectionHeader`) must sort `"Unassigned"` after all named rooms.
 2. **Evaluate Specific Functional Rooms (`"Ensuite"`) Before Broad Modifiers (`"Bedroom"`)**:
    - Keep `"Ensuite"` above `"Bedroom"` in `inferRoomFromName` so `"Master Bath"`, `"Guest Bathroom"`, `"Primary Bath"`, and `"Kids Bath"` never get misclassified into `"Bedroom"`.
 3. **Enforce Word Boundaries on Short Ambiguous Tokens (`\bbed\b`, `\bhall\b`, `\bden\b`, `\bgirl\b`, `\bboy\b`, `\bkid\b`, `\bwc\b`)**:
