@@ -55,5 +55,5 @@ Whenever modifying `DeviceEntities.kt`, `DiscoveryCoordinator.kt`, `SsdpDiscover
    - Always use `WORD_BED_REGEX` (`\bbed\b`), `WORD_HALL_REGEX` (`\bhall\b`), `WORD_DEN_REGEX` (`\bden\b`), `WORD_GIRL_REGEX` (`\bgirl\b`), `WORD_BOY_REGEX` (`\bboy\b`), `WORD_KID_REGEX` (`\bkid\b`), and `WORD_WC_REGEX` (`\bwc\b`) after `normalizeDeviceNameForInference`.
 4. **All Discovery & Reconnect Flows Must Use `matchesDiscoveredDevice` and `resolveDeviceRoomAssignment`**:
    - Never bypass serial-number mismatch protection or overwrite custom user room assignments in `executeSsdpScan`, `adoptDiscoveredDevice`, `reconnectAndRediscoverHome`, or `sanitizeAndResolveInitialLanHome`.
-5. **Unit, Governance & E2E Tests Must Pass (`30/30` across 8 suites)**:
+5. **Unit, Governance & E2E Tests Must Pass (`31/31` across 8 suites)**:
    - Verify [`SkuAndCryptoTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/SkuAndCryptoTest.kt), [`SoapAndSelfHealingTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/SoapAndSelfHealingTest.kt), [`ExampleRobolectricTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ExampleRobolectricTest.kt), and [`HardwareCujEndToEndTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/HardwareCujEndToEndTest.kt) with `./gradlew testDebugUnitTest --rerun-tasks`.
