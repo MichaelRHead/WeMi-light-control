@@ -52,7 +52,7 @@ STAGE4_SHA="$(sed -n 's/^SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (\([^ )]*
 BASE_SHA="$(awk -F': *' '/^CANDIDATE_BASE_SHA:/ { print $2; exit }' RELEASE_SIGN_OFF.md | tr -d '\r' || true)"
 HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "${STAGE5_SHA:-${STAGE4_SHA:-${BASE_SHA:-ai-studio}}}")"
 if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "NONE" ]]; then
-  HEAD_SHA="v23.0-rc"
+  HEAD_SHA="v25.0-rc"
 fi
 
 python3 - "${ACTION}" "${PST_NOW}" "${HEAD_SHA}" "$@" <<'PYEOF'
@@ -68,8 +68,8 @@ raw_args = [a for a in sys.argv[4:] if a != "--no-push"]
 gradle_text = Path("app/build.gradle.kts").read_text(encoding="utf-8")
 ver_code_match = re.search(r"versionCode\s*=\s*(\d+)", gradle_text)
 ver_name_match = re.search(r'versionName\s*=\s*"([^"]+)"', gradle_text)
-gradle_ver_code = ver_code_match.group(1) if ver_code_match else "23"
-gradle_ver_name = f"v{ver_name_match.group(1)}" if ver_name_match else "v23.0"
+gradle_ver_code = ver_code_match.group(1) if ver_code_match else "25"
+gradle_ver_name = f"v{ver_name_match.group(1)}" if ver_name_match else "v25.0"
 
 sign_off_path = Path("RELEASE_SIGN_OFF.md")
 text = sign_off_path.read_text(encoding="utf-8")

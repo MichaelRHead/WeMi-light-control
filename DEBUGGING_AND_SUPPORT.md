@@ -1,6 +1,6 @@
 # WeMi Light Control — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture (`DEBUGGING_AND_SUPPORT.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v23.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v25.0`)  
 **Document & Skill Owner**: **Antigravity Debugging & Support Agent — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md)  
 **Companion User Guide**: [`docs/user-guide/telemetry-and-troubleshooting.md`](docs/user-guide/telemetry-and-troubleshooting.md)
@@ -16,7 +16,7 @@ Related documentation:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Device Discovery & Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — 5-Agent Autonomous Round-Robin Release Review Process & Sign-Off Ledger
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v23.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v25.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -26,11 +26,13 @@ Related documentation:
 
 Because switches from Belkin's discontinued smart switch platform (`F7C030`, `WLS040`/`WLS0403`, `F7C059`/`WDS060`, `F7C063`/`WSP080`) communicate over the user's private local Wi-Fi (`192.168.x.x/24`) or an unconfigured switch's isolated `10.22.22.1/24` Setup AP, remote agents cannot directly ping the user's switches from the cloud.
 
-To make hardware debugging fast, deterministic, and privacy-preserving, **WeMi Light Control** embeds a two-channel on-device telemetry system:
+To make hardware and production release debugging fast, deterministic, and privacy-preserving, **WeMi Light Control** combines on-device LAN telemetry with embedded Play Console crash deobfuscation:
 1. **Channel A — High-Contrast On-Screen Screenshot Panels**:
    - Designed so a single phone or Android TV screenshot captures the complete hardware, network, encryption, and SOAP state.
 2. **Channel B — One-Tap Recorded Telemetry File Exporter (`wemi-telemetry-latest.txt`)**:
    - Writes a structured 4-section text report to `/data/data/com.aistudio.wemiswitch.kxpqzr/files/wemi-telemetry-latest.txt`, copies it to the system clipboard, and launches Android's `Intent.ACTION_SEND` share sheet.
+3. **Release App Bundle Crash/ANR Deobfuscation (`proguard.map` & Pure Kotlin/DEX)**:
+   - Release builds ([`app/build.gradle.kts`](app/build.gradle.kts) & [`app/proguard-rules.pro`](app/proguard-rules.pro)) embed R8 mapping metadata with `-keepattributes SourceFile,LineNumberTable` (preserving Room v5 entities/DAOs and domain enums) and exclude un-symbolicated transitive `.so` shims so Google Play Console stack traces remain human-readable with exact line numbers.
 
 ---
 
@@ -86,7 +88,7 @@ All agents modifying networking, repository, or UI code must preserve these five
 3. **Never Log Plaintext Wi-Fi Passwords in Screenshots or Telemetry Files**:
    - `SetupDebugSnapshot` and `TelemetryFileExporter` must only record `Method`, `addLengths`, `plainLen`, `encLen`, and `suffix` (`[STEP 4 CRYPTO] Method=1 addLengths=true plainLen=12 encLen=68 suffix=0c40`) — never the user's raw Wi-Fi password.
 4. **Preserve Diagnostic `Modifier.testTag(...)` Identifiers**:
-   - Keep `provision_debug_panel`, `provision_debug_text`, `copy_provision_debug_button`, `share_provision_debug_button`, `keep_provision_dialog_open_chip`, `provision_len_auto_chip`, `provision_len_true_chip`, `provision_len_false_chip`, `export_telemetry_file_button`, and `ping_device_<id>` intact and covered across the 10-suite `37/37` automated test gate ([`GenaProvisioningAndRulesTest.kt`](app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt), [`SoapAndSelfHealingTest.kt`](app/src/test/java/org/suppressingfire/wemi/SoapAndSelfHealingTest.kt), [`EndToEndUiTest.kt`](app/src/test/java/org/suppressingfire/wemi/EndToEndUiTest.kt), and [`HardwareCujEndToEndTest.kt`](app/src/test/java/org/suppressingfire/wemi/HardwareCujEndToEndTest.kt)).
+   - Keep `provision_debug_panel`, `provision_debug_text`, `copy_provision_debug_button`, `share_provision_debug_button`, `keep_provision_dialog_open_chip`, `provision_len_auto_chip`, `provision_len_true_chip`, `provision_len_false_chip`, `export_telemetry_file_button`, and `ping_device_<id>` intact and covered across the 10-suite `38/38` automated test gate ([`GenaProvisioningAndRulesTest.kt`](app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt), [`SoapAndSelfHealingTest.kt`](app/src/test/java/org/suppressingfire/wemi/SoapAndSelfHealingTest.kt), [`EndToEndUiTest.kt`](app/src/test/java/org/suppressingfire/wemi/EndToEndUiTest.kt), and [`HardwareCujEndToEndTest.kt`](app/src/test/java/org/suppressingfire/wemi/HardwareCujEndToEndTest.kt)).
 5. **Preserve `LanHttpClient` & `GenaSubscriptionManager` Byte-Exact UTF-8 `Content-Length` Framing, Delayed-`FIN` Recovery & `8500ms` Site-Survey Read Timeout**:
    - Embedded `uhttpd` / RTOS HTTP servers on `10.22.22.1` often keep TCP sockets open (`Connection: keep-alive`) or delay TCP `FIN` after sending `/setup.xml` and take `3–6 seconds` to complete an 11-channel 2.4 GHz `GetApList` scan. Always use [`LanHttpClient`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) (`tcpNoDelay = true`, `connectTimeoutMs = 1500`, `readTimeoutMs = 8500`, buffered delayed-`FIN` recovery in `readUntilEof`) rather than raw `Socket.getInputStream().readText()` EOF reads, and preserve byte-exact UTF-8 `Content-Length` framing in [`GenaSubscriptionManager.kt`](app/src/main/java/org/suppressingfire/wemi/network/GenaSubscriptionManager.kt).
 

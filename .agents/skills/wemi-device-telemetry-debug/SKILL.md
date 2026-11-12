@@ -140,4 +140,4 @@ Format:
 Whenever a screenshot or exported telemetry file reveals a new firmware flag, SOAP tag, or hardware SKU quirk:
 1. Add the parsed field to `SetupDeviceDescriptor` in [`NetworkModels.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) (populated by `probeSetupDevice` in [`ProvisionerClient.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt)) and surface it in `SetupDebugSnapshot.toDisplayLines` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt).
 2. Add a deterministic loopback regression test in [`GenaProvisioningAndRulesTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt) using [`FakeUpnpServer.kt`](../../app/src/test/java/org/suppressingfire/wemi/FakeUpnpServer.kt).
-3. Run `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` (`37/37` tests across 10 suites) before pushing.
+3. Run `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` (`38/38` tests across 10 suites) before pushing.
