@@ -141,12 +141,12 @@ class TvAndHeaderLayoutE2ETest {
                         vm.resetLanHomesSwitchesAndRooms(rediscoverAfterReset = false)
                     }
                     awaitLoopbackIo {
-                        !vm.isDemoShowroomMode.value && vm.devices.value.isEmpty()
+                        !vm.isDemoShowroomMode.value && vm.devices.value.isEmpty() && !vm.isRefreshing.value
                     }
 
                     composeTestRule.onNodeWithTag("tv_scan_button").assertIsDisplayed().performClick()
                     awaitLoopbackIo {
-                        vm.devices.value.size == 3
+                        vm.devices.value.size == 3 && !vm.isRefreshing.value
                     }
 
                     val adopted = vm.devices.value
@@ -159,7 +159,7 @@ class TvAndHeaderLayoutE2ETest {
 
                     // 2. Verify "Living Room" section renders above "Unassigned" in the 3-column TV grid
                     composeTestRule.onNodeWithTag("tv_device_grid")
-                        .performScrollToNode(hasTestTag("tv_room_header_Unassigned"))
+                        .performScrollToNode(hasTestTag("tv_room_header_Living Room"))
                     composeTestRule.waitForIdle()
                     val livingHeaderBounds = composeTestRule.onNodeWithTag("tv_room_header_Living Room")
                         .assertIsDisplayed()
@@ -181,7 +181,7 @@ class TvAndHeaderLayoutE2ETest {
                         .performKeyInput { pressKey(Key.DirectionCenter) }
 
                     awaitLoopbackIo {
-                        switchServer.relayStateOn.get()
+                        switchServer.relayStateOn.get() && vm.togglingDeviceIds.value.isEmpty()
                     }
                     assertTrue(switchServer.relayStateOn.get())
 
@@ -200,7 +200,7 @@ class TvAndHeaderLayoutE2ETest {
                     composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
                         .performKeyInput { pressKey(Key.DirectionRight) }
                     awaitLoopbackIo {
-                        dimmerServer.dimmerBrightness.get() == 60
+                        dimmerServer.dimmerBrightness.get() == 60 && vm.togglingDeviceIds.value.isEmpty()
                     }
                     assertEquals(60, dimmerServer.dimmerBrightness.get())
 
@@ -217,7 +217,10 @@ class TvAndHeaderLayoutE2ETest {
                         .performKeyInput { pressKey(Key.DirectionCenter) }
 
                     awaitLoopbackIo {
-                        !switchServer.relayStateOn.get() && !dimmerServer.relayStateOn.get()
+                        !switchServer.relayStateOn.get() &&
+                            !dimmerServer.relayStateOn.get() &&
+                            vm.togglingRooms.value.isEmpty() &&
+                            vm.togglingDeviceIds.value.isEmpty()
                     }
                     assertFalse(switchServer.relayStateOn.get())
                     assertFalse(dimmerServer.relayStateOn.get())

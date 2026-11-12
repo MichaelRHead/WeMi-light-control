@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v24.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v25.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v24.0`)
+## Quick Release Summary (`v1.0` → `v25.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v25.0`](#version-250-versioncode--25--november-12-2026)** | `25` | Nov 12, 2026 | Play Store `v25.0` (`versionCode = 25`) release App Bundle with R8 code/resource shrinking, embedded Play Console crash deobfuscation mapping (`proguard.map`), and pure Kotlin/DEX packaging |
 | **[`v24.0`](#version-240-versioncode--24--november-11-2026)** | `24` | Nov 11, 2026 | Smaller, faster R8-shrunk release App Bundle with embedded Play Console crash deobfuscation mapping (`proguard.map`) and pure Kotlin/DEX packaging |
 | **[`v23.0`](#version-230-versioncode--23--november-10-2026)** | `23` | Nov 10, 2026 | Redesigned 3-column Room-Grouped Android TV dashboard (`wemi TV`) with unmistakable 10-foot cursor focus & non-interfering Dimmer Adjust Mode, plus compact single-row phone/tablet `TopHeader` |
 | **[`v22.0`](#version-220-versioncode--22--november-10-2026)** | `22` | Nov 10, 2026 | Refreshed Google Play Store & in-app visual showcase across Phone, 7"/10" Tablets & Android TV matching the live Ocean Teal, Electric Cyan & Deep Sapphire UI, plus streamlined `MIT` + `Apache-2.0` runtime |
@@ -43,6 +44,11 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 25.0 (`versionCode = 25`) — November 12, 2026
+- **Google Play Store `v25.0` (`versionCode = 25`) Release App Bundle**: Bumped Play Store release version to `25.0` (`versionCode = 25`) with R8 code minification (`isMinifyEnabled = true`), resource shrinking (`isShrinkResources = true`), embedded Play Console crash/ANR deobfuscation mapping (`proguard.map`), and pure Kotlin/DEX packaging (`0` un-symbolicated native `.so` shims).
+
+---
 
 ### Version 24.0 (`versionCode = 24`) — November 11, 2026
 - **Smaller, Faster R8-Optimized Release App Bundle**: Enabled release R8 code minification and resource shrinking (`isMinifyEnabled = true`, `isShrinkResources = true`) with embedded Play Console crash/ANR deobfuscation mapping (`proguard.map`) and Room v5 / enum preservation rules (`proguard-rules.pro`).

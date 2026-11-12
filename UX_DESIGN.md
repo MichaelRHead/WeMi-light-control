@@ -19,7 +19,7 @@ Related documentation:
 
 ## 1. Executive Summary & UX Philosophy
 
-**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v24.0`) reimagines the tactile, unmistakable physical affordances of a dedicated smart-home switch interface (Ocean Teal `#0891B2`, Electric Cyan `#06B6D4`, and Deep Sapphire `#0F4C81` header gradient, crisp white device rows, glowing cyan power rings, and skeuomorphic appliance illustrations) for Belkin's discontinued smart switch platform while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
+**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v25.0`) reimagines the tactile, unmistakable physical affordances of a dedicated smart-home switch interface (Ocean Teal `#0891B2`, Electric Cyan `#06B6D4`, and Deep Sapphire `#0F4C81` header gradient, crisp white device rows, glowing cyan power rings, and skeuomorphic appliance illustrations) for Belkin's discontinued smart switch platform while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
 
 Smart-home control apps fail when they treat physical wall switches like generic cloud database rows. Our UX design is anchored on four core principles:
 1. **Sub-Frame Tactile Responsiveness (`<16ms`)**: Tapping a light switch in the app must feel as instantaneous as flipping a physical paddle on the wall, backed by optimistic state projection and `1200ms` UPnP GENA echo suppression.

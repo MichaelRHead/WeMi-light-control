@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v24.0 — Phone, Tablet & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v25.0 — Phone, Tablet & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `24.0` (`versionCode = 24`)
+- **Version:** `25.0` (`versionCode = 25`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,7 +17,7 @@ WeMi Switch Control brings reliable, instant local-network control back to Belki
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
-### What's New in Version 24.0
+### What's New in Version 25.0
 - **Smaller, R8-Optimized Pure Kotlin/DEX Release Bundle:** Enabled R8 minification, resource shrinking, and embedded Play Console deobfuscation mapping (`proguard.map`) while excluding unused transitive native `.so` shims.
 - **Redesigned Android TV (`wemi TV`) 3-Column Room-Grouped Dashboard:** Full-height 3-column switch grid organized by Room Section Headers (`LIVING ROOM`, `BEDROOM`, `KITCHEN`) with unmistakable 10-foot Electric Cyan cursor focus (`FOCUSED • OK`), non-interfering `DIM -/+` brightness mode, and non-blocking LAN rescan.
 - **Compact Single-Row Phone & Tablet Header:** Moved `Refresh` and `Edit` alongside the `wemi` wordmark and `+` button to maximize vertical screen space for room and switch cards.

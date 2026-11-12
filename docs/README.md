@@ -15,7 +15,7 @@ Welcome to the user documentation for **WeMi Light Control**, a local-network An
 | **[Rules, Schedules & Auto-Off Timers](user-guide/rules-and-timers.md)** | Creating local daily schedules, Sunset/Sunrise triggers, Auto-Off countdown timers, and motion-triggered rules. |
 | **[Master Controls, Demo Mode & Android TV](user-guide/more-and-tv-mode.md)** | Using the **More** tab (`All Switches ON/OFF`, Demo Showroom Mode, Open Source License) and controlling your home with a TV remote in the 10-foot **Android TV (`wemi TV`)** interface. |
 | **[Troubleshooting & Telemetry Logs](user-guide/telemetry-and-troubleshooting.md)** | Capturing on-screen diagnostic views (`SETUP DEBUG DETAILS`, `UPnP / SOAP Packet Log`, Inline Switch Diagnostics) and exporting or sharing `wemi-telemetry-latest.txt`. |
-| **[Release Notes & Version History](user-guide/release-notes.md)** | Summary of user-facing features, visual refinements, and reliability improvements across releases (`v1.0` → `v24.0`). |
+| **[Release Notes & Version History](user-guide/release-notes.md)** | Summary of user-facing features, visual refinements, and reliability improvements across releases (`v1.0` → `v25.0`). |
 
 ---
 
