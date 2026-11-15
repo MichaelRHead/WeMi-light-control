@@ -8,15 +8,15 @@ The **Main Screen** (**Devices** tab) is your primary control center in **WeMi L
 
 ## 1. Top Header Bar
 
-At the top of the screen, the brushed lime-green Belkin WeMo header provides quick access to core actions:
+At the top of the screen, the compact single-row WeMi header provides quick access to core actions:
 
 | Control | Location | What It Does |
 | :--- | :--- | :--- |
-| **`wemo` / `wemi` Wordmark** | Top-left | Tap the brand logo to toggle between the classic **`wemo`** wordmark and the **`wemi`** wordmark. |
-| **`TV` Button** | Left of icons | Opens the 10-foot **Android TV Dashboard (`wemi TV`)** with D-Pad navigation and quick lighting scenes (see [Master Controls, Diagnostics, Demo Mode & Android TV](more-and-tv-mode.md)). |
-| **Refresh / Radar Icon** | Top-right | Opens the live **SSDP Network Discovery Scanner** and starts an immediate local Wi-Fi scan (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
-| **`+` (Add) Button** | Top-right | On the **Devices** tab, opens the **Add Device** dialog. On the **Rules** tab, opens the **New Rule** dialog. |
-| **`Edit` / `Done` Button** | Far top-right | Toggles **Edit Mode** so you can reorder, rename, reconfigure, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
+| **`wemi` Wordmark** | Top-left | Tap the brand logo to toggle the top-left wordmark display. |
+| **`All Off` Button** | Next to Refresh | Turns **OFF** all reachable switches and dimmers on your active Wi-Fi Home in one tap (`all_off_devices_button`). |
+| **Refresh Icon** | Top-right | Opens the live **SSDP Network Discovery Scanner** and starts an immediate local Wi-Fi scan (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
+| **`Edit` / `Done` Button** | Top-right | Toggles **Edit Mode** so you can reorder, rename, reconfigure, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
+| **`+` (Add) Button** | Far top-right | On the **Devices** tab, opens the **Add Device** dialog. On the **Rules** tab, opens the **New Rule** dialog. |
 
 ---
 

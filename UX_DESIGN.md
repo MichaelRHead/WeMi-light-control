@@ -38,6 +38,7 @@ WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`Botto
 1. **Compact Single-Row Top Header (`TopHeader`)**:
    - **Brand Wordmark**: Displays the `wemi` / `wemo` wordmark (`brand_wordmark_text`) on the left, omitting redundant static subtitle pills (`"LAN SWITCHES"`) so all top-bar actions fit on a single compact row and maximize vertical screen space for room and switch cards.
    - **Inline Action Cluster (Right)**:
+     - **All Off Button (`all_off_devices_button`)**: Positioned immediately next to the Refresh button (`[All Off] [Refresh] [Edit] [+]`), providing one-tap master power-off for all reachable controllable switches on the active Wi-Fi Home.
      - **Refresh / SSDP Scan Button (`refresh_devices_button`)**: Launches the live `SsdpScannerModal` and triggers background `GetBinaryState` verification across all saved switches.
      - **Edit / Done Toggle (`edit_devices_button`)**: Switches the device list between normal operation and management mode (exposing inline reorder, `Edit`, and `Delete` actions).
      - **Add Button (`add_device_button`)**: Opens `AddOrEditDeviceDialog` on the `Devices` tab or `AddRuleDialog` on the `Rules` tab.

@@ -150,6 +150,10 @@ fun WeMiSwitchApp(
         }
     }
 
+    val activeOnCount = remember(homeDevices) {
+        homeDevices.count { it.isReachable && it.isOn && it.parsedType != org.suppressingfire.wemi.data.DeviceType.MOTION_SENSOR }
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
@@ -172,7 +176,9 @@ fun WeMiSwitchApp(
                             viewModel.openAddDeviceDialog()
                         }
                     },
-                    onWordmarkClick = { viewModel.toggleBrandWordmark() }
+                    onWordmarkClick = { viewModel.toggleBrandWordmark() },
+                    activeOnCount = activeOnCount,
+                    onAllOffClick = { viewModel.turnAllSwitches(false) }
                 )
             }
         },

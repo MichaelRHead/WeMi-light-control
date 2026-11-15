@@ -581,7 +581,13 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
                     it.parsedType != DeviceType.MOTION_SENSOR &&
                     it.isOn != turnOn
             }
-            targets.forEach { dev -> repository.toggleDevicePower(dev) }
+            val targetIds = targets.map { it.id }.toSet()
+            _togglingDeviceIds.value = _togglingDeviceIds.value + targetIds
+            try {
+                targets.forEach { dev -> repository.toggleDevicePower(dev) }
+            } finally {
+                _togglingDeviceIds.value = _togglingDeviceIds.value - targetIds
+            }
             showTransientStatus(
                 if (turnOn) "All reachable switches on ${currentWifiSsid()} turned ON"
                 else "All reachable switches on ${currentWifiSsid()} turned OFF"

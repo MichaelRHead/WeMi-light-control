@@ -2,6 +2,7 @@
     <string name="app_name">WeMi Switch Control</string>
     <string name="header_brand_wemo">wemi</string>
     <string name="header_brand_wemi">wemi</string>
+    <string name="action_all_off">All Off</string>
     <string name="action_refresh">Refresh Devices</string>
     <string name="action_edit">Edit</string>
     <string name="action_done">Done</string>

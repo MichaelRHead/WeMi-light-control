@@ -48,19 +48,26 @@ class TvAndHeaderLayoutE2ETest {
         composeTestRule.waitForIdle()
 
         val wordmarkNode = composeTestRule.onNodeWithTag("brand_wordmark_text").assertIsDisplayed()
+        val allOffNode = composeTestRule.onNodeWithTag("all_off_devices_button").assertIsDisplayed()
         val refreshNode = composeTestRule.onNodeWithTag("refresh_devices_button").assertIsDisplayed()
         val editNode = composeTestRule.onNodeWithTag("edit_devices_button").assertIsDisplayed()
         val addNode = composeTestRule.onNodeWithTag("add_device_button").assertIsDisplayed()
 
         // Legacy multi-line "LAN SWITCHES" subtitle must not exist in the compact single-row TopHeader
         composeTestRule.onNodeWithText("LAN SWITCHES").assertDoesNotExist()
+        composeTestRule.onNodeWithText("All Off").assertIsDisplayed()
 
         val wordmarkBounds = wordmarkNode.fetchSemanticsNode().boundsInRoot
+        val allOffBounds = allOffNode.fetchSemanticsNode().boundsInRoot
         val refreshBounds = refreshNode.fetchSemanticsNode().boundsInRoot
         val editBounds = editNode.fetchSemanticsNode().boundsInRoot
         val addBounds = addNode.fetchSemanticsNode().boundsInRoot
 
-        // All 4 controls must share the same single horizontal header row (vertical centers within 10px)
+        // All 5 controls must share the same single horizontal header row (vertical centers within 10px)
+        assertTrue(
+            "Expected All Off button aligned vertically with wordmark ($wordmarkBounds vs $allOffBounds)",
+            abs(allOffBounds.center.y - wordmarkBounds.center.y) <= 10f
+        )
         assertTrue(
             "Expected refresh button aligned vertically with wordmark ($wordmarkBounds vs $refreshBounds)",
             abs(refreshBounds.center.y - wordmarkBounds.center.y) <= 10f
@@ -74,10 +81,11 @@ class TvAndHeaderLayoutE2ETest {
             abs(addBounds.center.y - wordmarkBounds.center.y) <= 10f
         )
 
-        // Strict left-to-right horizontal ordering across the single row
+        // Strict left-to-right horizontal ordering across the single row: wordmark -> All Off -> Refresh -> Edit -> Add
         assertTrue(
-            "Expected strict left-to-right header ordering: wordmark -> refresh -> edit -> add",
-            wordmarkBounds.right <= refreshBounds.left + 8f &&
+            "Expected strict left-to-right header ordering: wordmark -> all_off -> refresh -> edit -> add",
+            wordmarkBounds.right <= allOffBounds.left + 8f &&
+                allOffBounds.center.x < refreshBounds.center.x &&
                 refreshBounds.center.x < editBounds.center.x &&
                 editBounds.center.x < addBounds.center.x
         )
@@ -89,6 +97,16 @@ class TvAndHeaderLayoutE2ETest {
         wordmarkNode.performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("wemi").assertIsDisplayed()
+
+        // Clicking "All Off" next to the Refresh button turns OFF all reachable controllable switches on the active home
+        val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
+        allOffNode.performClick()
+        awaitLoopbackIo {
+            vm.togglingDeviceIds.value.isEmpty() &&
+                vm.devices.value
+                    .filter { it.networkKey == vm.activeNetworkKey.value && it.isReachable && it.parsedType != org.suppressingfire.wemi.data.DeviceType.MOTION_SENSOR }
+                    .none { it.isOn }
+        }
     }
 
     @OptIn(ExperimentalTestApi::class)

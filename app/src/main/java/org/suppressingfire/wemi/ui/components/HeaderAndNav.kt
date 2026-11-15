@@ -28,8 +28,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,6 +75,8 @@ fun TopHeader(
     onEditClick: () -> Unit,
     onAddClick: () -> Unit,
     onWordmarkClick: () -> Unit,
+    activeOnCount: Int = 0,
+    onAllOffClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "refreshSpin")
@@ -116,9 +118,9 @@ fun TopHeader(
                 )
             }
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 14.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
-        // Single compact row: "wemi" wordmark on left; Refresh, Edit/Done, and "+" buttons on right
+        // Single compact row: "wemi" wordmark on left; All Off, Refresh, Edit/Done, and "+" buttons on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -141,7 +143,7 @@ fun TopHeader(
                     color = Color.White,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 32.sp,
+                    fontSize = 30.sp,
                     letterSpacing = (-0.8).sp
                 )
             }
@@ -150,11 +152,45 @@ fun TopHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (activeOnCount > 0) {
+                        Color.White.copy(alpha = 0.24f)
+                    } else {
+                        Color.White.copy(alpha = 0.14f)
+                    },
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .clickable(onClick = onAllOffClick)
+                        .testTag("all_off_devices_button")
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PowerSettingsNew,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = stringResource(R.string.action_all_off),
+                            color = Color.White,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.5.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                }
+
                 IconButton(
                     onClick = onRefreshClick,
                     modifier = Modifier
-                        .minimumInteractiveComponentSize()
-                        .size(38.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.16f))
                         .testTag("refresh_devices_button")
@@ -164,7 +200,7 @@ fun TopHeader(
                         contentDescription = stringResource(R.string.action_refresh),
                         tint = Color.White,
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(20.dp)
                             .rotate(if (isRefreshing) rotation else 0f)
                     )
                 }
@@ -173,28 +209,30 @@ fun TopHeader(
                     shape = RoundedCornerShape(18.dp),
                     color = if (isEditMode) Color.White else Color.White.copy(alpha = 0.16f),
                     modifier = Modifier
-                        .minimumInteractiveComponentSize()
                         .clip(RoundedCornerShape(18.dp))
                         .clickable(onClick = onEditClick)
                         .testTag("edit_devices_button")
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
                             text = if (isEditMode) stringResource(R.string.action_done) else stringResource(R.string.action_edit),
                             color = if (isEditMode) WemoGreenBottom else Color.White,
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
-                            fontSize = 15.sp
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
 
                 Box(
                     modifier = Modifier
-                        .minimumInteractiveComponentSize()
+                        .size(34.dp)
+                        .clip(RoundedCornerShape(10.dp))
                         .clickable(onClick = onAddClick)
                         .testTag("add_device_button"),
                     contentAlignment = Alignment.Center
@@ -210,7 +248,7 @@ fun TopHeader(
                                 imageVector = Icons.Default.Add,
                                 contentDescription = stringResource(R.string.action_add_device),
                                 tint = WemoGreenDark,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }

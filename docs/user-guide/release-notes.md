@@ -14,7 +14,7 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
-| **[`v25.0`](#version-250-versioncode--25--november-12-2026)** | `25` | Nov 12, 2026 | Play Store `v25.0` (`versionCode = 25`) release App Bundle with R8 code/resource shrinking, embedded Play Console crash deobfuscation mapping (`proguard.map`), and pure Kotlin/DEX packaging |
+| **[`v25.0`](#version-250-versioncode--25--november-14-2026)** | `25` | Nov 14, 2026 | Top-header **`All Off`** button next to Refresh for 1-tap whole-home power-off, plus R8-shrunk pure Kotlin/DEX release App Bundle with embedded Play Console deobfuscation mapping (`proguard.map`) |
 | **[`v24.0`](#version-240-versioncode--24--november-11-2026)** | `24` | Nov 11, 2026 | Smaller, faster R8-shrunk release App Bundle with embedded Play Console crash deobfuscation mapping (`proguard.map`) and pure Kotlin/DEX packaging |
 | **[`v23.0`](#version-230-versioncode--23--november-10-2026)** | `23` | Nov 10, 2026 | Redesigned 3-column Room-Grouped Android TV dashboard (`wemi TV`) with unmistakable 10-foot cursor focus & non-interfering Dimmer Adjust Mode, plus compact single-row phone/tablet `TopHeader` |
 | **[`v22.0`](#version-220-versioncode--22--november-10-2026)** | `22` | Nov 10, 2026 | Refreshed Google Play Store & in-app visual showcase across Phone, 7"/10" Tablets & Android TV matching the live Ocean Teal, Electric Cyan & Deep Sapphire UI, plus streamlined `MIT` + `Apache-2.0` runtime |
@@ -45,8 +45,9 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 ## Release-by-Release Highlights (Newest to Oldest)
 
-### Version 25.0 (`versionCode = 25`) — November 12, 2026
-- **Google Play Store `v25.0` (`versionCode = 25`) Release App Bundle**: Bumped Play Store release version to `25.0` (`versionCode = 25`) with R8 code minification (`isMinifyEnabled = true`), resource shrinking (`isShrinkResources = true`), embedded Play Console crash/ANR deobfuscation mapping (`proguard.map`), and pure Kotlin/DEX packaging (`0` un-symbolicated native `.so` shims).
+### Version 25.0 (`versionCode = 25`) — November 14, 2026
+- **Top-Header `All Off` Button Next to Refresh**: Added a one-tap **`All Off`** button (`all_off_devices_button`) immediately next to the **Refresh** button in the compact single-row top header bar so you can turn off every reachable switch and dimmer on your active Wi-Fi Home from the top of the screen.
+- **Google Play Store `v25.0` (`versionCode = 25`) Release App Bundle**: Enabled release R8 code minification (`isMinifyEnabled = true`), resource shrinking (`isShrinkResources = true`), embedded Play Console crash/ANR deobfuscation mapping (`proguard.map`), and pure Kotlin/DEX packaging (`0` un-symbolicated native `.so` shims).
 
 ---
 

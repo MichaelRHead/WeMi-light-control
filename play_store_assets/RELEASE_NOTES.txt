@@ -1,5 +1,4 @@
 WeMi Switch Control v25.0:
+• Top-Header "All Off" Button: One-tap "All Off" button right next to the Refresh button to turn off all reachable switches on your active Wi-Fi Home.
 • Smaller, R8-shrunk pure Kotlin/DEX release bundle with embedded Play Console crash deobfuscation mapping.
 • Redesigned Android TV (wemi TV) 3-Column Room-Grouped Dashboard with Electric Cyan cursor focus (FOCUSED • OK) and non-interfering Dimmer Adjust Mode (DIM -/+).
-• Compact Single-Row Phone/Tablet Header: Refresh & Edit sit alongside wemi and '+' to save vertical space.
-
