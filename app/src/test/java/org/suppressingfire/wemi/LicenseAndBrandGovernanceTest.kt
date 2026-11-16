@@ -140,9 +140,12 @@ class LicenseAndBrandGovernanceTest {
             wemoNamedFiles.isEmpty()
         )
 
-        // 3. Store-facing, screenshot generator & app resource files must not leak the "WeMo" trademark
+        // 3. Store-facing, manifest/backup XML, screenshot generator & app resource files must not leak the "WeMo" trademark
         val brandBoundaryFiles = listOf(
+            "app/src/main/AndroidManifest.xml",
             "app/src/main/res/values/strings.xml",
+            "app/src/main/res/xml/backup_rules.xml",
+            "app/src/main/res/xml/data_extraction_rules.xml",
             "metadata.json",
             "play_store_assets/STORE_LISTING.md",
             "play_store_assets/RELEASE_NOTES.txt",
@@ -159,6 +162,16 @@ class LicenseAndBrandGovernanceTest {
                 Regex("\\bWeMo\\b|\\bWemo\\b").containsMatchIn(content)
             )
         }
+
+        // Verify Play Store Data Safety alignment: ephemeral LAN telemetry file excluded from cloud Auto-Backup
+        assertTrue(
+            "backup_rules.xml must exclude wemi-telemetry-latest.txt from cloud Auto-Backup",
+            File(repoRoot, "app/src/main/res/xml/backup_rules.xml").readText().contains("wemi-telemetry-latest.txt")
+        )
+        assertTrue(
+            "data_extraction_rules.xml must exclude wemi-telemetry-latest.txt from cloud backup & transfer",
+            File(repoRoot, "app/src/main/res/xml/data_extraction_rules.xml").readText().contains("wemi-telemetry-latest.txt")
+        )
 
         // 4. Modular UI composables & controllers (MainActivity.kt + ui/**/*.kt) must not expose user-visible "WeMo" string literals
         val allowedUiProtocolOrTagTokens = setOf(

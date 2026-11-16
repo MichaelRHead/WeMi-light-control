@@ -1,4 +1,4 @@
 WeMi Switch Control v27.0:
-• Android TV Focusable Dimmer Slider & Room Navigation: Press Down from a dimmer toggle to focus the brightness slider (Left/Right -10%/+10%), with deterministic Up/Down navigation across Room Master Headers from all columns.
-• Top-Header "All Off" Button: One-tap "All Off" next to Refresh turns off all reachable switches on your active Wi-Fi Home.
-• R8-shrunk pure Kotlin/DEX bundle with Play Console crash mapping.
+• Android TV Dimmer & Room Navigation: Press Down from a dimmer toggle to focus the brightness slider (-10%/+10%), step whole-room dimmers from Room Headers, and navigate deterministically across all columns.
+• Faster Local Wi-Fi Control: Immediate <100ms physical switch push updates on adoption and parallel whole-room / "All Off" execution.
+• R8-optimized pure Kotlin/DEX bundle (minSdk 24+) & strictly local diagnostic logs.

@@ -14,7 +14,7 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
-| **[`v27.0`](#version-270-versioncode--27--november-15-2026)** | `27` | Nov 15, 2026 | Google TV remote focusable inline dimmer slider (`Down` from Toggle → `Left`/`Right` `-10%`/`+10%`) & deterministic `Up`/`Down` Room Master Header navigation across all 3 columns (`wemi TV`) |
+| **[`v27.0`](#version-270-versioncode--27--november-1516-2026)** | `27` | Nov 15–16, 2026 | Google TV focusable inline & Room-Header dimmer controls, deterministic `Up`/`Down` Room Master Header navigation across all 3 columns (`wemi TV`), immediate `<100ms` GENA push on adoption & parallel whole-room/`All Off` control |
 | **[`v25.0`](#version-250-versioncode--25--november-14-2026)** | `25` | Nov 14, 2026 | Top-header **`All Off`** button next to Refresh for 1-tap whole-home power-off, plus R8-shrunk pure Kotlin/DEX release App Bundle with embedded Play Console deobfuscation mapping (`proguard.map`) |
 | **[`v24.0`](#version-240-versioncode--24--november-11-2026)** | `24` | Nov 11, 2026 | Smaller, faster R8-shrunk release App Bundle with embedded Play Console crash deobfuscation mapping (`proguard.map`) and pure Kotlin/DEX packaging |
 | **[`v23.0`](#version-230-versioncode--23--november-10-2026)** | `23` | Nov 10, 2026 | Redesigned 3-column Room-Grouped Android TV dashboard (`wemi TV`) with unmistakable 10-foot cursor focus & non-interfering Dimmer Adjust Mode, plus compact single-row phone/tablet `TopHeader` |
@@ -46,9 +46,11 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 
 ## Release-by-Release Highlights (Newest to Oldest)
 
-### Version 27.0 (`versionCode = 27`) — November 15, 2026
-- **Google TV Focusable Inline Dimmer Slider (`wemi TV`)**: On Android TV and Google TV remotes without dedicated `Play/Pause` or `Menu` buttons, pressing **Down** from any dimmer card's ON/OFF toggle now focuses the inline **Dimmer Slider** directly underneath it (`◄ -10% • +10% ►`), where **Left / Right** adjusts brightness in `10%` steps, **Up** returns to the ON/OFF toggle, and **Down** advances to the next row.
+### Version 27.0 (`versionCode = 27`) — November 15–16, 2026
+- **Google TV Focusable Inline Dimmer Slider & Room-Header Dimming (`wemi TV`)**: On Android TV and Google TV remotes without dedicated `Play/Pause` or `Menu` buttons, pressing **Down** from any dimmer card's ON/OFF toggle now focuses the inline **Dimmer Slider** directly underneath it (`◄ -10% • +10% ►`), where **Left / Right** adjusts brightness in `10%` steps, **Up** or **Back** returns to the ON/OFF toggle, and **Down** advances to the next row. Focusing a **Room Master Header** also supports **Left / Right** `-10% / +10%` whole-room dimmer stepping.
 - **Deterministic Room Master Header Navigation Across All Columns**: Navigating **Up / Down** from any column—including the leftmost switch card—now deterministically focuses and traverses full-width **Room Master Headers** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, `UNASSIGNED`) while remembering your active column.
+- **Faster Local Wi-Fi Control & Instant Physical Switch Sync**: Newly discovered, adopted, or reconnected switches immediately subscribe to `<100ms` UPnP GENA push updates, while whole-room toggles, **`All Off`**, and background health checks run in parallel (`Semaphore(3)`-bounded for embedded RTOS switch safety).
+- **Android 7.0+ (`minSdk 24`), Ethernet TV Compatibility & Strictly Local Diagnostics**: Hardened Android 7.0+ Wi-Fi setup cryptography, enabled Ethernet-connected Android TV / Google TV compatibility on Google Play, stamped app version metadata into support snapshots, and excluded optional `wemi-telemetry-latest.txt` diagnostic logs from cloud Auto-Backup.
 
 ---
 
