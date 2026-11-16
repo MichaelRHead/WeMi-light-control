@@ -41,9 +41,9 @@ When a trace is longer than one screen or the user prefers sharing a text file:
 
 1. **Inside `ProvisionApDialog` (`SETUP DEBUG DETAILS` header — [`ProvisionDebugPanel.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/components/ProvisionDebugPanel.kt))**:
    - Tap **`Save/Share`** (`share_provision_debug_button`) to write `/data/data/com.aistudio.wemiswitch.kxpqzr/files/wemi-telemetry-latest.txt`, copy the full report to the clipboard, and open Android's share sheet (to save to Google Drive / Files or paste directly into chat).
-   - Or tap **`Copy`** (`copy_provision_debug_button`) to copy the `=== WeMi Setup AP Diagnostic Report ===` block to the clipboard and save `wemi-telemetry-latest.txt`.
+   - Or tap **`Copy`** (`copy_provision_debug_button`) to copy the version-stamped `=== WeMi Setup AP Diagnostic Report (v<VERSION_NAME> [<VERSION_CODE>] • <timestamp>) ===` block to the clipboard and save `wemi-telemetry-latest.txt`.
 2. **Inside the `More` Tab (`UPnP / SOAP Packet Log` header — [`MoreScreen.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) & [`MoreControlAndLogCards.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreControlAndLogCards.kt))**:
-   - Tap **`Save/Share Log`** (`export_telemetry_file_button`) to generate a complete 4-section report (`TelemetryFileExporter.buildFullTelemetryReport` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt)):
+   - Tap **`Save/Share Log`** (`export_telemetry_file_button`) to generate a complete 4-section report stamped with `App Version: v<VERSION_NAME> (versionCode=<VERSION_CODE>, com.aistudio.wemiswitch.kxpqzr)` (`TelemetryFileExporter.buildFullTelemetryReport` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt)):
      - `--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`
      - `--- [2. REMEMBERED WI-FI HOMES] ---`
      - `--- [3. REGISTERED SWITCHES & DEVICES] ---`

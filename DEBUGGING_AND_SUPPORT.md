@@ -1,6 +1,6 @@
 # WeMi Light Control — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture (`DEBUGGING_AND_SUPPORT.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v25.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v27.0`)  
 **Document & Skill Owner**: **Antigravity Debugging & Support Agent — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md)  
 **Companion User Guide**: [`docs/user-guide/telemetry-and-troubleshooting.md`](docs/user-guide/telemetry-and-troubleshooting.md)
@@ -16,7 +16,7 @@ Related documentation:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Device Discovery & Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — 5-Agent Autonomous Round-Robin Release Review Process & Sign-Off Ledger
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v25.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v27.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -29,10 +29,10 @@ Because switches from Belkin's discontinued smart switch platform (`F7C030`, `WL
 To make hardware and production release debugging fast, deterministic, and privacy-preserving, **WeMi Light Control** combines on-device LAN telemetry with embedded Play Console crash deobfuscation:
 1. **Channel A — High-Contrast On-Screen Screenshot Panels**:
    - Designed so a single phone or Android TV screenshot captures the complete hardware, network, encryption, and SOAP state.
-2. **Channel B — One-Tap Recorded Telemetry File Exporter (`wemi-telemetry-latest.txt`)**:
-   - Writes a structured 4-section text report to `/data/data/com.aistudio.wemiswitch.kxpqzr/files/wemi-telemetry-latest.txt`, copies it to the system clipboard, and launches Android's `Intent.ACTION_SEND` share sheet.
+2. **Channel B — One-Tap Recorded Telemetry File Exporter (`wemi-telemetry-latest.txt`) with `BuildConfig` Version Stamping**:
+   - Writes a structured 4-section text report stamped with `App Version: v<VERSION_NAME> (versionCode=<VERSION_CODE>, <APPLICATION_ID>)` to `/data/data/com.aistudio.wemiswitch.kxpqzr/files/wemi-telemetry-latest.txt`, copies it to the system clipboard, and launches Android's `Intent.ACTION_SEND` share sheet (capturing every `SetBinaryState` / `GetBinaryState` / `GetMetaInfo` / `GENA` / `SSDP` packet across phone, TopHeader `"All Off"`, Room Master, and Android TV D-Pad toggle & focusable dimmer slider actions).
 3. **Release App Bundle Crash/ANR Deobfuscation (`proguard.map` & Pure Kotlin/DEX)**:
-   - Release builds ([`app/build.gradle.kts`](app/build.gradle.kts) & [`app/proguard-rules.pro`](app/proguard-rules.pro)) embed R8 mapping metadata with `-keepattributes SourceFile,LineNumberTable` (preserving Room v5 entities/DAOs and domain enums) and exclude un-symbolicated transitive `.so` shims so Google Play Console stack traces remain human-readable with exact line numbers.
+   - Release builds ([`app/build.gradle.kts`](app/build.gradle.kts) & [`app/proguard-rules.pro`](app/proguard-rules.pro)) embed R8 mapping metadata with `-keepattributes SourceFile,LineNumberTable` (preserving Room v5 entities/DAOs and domain enums) and exclude un-symbolicated transitive `.so` shims so Google Play Console stack traces remain human-readable with exact line numbers correlated to `versionCode`.
 
 ---
 
@@ -67,7 +67,7 @@ flowchart TD
 
 | File | Key Types & Functions | Diagnostic Role |
 | :--- | :--- | :--- |
-| [`SetupDiagnostics.kt`](app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt) | `SetupDebugSnapshot`, `TelemetryFileExporter` | Immutable snapshot of `10.22.22.1` setup telemetry (`[NET]`, `[PROBE]`, `[XML]`, `[FLAGS]`, `[ID]`, `[SCAN]`, `[TARGET AP]`, `[STEP 1..6]`) plus `buildFullTelemetryReport`, `latestTelemetryFile`, `saveTelemetryReportToFile`, and `copyAndShareTelemetryReport`. |
+| [`SetupDiagnostics.kt`](app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt) | `SetupDebugSnapshot`, `TelemetryFileExporter` | Immutable snapshot of `10.22.22.1` setup telemetry (`[NET]`, `[PROBE]`, `[XML]`, `[FLAGS]`, `[ID]`, `[SCAN]`, `[TARGET AP]`, `[STEP 1..6]`) plus `BuildConfig`-version-stamped `toClipboardText`, `buildFullTelemetryReport`, `latestTelemetryFile`, `saveTelemetryReportToFile`, and `copyAndShareTelemetryReport`. |
 | [`ProvisionerClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt), [`NetworkModels.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) & [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) | `probeSetupDevice`, `fetchAvailableApList`, `provisionDeviceToHomeWifi`, `SetupDeviceDescriptor`, `ProvisionResult`, `LanHttpClient` | Byte-exact `Content-Length` / chunked / delayed-`FIN`-framed `10.22.22.1` HTTP/1.1 probing across ports `49151..49159` via zero-dependency `LanHttpClient` (`tcpNoDelay = true`, `connectTimeoutMs = 1500`, `readTimeoutMs = 8500`), `GetMetaInfo` + `GetMacAddr`/`GetSerialNo` fallback, double-send `ConnectHomeNetwork`, 18-poll `GetNetworkStatus` loop, and non-destructive `CloseSetup` gating. |
 | [`PasswordCrypto.kt`](app/src/main/java/org/suppressingfire/wemi/network/PasswordCrypto.kt) | `encryptWifiPassword`, `decryptWifiPassword` | Stateless first-party OpenSSL `EVP_BytesToKey` MD5 key/IV derivation and AES-128-CBC encryption supporting all 6 permutations (`Method 1/2/3` × `addPasswordLengths = true/false`). |
 | [`NetworkMonitor.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkMonitor.kt) | `createWifiBoundSocketFactory`, `hasBoundWifiNetwork` | Binds HTTP/SOAP sockets directly to the active (even unvalidated/no-internet) `10.22.22.x` Wi-Fi `Network` handle so Android cellular data never hijacks setup traffic. |

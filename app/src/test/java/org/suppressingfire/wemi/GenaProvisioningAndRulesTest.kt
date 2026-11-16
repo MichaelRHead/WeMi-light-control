@@ -288,6 +288,8 @@ class GenaProvisioningAndRulesTest {
             assertTrue(displayLines.any { it.contains("[NET] mode=REAL-LAN ip=10.22.22.142") })
             assertTrue(displayLines.any { it.contains("[ID] mac=EC1A59CC7788 sn=221517K01018F7 (src=GetMetaInfo)") })
             assertTrue(displayLines.any { it.contains("[TARGET AP] \"HeadFamily-2.4G\" found in ApList: Ch=6") })
+            val clipboardReport = snapshot.toClipboardText("HeadFamily-2.4G")
+            assertTrue(clipboardReport.contains("v${BuildConfig.VERSION_NAME} [${BuildConfig.VERSION_CODE}]"))
 
             // Verify TelemetryFileExporter builds and saves wemi-telemetry-latest.txt cleanly
             val appContext = ApplicationProvider.getApplicationContext<Context>()
@@ -299,6 +301,11 @@ class GenaProvisioningAndRulesTest {
                 soapLogs = repo.soapLogs.value
             )
             assertTrue(fullReport.contains("=== WeMi Light Control Device & Network Telemetry Report ==="))
+            assertTrue(
+                fullReport.contains(
+                    "App Version: v${BuildConfig.VERSION_NAME} (versionCode=${BuildConfig.VERSION_CODE}, ${BuildConfig.APPLICATION_ID})"
+                )
+            )
             assertTrue(fullReport.contains("--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---"))
             assertTrue(fullReport.contains("--- [4. UPNP / SOAP PACKET LOG"))
             val savedFile = org.suppressingfire.wemi.network.TelemetryFileExporter.saveTelemetryReportToFile(appContext, fullReport)

@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import org.suppressingfire.wemi.BuildConfig
 import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.HomeNetworkEntity
@@ -78,7 +79,7 @@ data class SetupDebugSnapshot(
 
     fun toClipboardText(selectedSsid: String = ""): String {
         return buildString {
-            appendLine("=== WeMi Setup AP Diagnostic Report ($timestamp) ===")
+            appendLine("=== WeMi Setup AP Diagnostic Report (v${BuildConfig.VERSION_NAME} [${BuildConfig.VERSION_CODE}] • $timestamp) ===")
             toDisplayLines(selectedSsid).forEach { appendLine(it) }
         }.trim()
     }
@@ -101,6 +102,7 @@ object TelemetryFileExporter {
         val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         return buildString {
             appendLine("=== WeMi Light Control Device & Network Telemetry Report ===")
+            appendLine("App Version: v${BuildConfig.VERSION_NAME} (versionCode=${BuildConfig.VERSION_CODE}, ${BuildConfig.APPLICATION_ID})")
             appendLine("Generated: $now")
             appendLine()
             appendLine("--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---")
