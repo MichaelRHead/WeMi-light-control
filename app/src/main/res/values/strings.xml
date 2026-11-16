@@ -12,15 +12,11 @@
     <string name="tab_more">More</string>
     <string name="status_not_detected">Not Detected</string>
     <string name="status_motion_sensed">Motion sensed: %1$s</string>
-    <string name="content_desc_power_toggle">Toggle power for %1$s</string>
     <string name="content_desc_expand_dimmer">Adjust brightness and settings for %1$s</string>
     <string name="dialog_add_device_title">Add Smart Switch Device</string>
     <string name="dialog_scan_network">Scan Local Wi-Fi (SSDP UPnP)</string>
     <string name="label_device_name">Friendly Name</string>
     <string name="label_ip_address">Local IP Address</string>
-    <string name="label_port">UPnP Port (49152–49155)</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
-    <string name="action_delete">Delete</string>
-    <string name="action_test_soap">Test SOAP Ping</string>
 </resources>

@@ -124,7 +124,7 @@ class SkuAndCryptoTest {
         assertFalse(method1Enc == method2Enc)
         assertFalse(method1Enc == method3Enc)
 
-        // Verify byte-for-byte OpenSSL AES-128-CBC round-trip decryption for all 3 methods
+        // Verify byte-for-byte OpenSSL AES-128-CBC round-trip decryption for all 3 methods (ASCII + multi-byte UTF-8)
         assertEquals(
             plainPassword,
             provisioner.decryptWifiPassword(method1Enc, mac, serial, encryptionMethod = 1)
@@ -137,6 +137,20 @@ class SkuAndCryptoTest {
             plainPassword,
             provisioner.decryptWifiPassword(method3Enc, mac, serial, encryptionMethod = 3)
         )
+
+        val utf8Password = "Café☕Wi-Fi•2026!"
+        for (method in listOf(1, 2, 3)) {
+            val encUtf8 = provisioner.encryptWifiPassword(
+                plainPassword = utf8Password,
+                macAddress = mac,
+                serialNumber = serial,
+                encryptionMethod = method
+            )
+            assertEquals(
+                utf8Password,
+                provisioner.decryptWifiPassword(encUtf8, mac, serial, encryptionMethod = method)
+            )
+        }
     }
 
     @Test

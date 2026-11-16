@@ -3,6 +3,9 @@ package org.suppressingfire.wemi.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -11,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
@@ -273,10 +277,11 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
     fun detectCurrentLanIp(): String = repository.detectCurrentLanIp()
 
     fun stepDeviceBrightness(device: DeviceEntity, deltaPercent: Int) {
-        if (!device.isReachable || device.parsedType != DeviceType.LIGHTBULB_DIMMER) return
-        val next = (device.brightness + deltaPercent).coerceIn(10, 100)
-        updateBrightness(device, next)
-        showTransientStatus("${device.name}: Brightness ${next}% via TV Remote")
+        val current = devices.value.firstOrNull { it.id == device.id } ?: device
+        if (!current.isReachable || current.parsedType != DeviceType.LIGHTBULB_DIMMER) return
+        val next = (current.brightness + deltaPercent).coerceIn(10, 100)
+        updateBrightness(current, next)
+        showTransientStatus("${current.name}: Brightness ${next}% via TV Remote")
     }
 
     fun applyTvScene(sceneKey: String) =
@@ -582,11 +587,21 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
                     it.isOn != turnOn
             }
             val targetIds = targets.map { it.id }.toSet()
-            _togglingDeviceIds.value = _togglingDeviceIds.value + targetIds
+            _togglingDeviceIds.update { it + targetIds }
             try {
-                targets.forEach { dev -> repository.toggleDevicePower(dev) }
+                coroutineScope {
+                    targets.map { dev ->
+                        async {
+                            try {
+                                repository.setDevicePowerExplicit(dev, turnOn)
+                            } finally {
+                                _togglingDeviceIds.update { it - dev.id }
+                            }
+                        }
+                    }.awaitAll()
+                }
             } finally {
-                _togglingDeviceIds.value = _togglingDeviceIds.value - targetIds
+                _togglingDeviceIds.update { it - targetIds }
             }
             showTransientStatus(
                 if (turnOn) "All reachable switches on ${currentWifiSsid()} turned ON"

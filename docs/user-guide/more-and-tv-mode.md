@@ -62,16 +62,17 @@ At the bottom of the **More** tab, the **Open Source License** card (`open_sourc
 ### Key Features of `wemi TV`:
 1. **Full-Height 3-Column Room-Grouped Switch Grid**:
    - A single compact top bar (`wemi TV`, active switch count, focused switch status pill, quick scenes, and `Rescan`) dedicates over 90% of vertical screen height to your switches.
-   - Switches are grouped under full-width **Room Section Headers** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `Unassigned` last) inside a 3-column grid (`GridCells.Fixed(3)`). Moving **`Up`** or **`Down`** through a Room Bar from any column (including the leftmost switch widget) selects the Room Bar next, and pressing **`OK / Select`** toggles all switches in that room ON or OFF.
-2. **Unmistakable 10-Foot Cursor Focus**:
-   - The first switch card automatically receives D-Pad focus on launch.
+   - Switches are grouped under full-width **Room Section Headers** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `Unassigned` last) inside a 3-column grid (`GridCells.Fixed(3)`). Moving **`Up`** or **`Down`** through a Room Bar from any column (including the leftmost switch widget) selects the Room Bar next while remembering your column (`Col 1`, `Col 2`, or `Col 3`), pressing **`OK / Select`** toggles all switches in that room ON or OFF, and pressing **`Left`** / **`Right`** on a Room Bar with reachable dimmers steps all dimmers in that room `-10%` / `+10%`.
+2. **Unmistakable 10-Foot Cursor Focus (Including Empty-Home `Rescan` Focus)**:
+   - On launch, the first switch card automatically receives D-Pad focus — or, when a newly reset LAN home has zero switches yet, D-Pad focus lands directly on **`Rescan`** so a single **`OK / Select`** press discovers your switches immediately.
    - The focused card stands out across the living room with a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated card surface (`#133B66`), subtle scale lift (`1.022x`), and a **`FOCUSED • OK`** badge in the top-right corner.
 3. **Google TV Remote-Friendly Focusable Dimmer Slider & 3-Column Navigation**:
    - **On/Off Toggle**: Navigating down into a switch or dimmer card focuses its **On/Off Toggle**. Pressing **D-Pad `Left` / `Right`** moves across the switch cards to the left and right, and pressing **`OK / Select`** immediately toggles power **ON** or **OFF** (or triggers a 9-port reconnect if offline).
-   - **Focusable Dimmer Slider**: Navigating **`Down` once more** from a dimmer card's On/Off Toggle focuses the **Dimmer Slider** inside the card (highlighted with a glowing Gold `#FBBF24` border and **`◄ -10% • +10% ►`** badge) — no Play or Menu button required. While the Dimmer Slider is focused, press **`Left`** / **`Right`** to lower (`-10%`) or raise (`+10%`) the dimmer brightness, press **`Up`** to return to the On/Off Toggle, or press **`Down`** to move to the widget below.
+   - **Focusable Dimmer Slider**: Navigating **`Down` once more** from a dimmer card's On/Off Toggle focuses the **Dimmer Slider** inside the card (highlighted with a glowing Gold `#FBBF24` border and **`◄ -10% • +10% ►`** badge) — no Play or Menu button required. While the Dimmer Slider is focused, press **`Left`** / **`Right`** to lower (`-10%`) or raise (`+10%`) the dimmer brightness, press **`Up`** or **`Back`** to return to the On/Off Toggle, or press **`Down`** to move to the widget below.
 4. **1-Click TV Lighting Scenes & Non-Blocking LAN Rescan**:
-   - **`Movie 20%`**: Dims Living Room lights to a soft `20%` glow and turns off bright overhead switches.
-   - **`Holiday ON`**: Turns all holiday/tree switches **ON**.
-   - **`All OFF`**: Turns every switch in the home **OFF**.
+   - **`Movie 20%`**: Dims Living Room lights to a soft `20%` glow and turns off bright overhead switches concurrently.
+   - **`Holiday ON`**: Turns all holiday/tree switches **ON** concurrently without toggling ones that are already ON.
+   - **`All OFF`**: Turns every active switch in the home **OFF** concurrently.
    - **`Rescan`**: Runs a background SSDP + state refresh with a bottom status toast—never popping up modal dialogs over the TV screen.
+
 

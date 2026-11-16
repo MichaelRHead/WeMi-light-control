@@ -1,6 +1,7 @@
 package org.suppressingfire.wemi.data
 
 import android.content.Context
+import androidx.core.content.edit
 import org.suppressingfire.wemi.network.GenaEventNotification
 import org.suppressingfire.wemi.network.GenaSubscriptionManager
 import org.suppressingfire.wemi.network.LanRuntimeUtils
@@ -191,7 +192,7 @@ class SwitchRepository(
     }
 
     suspend fun setDemoShowroomMode(enabled: Boolean): String {
-        prefs?.edit()?.putBoolean(KEY_DEMO_SHOWROOM_MODE, enabled)?.apply()
+        prefs?.edit { putBoolean(KEY_DEMO_SHOWROOM_MODE, enabled) }
         return if (enabled) {
             resetToClassicScreenshotPreset()
             DEFAULT_MAIN_HOME_KEY
@@ -214,7 +215,7 @@ class SwitchRepository(
 
     suspend fun resetToClassicScreenshotPreset() {
         _isDemoShowroomMode.value = true
-        prefs?.edit()?.putBoolean(KEY_DEMO_SHOWROOM_MODE, true)?.apply()
+        prefs?.edit { putBoolean(KEY_DEMO_SHOWROOM_MODE, true) }
         dao.deleteAllDevices()
         dao.deleteAllRules()
         dao.deleteAllHomeNetworks()
@@ -395,7 +396,7 @@ class SwitchRepository(
         )
     }
 
-    private suspend fun setDevicePowerExplicit(
+    suspend fun setDevicePowerExplicit(
         device: DeviceEntity,
         targetOn: Boolean
     ): DeviceEntity {

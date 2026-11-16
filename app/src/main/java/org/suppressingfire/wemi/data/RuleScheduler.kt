@@ -27,6 +27,7 @@ class RuleScheduler(
     private val onScheduleRuleTriggered: suspend (rule: RuleEntity) -> Unit
 ) {
     private val countdownJobs = ConcurrentHashMap<Int, Job>()
+    private val configuredDurationSec = ConcurrentHashMap<Int, Int>()
     private val _activeCountdownsSec = MutableStateFlow<Map<Int, Int>>(emptyMap())
     val activeCountdownsSec: StateFlow<Map<Int, Int>> = _activeCountdownsSec.asStateFlow()
 
@@ -35,6 +36,8 @@ class RuleScheduler(
 
     /**
      * Starts or cancels the Auto-Off countdown for [device] whenever its power state changes.
+     * Preserves an already-running countdown of the same configured duration across 30s health
+     * polls and unrelated Room table updates so timers > 30s count down uninterrupted to zero.
      */
     fun onDeviceStateUpdated(
         device: DeviceEntity,
@@ -62,7 +65,11 @@ class RuleScheduler(
             return
         }
 
-        startAutoOffCountdownSeconds(device.id, totalMinutes * 60)
+        val targetSeconds = totalMinutes * 60
+        if (countdownJobs[device.id]?.isActive == true && configuredDurationSec[device.id] == targetSeconds) {
+            return
+        }
+        startAutoOffCountdownSeconds(device.id, targetSeconds)
     }
 
     /**
@@ -71,10 +78,12 @@ class RuleScheduler(
     fun startAutoOffCountdownSeconds(deviceId: Int, durationSeconds: Int) {
         countdownJobs.remove(deviceId)?.cancel()
         if (durationSeconds <= 0) {
+            configuredDurationSec.remove(deviceId)
             _activeCountdownsSec.value = _activeCountdownsSec.value - deviceId
             return
         }
 
+        configuredDurationSec[deviceId] = durationSeconds
         _activeCountdownsSec.value = _activeCountdownsSec.value + (deviceId to durationSeconds)
         val job = scope.launch {
             var remaining = durationSeconds
@@ -85,6 +94,7 @@ class RuleScheduler(
             }
             _activeCountdownsSec.value = _activeCountdownsSec.value - deviceId
             countdownJobs.remove(deviceId)
+            configuredDurationSec.remove(deviceId)
             if (isActive) {
                 onAutoOffExpired(deviceId)
             }
@@ -94,6 +104,7 @@ class RuleScheduler(
 
     fun cancelAutoOff(deviceId: Int) {
         countdownJobs.remove(deviceId)?.cancel()
+        configuredDurationSec.remove(deviceId)
         if (deviceId in _activeCountdownsSec.value) {
             _activeCountdownsSec.value = _activeCountdownsSec.value - deviceId
         }
@@ -133,6 +144,7 @@ class RuleScheduler(
         scheduleLoopJob = null
         countdownJobs.values.forEach { it.cancel() }
         countdownJobs.clear()
+        configuredDurationSec.clear()
         _activeCountdownsSec.value = emptyMap()
     }
 

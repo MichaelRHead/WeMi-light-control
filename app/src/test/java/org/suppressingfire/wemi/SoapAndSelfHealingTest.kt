@@ -213,4 +213,29 @@ class SoapAndSelfHealingTest {
             assertEquals("HeadFamily-2.4G", meta?.accessPointSsid)
         }
     }
+
+    @Test
+    fun `verify NetworkMonitor 10_22_22_x Setup AP snapshot classification and loopback-safe createWifiBoundSocketFactory`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val monitor = org.suppressingfire.wemi.network.NetworkMonitor(
+            context = context,
+            fallbackIpResolver = { "10.22.22.142" }
+        )
+        try {
+            val snap = monitor.refreshSnapshot()
+            assertEquals("10.22.22.142", snap.localIpv4)
+            assertEquals("10.22.22", snap.subnetPrefix)
+            assertEquals("10.22.22.1", snap.gatewayIp)
+            assertTrue(snap.isWemoSetupApSubnet)
+
+            ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")).use { loopbackServer ->
+                val factory = org.suppressingfire.wemi.network.NetworkMonitor.createWifiBoundSocketFactory(context)
+                factory.createSocket("127.0.0.1", loopbackServer.localPort).use { clientSock ->
+                    assertTrue(clientSock.isConnected)
+                }
+            }
+        } finally {
+            monitor.stopMonitoring()
+        }
+    }
 }

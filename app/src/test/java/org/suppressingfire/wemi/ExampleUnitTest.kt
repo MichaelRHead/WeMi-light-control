@@ -155,5 +155,15 @@ class ExampleUnitTest {
             "proguard-rules.pro must preserve domain enum constant names for Room valueOf lookups",
             proguardRules.contains("-keep enum org.suppressingfire.wemi.**")
         )
+        assertTrue(
+            "proguard-rules.pro must preserve androidx.activity.EdgeToEdge* API-level impls loaded reflectively",
+            proguardRules.contains("-keep class androidx.activity.EdgeToEdge*")
+        )
+
+        val manifestXml = java.io.File(repoRoot, "app/src/main/AndroidManifest.xml").readText()
+        assertTrue(
+            "AndroidManifest.xml must declare android.hardware.wifi with required=false for Ethernet Android TV boxes",
+            manifestXml.contains("android.hardware.wifi") && manifestXml.contains("android:required=\"false\"")
+        )
     }
 }

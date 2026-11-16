@@ -1,11 +1,2 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="wemi_cyan_light">#FF22D3EE</color>
-    <color name="wemi_cyan_primary">#FF06B6D4</color>
-    <color name="wemi_teal_primary">#FF0891B2</color>
-    <color name="wemi_teal_dark">#FF0E7490</color>
-    <color name="wemi_sapphire_deep">#FF0F4C81</color>
-    <color name="wemi_surface_slate">#FFEEF2F6</color>
-    <color name="black">#FF0F172A</color>
-    <color name="white">#FFFFFFFF</color>
-</resources>
+<resources />

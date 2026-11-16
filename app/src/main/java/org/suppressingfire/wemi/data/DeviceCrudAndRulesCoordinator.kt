@@ -1,5 +1,8 @@
 package org.suppressingfire.wemi.data
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -54,7 +57,7 @@ internal class DeviceCrudAndRulesCoordinator(
         roomName: String,
         targetOn: Boolean,
         networkKey: String? = null
-    ): Int {
+    ): Int = coroutineScope {
         val demoMode = isDemoShowroomMode()
         val currentDevices = dao.getAllDevices().first().let {
             if (it.isEmpty() && demoMode) DemoFixtures.defaultClassicDevices() else it
@@ -65,21 +68,18 @@ internal class DeviceCrudAndRulesCoordinator(
                 it.isReachable &&
                 it.parsedType != DeviceType.MOTION_SENSOR
         }
-        var succeeded = 0
-        for (dev in roomSwitches) {
-            val updated = setDevicePowerExplicit(dev, targetOn)
-            if (updated.isReachable) {
-                succeeded++
+        roomSwitches.map { dev ->
+            async {
+                setDevicePowerExplicit(dev, targetOn).isReachable
             }
-        }
-        return succeeded
+        }.awaitAll().count { it }
     }
 
     suspend fun updateRoomBrightness(
         roomName: String,
         newBrightness: Int,
         networkKey: String? = null
-    ): Int {
+    ): Int = coroutineScope {
         val clamped = newBrightness.coerceIn(1, 100)
         val demoMode = isDemoShowroomMode()
         val currentDevices = dao.getAllDevices().first().let {
@@ -91,10 +91,12 @@ internal class DeviceCrudAndRulesCoordinator(
                 it.isReachable &&
                 it.parsedType == DeviceType.LIGHTBULB_DIMMER
         }
-        roomBulbs.forEach { bulb ->
-            updateDeviceBrightness(bulb, clamped)
-        }
-        return roomBulbs.size
+        roomBulbs.map { bulb ->
+            async {
+                updateDeviceBrightness(bulb, clamped)
+            }
+        }.awaitAll()
+        roomBulbs.size
     }
 
     suspend fun triggerMotionEvent(device: DeviceEntity) {
@@ -130,9 +132,12 @@ internal class DeviceCrudAndRulesCoordinator(
         device: DeviceEntity,
         syncFriendlyNameToHardware: Boolean = false
     ): DeviceEntity {
+        val demoMode = isDemoShowroomMode()
+        val isSyntheticDemoEndpoint =
+            demoMode && device.ipAddress != "127.0.0.1" && device.ipAddress != "localhost"
         val hasPlaceholderSerial = LanRuntimeUtils.isPlaceholderSerial(device.serialNumber)
 
-        val liveDesc = if (device.id == 0 || hasPlaceholderSerial) {
+        val liveDesc = if (!isSyntheticDemoEndpoint && (device.id == 0 || hasPlaceholderSerial)) {
             lanSemaphore.withPermit {
                 networkClient.probeAndFetchDeviceDescriptor(
                     ipAddress = device.ipAddress,
@@ -175,7 +180,7 @@ internal class DeviceCrudAndRulesCoordinator(
                 wifiSsid = liveDesc.wifiSsid.ifBlank { device.wifiSsid },
                 signalStrengthPercent = liveDesc.signalStrengthPercent
             )
-        } else if (hasPlaceholderSerial && !isDemoShowroomMode()) {
+        } else if (hasPlaceholderSerial && !demoMode) {
             device.copy(serialNumber = "")
         } else {
             device
@@ -191,7 +196,7 @@ internal class DeviceCrudAndRulesCoordinator(
             enriched
         }
 
-        if (syncFriendlyNameToHardware) {
+        if (syncFriendlyNameToHardware && !isSyntheticDemoEndpoint) {
             val renameResult = lanSemaphore.withPermit {
                 networkClient.changeFriendlyName(saved, saved.name)
             }

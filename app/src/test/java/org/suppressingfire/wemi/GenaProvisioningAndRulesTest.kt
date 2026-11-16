@@ -383,5 +383,103 @@ class GenaProvisioningAndRulesTest {
             }
         }
     }
+
+    @Test
+    fun `verify RuleScheduler preserves active countdown across repeated state polls and triggerMotionEvent executes MOTION_TRIGGER rules`() = runBlocking {
+        // 1. Verify repeated onDeviceStateUpdated polls with identical duration do NOT reset remaining seconds
+        val expiredCount = AtomicInteger(0)
+        val scheduler = RuleScheduler(
+            onAutoOffExpired = { expiredCount.incrementAndGet() },
+            onScheduleRuleTriggered = {}
+        )
+        try {
+            val pantrySwitch = DeviceEntity(
+                id = 55,
+                name = "Pantry Light",
+                roomName = "Kitchen",
+                ipAddress = "127.0.0.1",
+                port = 49153,
+                isOn = true,
+                isReachable = true,
+                autoOffMinutes = 1
+            )
+            scheduler.onDeviceStateUpdated(pantrySwitch, emptyList())
+            assertEquals(60, scheduler.activeCountdownsSec.value[55])
+            delay(1150L)
+            val remainingAfterOneSec = scheduler.activeCountdownsSec.value[55] ?: 60
+            assertTrue("Expected countdown to tick below 60s, got $remainingAfterOneSec", remainingAfterOneSec < 60)
+
+            // Simulate 30s health poll emitting updated latencyMs while switch stays ON with same autoOffMinutes = 1
+            scheduler.onDeviceStateUpdated(pantrySwitch.copy(latencyMs = 19), emptyList())
+            val remainingAfterPoll = scheduler.activeCountdownsSec.value[55] ?: 60
+            assertTrue(
+                "Expected active countdown NOT to reset back to 60s on poll, got $remainingAfterPoll",
+                remainingAfterPoll <= remainingAfterOneSec
+            )
+
+            // Turning switch OFF cancels countdown immediately
+            scheduler.onDeviceStateUpdated(pantrySwitch.copy(isOn = false), emptyList())
+            assertFalse(scheduler.activeCountdownsSec.value.containsKey(55))
+        } finally {
+            scheduler.stopAll()
+        }
+
+        // 2. Verify triggerMotionEvent fires enabled MOTION_TRIGGER rules against live loopback switch
+        FakeUpnpServer(
+            initialFriendlyName = "Hallway Sconce",
+            serialNumber = "WLS0403MOTION01",
+            initialRelayOn = false
+        ).use { targetServer ->
+            val client = NetworkClient(extraCandidatePorts = listOf(targetServer.port))
+            val repo = SwitchRepository(
+                dao = database.switchDao(),
+                networkClient = client,
+                initialDemoModeOverride = false
+            )
+            repo.ensureSeeded()
+
+            val sensorId = database.switchDao().insertDevice(
+                DeviceEntity(
+                    name = "Hallway Motion Sensor",
+                    roomName = "Hallway & Landing",
+                    deviceType = org.suppressingfire.wemi.data.DeviceType.MOTION_SENSOR.name,
+                    ipAddress = "127.0.0.1",
+                    port = targetServer.port,
+                    isOn = false,
+                    isReachable = true,
+                    serialNumber = "SENSOR001"
+                )
+            ).toInt()
+            val targetId = database.switchDao().insertDevice(
+                DeviceEntity(
+                    name = "Hallway Sconce",
+                    roomName = "Hallway & Landing",
+                    ipAddress = "127.0.0.1",
+                    port = targetServer.port,
+                    isOn = false,
+                    isReachable = true,
+                    serialNumber = "WLS0403MOTION01"
+                )
+            ).toInt()
+            database.switchDao().insertRule(
+                org.suppressingfire.wemi.data.RuleEntity(
+                    name = "Hallway Motion Light",
+                    ruleType = org.suppressingfire.wemi.data.RuleType.MOTION_TRIGGER.name,
+                    targetDeviceId = targetId,
+                    targetDeviceName = "Hallway Sconce",
+                    triggerSummary = "When Hallway Motion Sensor detects movement",
+                    actionSummary = "Turn ON Hallway Sconce",
+                    targetStateOn = true,
+                    isEnabled = true
+                )
+            )
+
+            val sensorEntity = database.switchDao().getDeviceById(sensorId)!!
+            repo.triggerMotionEvent(sensorEntity)
+
+            assertTrue(targetServer.relayStateOn.get())
+            assertEquals(true, database.switchDao().getDeviceById(targetId)?.isOn)
+        }
+    }
 }
 

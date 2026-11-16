@@ -25,5 +25,10 @@
 -keep @androidx.room.Dao class org.suppressingfire.wemi.data.** { *; }
 -keep class org.suppressingfire.wemi.data.**_Impl { *; }
 
+# Preserve AndroidX EdgeToEdge & SystemBarStyle entrypoints so Play Console's SDK 35/36
+# static analyzer recognizes enableEdgeToEdge() and does not flag legacy compat shims.
+-keep class androidx.activity.EdgeToEdge* { *; }
+-keep class androidx.activity.SystemBarStyle* { *; }
+
 # LanRuntimeUtils.isRunningInRobolectric() probes org.robolectric.Robolectric via runCatching.
 -dontwarn org.robolectric.**

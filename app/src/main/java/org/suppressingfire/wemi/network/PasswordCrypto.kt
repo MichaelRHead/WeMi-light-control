@@ -1,11 +1,12 @@
 package org.suppressingfire.wemi.network
 
 import java.security.MessageDigest
-import java.util.Base64
 import java.util.Locale
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Pure OpenSSL `EVP_BytesToKey` MD5 + `AES-128-CBC` Wi-Fi password encryption and decryption
@@ -14,6 +15,7 @@ import javax.crypto.spec.SecretKeySpec
  * - **Method 2** (Gen-2 RTOS `WLS040` / `WLS0403` / `WDS060` / `WSP080`): `mac[0..6] + serial + mac[6..12] + METHOD_2_RTOS_SALT_SUFFIX`, `addLengths = false`
  * - **Method 3** (`binaryOption = 1`): `mac[0..3] + mac[9..12] + serial + METHOD_3_BINARY_OPTION_EXTRA + mac[6..9] + mac[3..6]`, `addLengths = true`
  */
+@OptIn(ExperimentalEncodingApi::class)
 object PasswordCrypto {
 
     const val METHOD_2_RTOS_SALT_SUFFIX = "b3{8t;80dIN{ra83eC1s?M70?683@2Yf"
@@ -56,7 +58,7 @@ object PasswordCrypto {
         cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(derivedKey, "AES"), IvParameterSpec(ivBytes))
         val plainBytes = plainPassword.toByteArray(Charsets.UTF_8)
         val encryptedBytes = cipher.doFinal(plainBytes)
-        val base64Encoded = Base64.getEncoder().encodeToString(encryptedBytes)
+        val base64Encoded = Base64.Default.encode(encryptedBytes)
 
         val shouldAddLengths = addPasswordLengths ?: (encryptionMethod != 2)
         return if (shouldAddLengths) {
@@ -90,7 +92,7 @@ object PasswordCrypto {
         } else {
             encryptedPayload
         }
-        val cipherBytes = Base64.getDecoder().decode(base64Part)
+        val cipherBytes = Base64.Default.decode(base64Part)
         val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
         cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(derivedKey, "AES"), IvParameterSpec(ivBytes))
         return String(cipher.doFinal(cipherBytes), Charsets.UTF_8)

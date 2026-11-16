@@ -1,7 +1,10 @@
 package org.suppressingfire.wemi
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -14,7 +17,9 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
+import kotlin.math.abs
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -24,15 +29,16 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.suppressingfire.wemi.ui.SwitchViewModel
-import kotlin.math.abs
 
 /**
  * Full-stack Jetpack Compose + Robolectric E2E validation for UI layout & Android TV D-Pad CUJs:
- * 1. Compact single-row mobile/tablet `TopHeader` horizontal alignment, `"All Off"` button, and wordmark toggle.
- * 2. Native Android TV (`UI_MODE_TYPE_TELEVISION`) 3-column room-grouped grid, `"Unassigned"`-last
- *    room ordering, leftmost switch widget Up/Down Room Bar navigation, focusable Dimmer On/Off Toggle
- *    vs. focusable Dimmer Slider (`DirectionDown` -> `DirectionRight` / `DirectionLeft` -> `DirectionDown`),
- *    and Room Master SOAP control over live loopback [FakeUpnpServer] instances.
+ * 1. Compact single-row mobile/tablet `TopHeader` horizontal alignment, `>= 48.dp` Play Console
+ *    Accessibility touch targets, `Role.Button` + `ContentDescription` semantics, `"All Off"` button,
+ *    and wordmark toggle.
+ * 2. Native Android TV (`UI_MODE_TYPE_TELEVISION`) 3-column room-grouped grid, deterministic
+ *    alphabetical adoption ordering (`Living Room Dimmer` Col 0, `Living Room Switch` Col 1),
+ *    `"Unassigned"`-last room ordering, Up/Down Room Bar navigation across columns, focusable Dimmer
+ *    On/Off Toggle vs. focusable Dimmer Slider, and Room Master SOAP control over loopback servers.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -45,7 +51,7 @@ class TvAndHeaderLayoutE2ETest {
         composeTestRule.awaitLoopbackIo(timeoutMs, condition)
 
     @Test
-    fun `verify v23_0 compact single-row TopHeader layout and brand wordmark toggle`() {
+    fun `verify v23_0 compact single-row TopHeader layout, 48dp accessibility touch targets, and brand wordmark toggle`() {
         composeTestRule.waitForIdle()
 
         val wordmarkNode = composeTestRule.onNodeWithTag("brand_wordmark_text").assertIsDisplayed()
@@ -58,11 +64,37 @@ class TvAndHeaderLayoutE2ETest {
         composeTestRule.onNodeWithText("LAN SWITCHES").assertDoesNotExist()
         composeTestRule.onNodeWithText("All Off").assertIsDisplayed()
 
-        val wordmarkBounds = wordmarkNode.fetchSemanticsNode().boundsInRoot
-        val allOffBounds = allOffNode.fetchSemanticsNode().boundsInRoot
-        val refreshBounds = refreshNode.fetchSemanticsNode().boundsInRoot
-        val editBounds = editNode.fetchSemanticsNode().boundsInRoot
-        val addBounds = addNode.fetchSemanticsNode().boundsInRoot
+        val headerControls = listOf(
+            "brand_wordmark_text" to wordmarkNode.fetchSemanticsNode(),
+            "all_off_devices_button" to allOffNode.fetchSemanticsNode(),
+            "refresh_devices_button" to refreshNode.fetchSemanticsNode(),
+            "edit_devices_button" to editNode.fetchSemanticsNode(),
+            "add_device_button" to addNode.fetchSemanticsNode()
+        )
+        val minTouchHeightPx = with(composeTestRule.density) { 48.dp.toPx() } - 0.5f
+
+        headerControls.forEach { (tag, semNode) ->
+            assertTrue(
+                "Expected $tag height >= 48.dp ($minTouchHeightPx px), got ${semNode.boundsInRoot.height}",
+                semNode.boundsInRoot.height >= minTouchHeightPx
+            )
+            assertEquals(
+                "Expected $tag to expose Role.Button for TalkBack & Play Console Accessibility Scanner",
+                Role.Button,
+                semNode.config.getOrNull(SemanticsProperties.Role)
+            )
+            val descriptions = semNode.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
+            assertTrue(
+                "Expected $tag to expose a non-blank accessibility ContentDescription",
+                descriptions.any { it.isNotBlank() }
+            )
+        }
+
+        val wordmarkBounds = headerControls[0].second.boundsInRoot
+        val allOffBounds = headerControls[1].second.boundsInRoot
+        val refreshBounds = headerControls[2].second.boundsInRoot
+        val editBounds = headerControls[3].second.boundsInRoot
+        val addBounds = headerControls[4].second.boundsInRoot
 
         // All 5 controls must share the same single horizontal header row (vertical centers within 10px)
         assertTrue(
@@ -175,8 +207,9 @@ class TvAndHeaderLayoutE2ETest {
                     assertEquals("Living Room", switchEntity.roomName)
                     assertEquals("Living Room", dimmerEntity.roomName)
                     assertEquals("Unassigned", unassignedEntity.roomName)
+                    assertTrue(switchEntity.sortOrder < dimmerEntity.sortOrder)
 
-                    // 2. Verify "Living Room" section renders above "Unassigned" in the 3-column TV grid
+                    // 2. Verify "Living Room" section renders above "Unassigned" and Switch (Col 0) left of Dimmer (Col 1)
                     composeTestRule.onNodeWithTag("tv_device_grid")
                         .performScrollToNode(hasTestTag("tv_room_header_Living Room"))
                     composeTestRule.waitForIdle()
@@ -186,9 +219,19 @@ class TvAndHeaderLayoutE2ETest {
                     val unassignedHeaderBounds = composeTestRule.onNodeWithTag("tv_room_header_Unassigned")
                         .assertIsDisplayed()
                         .fetchSemanticsNode().boundsInRoot
+                    val switchCardBounds = composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
+                        .assertIsDisplayed()
+                        .fetchSemanticsNode().boundsInRoot
+                    val dimmerCardBounds = composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
+                        .assertIsDisplayed()
+                        .fetchSemanticsNode().boundsInRoot
                     assertTrue(
                         "Expected 'Living Room' header above 'Unassigned' ($livingHeaderBounds vs $unassignedHeaderBounds)",
                         livingHeaderBounds.top < unassignedHeaderBounds.top
+                    )
+                    assertTrue(
+                        "Expected deterministic registration column order: Switch (Col 0) left of Dimmer (Col 1)",
+                        switchCardBounds.left < dimmerCardBounds.left
                     )
 
                     // 3. Focus leftmost switch widget (Column 1: Living Room Switch) and verify Up/Down

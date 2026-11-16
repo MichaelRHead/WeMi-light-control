@@ -1,6 +1,9 @@
 package org.suppressingfire.wemi.ui
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -170,7 +173,11 @@ internal class HomeAndRulesUiController(
                     val bulbs = currentHomeDevices.filter {
                         it.isReachable && it.parsedType == DeviceType.LIGHTBULB_DIMMER
                     }
-                    bulbs.forEach { repository.updateDeviceBrightness(it, 20) }
+                    coroutineScope {
+                        bulbs.map { bulb ->
+                            async { repository.updateDeviceBrightness(bulb, 20) }
+                        }.awaitAll()
+                    }
                     onShowTransientStatus("TV Movie Mode: Dimmed ${bulbs.size} smart bulb(s) to 20%")
                 }
                 TvScene.HOLIDAY_ON -> {
@@ -179,7 +186,11 @@ internal class HomeAndRulesUiController(
                             it.parsedType == DeviceType.SWITCH_PLUG &&
                             !it.isOn
                     }
-                    holidaySwitches.forEach { repository.toggleDevicePower(it) }
+                    coroutineScope {
+                        holidaySwitches.map { sw ->
+                            async { repository.setDevicePowerExplicit(sw, true) }
+                        }.awaitAll()
+                    }
                     onShowTransientStatus("Holiday Scene: All smart plugs turned ON")
                 }
                 TvScene.BEDTIME_OFF -> {
