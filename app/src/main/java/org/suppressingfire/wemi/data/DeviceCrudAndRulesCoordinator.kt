@@ -204,7 +204,9 @@ internal class DeviceCrudAndRulesCoordinator(
                 brightness = liveDesc.brightness,
                 latencyMs = liveDesc.responseTimeMs.toInt().coerceAtLeast(1),
                 lastCheckedTime = nowFormatted(),
-                serialNumber = liveDesc.serialNumber.ifBlank { baseEntity.serialNumber },
+                serialNumber = liveDesc.serialNumber
+                    .takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
+                    ?: baseEntity.serialNumber.takeUnless { !demoMode && LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
                 firmwareVersion = liveDesc.firmwareVersion.ifBlank { baseEntity.firmwareVersion },
                 hardwareModel = liveDesc.hardwareSku.ifBlank { baseEntity.hardwareModel },
                 macAddress = liveDesc.macAddress.ifBlank { baseEntity.macAddress },
@@ -235,8 +237,13 @@ internal class DeviceCrudAndRulesCoordinator(
         }
 
         val saved = if (enriched.id == 0) {
-            val count = dao.getDeviceCount()
-            val toInsert = enriched.copy(sortOrder = count)
+            val nextSortOrder = (
+                dao.getAllDevices().first()
+                    .filter { it.networkKey == enriched.networkKey }
+                    .maxOfOrNull { it.sortOrder }
+                    ?: -1
+                ) + 1
+            val toInsert = enriched.copy(sortOrder = nextSortOrder)
             val newId = dao.insertDevice(toInsert).toInt()
             toInsert.copy(id = newId)
         } else {

@@ -137,21 +137,25 @@ internal class DiscoveryCoordinator(
         homeDevices.map { device ->
             async {
                 mutexFor(device).withLock {
+                    val current = if (device.id != 0) dao.getDeviceById(device.id) ?: return@withLock device else device
                     val probe = lanSemaphore.withPermit {
-                        networkClient.getBinaryState(device)
+                        networkClient.getBinaryState(current)
                     }
                     appendLog(probe.logEntry)
+                    val latest = if (current.id != 0) dao.getDeviceById(current.id) ?: current else current
+                    val recentSetMs = lastSetStateTimestampMs[latest.id] ?: 0L
+                    val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
                     val updated = when {
-                        probe.reachableOnLan -> device.copy(
+                        probe.reachableOnLan -> latest.copy(
                             isReachable = true,
                             port = probe.resolvedPort,
-                            isOn = probe.binaryStateOn ?: device.isOn,
-                            brightness = probe.brightness ?: device.brightness,
+                            isOn = if (allowStateOverwrite) (probe.binaryStateOn ?: latest.isOn) else latest.isOn,
+                            brightness = if (allowStateOverwrite) (probe.brightness ?: latest.brightness) else latest.brightness,
                             latencyMs = probe.latencyMs.coerceAtLeast(1),
                             lastCheckedTime = checkedAt
                         )
-                        demoMode -> device
-                        else -> device.copy(
+                        demoMode -> latest
+                        else -> latest.copy(
                             isReachable = false,
                             latencyMs = 0,
                             lastCheckedTime = "Offline • Timeout"
@@ -170,7 +174,7 @@ internal class DiscoveryCoordinator(
      */
     suspend fun reconnectDevice(device: DeviceEntity): DeviceEntity {
         return mutexFor(device).withLock {
-            var activeDevice = device
+            var activeDevice = if (device.id != 0) dao.getDeviceById(device.id) ?: device else device
             var probe = lanSemaphore.withPermit {
                 networkClient.getBinaryState(activeDevice)
             }
@@ -210,7 +214,7 @@ internal class DiscoveryCoordinator(
                 isDemoShowroomMode() -> activeDevice.copy(
                     isReachable = true,
                     port = probe.resolvedPort,
-                    latencyMs = device.latencyMs.takeIf { it > 0 } ?: 11,
+                    latencyMs = activeDevice.latencyMs.takeIf { it > 0 } ?: 11,
                     lastCheckedTime = nowFormatted(),
                     isOn = probe.binaryStateOn ?: activeDevice.isOn
                 )
@@ -282,17 +286,18 @@ internal class DiscoveryCoordinator(
             rememberedForHome.mapIndexed { idx, device ->
                 async {
                     mutexFor(device).withLock {
+                        val latest = if (device.id != 0) dao.getDeviceById(device.id) ?: return@withLock null else device
                         val ssdpMatch = report.discoveredDevices.find { discovered ->
                             matchesDiscoveredDevice(
-                                existing = device,
+                                existing = latest,
                                 discovered = discovered,
                                 requireSamePortWhenBlankSerial = false
                             )
                         }
                         val candidateDevice = if (ssdpMatch != null) {
-                            device.copy(ipAddress = ssdpMatch.ipAddress, port = ssdpMatch.port)
+                            latest.copy(ipAddress = ssdpMatch.ipAddress, port = ssdpMatch.port)
                         } else {
-                            device
+                            latest
                         }
 
                         val probe = lanSemaphore.withPermit {
@@ -300,6 +305,7 @@ internal class DiscoveryCoordinator(
                         }
                         appendLog(probe.logEntry)
 
+                        val current = if (latest.id != 0) dao.getDeviceById(latest.id) ?: latest else latest
                         val isOnline = probe.reachableOnLan ||
                             (ssdpMatch != null && ssdpMatch.isLiveUdpResponse) ||
                             demoMode
@@ -310,31 +316,32 @@ internal class DiscoveryCoordinator(
                                 demoMode -> 11 + idx * 3
                                 else -> 12
                             }
-                            val recentSetMs = lastSetStateTimestampMs[device.id] ?: 0L
+                            val recentSetMs = lastSetStateTimestampMs[current.id] ?: 0L
                             val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
                             val resolvedRoom = resolveDeviceRoomAssignment(
-                                existingRoomName = device.roomName,
-                                deviceName = device.name,
+                                existingRoomName = current.roomName,
+                                deviceName = current.name,
                                 discoveredRoomName = ssdpMatch?.roomName.orEmpty(),
                                 isDemoMode = demoMode
                             )
                             dao.updateDevice(
-                                candidateDevice.copy(
+                                current.copy(
+                                    ipAddress = candidateDevice.ipAddress,
                                     roomName = resolvedRoom,
                                     port = if (probe.reachableOnLan) probe.resolvedPort else candidateDevice.port,
-                                    isOn = if (allowStateOverwrite && probe.binaryStateOn != null) probe.binaryStateOn else device.isOn,
-                                    brightness = if (allowStateOverwrite && probe.brightness != null) probe.brightness else device.brightness,
+                                    isOn = if (allowStateOverwrite && probe.binaryStateOn != null) probe.binaryStateOn else current.isOn,
+                                    brightness = if (allowStateOverwrite && probe.brightness != null) probe.brightness else current.brightness,
                                     isReachable = true,
                                     latencyMs = resolvedLatency,
                                     lastCheckedTime = checkedAt,
-                                    firmwareVersion = ssdpMatch?.firmwareVersion?.ifBlank { device.firmwareVersion } ?: device.firmwareVersion,
-                                    hardwareModel = ssdpMatch?.hardwareSku?.ifBlank { device.hardwareModel } ?: device.hardwareModel
+                                    firmwareVersion = ssdpMatch?.firmwareVersion?.ifBlank { current.firmwareVersion } ?: current.firmwareVersion,
+                                    hardwareModel = ssdpMatch?.hardwareSku?.ifBlank { current.hardwareModel } ?: current.hardwareModel
                                 )
                             )
                             resolvedLatency
                         } else {
                             dao.updateDevice(
-                                device.copy(
+                                current.copy(
                                     isReachable = false,
                                     latencyMs = 0,
                                     lastCheckedTime = "Offline • Timeout"
@@ -380,34 +387,43 @@ internal class DiscoveryCoordinator(
 
         val checkedAt = nowFormatted()
         currentDevicesForHome.forEach { existing ->
-            val match = report.discoveredDevices.find { discovered ->
-                matchesDiscoveredDevice(existing, discovered, requireSamePortWhenBlankSerial = true)
-            }
-            if (match != null) {
-                val recentSetMs = lastSetStateTimestampMs[existing.id] ?: 0L
+            mutexFor(existing).withLock {
+                val latest = if (existing.id != 0) dao.getDeviceById(existing.id) ?: return@withLock else existing
+                val match = report.discoveredDevices.find { discovered ->
+                    matchesDiscoveredDevice(latest, discovered, requireSamePortWhenBlankSerial = true)
+                } ?: return@withLock
+
+                val recentSetMs = lastSetStateTimestampMs[latest.id] ?: 0L
                 val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
-                val resolvedName = existing.name.ifBlank { match.name }
+                val resolvedName = latest.name.ifBlank { match.name }
                 val resolvedRoom = resolveDeviceRoomAssignment(
-                    existingRoomName = existing.roomName,
+                    existingRoomName = latest.roomName,
                     deviceName = resolvedName,
                     discoveredRoomName = match.roomName,
                     isDemoMode = demoMode
                 )
+                val cleanSerial = match.serialNumber
+                    .takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
+                    ?: latest.serialNumber
+                val cleanSsid = match.wifiSsid
+                    .takeIf { it.isNotBlank() && !isWemoDeviceSetupSsid(it) }
+                    ?: latest.wifiSsid
                 dao.updateDevice(
-                    existing.copy(
+                    latest.copy(
+                        name = resolvedName,
                         roomName = resolvedRoom,
                         ipAddress = match.ipAddress,
                         port = match.port,
                         isReachable = true,
-                        isOn = if (allowStateOverwrite) match.isOn else existing.isOn,
-                        brightness = if (allowStateOverwrite) match.brightness else existing.brightness,
+                        isOn = if (allowStateOverwrite) match.isOn else latest.isOn,
+                        brightness = if (allowStateOverwrite) match.brightness else latest.brightness,
                         latencyMs = match.responseTimeMs.toInt().coerceAtLeast(1),
                         lastCheckedTime = checkedAt,
-                        serialNumber = match.serialNumber.ifBlank { existing.serialNumber },
-                        firmwareVersion = match.firmwareVersion.ifBlank { existing.firmwareVersion },
-                        hardwareModel = match.hardwareSku.ifBlank { existing.hardwareModel },
-                        macAddress = match.macAddress.ifBlank { existing.macAddress },
-                        wifiSsid = match.wifiSsid.ifBlank { existing.wifiSsid }
+                        serialNumber = cleanSerial,
+                        firmwareVersion = match.firmwareVersion.ifBlank { latest.firmwareVersion },
+                        hardwareModel = match.hardwareSku.ifBlank { latest.hardwareModel },
+                        macAddress = match.macAddress.ifBlank { latest.macAddress },
+                        wifiSsid = cleanSsid
                     )
                 )
             }

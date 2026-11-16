@@ -3,6 +3,7 @@ package org.suppressingfire.wemi.data
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.XmlAndSkuParser
 
 /**
@@ -42,8 +43,17 @@ internal class HomeProfileSanitizer(
         if (validRouterSsid != null) {
             syncHomeSsidFromDeviceSsid(activeNetworkKey, validRouterSsid)
         }
+        val cleanDiscoveredSerial = discovered.serialNumber.takeIf {
+            !LanRuntimeUtils.isPlaceholderSerial(it)
+        }
         val checkedAt = nowFormatted()
         if (existing == null) {
+            val nextSortOrder = (
+                currentDevices
+                    .filter { it.networkKey == activeNetworkKey }
+                    .maxOfOrNull { it.sortOrder }
+                    ?: -1
+                ) + 1
             val newEntity = DeviceEntity(
                 name = discovered.name,
                 roomName = discovered.roomName.ifBlank { inferRoomFromName(discovered.name) },
@@ -57,13 +67,13 @@ internal class HomeProfileSanitizer(
                 brightness = discovered.brightness,
                 latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(1),
                 lastCheckedTime = checkedAt,
-                serialNumber = discovered.serialNumber,
+                serialNumber = cleanDiscoveredSerial.orEmpty(),
                 firmwareVersion = discovered.firmwareVersion,
                 hardwareModel = discovered.hardwareSku,
                 macAddress = discovered.macAddress,
                 udn = discovered.usn,
                 signalStrengthPercent = discovered.signalStrengthPercent,
-                sortOrder = currentDevices.size
+                sortOrder = nextSortOrder
             )
             val newId = dao.insertDevice(newEntity).toInt()
             newEntity.copy(id = newId)
@@ -87,7 +97,7 @@ internal class HomeProfileSanitizer(
                 isReachable = true,
                 latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(1),
                 lastCheckedTime = checkedAt,
-                serialNumber = discovered.serialNumber.ifBlank { existing.serialNumber },
+                serialNumber = cleanDiscoveredSerial ?: existing.serialNumber,
                 firmwareVersion = discovered.firmwareVersion.ifBlank { existing.firmwareVersion },
                 hardwareModel = discovered.hardwareSku.ifBlank { existing.hardwareModel },
                 macAddress = discovered.macAddress.ifBlank { existing.macAddress },

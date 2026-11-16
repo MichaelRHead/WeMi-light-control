@@ -18,6 +18,7 @@ object LanRuntimeUtils {
 
     val PLACEHOLDER_SERIALS: Set<String> = setOf(
         "",
+        "UNKNOWN",
         DEFAULT_PLACEHOLDER_SERIAL,
         DEFAULT_LAN_PLACEHOLDER_SERIAL,
         DEFAULT_NEW_PLACEHOLDER_SERIAL

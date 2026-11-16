@@ -142,7 +142,7 @@ class TvNavigationAndScenesE2ETest {
                         composeTestRule.waitForIdle()
                         composeTestRule.onNodeWithTag("tv_device_card_${alpha.id}").assertIsFocused()
 
-                        // 5. Navigate Up to Living Room Header -> Left/Right steps room dimmer brightness (-10% / +10%)
+                        // 5. Navigate Up to Living Room Header -> consecutive Left/Right steps room dimmer brightness (-10% x2 / +10% x2)
                         composeTestRule.onNodeWithTag("tv_device_card_${alpha.id}")
                             .performKeyInput { pressKey(Key.DirectionUp) }
                         composeTestRule.waitForIdle()
@@ -154,9 +154,20 @@ class TvNavigationAndScenesE2ETest {
                             alphaServer.dimmerBrightness.get() == 70 &&
                                 vm.devices.value.firstOrNull { it.id == alpha.id }?.brightness == 70
                         }
-                        composeTestRule.waitForIdle()
-                        assertEquals(70, alphaServer.dimmerBrightness.get())
+                        composeTestRule.onNodeWithTag("tv_room_header_Living Room")
+                            .performKeyInput { pressKey(Key.DirectionLeft) }
+                        awaitLoopbackIo {
+                            alphaServer.dimmerBrightness.get() == 60 &&
+                                vm.devices.value.firstOrNull { it.id == alpha.id }?.brightness == 60
+                        }
+                        assertEquals(60, alphaServer.dimmerBrightness.get())
 
+                        composeTestRule.onNodeWithTag("tv_room_header_Living Room")
+                            .performKeyInput { pressKey(Key.DirectionRight) }
+                        awaitLoopbackIo {
+                            alphaServer.dimmerBrightness.get() == 70 &&
+                                vm.devices.value.firstOrNull { it.id == alpha.id }?.brightness == 70
+                        }
                         composeTestRule.onNodeWithTag("tv_room_header_Living Room")
                             .performKeyInput { pressKey(Key.DirectionRight) }
                         awaitLoopbackIo {
@@ -201,6 +212,34 @@ class TvNavigationAndScenesE2ETest {
                         assertFalse(alphaServer.relayStateOn.get())
                         assertFalse(bravoServer.relayStateOn.get())
                         assertFalse(deltaServer.relayStateOn.get())
+
+                        // 7. Verify TvSceneChip & tv_scan_button rememberUpdatedState(onNavigateDown):
+                        //    even though TvTopHeaderBar was mounted while groupedByRoom was empty in Step 1,
+                        //    pressing Down from tv_scene_bedtime and tv_scan_button navigates into Living Room Header!
+                        composeTestRule.onNodeWithTag("tv_scene_bedtime")
+                            .performKeyInput { pressKey(Key.DirectionDown) }
+                        composeTestRule.waitForIdle()
+                        composeTestRule.onNodeWithTag("tv_room_header_Living Room").assertIsFocused()
+
+                        composeTestRule.onNodeWithTag("tv_room_header_Living Room")
+                            .performKeyInput { pressKey(Key.DirectionUp) }
+                        composeTestRule.waitForIdle()
+                        composeTestRule.onNodeWithTag("tv_scene_movie").assertIsFocused()
+                        repeat(3) {
+                            composeTestRule.onNodeWithTag(
+                                when (it) {
+                                    0 -> "tv_scene_movie"
+                                    1 -> "tv_scene_holiday"
+                                    else -> "tv_scene_bedtime"
+                                }
+                            ).performKeyInput { pressKey(Key.DirectionRight) }
+                            composeTestRule.waitForIdle()
+                        }
+                        composeTestRule.onNodeWithTag("tv_scan_button").assertIsFocused()
+                        composeTestRule.onNodeWithTag("tv_scan_button")
+                            .performKeyInput { pressKey(Key.DirectionDown) }
+                        composeTestRule.waitForIdle()
+                        composeTestRule.onNodeWithTag("tv_room_header_Living Room").assertIsFocused()
                     }
                 }
             }

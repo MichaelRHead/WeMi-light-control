@@ -68,6 +68,8 @@ internal fun TvDeviceCardDimmerStrip(
 ) {
     var hasSliderHardwareFocus by remember { mutableStateOf(false) }
     val currentOnStepBrightness by rememberUpdatedState(onStepBrightness)
+    val currentOnNavigateUp by rememberUpdatedState(onNavigateUp)
+    val currentOnNavigateDown by rememberUpdatedState(onNavigateDown)
     val isFocused = isSliderFocused || hasSliderHardwareFocus
 
     Surface(
@@ -101,15 +103,15 @@ internal fun TvDeviceCardDimmerStrip(
                             currentOnStepBrightness(10)
                             true
                         }
-                        Key.DirectionUp -> onNavigateUp()
-                        Key.DirectionDown -> onNavigateDown()
+                        Key.DirectionUp -> currentOnNavigateUp()
+                        Key.DirectionDown -> currentOnNavigateDown()
                         Key.DirectionCenter,
                         Key.Enter,
                         Key.NumPadEnter,
                         Key.Back,
                         Key.Escape,
                         Key.MediaPlayPause,
-                        Key.Menu -> onNavigateUp()
+                        Key.Menu -> currentOnNavigateUp()
                         else -> false
                     }
                 } else {

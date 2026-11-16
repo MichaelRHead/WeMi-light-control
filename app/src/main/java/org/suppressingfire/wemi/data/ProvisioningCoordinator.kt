@@ -303,6 +303,12 @@ internal class ProvisioningCoordinator(
             val placeholderLanIp = "$homePrefix.$nextOctet"
 
             if (existing == null) {
+                val nextSortOrder = (
+                    existingDevices
+                        .filter { it.networkKey == targetNetworkKey }
+                        .maxOfOrNull { it.sortOrder }
+                        ?: -1
+                    ) + 1
                 val newEntity = DeviceEntity(
                     name = resolvedName,
                     roomName = resolvedRoom,
@@ -322,7 +328,7 @@ internal class ProvisioningCoordinator(
                     macAddress = mac,
                     udn = udn,
                     signalStrengthPercent = 90,
-                    sortOrder = existingDevices.size
+                    sortOrder = nextSortOrder
                 )
                 dao.insertDevice(newEntity)
             } else {

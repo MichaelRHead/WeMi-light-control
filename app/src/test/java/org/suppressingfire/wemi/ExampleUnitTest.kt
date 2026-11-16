@@ -29,6 +29,7 @@ class ExampleUnitTest {
         assertTrue(LanRuntimeUtils.isPlaceholderSerial(LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL))
         assertTrue(LanRuntimeUtils.isPlaceholderSerial(LanRuntimeUtils.DEFAULT_NEW_PLACEHOLDER_SERIAL))
         assertTrue(LanRuntimeUtils.isPlaceholderSerial("221517k01018lan"))
+        assertTrue(LanRuntimeUtils.isPlaceholderSerial("unknown"))
         assertFalse(LanRuntimeUtils.isPlaceholderSerial("WLS0403SN9988"))
     }
 

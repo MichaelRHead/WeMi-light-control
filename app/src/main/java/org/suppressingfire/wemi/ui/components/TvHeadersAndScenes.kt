@@ -254,6 +254,9 @@ internal fun TvTopHeaderBar(
             )
 
             var isScanFocused by remember { mutableStateOf(false) }
+            val currentOnScanSsdpClick by androidx.compose.runtime.rememberUpdatedState(onScanSsdpClick)
+            val currentOnNavigateTopHorizontal by androidx.compose.runtime.rememberUpdatedState(onNavigateTopActionHorizontal)
+            val currentOnNavigateDownFromTopBar by androidx.compose.runtime.rememberUpdatedState(onNavigateDownFromTopBar)
             val scanRequester = topActionFocusRequesters.getOrNull(3)
             Surface(
                 shape = RoundedCornerShape(10.dp),
@@ -274,12 +277,12 @@ internal fun TvTopHeaderBar(
                         if (event.type == KeyEventType.KeyDown) {
                             when (event.key) {
                                 Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                    onScanSsdpClick()
+                                    currentOnScanSsdpClick()
                                     true
                                 }
-                                Key.DirectionLeft -> onNavigateTopActionHorizontal(2)
+                                Key.DirectionLeft -> currentOnNavigateTopHorizontal(2)
                                 Key.DirectionRight -> true
-                                Key.DirectionDown -> onNavigateDownFromTopBar()
+                                Key.DirectionDown -> currentOnNavigateDownFromTopBar()
                                 Key.DirectionUp -> true
                                 else -> false
                             }
@@ -330,6 +333,10 @@ internal fun TvSceneChip(
     testTag: String
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val currentOnClick by androidx.compose.runtime.rememberUpdatedState(onClick)
+    val currentOnNavigateLeft by androidx.compose.runtime.rememberUpdatedState(onNavigateLeft)
+    val currentOnNavigateRight by androidx.compose.runtime.rememberUpdatedState(onNavigateRight)
+    val currentOnNavigateDown by androidx.compose.runtime.rememberUpdatedState(onNavigateDown)
     Surface(
         color = if (isFocused) Color(0xFF133B66) else Color(0xFF0F2540),
         shape = RoundedCornerShape(10.dp),
@@ -349,12 +356,12 @@ internal fun TvSceneChip(
                 if (event.type == KeyEventType.KeyDown) {
                     when (event.key) {
                         Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                            onClick()
+                            currentOnClick()
                             true
                         }
-                        Key.DirectionLeft -> onNavigateLeft()
-                        Key.DirectionRight -> onNavigateRight()
-                        Key.DirectionDown -> onNavigateDown()
+                        Key.DirectionLeft -> currentOnNavigateLeft()
+                        Key.DirectionRight -> currentOnNavigateRight()
+                        Key.DirectionDown -> currentOnNavigateDown()
                         Key.DirectionUp -> true
                         else -> false
                     }

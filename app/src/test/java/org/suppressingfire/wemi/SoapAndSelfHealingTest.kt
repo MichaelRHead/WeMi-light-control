@@ -348,4 +348,90 @@ class SoapAndSelfHealingTest {
             }
         }
     }
+
+    @Test
+    fun `verify executeSsdpScan preserves concurrent DB edits inside mutex and adoptDiscoveredDevice assigns monotonic sortOrder after deletion`() = runBlocking {
+        FakeUpnpServer(
+            initialFriendlyName = "Kitchen Island Switch",
+            serialNumber = "221803K1300991",
+            udn = "uuid:Lightswitch-2_0-221803K1300991",
+            wifiSsid = "WeMo.Switch.991",
+            initialRelayOn = false,
+            enableSsdpResponder = true,
+            registerAsCandidatePort = true
+        ).use { server ->
+            val client = NetworkClient(extraCandidatePorts = listOf(server.port))
+            val repo = SwitchRepository(
+                dao = database.switchDao(),
+                networkClient = client,
+                initialDemoModeOverride = false
+            )
+            try {
+                // 1. Seed 3 switches (sortOrder 0, 1, 2), then delete the first one (leaving sortOrder = [1, 2], size = 2)
+                val firstId = database.switchDao().insertDevice(
+                    DeviceEntity(name = "Entry Lamp", roomName = "Entryway", ipAddress = "127.0.0.1", port = 49901, sortOrder = 0)
+                ).toInt()
+                val targetId = database.switchDao().insertDevice(
+                    DeviceEntity(
+                        name = "Custom Kitchen Island",
+                        roomName = "Kitchen",
+                        ipAddress = "127.0.0.1",
+                        port = server.port,
+                        serialNumber = "221803K1300991",
+                        wifiSsid = "HeadFamily-2.4G",
+                        autoOffMinutes = 15,
+                        sortOrder = 1
+                    )
+                ).toInt()
+                database.switchDao().insertDevice(
+                    DeviceEntity(name = "Patio String", roomName = "Outdoor", ipAddress = "127.0.0.1", port = 49902, sortOrder = 2)
+                )
+                repo.deleteDevice(firstId)
+
+                // 2. Toggle power (recording lastSetStateTimestampMs) and mutate autoOffMinutes/sortOrder concurrently before SSDP scan
+                server.relayStateOn.set(true)
+                val toggled = repo.setDevicePowerExplicit(database.switchDao().getDeviceById(targetId)!!, true)
+                assertTrue(toggled.isOn)
+                // Simulate hardware momentarily reporting stale OFF during 1500ms echo window while user also updated autoOffMinutes
+                server.relayStateOn.set(false)
+                database.switchDao().updateDevice(toggled.copy(autoOffMinutes = 30, sortOrder = 5))
+
+                repo.executeSsdpScan(autoAdoptNew = false)
+                val afterScan = database.switchDao().getDeviceById(targetId)!!
+                assertEquals("Custom Kitchen Island", afterScan.name)
+                assertEquals(30, afterScan.autoOffMinutes)
+                assertEquals(5, afterScan.sortOrder)
+                assertTrue("1500ms echo guard must preserve recent user ON state", afterScan.isOn)
+                assertEquals("Soft-AP SSID from GetMetaInfo must never overwrite router SSID", "HeadFamily-2.4G", afterScan.wifiSsid)
+
+                // 3. Adopt a brand-new discovered switch (with placeholder serial) -> sortOrder must be max(2, 5) + 1 = 6, and serial sanitized to ""
+                val newlyAdopted = repo.adoptDiscoveredDevice(
+                    org.suppressingfire.wemi.data.SsdpDiscoveredDevice(
+                        usn = "uuid:Socket-1_0-NEWMINI999",
+                        searchTarget = "urn:Belkin:service:basicevent:1",
+                        locationUrl = "http://127.0.0.1:49903/setup.xml",
+                        ipAddress = "127.0.0.1",
+                        port = 49903,
+                        name = "Office Desk Fan",
+                        roomName = "Office",
+                        deviceType = org.suppressingfire.wemi.data.DeviceType.SWITCH_PLUG,
+                        modelName = "Socket",
+                        isOn = false,
+                        brightness = 100,
+                        responseTimeMs = 8,
+                        serialNumber = org.suppressingfire.wemi.network.LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL,
+                        firmwareVersion = "WeMo_WW_2.00",
+                        hardwareSku = "WSP080",
+                        macAddress = "EC1A59000999",
+                        wifiSsid = "WeMo.Mini.999"
+                    )
+                )
+                assertEquals(6, newlyAdopted.sortOrder)
+                assertEquals("", newlyAdopted.serialNumber)
+                org.junit.Assert.assertNotEquals("WeMo.Mini.999", newlyAdopted.wifiSsid)
+            } finally {
+                repo.close()
+            }
+        }
+    }
 }
