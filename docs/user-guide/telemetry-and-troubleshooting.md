@@ -11,7 +11,7 @@ Whenever you need help troubleshooting `10.22.22.1` Wi-Fi setup, switch discover
 2. **Export or copy the recorded telemetry file (`wemi-telemetry-latest.txt`)** with a single tap on **`Save/Share`** or **`Copy`**.
 
 > [!NOTE]
-> **Privacy & Wi-Fi Password Protection**: Neither the on-screen debug panel nor the exported `wemi-telemetry-latest.txt` file ever displays or records your plaintext Wi-Fi password. Only the encryption method (`Method 1/2/3`), length-suffix flag (`addLengths`), and plaintext/encrypted lengths (`plainLen` / `encLen`) are logged.
+> **Privacy & Local-Only Storage Protection**: Neither the on-screen debug panel nor the exported `wemi-telemetry-latest.txt` file ever displays or records your plaintext Wi-Fi password (only the encryption method `Method 1/2/3`, length-suffix flag `addLengths`, and plaintext/encrypted lengths `plainLen` / `encLen` are logged). In addition, `wemi-telemetry-latest.txt` is explicitly excluded from Android cloud Auto-Backup and device-to-device transfer so diagnostic LAN metadata stays strictly local until you choose to share it.
 
 ---
 
