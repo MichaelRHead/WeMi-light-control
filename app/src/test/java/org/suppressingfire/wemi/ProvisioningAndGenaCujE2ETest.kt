@@ -12,6 +12,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -173,6 +174,9 @@ class ProvisioningAndGenaCujE2ETest {
             val exportedText = exportedFile.readText()
             assertTrue(exportedText.contains("GetBinaryState"))
             assertTrue(exportedText.contains("GENA"))
+            assertTrue(exportedText.contains("--- [2. REMEMBERED WI-FI HOMES (1)] ---"))
+            assertTrue(exportedText.contains("[HOME] key="))
+            assertFalse(exportedText.contains("[NET] mode=REAL-LAN ip= "))
 
             // Restore Classic Showroom preset
             composeTestRule.onNodeWithTag("more_screen_list")
@@ -258,7 +262,9 @@ class ProvisioningAndGenaCujE2ETest {
 
             val telemetryFile = TelemetryFileExporter.latestTelemetryFile(composeTestRule.activity)
             assertTrue(telemetryFile.exists())
-            assertTrue(telemetryFile.readText().contains("[STEP 6 CLOSE] CloseSetup -> success"))
+            val copiedSnapshotText = telemetryFile.readText()
+            assertTrue(copiedSnapshotText.contains("[STEP 6 CLOSE] CloseSetup -> success"))
+            assertFalse(copiedSnapshotText.contains("HomeRouterSecret99"))
 
             composeTestRule.onNodeWithText("Cancel").performClick()
             composeTestRule.waitForIdle()
@@ -272,6 +278,20 @@ class ProvisioningAndGenaCujE2ETest {
                 }.getOrDefault(false)
             }
             composeTestRule.onNodeWithText("Stairway 3-Way Switch").assertIsDisplayed()
+
+            // 7. Export full 4-section telemetry from More -> Save/Share Log and verify session setup trace + homes + redaction
+            composeTestRule.onNodeWithTag("nav_tab_more").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("more_screen_list")
+                .performScrollToNode(hasTestTag("export_telemetry_file_button"))
+            composeTestRule.onNodeWithTag("export_telemetry_file_button").performClick()
+            composeTestRule.waitForIdle()
+
+            val fullMoreExport = telemetryFile.readText()
+            assertTrue(fullMoreExport.contains("[STEP 6 CLOSE] CloseSetup -> success"))
+            assertTrue(fullMoreExport.contains("[HOME] key="))
+            assertTrue(fullMoreExport.contains("Stairway 3-Way Switch"))
+            assertFalse(fullMoreExport.contains("HomeRouterSecret99"))
         }
     }
 }

@@ -397,7 +397,7 @@ class ProvisionerClient(
                 endpoint = endpoint,
                 soapAction = "WiFiSetup1#ConnectHomeNetwork($ssid, Method $effectiveMethod, lengths=$effectiveAddLengths, Pairing=$lastPairingStatus)",
                 statusText = statusDesc,
-                xmlSnippet = connectBody.take(260),
+                xmlSnippet = "<ConnectHomeNetwork><ssid>${XmlAndSkuParser.escapeXml(ssid)}</ssid><auth>${XmlAndSkuParser.escapeXml(resolvedAuth)}</auth><password>[REDACTED encLen=${encryptedPwd.length}]</password><encrypt>${XmlAndSkuParser.escapeXml(resolvedEncrypt)}</encrypt><channel>$effectiveChannel</channel></ConnectHomeNetwork>",
                 isLiveLanSuccess = overallSuccess
             ),
             closeSetupStatus = closeStatus,

@@ -46,7 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.data.HomeNetworkEntity
 import org.suppressingfire.wemi.data.SoapLogEntry
+import org.suppressingfire.wemi.network.LanNetworkSnapshot
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.TelemetryFileExporter
 import org.suppressingfire.wemi.ui.theme.WemoErrorRed
@@ -351,6 +353,9 @@ internal fun SoapPacketLogCard(
     devices: List<DeviceEntity>,
     soapLogs: List<SoapLogEntry>,
     isDemoShowroomMode: Boolean,
+    homeNetworks: List<HomeNetworkEntity> = emptyList(),
+    setupDebugSnapshot: SetupDebugSnapshot = SetupDebugSnapshot(),
+    lanNetworkState: LanNetworkSnapshot = LanNetworkSnapshot(),
     onClearLogs: () -> Unit
 ) {
     val context = LocalContext.current
@@ -379,10 +384,12 @@ internal fun SoapPacketLogCard(
                     TextButton(
                         onClick = {
                             val reportText = TelemetryFileExporter.buildFullTelemetryReport(
-                                setupSnapshot = SetupDebugSnapshot(
-                                    timestamp = "MoreTabExport",
+                                setupSnapshot = TelemetryFileExporter.resolveExportSetupSnapshot(
+                                    setupSnapshot = setupDebugSnapshot,
+                                    lanSnapshot = lanNetworkState,
                                     isDemoMode = isDemoShowroomMode
                                 ),
+                                homes = homeNetworks,
                                 devices = devices,
                                 soapLogs = soapLogs
                             )

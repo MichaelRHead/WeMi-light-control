@@ -105,6 +105,7 @@ fun WeMiSwitchApp(
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
     val isDemoShowroomMode by viewModel.isDemoShowroomMode.collectAsStateWithLifecycle()
+    val setupDebugSnapshot by viewModel.setupDebugSnapshot.collectAsStateWithLifecycle()
 
     val homeDevices = remember(devices, activeNetworkKey) {
         devices.filter { it.networkKey == activeNetworkKey }
@@ -296,6 +297,10 @@ fun WeMiSwitchApp(
                                 soapLogs = soapLogs,
                                 useWeMiWordmark = useWeMiWordmark,
                                 isDemoShowroomMode = isDemoShowroomMode,
+                                allDevices = devices,
+                                homeNetworks = homeNetworks,
+                                setupDebugSnapshot = setupDebugSnapshot,
+                                lanNetworkState = lanNetworkState,
                                 onTurnAllOn = { viewModel.turnAllSwitches(true) },
                                 onTurnAllOff = { viewModel.turnAllSwitches(false) },
                                 onScanNetwork = { viewModel.openSsdpScannerAndScan() },

@@ -30,7 +30,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.data.HomeNetworkEntity
 import org.suppressingfire.wemi.data.SoapLogEntry
+import org.suppressingfire.wemi.network.LanNetworkSnapshot
+import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
@@ -43,6 +46,10 @@ fun MoreScreen(
     soapLogs: List<SoapLogEntry>,
     useWeMiWordmark: Boolean,
     isDemoShowroomMode: Boolean = false,
+    allDevices: List<DeviceEntity> = devices,
+    homeNetworks: List<HomeNetworkEntity> = emptyList(),
+    setupDebugSnapshot: SetupDebugSnapshot = SetupDebugSnapshot(),
+    lanNetworkState: LanNetworkSnapshot = LanNetworkSnapshot(),
     onTurnAllOn: () -> Unit,
     onTurnAllOff: () -> Unit,
     onScanNetwork: () -> Unit,
@@ -89,7 +96,10 @@ fun MoreScreen(
 
         item(key = "more_soap_packet_log") {
             SoapPacketLogCard(
-                devices = devices,
+                devices = allDevices,
+                homeNetworks = homeNetworks,
+                setupDebugSnapshot = setupDebugSnapshot,
+                lanNetworkState = lanNetworkState,
                 soapLogs = soapLogs,
                 isDemoShowroomMode = isDemoShowroomMode,
                 onClearLogs = onClearLogs

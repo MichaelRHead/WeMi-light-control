@@ -92,6 +92,29 @@ data class SetupDebugSnapshot(
 object TelemetryFileExporter {
     const val DEFAULT_TELEMETRY_FILENAME = "wemi-telemetry-latest.txt"
 
+    fun resolveExportSetupSnapshot(
+        setupSnapshot: SetupDebugSnapshot,
+        lanSnapshot: LanNetworkSnapshot = LanNetworkSnapshot(),
+        isDemoMode: Boolean = setupSnapshot.isDemoMode
+    ): SetupDebugSnapshot {
+        val hasCapturedSession = setupSnapshot.timestamp.isNotBlank()
+        return setupSnapshot.copy(
+            timestamp = setupSnapshot.timestamp.ifBlank {
+                SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
+            },
+            phoneLocalIp = setupSnapshot.phoneLocalIp.ifBlank { lanSnapshot.localIpv4 },
+            phoneGatewayIp = setupSnapshot.phoneGatewayIp.ifBlank { lanSnapshot.gatewayIp },
+            phoneInterface = if (hasCapturedSession) {
+                setupSnapshot.phoneInterface.ifBlank { lanSnapshot.interfaceName }
+            } else {
+                lanSnapshot.interfaceName.ifBlank { setupSnapshot.phoneInterface }
+            },
+            isWemoSetupSubnet = setupSnapshot.isWemoSetupSubnet || lanSnapshot.isWemoSetupApSubnet,
+            isWifiSocketBound = setupSnapshot.isWifiSocketBound || lanSnapshot.isWifiSocketBound,
+            isDemoMode = isDemoMode
+        )
+    }
+
     fun buildFullTelemetryReport(
         setupSnapshot: SetupDebugSnapshot,
         selectedSsid: String = "",
