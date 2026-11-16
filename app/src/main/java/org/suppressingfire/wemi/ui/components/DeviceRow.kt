@@ -233,6 +233,19 @@ fun DeviceRow(
                                     label = if (device.isOn) "ON • ${device.brightness}%" else "OFF • ${device.brightness}%",
                                     modifier = Modifier.testTag("power_state_badge_${device.id}")
                                 )
+                                if (autoOffRemainingSeconds != null && autoOffRemainingSeconds > 0) {
+                                    val mins = autoOffRemainingSeconds / 60
+                                    val secs = autoOffRemainingSeconds % 60
+                                    Text(
+                                        text = "Auto-Off ${mins}:${secs.toString().padStart(2, '0')}",
+                                        color = WemoTextSecondary,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                                 Icon(
                                     imageVector = if (isExpanded) {
                                         Icons.Default.KeyboardArrowUp

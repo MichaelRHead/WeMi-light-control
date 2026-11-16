@@ -33,8 +33,8 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
    - On startup/SSDP scan in Real LAN Mode (`resolveDeviceRoomAssignment`), switches previously stuck in `"Living Room"` are automatically migrated to their inferred rooms while preserving custom user room assignments.
 
 4. **Native Hardware Form-Factor Routing (Phone/Tablet vs. Android TV)**:
-   - Phone/tablet (`Scaffold` with compact single-row `TopHeader` and `BottomNavigationBar`) and Android TV (`TvDashboardScreen` under `Configuration.UI_MODE_TYPE_TELEVISION`) are strictly native to their hardware form factor and interaction model. Do not add manual Phone/TV mode switch buttons to either layout.
-   - On Android TV (`wemi TV`), use a single compact top header row paired with a full-height **3-Column Room-Grouped Switch Grid (`GridCells.Fixed(3)`)** with full-span `TvRoomSectionHeader` headers (`tv_room_header_<Room>`) that are deterministically selected when moving Up or Down from any column (including Column 1), unmistakable 10-foot cursor focus (`3.5.dp` `#22D3EE` border, `#133B66` surface, `FOCUSED • OK` badge), and a focusable **Dimmer Slider (`tv_card_dim_mode_<id>`)** below the dimmer's On/Off Toggle so Google TV remotes without a Play/Menu button can navigate `Down` from the toggle into the slider, press `Left / Right` (`-10%` / `+10%`) to adjust brightness, and press `Down` to move to the widget below.
+   - Phone/tablet (`Scaffold` with compact single-row `TopHeader` in `HeaderAndNav.kt` and `BottomNavigationBar` in `BottomNavBar.kt`) and Android TV (`TvDashboardScreen` under `Configuration.UI_MODE_TYPE_TELEVISION`) are strictly native to their hardware form factor and interaction model. Do not add manual Phone/TV mode switch buttons to either layout.
+   - On Android TV (`wemi TV`), use a single compact top header row paired with a full-height **3-Column Room-Grouped Switch Grid (`GridCells.Fixed(3)`)** with full-span `TvRoomSectionHeader` headers (`tv_room_header_<Room>` in `TvRoomSectionHeader.kt`) that are deterministically selected when moving Up or Down from any column (including Column 1) and support `Left / Right` (`-10%` / `+10%`) room dimmer stepping, unmistakable 10-foot cursor focus (`3.5.dp` `#22D3EE` border, `#133B66` surface, `FOCUSED • OK` badge, with empty-home initial focus on `tv_scan_button`), and a focusable **Dimmer Slider (`tv_card_dim_mode_<id>` in `TvDimmerControls.kt`)** below the dimmer's On/Off Toggle so Google TV remotes without a Play/Menu button can navigate `Down` from the toggle into the slider, press `Left / Right` (`-10%` / `+10%`) to adjust brightness, press `Up` or system `Back` (`BackHandler`) to return to the toggle, and press `Down` to move to the widget below.
 
 ---
 
@@ -61,7 +61,7 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
 
 ---
 
-## 3. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt` & `TvAndHeaderLayoutE2ETest.kt` — `38/38` Tests Across 10 Suites)
+## 3. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt` & `TvNavigationAndScenesE2ETest.kt` — `46/46` Tests Across 13 Suites)
 
 Whenever UI components, ViewModel flows, or repository methods are touched, verify all 7 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
 

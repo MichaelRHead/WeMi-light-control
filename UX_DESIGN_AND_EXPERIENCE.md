@@ -1,6 +1,6 @@
 # WeMi Light Control — Android & Android TV UX Design, Behavioral Model & Critical User Journeys (`UX_DESIGN_AND_EXPERIENCE.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v25.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v27.0`)  
 **Document & Skill Owner**: **Google AI Studio Agent (`AI Studio Build`) — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md)
 
@@ -16,7 +16,7 @@ Related documentation:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — read-only for the Google AI Studio Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent — read-only for the Google AI Studio Agent)*
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v25.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v27.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -121,8 +121,8 @@ Every screen and component in **WeMi Light Control** must obey these five layout
 ### Invariant 5: Non-Blocking Feedback & Synchronous Modal Dismissal
 - **Rule**: Transient status banners must never block touches on underlying list items, and modal dialogs must close immediately when the user taps Save/Confirm.
 - **Implementation**:
-  - `status_feedback_banner` in `MainActivity.kt` is a non-clickable `Box` overlay so taps pass straight through to switch rows and bottom navigation tabs.
-  - All ViewModel and UI controller dialog save/confirm actions (`SwitchViewModel.kt`, `ProvisionApUiController.kt`, `HomeAndRulesUiController.kt`, and `WeMiModalDialogs.kt`: `saveDevice`, `addWifiHomeNetwork`, `deleteDevice`, `addRule`) set their dialog `MutableStateFlow` to `false`/`null` **synchronously on the main thread** before launching background `Dispatchers.IO` network probes.
+  - `status_feedback_banner` in `MainActivity.kt` is a non-clickable `Box` overlay so taps pass straight through to switch rows and bottom navigation tabs, and `SwitchViewModel.showTransientStatus` cancels any prior `statusBannerJob` timer so sequential status toasts never auto-dismiss prematurely.
+  - All ViewModel and UI controller dialog save/confirm actions (`SwitchViewModel.kt`, `DeviceActionsUiController.kt`, `ProvisionApUiController.kt`, `HomeAndRulesUiController.kt`, and `WeMiModalDialogs.kt`: `saveDevice`, `addWifiHomeNetwork`, `deleteDevice`, `addRule`) set their dialog `MutableStateFlow` to `false`/`null` **synchronously on the main thread** before launching background `Dispatchers.IO` network probes, and wrap all loading spinner flags in cancellation-safe `try / finally` blocks.
 
 ---
 
@@ -170,8 +170,8 @@ Every screen and component in **WeMi Light Control** must obey these five layout
 ### CUJ 7: Native 10-Foot Living Room Android TV Experience (`wemi TV`)
 1. **Context**: User opens **WeMi Light Control** on an Android TV / Google TV device (`UI_MODE_TYPE_TELEVISION`).
 2. **Experience**:
-   - Automatically launches `TvDashboardScreen` (`tv_dashboard_screen` across `TvScreen.kt`, `TvHeadersAndScenes.kt`, and `TvCardsAndScenes.kt`) with a single compact top header bar (`wemi TV`, active switch counter, focused switch status pill `tv_remote_dpad_ok`, quick scene chips `Movie 20%`, `Holiday ON`, `All OFF` via `TvScene`, and `Rescan`) so over 90% of vertical screen height showcases the **3-Column Room-Grouped Switch Grid (`tv_device_grid`)**.
-   - **Room Section Headers (`TvRoomSectionHeader`, `tv_room_header_<RoomName>`)**: Group switches by room across all 3 columns (`span = { GridItemSpan(maxLineSpan) }`, with `"Unassigned"` sorted last), are always selected next when moving Up or Down through them from any column (including the leftmost switch widget), and allow one-click Room Master toggling when pressed with `OK`.
-   - **Unmistakable 10-Foot Cursor Focus**: Initial focus (`FocusRequester`) automatically lands on the first switch card, rendering a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated surface (`#133B66`), `1.022f` scale lift, and a **`FOCUSED • OK`** badge.
-   - **Google TV Remote-Friendly Focusable Dimmer Slider & 3-Column Navigation**: Navigating into a dimmer card focuses its **On/Off Toggle** (`tv_device_card_<id>`), where `Left / Right` moves across adjacent switch cards and `OK` toggles power `ON` / `OFF`. Navigating **Down once more** focuses the **Dimmer Slider** (`tv_card_dim_mode_<id>`, highlighted in glowing Gold `#FBBF24`), where pressing `Left / Right` lowers (`-10%`) or raises (`+10%`) the dimmer brightness, pressing `Up` returns to the On/Off Toggle, and pressing `Down` moves to the widget below.
+   - Automatically launches `TvDashboardScreen` (`tv_dashboard_screen` across `TvScreen.kt`, `TvDimmerControls.kt`, `TvRoomSectionHeader.kt`, `TvHeadersAndScenes.kt`, and `TvCardsAndScenes.kt`) with a single compact top header bar (`wemi TV`, active switch counter, focused switch status pill `tv_remote_dpad_ok`, quick scene chips `Movie 20%`, `Holiday ON`, `All OFF` via `TvScene`, and `Rescan`) so over 90% of vertical screen height showcases the **3-Column Room-Grouped Switch Grid (`tv_device_grid`)**.
+   - **Room Section Headers (`TvRoomSectionHeader`, `tv_room_header_<RoomName>`)**: Group switches by room across all 3 columns (`span = { GridItemSpan(maxLineSpan) }`, with `"Unassigned"` sorted last), are always selected next when moving Up or Down through them from any column (including the leftmost switch widget), allow one-click concurrent (`Semaphore(3)`) Room Master toggling when pressed with `OK`, and step all room dimmers by `-10%` / `+10%` when `Left` / `Right` is pressed on a focused Room Header (`FOCUSED • OK TOGGLE • L/R DIM`).
+   - **Unmistakable 10-Foot Cursor Focus & Empty-Home Rescan Focus**: Initial focus (`FocusRequester`) automatically lands on the first switch card (or on `Rescan` `tv_scan_button` when the active Wi-Fi Home has `0` switches), rendering a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated surface (`#133B66`), `1.022f` scale lift, and a **`FOCUSED • OK`** badge.
+   - **Google TV Remote-Friendly Focusable Dimmer Slider, System Back & 3-Column Navigation**: Navigating into a dimmer card focuses its **On/Off Toggle** (`tv_device_card_<id>`), where `Left / Right` moves across adjacent switch cards and `OK` toggles power `ON` / `OFF`. Navigating **Down once more** focuses the **Dimmer Slider** (`tv_card_dim_mode_<id>`, highlighted in glowing Gold `#FBBF24`), where pressing `Left / Right` lowers (`-10%`) or raises (`+10%`) the dimmer brightness (surfacing `tv_dimmer_hud_overlay`), pressing `Up` or **system `Back`** (`BackHandler`) returns focus to the On/Off Toggle (`tv_device_card_<id>`), and pressing `Down` moves to the widget in the same column below.
 

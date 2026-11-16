@@ -19,7 +19,7 @@ Related documentation:
 
 ## 1. Executive Summary & UX Philosophy
 
-**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v25.0`) reimagines the tactile, unmistakable physical affordances of a dedicated smart-home switch interface (Ocean Teal `#0891B2`, Electric Cyan `#06B6D4`, and Deep Sapphire `#0F4C81` header gradient, crisp white device rows, glowing cyan power rings, and skeuomorphic appliance illustrations) for Belkin's discontinued smart switch platform while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
+**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v27.0`) reimagines the tactile, unmistakable physical affordances of a dedicated smart-home switch interface (Ocean Teal `#0891B2`, Electric Cyan `#06B6D4`, and Deep Sapphire `#0F4C81` header gradient, crisp white device rows, glowing cyan power rings, and skeuomorphic appliance illustrations) for Belkin's discontinued smart switch platform while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
 
 Smart-home control apps fail when they treat physical wall switches like generic cloud database rows. Our UX design is anchored on four core principles:
 1. **Sub-Frame Tactile Responsiveness (`<16ms`)**: Tapping a light switch in the app must feel as instantaneous as flipping a physical paddle on the wall, backed by optimistic state projection and `1200ms` UPnP GENA echo suppression.
@@ -31,15 +31,15 @@ Smart-home control apps fail when they treat physical wall switches like generic
 
 ## 2. Navigation Patterns & Information Architecture
 
-### 2.1 Primary Phone & Tablet Navigation (`HeaderAndNav.kt`)
+### 2.1 Primary Phone & Tablet Navigation (`HeaderAndNav.kt` & `BottomNavBar.kt`)
 
-WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`BottomNavigationBar`) paired with a compact single-row top header (`TopHeader`):
+WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`BottomNavigationBar` in `BottomNavBar.kt`) paired with a compact single-row top header (`TopHeader` in `HeaderAndNav.kt`):
 
 1. **Compact Single-Row Top Header (`TopHeader`)**:
    - **Brand Wordmark**: Displays the `wemi` / `wemo` wordmark (`brand_wordmark_text`) on the left, omitting redundant static subtitle pills (`"LAN SWITCHES"`) so all top-bar actions fit on a single compact row and maximize vertical screen space for room and switch cards.
-   - **Inline Action Cluster (Right)**:
-     - **All Off Button (`all_off_devices_button`)**: Positioned immediately next to the Refresh button (`[All Off] [Refresh] [Edit] [+]`), providing one-tap master power-off for all reachable controllable switches on the active Wi-Fi Home.
-     - **Refresh / SSDP Scan Button (`refresh_devices_button`)**: Launches the live `SsdpScannerModal` and triggers background `GetBinaryState` verification across all saved switches.
+   - **Inline Action Cluster (Right, `>= 48.dp × 48.dp` Accessible Touch Targets)**:
+     - **All Off Button (`all_off_devices_button` / `header_all_off_button`)**: Positioned immediately next to the Refresh button (`[All Off] [Refresh] [Edit] [+]`), providing one-tap concurrent (`Semaphore(3)`) master power-off for all reachable controllable switches on the active Wi-Fi Home.
+     - **Refresh / SSDP Scan Button (`refresh_devices_button` / `refresh_button`)**: Launches the live `SsdpScannerModal` and triggers background `GetBinaryState` verification across all saved switches.
      - **Edit / Done Toggle (`edit_devices_button`)**: Switches the device list between normal operation and management mode (exposing inline reorder, `Edit`, and `Delete` actions).
      - **Add Button (`add_device_button`)**: Opens `AddOrEditDeviceDialog` on the `Devices` tab or `AddRuleDialog` on the `Rules` tab.
 
@@ -51,10 +51,10 @@ WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`Botto
    - Horizontal filter chips (`All Rooms`, `Living Room`, `Bedroom`, `Kitchen`, etc.) with live active/total badges (`e.g., 2/3 ON`) allow instant single-room focus, paired with a **`Grouped` / `Flat List`** toggle chip (`toggle_group_by_room_chip`).
    - In **Grouped by Room** mode, rooms render as collapsible cards:
      - **Uniform Collapsed Card Height**: All collapsed room headers share a locked single-line title (`AutoResizingDeviceNameText(..., singleLineOnly = true)`) and single-line status pills (`"2/3 ON"` or `"0/1 ON"`) so vertical scanning is rhythmically consistent across short and long room names.
-     - **Room Master Power Button (`room_power_toggle_<Room>`)**: Toggles every reachable switch and dimmer in that room in parallel without expanding the card.
+     - **Room Master Power Button (`room_power_toggle_<Room>`)**: Toggles every reachable switch and dimmer in that room concurrently (`Semaphore(3)`) via idempotent `setDevicePowerExplicit(dev, targetOn)` without expanding the card.
      - **Room Master Dimmer Bar (`room_dimmer_button_<Room>` / `room_dimmer_slider_<Room>`)**: Surfaces inside rooms that contain at least one `LIGHTBULB_DIMMER`, offering a room-wide master brightness slider and quick presets (`10%`, `25%`, `50%`, `75%`, `100%`) while preserving binary switches in the same room.
 
-4. **Bottom Navigation Bar (`BottomNavigationBar`)**:
+4. **Bottom Navigation Bar (`BottomNavigationBar` in `BottomNavBar.kt`)**:
    - **`Devices` Tab (`BottomTab.DEVICES`)**: Real-time switch & dimmer control, room groups, SSDP discovery, and hardware diagnostics.
    - **`Rules` Tab (`BottomTab.RULES`)**: Local schedule rules (`Daily Schedule`, `Sunset/Sunrise`, `Motion Trigger`, and `Auto-Off Timer` countdowns) with immediate enable/disable switches and CRUD dialogs.
    - **`More` Tab (`BottomTab.MORE` — `MoreScreen.kt` & `MoreControlAndLogCards.kt`)**: `10.22.22.1` factory-reset switch provisioning (`Provision New Switch AP`), `Showcase Demo Showroom` toggle, `Reset Homes, Discovered Switches & Rooms`, `Open Source License` & third-party notices card (`open_source_licenses_card`), and the live `UPnP / SOAP Packet Log` inspector.
@@ -82,19 +82,19 @@ Because WeMi Light Control uses reactive state-driven navigation (`selectedTab`,
 3. **Active Room Filter (`selectedRoomFilter != null`)** -> Clears the single-room filter back to `All Rooms`.
 4. **Secondary Bottom Tabs (`selectedTab != BottomTab.DEVICES`)** -> Navigates from `Rules` or `More` back to the primary `Devices` tab before allowing the activity to finish.
 
-### 2.4 Native 10-Foot Android TV & D-Pad Navigation (`TvScreen.kt`, `TvHeadersAndScenes.kt` & `TvCardsAndScenes.kt`)
+### 2.4 Native 10-Foot Android TV & D-Pad Navigation (`TvScreen.kt`, `TvDimmerControls.kt`, `TvRoomSectionHeader.kt`, `TvHeadersAndScenes.kt` & `TvCardsAndScenes.kt`)
 
 When running on an Android TV (`Configuration.UI_MODE_TYPE_TELEVISION`), the app launches directly into a dedicated 10-foot dark slate theater interface (`TvDashboardScreen`, `#0A192F` -> `#060E1A`) tailored exclusively for TV remote D-Pad interaction (without a phone-mode switch button or touch-only popup modals):
 
 - **Single Compact Top Bar & Full-Height 3-Column Room-Grouped Grid**:
   - A single compact top bar (`wemi TV`, active switch count, focused card status pill `tv_remote_dpad_ok`, scene chips `Movie 20%`, `Holiday ON`, `All OFF`, and `Rescan`) dedicates over 90% of vertical screen height to the 3-column (`GridCells.Fixed(3)`) switch grid.
-  - Switches are grouped by room under full-width focusable **Room Section Headers** (`TvRoomSectionHeader`, `span = { GridItemSpan(maxLineSpan) }`, `tv_room_header_<RoomName>`, with `"Unassigned"` sorted last). Navigating **Up** or **Down** through a Room Bar from **any** column (including Column 1 / the leftmost switch widget) deterministically selects the Room Bar next, and pressing `OK / Select` toggles all switches in that room.
-- **Unmistakable 10-Foot Cursor Focus**:
-  - Initial hardware focus (`FocusRequester`) is requested automatically on the first switch card at launch.
+  - Switches are grouped by room under full-width focusable **Room Section Headers** (`TvRoomSectionHeader` in `TvRoomSectionHeader.kt`, `span = { GridItemSpan(maxLineSpan) }`, `tv_room_header_<RoomName>`, with `"Unassigned"` sorted last). Navigating **Up** or **Down** through a Room Bar from **any** column (including Column 1 / the leftmost switch widget) deterministically selects the Room Bar next, pressing `OK / Select` toggles all switches in that room concurrently (`Semaphore(3)`), and when the room has reachable dimmers, pressing `D-Pad Left / Right` on the focused Room Bar steps all room dimmers by `-10%` / `+10%` (`FOCUSED • OK TOGGLE • L/R DIM`).
+- **Unmistakable 10-Foot Cursor Focus & Empty-Home Rescan Focus**:
+  - Initial hardware focus (`FocusRequester`) is requested automatically on the first switch card at launch—or automatically on **`Rescan` (`tv_scan_button`)** when the active Wi-Fi Home has `0` switches (`devices.isEmpty()`), so a TV user can discover switches with a single `OK` press.
   - Focused cards render a high-contrast `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated surface (`#133B66`), `1.022f` scale lift, `12.dp` shadow elevation, and an explicit top-right **`FOCUSED • OK`** badge.
-- **Google TV Remote-Friendly Focusable Dimmer Slider & 3-Column Navigation**:
+- **Google TV Remote-Friendly Focusable Dimmer Slider, System Back & 3-Column Navigation (`TvDimmerControls.kt`)**:
   - **On/Off Toggle Focus (`tv_device_card_<id>`)**: Navigating down into any switch or dimmer card focuses its **On/Off Toggle**. Pressing `D-Pad Left / Right` moves across the 3 columns of switch cards to the left and right, and pressing `OK / Select / Enter` immediately toggles power `ON` / `OFF` (or triggers a 9-port reconnect if offline).
-  - **Focusable Dimmer Slider (`tv_card_dim_mode_<id>`)**: Because Google TV remotes do not have a dedicated Play or Menu button, navigating **Down once more** from a dimmer card's On/Off Toggle focuses the **Dimmer Slider** directly below it (highlighted with a glowing Gold `#FBBF24` border and **`◄ -10% • +10% ►`** badge). While the dimmer slider is focused, pressing **`Left` / `Right`** lowers (`-10%`) or raises (`+10%`) the dimmer brightness immediately, pressing **`Up`** returns to the dimmer's On/Off Toggle, and pressing **`Down`** moves to the Room Bar or switch widget below.
+  - **Focusable Dimmer Slider (`tv_card_dim_mode_<id>`)**: Because Google TV remotes do not have a dedicated Play or Menu button, navigating **Down once more** from a dimmer card's On/Off Toggle focuses the **Dimmer Slider** directly below it (highlighted with a glowing Gold `#FBBF24` border and **`◄ -10% • +10% ►`** badge). While the dimmer slider is focused, pressing **`Left` / `Right`** lowers (`-10%`) or raises (`+10%`) the dimmer brightness immediately (and surfaces `tv_dimmer_hud_overlay`), pressing **`Up`** or **system `Back`** (`BackHandler`) returns focus to the dimmer's On/Off Toggle (`tv_device_card_<id>`), and pressing **`Down`** moves to the Room Bar or switch widget in the same column below.
 - **Zero Blocking Popup Modals on TV**: Clicking `Rescan` (`tv_scan_button`) runs a non-blocking background SSDP + state refresh with a bottom toast, and touch-only modal sheets are guarded by `if (!isTvMode)` so popups never trap TV remote focus.
 
 ---
@@ -212,4 +212,4 @@ Before committing any UI, ViewModel, or Repository change, verify that:
 - [ ] **Dimmer Controls First**: Expanded `LIGHTBULB_DIMMER` rows render the brightness slider, quick presets (`1%`–`100%`), and Night Mode toggle at the top of `ExpandedDrawer` before network metadata.
 - [ ] **Native Hardware Form-Factor Routing**: Phone/tablet (`Scaffold`) and Android TV (`TvDashboardScreen` under `UI_MODE_TYPE_TELEVISION`) remain tailored to their hardware form factors without manual Phone/TV mode switch buttons.
 - [ ] **48dp+ Touch Targets & Semantics**: All interactive controls meet `>= 48.dp` touch target minimums, include `Role` / `contentDescription` semantics, and carry deterministic `Modifier.testTag(...)` identifiers.
-- [ ] **End-to-End Tests Pass**: `./gradlew testDebugUnitTest --rerun-tasks` passes all 38 unit, protocol, governance, and Compose E2E UI tests across 10 suites (`ExampleUnitTest`, `ExampleRobolectricTest`, `EndToEndUiTest`, `HardwareCujEndToEndTest`, `TvAndHeaderLayoutE2ETest`, `LicenseAndBrandGovernanceTest`, `SkuAndCryptoTest`, `SoapAndSelfHealingTest`, `RepositorySelfHealingTest`, and `GenaProvisioningAndRulesTest`).
+- [ ] **End-to-End Tests Pass**: `./gradlew testDebugUnitTest --rerun-tasks` passes all 46 unit, protocol, governance, and Compose E2E UI tests across 13 suites (`ExampleUnitTest`, `ExampleRobolectricTest`, `EndToEndUiTest`, `HardwareCujEndToEndTest`, `ProvisioningAndGenaCujE2ETest`, `TvAndHeaderLayoutE2ETest`, `TvNavigationAndScenesE2ETest`, `LicenseAndBrandGovernanceTest`, `SkuAndCryptoTest`, `SoapAndSelfHealingTest`, `RepositorySelfHealingTest`, `BatchAndCrudIntegrationTest`, and `GenaProvisioningAndRulesTest`).
