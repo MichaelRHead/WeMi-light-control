@@ -112,9 +112,11 @@ internal class DiscoveryCoordinator(
                 ipAddress = match.ipAddress,
                 port = match.port,
                 isReachable = true,
+                serialNumber = match.serialNumber.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: device.serialNumber,
                 firmwareVersion = match.firmwareVersion.ifBlank { device.firmwareVersion },
                 hardwareModel = match.hardwareSku.ifBlank { device.hardwareModel },
-                macAddress = match.macAddress.ifBlank { device.macAddress }
+                macAddress = match.macAddress.ifBlank { device.macAddress },
+                udn = LanRuntimeUtils.canonicalHardwareUdn(match.usn).ifBlank { LanRuntimeUtils.canonicalHardwareUdn(device.udn) }
             )
         } else {
             null
@@ -318,14 +320,24 @@ internal class DiscoveryCoordinator(
                             }
                             val recentSetMs = lastSetStateTimestampMs[current.id] ?: 0L
                             val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
+                            val resolvedName = current.name.ifBlank { ssdpMatch?.name.orEmpty() }
                             val resolvedRoom = resolveDeviceRoomAssignment(
                                 existingRoomName = current.roomName,
-                                deviceName = current.name,
+                                deviceName = resolvedName,
                                 discoveredRoomName = ssdpMatch?.roomName.orEmpty(),
                                 isDemoMode = demoMode
                             )
+                            val cleanSerial = ssdpMatch?.serialNumber
+                                ?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
+                                ?: current.serialNumber
+                            val cleanSsid = ssdpMatch?.wifiSsid
+                                ?.takeIf { it.isNotBlank() && !isWemoDeviceSetupSsid(it) }
+                                ?: current.wifiSsid
+                            val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(ssdpMatch?.usn)
+                                .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(current.udn) }
                             dao.updateDevice(
                                 current.copy(
+                                    name = resolvedName,
                                     ipAddress = candidateDevice.ipAddress,
                                     roomName = resolvedRoom,
                                     port = if (probe.reachableOnLan) probe.resolvedPort else candidateDevice.port,
@@ -334,8 +346,12 @@ internal class DiscoveryCoordinator(
                                     isReachable = true,
                                     latencyMs = resolvedLatency,
                                     lastCheckedTime = checkedAt,
+                                    serialNumber = cleanSerial,
                                     firmwareVersion = ssdpMatch?.firmwareVersion?.ifBlank { current.firmwareVersion } ?: current.firmwareVersion,
-                                    hardwareModel = ssdpMatch?.hardwareSku?.ifBlank { current.hardwareModel } ?: current.hardwareModel
+                                    hardwareModel = ssdpMatch?.hardwareSku?.ifBlank { current.hardwareModel } ?: current.hardwareModel,
+                                    macAddress = ssdpMatch?.macAddress?.ifBlank { current.macAddress } ?: current.macAddress,
+                                    udn = cleanUdn,
+                                    wifiSsid = cleanSsid
                                 )
                             )
                             resolvedLatency
@@ -408,6 +424,8 @@ internal class DiscoveryCoordinator(
                 val cleanSsid = match.wifiSsid
                     .takeIf { it.isNotBlank() && !isWemoDeviceSetupSsid(it) }
                     ?: latest.wifiSsid
+                val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(match.usn)
+                    .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(latest.udn) }
                 dao.updateDevice(
                     latest.copy(
                         name = resolvedName,
@@ -423,6 +441,7 @@ internal class DiscoveryCoordinator(
                         firmwareVersion = match.firmwareVersion.ifBlank { latest.firmwareVersion },
                         hardwareModel = match.hardwareSku.ifBlank { latest.hardwareModel },
                         macAddress = match.macAddress.ifBlank { latest.macAddress },
+                        udn = cleanUdn,
                         wifiSsid = cleanSsid
                     )
                 )

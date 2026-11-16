@@ -37,6 +37,20 @@ object LanRuntimeUtils {
     }
 
     /**
+     * Extracts the canonical base UPnP `<UDN>` (stripping any `::urn:...` SSDP `USN` service
+     * suffix) and returns `""` when blank or synthesized from a placeholder serial number.
+     */
+    fun canonicalHardwareUdn(rawUdnOrUsn: String?): String {
+        val base = rawUdnOrUsn?.substringBefore("::")?.trim().orEmpty()
+        if (base.isEmpty()) return ""
+        val upper = base.uppercase(Locale.US)
+        val hasPlaceholderSuffix = PLACEHOLDER_SERIALS_UPPER.any { placeholder ->
+            placeholder.isNotEmpty() && upper.endsWith("-$placeholder")
+        }
+        return if (hasPlaceholderSuffix) "" else base
+    }
+
+    /**
      * Returns true when executing inside a local JVM Robolectric test runner rather than on
      * physical Android / Android TV hardware.
      */

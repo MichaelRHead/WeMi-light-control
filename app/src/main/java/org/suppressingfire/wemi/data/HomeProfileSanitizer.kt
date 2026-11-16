@@ -46,6 +46,7 @@ internal class HomeProfileSanitizer(
         val cleanDiscoveredSerial = discovered.serialNumber.takeIf {
             !LanRuntimeUtils.isPlaceholderSerial(it)
         }
+        val cleanDiscoveredUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered.usn)
         val checkedAt = nowFormatted()
         if (existing == null) {
             val nextSortOrder = (
@@ -71,7 +72,7 @@ internal class HomeProfileSanitizer(
                 firmwareVersion = discovered.firmwareVersion,
                 hardwareModel = discovered.hardwareSku,
                 macAddress = discovered.macAddress,
-                udn = discovered.usn,
+                udn = cleanDiscoveredUdn,
                 signalStrengthPercent = discovered.signalStrengthPercent,
                 sortOrder = nextSortOrder
             )
@@ -101,7 +102,7 @@ internal class HomeProfileSanitizer(
                 firmwareVersion = discovered.firmwareVersion.ifBlank { existing.firmwareVersion },
                 hardwareModel = discovered.hardwareSku.ifBlank { existing.hardwareModel },
                 macAddress = discovered.macAddress.ifBlank { existing.macAddress },
-                udn = discovered.usn.ifBlank { existing.udn },
+                udn = cleanDiscoveredUdn.ifBlank { LanRuntimeUtils.canonicalHardwareUdn(existing.udn) },
                 signalStrengthPercent = discovered.signalStrengthPercent
             )
             dao.updateDevice(updated)

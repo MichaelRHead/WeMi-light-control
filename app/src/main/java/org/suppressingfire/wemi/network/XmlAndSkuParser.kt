@@ -194,9 +194,13 @@ object XmlAndSkuParser {
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "WeMo_WW_2.00.11532.PVT"
         val macAddress = Regex("<macAddress>([^<]+)</macAddress>", RegexOption.IGNORE_CASE)
             .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
-        val udn = Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
-            .find(xml)?.groupValues?.getOrNull(1)?.trim()
-            ?: usnHeader.ifEmpty { "uuid:Lightswitch-1_0-$serial" }
+        val udn = LanRuntimeUtils.canonicalHardwareUdn(
+            Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
+                .find(xml)?.groupValues?.getOrNull(1)?.trim()
+                ?: usnHeader.ifEmpty {
+                    if (!LanRuntimeUtils.isPlaceholderSerial(serial)) "uuid:Lightswitch-1_0-$serial" else ""
+                }
+        )
         val isRtos = Regex("<rtos>\\s*1\\s*</rtos>", RegexOption.IGNORE_CASE).containsMatchIn(xml)
 
         val hostPortMatch = Regex("http://([^:/]+):(\\d+)").find(locationUrl)

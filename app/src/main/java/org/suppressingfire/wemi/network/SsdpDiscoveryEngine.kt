@@ -224,8 +224,10 @@ internal class SsdpDiscoveryEngine(
                     (!LanRuntimeUtils.isPlaceholderSerial(known.serialNumber) &&
                         !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
                         it.serialNumber.equals(known.serialNumber, ignoreCase = true)) ||
-                    (known.udn.isNotBlank() && it.usn.isNotBlank() &&
-                        it.usn.contains(known.udn, ignoreCase = true))
+                    (LanRuntimeUtils.canonicalHardwareUdn(known.udn).let { cleanKnownUdn ->
+                        cleanKnownUdn.isNotEmpty() &&
+                            cleanKnownUdn.equals(LanRuntimeUtils.canonicalHardwareUdn(it.usn), ignoreCase = true)
+                    })
             }
             if (!alreadySeen) {
                 val startProbe = System.currentTimeMillis()

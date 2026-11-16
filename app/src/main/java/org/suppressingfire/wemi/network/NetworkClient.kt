@@ -180,7 +180,7 @@ class NetworkClient(
                                     .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
                                 val matches = xmlSerial.equals(cleanExpected, ignoreCase = true) ||
                                     xmlUdn.contains(cleanExpected, ignoreCase = true) ||
-                                    cleanExpected.contains(xmlSerial, ignoreCase = true)
+                                    (xmlSerial.isNotEmpty() && cleanExpected.contains(xmlSerial, ignoreCase = true))
                                 if (!matches && xmlSerial.isNotEmpty()) {
                                     return@withContext null
                                 }
@@ -226,7 +226,7 @@ class NetworkClient(
             } catch (_: Exception) {
                 // Fall through to offline result
             }
-        } else if (discoveredPort == null) {
+        } else if (discoveredPort == null && LanRuntimeUtils.isPlaceholderSerial(device.serialNumber)) {
             for (port in orderedCandidatePorts(device.port).drop(1)) {
                 try {
                     wifiSocketFactory.createSocket().use { s ->

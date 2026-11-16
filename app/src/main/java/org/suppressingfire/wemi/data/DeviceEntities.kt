@@ -126,9 +126,9 @@ data class DeviceEntity(
         ) {
             return serialNumber.equals(discovered.serialNumber, ignoreCase = true)
         }
-        if (udn.isNotBlank() && discovered.usn.isNotBlank() &&
-            discovered.usn.contains(udn, ignoreCase = true)
-        ) {
+        val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(udn)
+        val cleanDiscoveredUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered.usn)
+        if (cleanUdn.isNotEmpty() && cleanUdn.equals(cleanDiscoveredUdn, ignoreCase = true)) {
             return true
         }
         val endpointMatch = ipAddress == discovered.ipAddress &&

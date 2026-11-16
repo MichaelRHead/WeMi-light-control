@@ -58,13 +58,14 @@ internal class DeviceCrudAndRulesCoordinator(
         targetOn: Boolean,
         networkKey: String? = null
     ): Int = coroutineScope {
+        val targetRoom = roomName.ifBlank { "Unassigned" }
         val demoMode = isDemoShowroomMode()
         val currentDevices = dao.getAllDevices().first().let {
             if (it.isEmpty() && demoMode) DemoFixtures.defaultClassicDevices() else it
         }
         val roomSwitches = currentDevices.filter {
             (networkKey == null || it.networkKey == networkKey) &&
-                it.roomName.equals(roomName, ignoreCase = true) &&
+                it.roomName.ifBlank { "Unassigned" }.equals(targetRoom, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType != DeviceType.MOTION_SENSOR
         }
@@ -80,6 +81,7 @@ internal class DeviceCrudAndRulesCoordinator(
         newBrightness: Int,
         networkKey: String? = null
     ): Int = coroutineScope {
+        val targetRoom = roomName.ifBlank { "Unassigned" }
         val clamped = newBrightness.coerceIn(1, 100)
         val demoMode = isDemoShowroomMode()
         val currentDevices = dao.getAllDevices().first().let {
@@ -87,7 +89,7 @@ internal class DeviceCrudAndRulesCoordinator(
         }
         val roomBulbs = currentDevices.filter {
             (networkKey == null || it.networkKey == networkKey) &&
-                it.roomName.equals(roomName, ignoreCase = true) &&
+                it.roomName.ifBlank { "Unassigned" }.equals(targetRoom, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType == DeviceType.LIGHTBULB_DIMMER
         }
@@ -149,15 +151,15 @@ internal class DeviceCrudAndRulesCoordinator(
         }
 
         val existingMatch = if (device.id == 0 && liveDesc != null) {
+            val cleanLiveUdn = LanRuntimeUtils.canonicalHardwareUdn(liveDesc.usn)
             val existingInHome = dao.getAllDevices().first().filter { it.networkKey == device.networkKey }
             existingInHome.find { existing ->
                 (!LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) &&
                     !LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber) &&
                     existing.serialNumber.equals(liveDesc.serialNumber, ignoreCase = true)) ||
                     (LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) &&
-                        liveDesc.usn.isNotBlank() &&
-                        existing.udn.isNotBlank() &&
-                        liveDesc.usn.contains(existing.udn, ignoreCase = true))
+                        cleanLiveUdn.isNotEmpty() &&
+                        cleanLiveUdn.equals(LanRuntimeUtils.canonicalHardwareUdn(existing.udn), ignoreCase = true))
             }
         } else {
             null
@@ -210,7 +212,8 @@ internal class DeviceCrudAndRulesCoordinator(
                 firmwareVersion = liveDesc.firmwareVersion.ifBlank { baseEntity.firmwareVersion },
                 hardwareModel = liveDesc.hardwareSku.ifBlank { baseEntity.hardwareModel },
                 macAddress = liveDesc.macAddress.ifBlank { baseEntity.macAddress },
-                udn = liveDesc.usn.ifBlank { baseEntity.udn },
+                udn = LanRuntimeUtils.canonicalHardwareUdn(liveDesc.usn)
+                    .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(baseEntity.udn) },
                 wifiSsid = cleanLiveSsid ?: device.wifiSsid.ifBlank { baseEntity.wifiSsid },
                 signalStrengthPercent = liveDesc.signalStrengthPercent,
                 autoOffMinutes = if (device.id == 0 && device.autoOffMinutes == 0) {

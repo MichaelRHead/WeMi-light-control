@@ -94,7 +94,7 @@ class ExampleUnitTest {
         )
         assertTrue(bySerial.matchesDiscovered(discovered))
 
-        // Tier 2: Matches by UDN prefix inside USN when serialNumber is placeholder
+        // Tier 2: Matches bidirectionally across bare <UDN> and USN::service suffix when serialNumber is placeholder
         val byUdn = DeviceEntity(
             name = "Old Name",
             roomName = "Porch & Entryway",
@@ -104,6 +104,31 @@ class ExampleUnitTest {
             udn = "uuid:Lightswitch-3_0-WLS0403REAL01"
         )
         assertTrue(byUdn.matchesDiscovered(discovered))
+        assertTrue(
+            byUdn.copy(udn = "uuid:Lightswitch-3_0-WLS0403REAL01::urn:Belkin:service:basicevent:1")
+                .matchesDiscovered(discovered.copy(usn = "uuid:Lightswitch-3_0-WLS0403REAL01"))
+        )
+
+        // Placeholder-synthesized UDNs must return "" from canonicalHardwareUdn and never cross-match distinct switches
+        assertEquals("", LanRuntimeUtils.canonicalHardwareUdn("uuid:Lightswitch-1_0-${LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL}"))
+        assertEquals("", LanRuntimeUtils.canonicalHardwareUdn("uuid:Lightswitch-1_0-UNKNOWN::urn:Belkin:service:basicevent:1"))
+        val placeholderSwitchA = DeviceEntity(
+            name = "Switch A",
+            ipAddress = "192.168.1.140",
+            port = 49153,
+            serialNumber = LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL,
+            udn = "uuid:Lightswitch-1_0-${LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL}"
+        )
+        assertFalse(
+            placeholderSwitchA.matchesDiscovered(
+                discovered.copy(
+                    name = "Switch B",
+                    ipAddress = "192.168.1.141",
+                    serialNumber = LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL,
+                    usn = "uuid:Lightswitch-1_0-${LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL}"
+                )
+            )
+        )
 
         // Different real serialNumber on same IP must NOT match (DHCP IP swap guard)
         val swappedSerial = DeviceEntity(

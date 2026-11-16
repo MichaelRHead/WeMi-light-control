@@ -434,4 +434,48 @@ class SoapAndSelfHealingTest {
             }
         }
     }
+
+    @Test
+    fun `verify executeWithPortHealing refuses DHCP-swapped foreign switch port and reconnectAndRediscoverHome enriches blank serial and toggles Unassigned room`() = runBlocking {
+        FakeUpnpServer(
+            initialFriendlyName = "Espresso Machine",
+            deviceTypeUrn = "urn:Belkin:device:controllee:1",
+            modelName = "WSP080",
+            serialNumber = "WSP080NEIGHBOR55",
+            udn = "uuid:Socket-1_0-WSP080NEIGHBOR55",
+            initialRelayOn = false,
+            enableSsdpResponder = true
+        ).use { foreignServer ->
+            val client = NetworkClient(extraCandidatePorts = listOf(foreignServer.port))
+            val repo = SwitchRepository(dao = database.switchDao(), networkClient = client, initialDemoModeOverride = false)
+            try {
+                val homeKey = repo.ensureSeeded()
+                val wrongSerialSwitch = DeviceEntity(
+                    id = 1, name = "Bedroom Lamp", roomName = "Bedroom", networkKey = homeKey,
+                    ipAddress = "127.0.0.1", port = 49153, serialNumber = "OTHER_SWITCH_SERIAL_01"
+                )
+                val blockedSet = client.setBinaryState(wrongSerialSwitch, targetOn = true)
+                assertFalse("executeWithPortHealing must refuse foreign switch on DHCP IP swap", blockedSet.reachableOnLan)
+                assertFalse("Foreign switch relay must remain untouched", foreignServer.relayStateOn.get())
+
+                val manualId = database.switchDao().insertDevice(
+                    DeviceEntity(
+                        name = "", roomName = "", networkKey = homeKey,
+                        ipAddress = "127.0.0.1", port = foreignServer.port, isReachable = false, serialNumber = ""
+                    )
+                ).toInt()
+                repo.reconnectAndRediscoverHome(homeKey)
+                val enriched = database.switchDao().getDeviceById(manualId)!!
+                assertEquals("WSP080NEIGHBOR55", enriched.serialNumber)
+                assertEquals("uuid:Socket-1_0-WSP080NEIGHBOR55", enriched.udn)
+                assertEquals("Unassigned", enriched.roomName)
+
+                database.switchDao().updateDevice(enriched.copy(roomName = ""))
+                assertEquals(1, repo.toggleRoomPower("Unassigned", targetOn = true, networkKey = homeKey))
+                assertTrue(foreignServer.relayStateOn.get())
+            } finally {
+                repo.close()
+            }
+        }
+    }
 }
