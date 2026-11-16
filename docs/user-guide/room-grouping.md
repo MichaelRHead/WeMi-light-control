@@ -40,6 +40,7 @@ When a room contains dimmable switches (`F7C059` / `WDS060` Smart Dimmers), tapp
 
 - **Master Brightness Slider (`1%–100%`)**: Dragging and releasing the slider sets every dimmable switch in that room to the same brightness level in parallel (protected by RTOS-safe concurrency limiting).
 - **Quick Room Presets**: Tap **`25%`**, **`50%`**, **`75%`**, or **`100%`** to set the entire room's lighting level with a single tap.
+- **Android TV (`wemi TV`) Room Bars**: On Android TV, each room renders a full-width **Room Bar** above its 3-column switch cards (with **`Unassigned`** placed last). Navigating **Up** or **Down** between rooms from any column (including the leftmost switch card) focuses the Room Bar (**`FOCUSED • OK TOGGLE ROOM`**), where pressing **`OK`** toggles every switch in that room ON or OFF at once.
 
 ---
 

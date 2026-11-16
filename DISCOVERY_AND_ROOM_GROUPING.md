@@ -1,6 +1,6 @@
 # WeMi Light Control — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture (`DISCOVERY_AND_ROOM_GROUPING.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v23.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v27.0`)  
 **Document & Skill Owner**: **Antigravity Device Discovery & Room Grouping Agent — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md)  
 **Companion User Guides**: [`docs/user-guide/room-grouping.md`](docs/user-guide/room-grouping.md) & [`docs/user-guide/switch-discovery.md`](docs/user-guide/switch-discovery.md)
@@ -16,7 +16,7 @@ Related documentation:
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry & `10.22.22.1` Provisioning Diagnostics *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source Licensing, Third-Party Attribution & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — 5-Agent Autonomous Round-Robin Release Process & Sign-Off Ledger
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v23.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v27.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -78,7 +78,7 @@ flowchart TD
 | [`LanRuntimeUtils.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanRuntimeUtils.kt) & [`NetworkModels.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) | `PLACEHOLDER_SERIALS`, `isPlaceholderSerial`, `isRunningInRobolectric`, `resolvePreferredLanInterfaceIpv4`, `SsdpScanReport`, `SwitchMetaInfo` | Distinguishes synthetic placeholder serials (`221517K01018AB` / `LAN` / `NEW`) from real hardware serials, selects `wlan*`-preferred IPv4 interfaces, and defines shared discovery/SOAP wire models. |
 | [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt) & [`NetworkClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkClient.kt) | `probeWemoPort`, `executeWithPortHealing`, `getBinaryState`, `getMetaInfo`, `getSignalStrength` | Zero-dependency `SocketFactory` HTTP/1.1 client (with `tcpNoDelay` & delayed-`FIN` recovery) and 9-port UPnP endpoint prober verifying `<serialNumber>`/`<UDN>` across ports `49153, 49152, 49154, 49151, 49155..49159`. |
 | [`XmlAndSkuParser.kt`](app/src/main/java/org/suppressingfire/wemi/network/XmlAndSkuParser.kt) | `parseSetupXmlDescriptor`, `classifyHardwareSku`, `parseMetaInfoSoapResponse`, `isWemoDeviceSetupSsid` | Extracts `<friendlyName>`, `<modelName>`, `<serialNumber>`, `<UDN>`, `<binaryState>`, and `<brightness>` from `/setup.xml`, classifies Belkin SKUs, and filters out Belkin soft-AP SSIDs (`WeMo.*` / `Wemo.LS3W.*`). |
-| [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt), [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt), [`TvHeadersAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvHeadersAndScenes.kt) & [`SsdpDiscoveryBanner.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/SsdpDiscoveryBanner.kt) | `availableRooms`, `groupedDevicesByRoom`, `groupedByRoom`, `TvRoomSectionHeader`, `SsdpDiscoveryBannerCard` | Groups active home devices by `roomName` on Phone/Tablet (`RoomGroupCard`) and Android TV's 3-column grid (`TvRoomSectionHeader`), sorting `"Unassigned"` after all named rooms while preserving `sortOrder` within each room. |
+| [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt), [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt), [`TvHeadersAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvHeadersAndScenes.kt) & [`SsdpDiscoveryBanner.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/SsdpDiscoveryBanner.kt) | `availableRooms`, `groupedDevicesByRoom`, `groupedByRoom`, `TvFocusTarget.RoomHeader`, `TvRoomSectionHeader`, `SsdpDiscoveryBannerCard` | Groups active home devices by `roomName` on Phone/Tablet (`RoomGroupCard`) and Android TV's 3-column grid (`TvRoomSectionHeader` with deterministic Up/Down `TvFocusTarget.RoomHeader` D-Pad traversal across all 3 columns), sorting `"Unassigned"` after all named rooms while preserving `sortOrder` within each room. |
 
 ---
 

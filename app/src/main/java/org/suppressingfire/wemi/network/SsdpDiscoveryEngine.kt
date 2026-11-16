@@ -149,7 +149,7 @@ internal class SsdpDiscoveryEngine(
                 sendBurst()
                 var retransmitted = false
                 val receiveBuffer = ByteArray(4096)
-                val seenLocations = mutableMapOf<String, Pair<Map<String, String>, Long>>()
+                val seenLocations = mutableMapOf<String, Triple<Map<String, String>, Long, Int>>()
                 val deadline = System.currentTimeMillis() + if (fastMode) 220L else 1250L
 
                 while (System.currentTimeMillis() < deadline) {
@@ -165,7 +165,7 @@ internal class SsdpDiscoveryEngine(
                         val headers = XmlAndSkuParser.parseSsdpHeaders(rawText)
                         val loc = headers["LOCATION"]
                         if (!loc.isNullOrEmpty() && !seenLocations.containsKey(loc)) {
-                            seenLocations[loc] = Pair(headers, elapsed)
+                            seenLocations[loc] = Triple(headers, elapsed, respPacket.port)
                             if (loopbackPorts.isNotEmpty() && seenLocations.size >= loopbackPorts.size) {
                                 break
                             }
@@ -177,8 +177,17 @@ internal class SsdpDiscoveryEngine(
                     }
                 }
 
-                for ((locUrl, pair) in seenLocations) {
-                    val (headers, latencyMs) = pair
+                val orderedSeen = if (loopbackPorts.isNotEmpty()) {
+                    seenLocations.entries.sortedBy { (_, triple) ->
+                        val portIdx = loopbackPorts.indexOf(triple.third)
+                        if (portIdx >= 0) portIdx else Int.MAX_VALUE
+                    }
+                } else {
+                    seenLocations.entries.toList()
+                }
+
+                for ((locUrl, triple) in orderedSeen) {
+                    val (headers, latencyMs, _) = triple
                     val desc = fetchLiveDeviceDescriptor(
                         locUrl,
                         headers["USN"].orEmpty(),
