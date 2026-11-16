@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v25.0 — Phone, Tablet & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v27.0 — Phone, Tablet & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `25.0` (`versionCode = 25`)
+- **Version:** `27.0` (`versionCode = 27`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,10 +17,11 @@ WeMi Switch Control brings reliable, instant local-network control back to Belki
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
-### What's New in Version 25.0
+### What's New in Version 27.0
+- **Google TV Focusable Dimmer Slider & Deterministic Room-Header D-Pad Navigation:** Press `Down` from any TV dimmer's ON/OFF toggle to focus the inline brightness slider (`Left`/`Right` steps `-10%`/`+10%`, `Down` moves to the next row), and press `Up`/`Down` from any column—including the leftmost switch card—to navigate deterministically into and out of Room Master Headers.
 - **Top-Header `All Off` Button Next to Refresh:** Added a one-tap **`All Off`** button right next to the Refresh button in the compact single-row top header bar to turn off all reachable switches and dimmers on your active Wi-Fi Home.
 - **Smaller, R8-Optimized Pure Kotlin/DEX Release Bundle:** Enabled R8 minification, resource shrinking, and embedded Play Console deobfuscation mapping (`proguard.map`) while excluding unused transitive native `.so` shims.
-- **Redesigned Android TV (`wemi TV`) 3-Column Room-Grouped Dashboard:** Full-height 3-column switch grid organized by Room Section Headers (`LIVING ROOM`, `BEDROOM`, `KITCHEN`) with unmistakable 10-foot Electric Cyan cursor focus (`FOCUSED • OK`), non-interfering `DIM -/+` brightness mode, and non-blocking LAN rescan.
+- **Redesigned Android TV (`wemi TV`) 3-Column Room-Grouped Dashboard:** Full-height 3-column switch grid organized by Room Section Headers (`LIVING ROOM`, `BEDROOM`, `KITCHEN`) with unmistakable 10-foot Electric Cyan cursor focus (`FOCUSED • OK`), focusable inline dimmer sliders, and non-blocking LAN rescan.
 - **Compact Single-Row Phone & Tablet Header:** Placed `All Off`, `Refresh`, `Edit`, and `+` alongside the `wemi` wordmark on a single compact header row to maximize vertical screen space for room and switch cards.
 - **Streamlined First-Party UPnP/HTTP Engine & `MIT` + `Apache-2.0` Footprint:** Replaced external HTTP libraries and bundled font files with a zero-dependency local-LAN HTTP/1.1 & UPnP GENA client (`LanHttpClient`) over JDK `SocketFactory` and platform `FontFamily.SansSerif` typography—keeping runtime dependencies strictly to AndroidX & Kotlin (`Apache-2.0`) under the `MIT` License (`includeInApk = false`).
 - **Dedicated Native Phone/Tablet & Android TV Layouts:** Automatically runs the touch-first dashboard on phones/tablets and the 10-foot D-Pad dashboard (`wemi TV`) on Android TV / Google TV (`UI_MODE_TYPE_TELEVISION`) without manual Phone/TV mode switch buttons.
@@ -30,7 +31,7 @@ WeMi Switch Control communicates directly with your switches over your home Wi-F
 
 ### Key Features
 - **Instant One-Tap Cyan Power Ring Toggles:** Turn individual switches or entire room groups ON or OFF directly over your local Wi-Fi network.
-- **Android TV 3-Column Room Grid & Dimmer Adjust Mode:** Includes native Leanback launcher support (`LEANBACK_LAUNCHER`), room-grouped 3-column switch cards with glowing cyan `"FOCUSED • OK"` focus rings, focusable room master headers, and non-interfering `DIM -/+` brightness control.
+- **Android TV 3-Column Room Grid & Focusable Dimmer Slider:** Includes native Leanback launcher support (`LEANBACK_LAUNCHER`), room-grouped 3-column switch cards with glowing cyan `"FOCUSED • OK"` focus rings, deterministic `Up`/`Down` Room Master Header navigation across all columns, and focusable inline `-10% / +10%` dimmer sliders for Google TV remotes.
 - **Inline Brightness & Dimmer Drawer:** Smoothly dim smart bulbs and dimmer switches from 1% to 100%, or jump to quick brightness presets (21%, 50%, 75%, 100%).
 - **Interactive SSDP Local Wi-Fi Scanner:** Broadcast `M-SEARCH` packets over `239.255.255.250:1900` across `urn:Belkin:service:basicevent:1`, `urn:Belkin:device:**`, and `upnp:rootdevice` to automatically discover switches, inspect their `/setup.xml` descriptors, and infer room assignments.
 - **Motion Sensor Status & Triggers:** View the latest motion detection timestamps and link motion events to turn on bedroom or hallway lights automatically.

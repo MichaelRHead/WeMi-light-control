@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v25.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v27.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v25.0`)
+## Quick Release Summary (`v1.0` → `v27.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v27.0`](#version-270-versioncode--27--november-15-2026)** | `27` | Nov 15, 2026 | Google TV remote focusable inline dimmer slider (`Down` from Toggle → `Left`/`Right` `-10%`/`+10%`) & deterministic `Up`/`Down` Room Master Header navigation across all 3 columns (`wemi TV`) |
 | **[`v25.0`](#version-250-versioncode--25--november-14-2026)** | `25` | Nov 14, 2026 | Top-header **`All Off`** button next to Refresh for 1-tap whole-home power-off, plus R8-shrunk pure Kotlin/DEX release App Bundle with embedded Play Console deobfuscation mapping (`proguard.map`) |
 | **[`v24.0`](#version-240-versioncode--24--november-11-2026)** | `24` | Nov 11, 2026 | Smaller, faster R8-shrunk release App Bundle with embedded Play Console crash deobfuscation mapping (`proguard.map`) and pure Kotlin/DEX packaging |
 | **[`v23.0`](#version-230-versioncode--23--november-10-2026)** | `23` | Nov 10, 2026 | Redesigned 3-column Room-Grouped Android TV dashboard (`wemi TV`) with unmistakable 10-foot cursor focus & non-interfering Dimmer Adjust Mode, plus compact single-row phone/tablet `TopHeader` |
@@ -44,6 +45,12 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 27.0 (`versionCode = 27`) — November 15, 2026
+- **Google TV Focusable Inline Dimmer Slider (`wemi TV`)**: On Android TV and Google TV remotes without dedicated `Play/Pause` or `Menu` buttons, pressing **Down** from any dimmer card's ON/OFF toggle now focuses the inline **Dimmer Slider** directly underneath it (`◄ -10% • +10% ►`), where **Left / Right** adjusts brightness in `10%` steps, **Up** returns to the ON/OFF toggle, and **Down** advances to the next row.
+- **Deterministic Room Master Header Navigation Across All Columns**: Navigating **Up / Down** from any column—including the leftmost switch card—now deterministically focuses and traverses full-width **Room Master Headers** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, `UNASSIGNED`) while remembering your active column.
+
+---
 
 ### Version 25.0 (`versionCode = 25`) — November 14, 2026
 - **Top-Header `All Off` Button Next to Refresh**: Added a one-tap **`All Off`** button (`all_off_devices_button`) immediately next to the **Refresh** button in the compact single-row top header bar so you can turn off every reachable switch and dimmer on your active Wi-Fi Home from the top of the screen.

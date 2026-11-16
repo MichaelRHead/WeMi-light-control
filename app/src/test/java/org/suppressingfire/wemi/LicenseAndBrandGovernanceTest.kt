@@ -77,6 +77,14 @@ class LicenseAndBrandGovernanceTest {
             "app/build.gradle.kts must omit dependency metadata block in APK",
             buildGradleText.contains("includeInApk = false")
         )
+        assertTrue(
+            "app/build.gradle.kts must exclude unused pre-stripped libandroidx.graphics.path.so shim for pure Kotlin/DEX packaging",
+            buildGradleText.contains("excludes += \"**/libandroidx.graphics.path.so\"")
+        )
+        assertTrue(
+            "app/proguard-rules.pro must exist for R8 release shrinking & deobfuscation",
+            File(repoRoot, "app/proguard-rules.pro").exists()
+        )
         assertFalse(
             "app/build.gradle.kts must not depend on okhttp",
             buildGradleText.lowercase().contains("okhttp")
