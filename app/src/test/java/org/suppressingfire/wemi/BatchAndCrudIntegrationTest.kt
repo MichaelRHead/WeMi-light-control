@@ -239,7 +239,7 @@ class BatchAndCrudIntegrationTest {
             try {
                 val vm = androidx.lifecycle.ViewModelProvider(
                     store,
-                    androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory.getInstance(app)
+                    androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory(app)
                 )[org.suppressingfire.wemi.ui.SwitchViewModel::class.java]
 
                 vm.toggleDemoShowroomMode(false)
@@ -284,6 +284,7 @@ class BatchAndCrudIntegrationTest {
                 assertNull(vm.statusBannerMessage.value)
             } finally {
                 store.clear()
+                SwitchDatabase.closeCurrentInstance()
             }
         }
     }

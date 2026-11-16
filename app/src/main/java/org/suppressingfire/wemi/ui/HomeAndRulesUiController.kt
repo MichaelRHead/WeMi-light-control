@@ -124,7 +124,9 @@ internal class HomeAndRulesUiController(
     ) {
         onClearRoomFilterAndSelection()
         scope.launch {
-            val freshKey = repository.resetLanHomesSwitchesAndRooms()
+            val freshKey = repository.resetLanHomesSwitchesAndRooms { resolvedKey ->
+                _activeNetworkKey.value = resolvedKey
+            }
             _activeNetworkKey.value = freshKey
             if (rediscoverAfterReset) {
                 onShowTransientStatus("Reset Wi-Fi Homes, switches & rooms • Scanning local LAN...")
@@ -140,7 +142,9 @@ internal class HomeAndRulesUiController(
         onResetRoomFilter: () -> Unit
     ) {
         scope.launch {
-            val nextKey = repository.setDemoShowroomMode(enabled)
+            val nextKey = repository.setDemoShowroomMode(enabled) { resolvedKey ->
+                _activeNetworkKey.value = resolvedKey
+            }
             _activeNetworkKey.value = nextKey
             onResetRoomFilter()
             if (enabled) {

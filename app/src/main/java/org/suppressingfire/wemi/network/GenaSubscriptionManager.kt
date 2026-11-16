@@ -77,6 +77,9 @@ class GenaSubscriptionManager(
     val activeSubscriptions: Map<String, GenaSubscriptionRecord>
         get() = subscriptionsByDeviceKey.toMap()
 
+    internal val activeSidCount: Int
+        get() = deviceKeyBySid.size
+
     private fun nowTime(): String {
         return SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
     }
@@ -299,6 +302,9 @@ class GenaSubscriptionManager(
                 )
                 if (resp.isSuccessful) {
                     val sid = resp.header("SID")?.trim().takeUnless { it.isNullOrEmpty() } ?: existing.sid
+                    if (sid != existing.sid) {
+                        deviceKeyBySid.remove(existing.sid, deviceKey)
+                    }
                     val updated = existing.copy(
                         sid = sid,
                         expiresAtMs = now + timeoutSeconds * 1000L
@@ -328,6 +334,9 @@ class GenaSubscriptionManager(
             )
             if (resp.isSuccessful) {
                 val sid = resp.header("SID")?.trim().orEmpty().ifEmpty { "uuid:gena-$deviceKey" }
+                if (existing != null && existing.sid != sid) {
+                    deviceKeyBySid.remove(existing.sid, deviceKey)
+                }
                 val record = GenaSubscriptionRecord(
                     deviceKey = deviceKey,
                     deviceName = device.name,

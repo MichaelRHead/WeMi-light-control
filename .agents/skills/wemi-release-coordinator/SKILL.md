@@ -25,7 +25,7 @@ Every Play Store release candidate (`v23.0+`) is reviewed once by each of the 5 
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<verification summary>"` (setting `CURRENT_TURN: code_quality_and_testing`).
 4. **Stage 4 (Review 3) — `code_quality_and_testing` (Antigravity Code Quality & End-to-End Testing Agent)**:
    - Audits file modularity & readability (`.agents/skills/android-code-modularization/SKILL.md`), Wi-Fi socket binding (`wifiSocketFactory`), SQLite/GENA/coroutine lifecycle cleanup, and `gradlew` & `scripts/*.sh` executable mode (`100755`).
-   - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`53/53+` unit, protocol, governance, and Compose E2E tests across `13` suites).
+   - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`56/56+` unit, protocol, governance, and Compose E2E tests across `13` suites).
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off code_quality_and_testing "<verification summary>"` (setting `CURRENT_TURN: license_governance`).
 5. **Stage 5 (Review 4) — `license_governance` (Antigravity License & Brand Governance Agent)**:
    - Audits root `LICENSE` (**MIT License**) parity with `MoreScreen.kt` (`open_source_licenses_card`, `mit_license_text_surface`, and `third_party_notices_surface`), permissive-only dependency allowlist (`gradle/libs.versions.toml` & `app/build.gradle.kts` with `includeInApk = false`), `org.suppressingfire.wemi` package/filename hygiene, and Play Store trademark boundaries (`LICENSE_GOVERNANCE.md`).
@@ -41,19 +41,19 @@ Every Play Store release candidate (`v23.0+`) is reviewed once by each of the 5 
 Antigravity conversations automatically wake up when an asynchronous background `run_command` task (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`) exits with code `0`.
 
 ### Step 1: Arm Your Agent's Turn Watcher
-Whenever you finish a turn in one of the four Antigravity specialist conversations, ensure [`scripts/await_release_turn.sh`](../../scripts/await_release_turn.sh) is running in the background for your role (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`):
+Whenever you finish a turn in one of the four Antigravity specialist conversations, ensure [`scripts/await_release_turn.sh`](../../scripts/await_release_turn.sh) is running in the background for your role (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`, `15`s poll interval, `14400`s 4-hour timeout):
 ```bash
 # In the Discovery & Room Grouping Agent conversation (Stage 2):
-bash scripts/await_release_turn.sh discovery_and_grouping
+bash scripts/await_release_turn.sh discovery_and_grouping 15 14400
 
 # In the Telemetry & Debugging Agent conversation (Stage 3):
-bash scripts/await_release_turn.sh telemetry_and_debugging
+bash scripts/await_release_turn.sh telemetry_and_debugging 15 14400
 
 # In the Code Quality & E2E Testing Agent conversation (Stage 4):
-bash scripts/await_release_turn.sh code_quality_and_testing
+bash scripts/await_release_turn.sh code_quality_and_testing 15 14400
 
 # In the License & Brand Governance Agent conversation (Stage 5):
-bash scripts/await_release_turn.sh license_governance
+bash scripts/await_release_turn.sh license_governance 15 14400
 ```
 
 ### Step 2: Execute Your Turn When Woken Up
@@ -69,5 +69,5 @@ When `scripts/await_release_turn.sh <your_role>` exits `0` and wakes your conver
    ```
 4. Re-arm your background watcher before ending your turn:
    ```bash
-   bash scripts/await_release_turn.sh <your_role>
+   bash scripts/await_release_turn.sh <your_role> 15 14400
    ```

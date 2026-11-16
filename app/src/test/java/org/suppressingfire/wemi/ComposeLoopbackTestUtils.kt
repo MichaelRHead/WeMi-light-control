@@ -18,6 +18,12 @@ import org.junit.Assert.assertTrue
 internal fun ComposeTestRule.awaitLoopbackIo(
     timeoutMs: Long = 5_000L,
     condition: () -> Boolean
+) = awaitLoopbackIo(timeoutMs = timeoutMs, failureDescription = null, condition = condition)
+
+internal fun ComposeTestRule.awaitLoopbackIo(
+    timeoutMs: Long = 5_000L,
+    failureDescription: (() -> String)?,
+    condition: () -> Boolean
 ) {
     val deadline = System.currentTimeMillis() + timeoutMs
     while (System.currentTimeMillis() < deadline) {
@@ -29,7 +35,8 @@ internal fun ComposeTestRule.awaitLoopbackIo(
         Thread.sleep(20)
     }
     waitForIdle()
-    assertTrue("Timed out waiting ${timeoutMs}ms for loopback IO condition", condition())
+    val detail = failureDescription?.invoke()?.let { " ($it)" }.orEmpty()
+    assertTrue("Timed out waiting ${timeoutMs}ms for loopback IO condition$detail", condition())
 }
 
 /**

@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import org.suppressingfire.wemi.ui.BottomTab
@@ -54,6 +55,9 @@ import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 
 class MainActivity : ComponentActivity() {
+    override val defaultViewModelProviderFactory: ViewModelProvider.Factory
+        get() = SwitchViewModel.Factory
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(

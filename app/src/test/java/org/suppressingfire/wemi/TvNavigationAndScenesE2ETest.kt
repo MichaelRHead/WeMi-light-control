@@ -245,4 +245,71 @@ class TvNavigationAndScenesE2ETest {
             }
         }
     }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    fun `verify Android TV Unassigned room header toggles power and dims blank-roomName dimmer via D-Pad`() {
+        composeTestRule.waitForIdle()
+        val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
+        val dao = org.suppressingfire.wemi.data.SwitchDatabase.getDatabase(composeTestRule.activity.application).switchDao()
+
+        composeTestRule.runOnUiThread {
+            vm.resetLanHomesSwitchesAndRooms(rediscoverAfterReset = false)
+        }
+        composeTestRule.awaitLoopbackIo(
+            failureDescription = {
+                "demo=${vm.isDemoShowroomMode.value}, devices=${vm.devices.value.size} (${vm.devices.value.map { it.name }}), refreshing=${vm.isRefreshing.value}"
+            }
+        ) {
+            !vm.isDemoShowroomMode.value && vm.devices.value.isEmpty() && !vm.isRefreshing.value
+        }
+
+        FakeUpnpServer(
+            initialFriendlyName = "Smart Dimmer",
+            deviceTypeUrn = "urn:Belkin:device:dimmer:1",
+            modelName = "WDS060",
+            serialNumber = "WDS060TVUNASSIGN1",
+            udn = "uuid:Dimmer-2_0-WDS060TVUNASSIGN1",
+            isRtos = true,
+            initialRelayOn = false,
+            initialBrightness = 50,
+            registerAsCandidatePort = true
+        ).use { dimmerServer ->
+            val insertedId = kotlinx.coroutines.runBlocking {
+                dao.insertDevice(
+                    org.suppressingfire.wemi.data.DeviceEntity(
+                        name = "Smart Dimmer",
+                        roomName = "",
+                        networkKey = vm.activeNetworkKey.value,
+                        deviceType = org.suppressingfire.wemi.data.DeviceType.LIGHTBULB_DIMMER.name,
+                        ipAddress = "127.0.0.1",
+                        port = dimmerServer.port,
+                        isOn = false,
+                        isReachable = true,
+                        brightness = 50,
+                        serialNumber = "WDS060TVUNASSIGN1"
+                    )
+                ).toInt()
+            }
+            awaitLoopbackIo { vm.devices.value.any { it.id == insertedId } }
+            composeTestRule.waitForIdle()
+
+            // Initial focus lands on Row 0 Col 0 (tv_device_card_${insertedId}); navigate Up onto tv_room_header_Unassigned
+            composeTestRule.onNodeWithTag("tv_device_card_$insertedId").assertIsDisplayed().assertIsFocused()
+            composeTestRule.onNodeWithTag("tv_device_card_$insertedId")
+                .performKeyInput { pressKey(Key.DirectionUp) }
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("tv_room_header_Unassigned").assertIsDisplayed().assertIsFocused()
+
+            composeTestRule.onNodeWithTag("tv_room_header_Unassigned")
+                .performKeyInput { pressKey(Key.DirectionCenter) }
+            awaitLoopbackIo { dimmerServer.relayStateOn.get() && vm.togglingRooms.value.isEmpty() }
+            assertTrue(dimmerServer.relayStateOn.get())
+
+            composeTestRule.onNodeWithTag("tv_room_header_Unassigned")
+                .performKeyInput { pressKey(Key.DirectionRight) }
+            awaitLoopbackIo { dimmerServer.dimmerBrightness.get() == 60 }
+            assertEquals(60, dimmerServer.dimmerBrightness.get())
+        }
+    }
 }

@@ -76,6 +76,7 @@ class SwitchRepository(
     val isDemoShowroomMode: StateFlow<Boolean> = _isDemoShowroomMode.asStateFlow()
 
     private val initialSeedDone = MutableStateFlow(false)
+    private val seedAndModeMutex = Mutex()
 
     /**
      * Limits concurrent HTTP/SOAP connections across the LAN to 3 so 2nd-Gen RTOS switches
@@ -181,8 +182,8 @@ class SwitchRepository(
         if (list.isEmpty() && demoMode) defaultClassicRules() else list
     }
 
-    suspend fun ensureSeeded(): String {
-        return if (_isDemoShowroomMode.value) {
+    suspend fun ensureSeeded(): String = seedAndModeMutex.withLock {
+        if (_isDemoShowroomMode.value) {
             if (dao.getHomeNetworkCount() == 0) dao.insertHomeNetworks(defaultHomeNetworks())
             if (dao.getDeviceCount() == 0) dao.insertDevices(defaultClassicDevices())
             if (dao.getRuleCount() == 0) dao.insertRules(defaultClassicRules())
@@ -202,10 +203,13 @@ class SwitchRepository(
         _latestSsdpReport.value = null
     }
 
-    suspend fun setDemoShowroomMode(enabled: Boolean): String {
+    suspend fun setDemoShowroomMode(
+        enabled: Boolean,
+        onActiveKeyResolved: ((String) -> Unit)? = null
+    ): String = seedAndModeMutex.withLock {
         prefs?.edit { putBoolean(KEY_DEMO_SHOWROOM_MODE, enabled) }
-        return if (enabled) {
-            resetToClassicScreenshotPreset()
+        if (enabled) {
+            resetToClassicScreenshotPresetLocked(onActiveKeyResolved)
             DEFAULT_MAIN_HOME_KEY
         } else {
             resetRuntimeDeviceState()
@@ -214,16 +218,24 @@ class SwitchRepository(
             dao.deleteAllHomeNetworks()
             val activeKey = discoveryCoordinator.sanitizeAndResolveInitialLanHome(detectCurrentLanIp())
             initialSeedDone.value = true
+            onActiveKeyResolved?.invoke(activeKey)
             _isDemoShowroomMode.value = false
             activeKey
         }
     }
 
-    suspend fun resetLanHomesSwitchesAndRooms(): String = setDemoShowroomMode(false)
+    suspend fun resetLanHomesSwitchesAndRooms(
+        onActiveKeyResolved: ((String) -> Unit)? = null
+    ): String = setDemoShowroomMode(false, onActiveKeyResolved)
 
-    suspend fun resetToClassicScreenshotPreset() {
+    suspend fun resetToClassicScreenshotPreset() = seedAndModeMutex.withLock {
+        resetToClassicScreenshotPresetLocked()
+    }
+
+    private suspend fun resetToClassicScreenshotPresetLocked(
+        onActiveKeyResolved: ((String) -> Unit)? = null
+    ) {
         resetRuntimeDeviceState()
-        _isDemoShowroomMode.value = true
         prefs?.edit { putBoolean(KEY_DEMO_SHOWROOM_MODE, true) }
         dao.deleteAllDevices()
         dao.deleteAllRules()
@@ -231,6 +243,8 @@ class SwitchRepository(
         dao.insertHomeNetworks(defaultHomeNetworks())
         dao.insertDevices(defaultClassicDevices())
         dao.insertRules(defaultClassicRules())
+        onActiveKeyResolved?.invoke(DEFAULT_MAIN_HOME_KEY)
+        _isDemoShowroomMode.value = true
     }
 
     fun detectCurrentLanIp(): String = networkClient.resolveLocalIpv4Address()

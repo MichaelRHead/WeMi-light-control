@@ -39,6 +39,11 @@ internal class DeviceCrudAndRulesCoordinator(
             .ifEmpty { "192.168.1" }
         val key = existingKey ?: "wifi_custom_${cleanSubnet.replace('.', '_')}_${System.currentTimeMillis() % 10000}"
         val currentNetworks = dao.getAllHomeNetworks().first()
+        val existingHome = existingKey?.let { targetKey ->
+            currentNetworks.find { it.networkKey == targetKey }
+        }
+        val nextSortOrder = existingHome?.sortOrder
+            ?: ((currentNetworks.maxOfOrNull { it.sortOrder } ?: -1) + 1)
         val entity = HomeNetworkEntity(
             networkKey = key,
             homeName = cleanHome,
@@ -46,8 +51,8 @@ internal class DeviceCrudAndRulesCoordinator(
             subnetPrefix = cleanSubnet,
             gatewayIp = "$cleanSubnet.1",
             lastConnectedTime = "Connected now",
-            autoReconnectOnArrival = true,
-            sortOrder = currentNetworks.size
+            autoReconnectOnArrival = existingHome?.autoReconnectOnArrival ?: true,
+            sortOrder = nextSortOrder
         )
         dao.insertHomeNetwork(entity)
         return entity
@@ -58,14 +63,14 @@ internal class DeviceCrudAndRulesCoordinator(
         targetOn: Boolean,
         networkKey: String? = null
     ): Int = coroutineScope {
-        val targetRoom = roomName.ifBlank { "Unassigned" }
+        val normalizedRoom = roomName.trim().ifBlank { "Unassigned" }
         val demoMode = isDemoShowroomMode()
         val currentDevices = dao.getAllDevices().first().let {
             if (it.isEmpty() && demoMode) DemoFixtures.defaultClassicDevices() else it
         }
         val roomSwitches = currentDevices.filter {
             (networkKey == null || it.networkKey == networkKey) &&
-                it.roomName.ifBlank { "Unassigned" }.equals(targetRoom, ignoreCase = true) &&
+                it.roomName.trim().ifBlank { "Unassigned" }.equals(normalizedRoom, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType != DeviceType.MOTION_SENSOR
         }
@@ -81,7 +86,7 @@ internal class DeviceCrudAndRulesCoordinator(
         newBrightness: Int,
         networkKey: String? = null
     ): Int = coroutineScope {
-        val targetRoom = roomName.ifBlank { "Unassigned" }
+        val normalizedRoom = roomName.trim().ifBlank { "Unassigned" }
         val clamped = newBrightness.coerceIn(1, 100)
         val demoMode = isDemoShowroomMode()
         val currentDevices = dao.getAllDevices().first().let {
@@ -89,7 +94,7 @@ internal class DeviceCrudAndRulesCoordinator(
         }
         val roomBulbs = currentDevices.filter {
             (networkKey == null || it.networkKey == networkKey) &&
-                it.roomName.ifBlank { "Unassigned" }.equals(targetRoom, ignoreCase = true) &&
+                it.roomName.trim().ifBlank { "Unassigned" }.equals(normalizedRoom, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType == DeviceType.LIGHTBULB_DIMMER
         }

@@ -2,7 +2,10 @@ package org.suppressingfire.wemi.ui
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -178,12 +181,13 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
     val isProvisioningAp: StateFlow<Boolean> = provisionApUiController.isProvisioningAp
 
     init {
+        val startedInDemoMode = isDemoShowroomMode.value
         viewModelScope.launch {
             val initialKey = repository.ensureSeeded()
-            if (activeNetworkKey.value == DEFAULT_MAIN_HOME_KEY) {
+            if (activeNetworkKey.value == DEFAULT_MAIN_HOME_KEY && isDemoShowroomMode.value == startedInDemoMode) {
                 homeAndRulesController.setActiveNetworkKey(initialKey)
             }
-            if (!isDemoShowroomMode.value) {
+            if (!startedInDemoMode && !isDemoShowroomMode.value) {
                 reconnectCurrentHomeNetwork()
             }
         }
@@ -460,6 +464,9 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
         networkMonitor.stopMonitoring()
         ruleScheduler.stopAll()
         repository.close()
+        if (SwitchRepository.isRunningInRobolectric()) {
+            SwitchDatabase.closeCurrentInstance()
+        }
     }
 
     internal fun showTransientStatus(message: String) {
@@ -469,6 +476,19 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
             delay(3200)
             if (_statusBannerMessage.value == message) {
                 _statusBannerMessage.value = null
+            }
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                if (modelClass.isAssignableFrom(SwitchViewModel::class.java)) {
+                    val app = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
+                    @Suppress("UNCHECKED_CAST")
+                    return SwitchViewModel(app) as T
+                }
+                return ViewModelProvider.NewInstanceFactory().create(modelClass, extras)
             }
         }
     }

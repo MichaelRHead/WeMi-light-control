@@ -65,33 +65,35 @@ internal class DeviceActionsUiController(
     }
 
     fun toggleRoomPower(roomName: String) {
+        val displayRoom = roomName.trim().ifBlank { "Unassigned" }
         scope.launch {
             val activeKey = activeNetworkKeyProvider()
             val roomSwitches = currentDevicesProvider().filter {
                 it.networkKey == activeKey &&
-                    it.roomName.equals(roomName, ignoreCase = true) &&
+                    it.roomName.ifBlank { "Unassigned" }.equals(displayRoom, ignoreCase = true) &&
                     it.isReachable &&
                     it.parsedType != DeviceType.MOTION_SENSOR
             }
             if (roomSwitches.isEmpty()) return@launch
             val targetOn = !roomSwitches.any { it.isOn }
 
-            _togglingRooms.update { it + roomName }
+            _togglingRooms.update { it + displayRoom }
             try {
-                val count = repository.toggleRoomPower(roomName, targetOn, activeKey)
+                val count = repository.toggleRoomPower(displayRoom, targetOn, activeKey)
                 onShowTransientStatus(
-                    "$roomName: Turned ${if (targetOn) "ON" else "OFF"} $count light switch(es)"
+                    "$displayRoom: Turned ${if (targetOn) "ON" else "OFF"} $count light switch(es)"
                 )
             } finally {
-                _togglingRooms.update { it - roomName }
+                _togglingRooms.update { it - displayRoom }
             }
         }
     }
 
     fun updateRoomBrightness(roomName: String, brightness: Int) {
+        val displayRoom = roomName.trim().ifBlank { "Unassigned" }
         scope.launch {
-            val count = repository.updateRoomBrightness(roomName, brightness, activeNetworkKeyProvider())
-            onShowTransientStatus("$roomName: Set $count dimmable light(s) to $brightness%")
+            val count = repository.updateRoomBrightness(displayRoom, brightness, activeNetworkKeyProvider())
+            onShowTransientStatus("$displayRoom: Set $count dimmable light(s) to $brightness%")
         }
     }
 

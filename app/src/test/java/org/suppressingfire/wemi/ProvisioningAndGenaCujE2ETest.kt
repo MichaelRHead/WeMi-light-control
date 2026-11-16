@@ -295,4 +295,71 @@ class ProvisioningAndGenaCujE2ETest {
             assertFalse(fullMoreExport.contains("HomeRouterSecret99"))
         }
     }
+
+    @Test
+    fun `verify Unassigned room dimmer fan-out, HomeNetworkEntity sortOrder preservation, and GENA superseded SID eviction`() =
+        kotlinx.coroutines.runBlocking {
+            val db = androidx.room.Room.inMemoryDatabaseBuilder(
+                composeTestRule.activity,
+                org.suppressingfire.wemi.data.SwitchDatabase::class.java
+            ).allowMainThreadQueries().build()
+            FakeUpnpServer(
+                initialFriendlyName = "Smart Dimmer",
+                deviceTypeUrn = "urn:Belkin:device:dimmer:1",
+                modelName = "WDS060",
+                serialNumber = "WDS060UNASSIGNED1",
+                udn = "uuid:Dimmer-2_0-WDS060UNASSIGNED1",
+                isRtos = true,
+                initialRelayOn = false,
+                initialBrightness = 40,
+                registerAsCandidatePort = true
+            ).use { server ->
+                val client = org.suppressingfire.wemi.network.NetworkClient(extraCandidatePorts = listOf(server.port))
+                val repo = org.suppressingfire.wemi.data.SwitchRepository(
+                    dao = db.switchDao(),
+                    networkClient = client,
+                    initialDemoModeOverride = false
+                )
+                try {
+                    val devId = db.switchDao().insertDevice(
+                        org.suppressingfire.wemi.data.DeviceEntity(
+                            name = "Smart Dimmer",
+                            roomName = "",
+                            deviceType = org.suppressingfire.wemi.data.DeviceType.LIGHTBULB_DIMMER.name,
+                            ipAddress = "127.0.0.1",
+                            port = server.port,
+                            isOn = false,
+                            brightness = 40,
+                            serialNumber = "WDS060UNASSIGNED1"
+                        )
+                    ).toInt()
+                    assertEquals(1, repo.toggleRoomPower("Unassigned", targetOn = true))
+                    assertTrue(server.relayStateOn.get())
+                    assertEquals(1, repo.updateRoomBrightness("Unassigned", newBrightness = 75))
+                    assertEquals(75, server.dimmerBrightness.get())
+
+                    db.switchDao().insertHomeNetwork(org.suppressingfire.wemi.data.HomeNetworkEntity("h0", "H0", "S0", "192.168.10", sortOrder = 0))
+                    db.switchDao().insertHomeNetwork(org.suppressingfire.wemi.data.HomeNetworkEntity("h1", "H1", "S1", "192.168.11", autoReconnectOnArrival = false, sortOrder = 1))
+                    db.switchDao().insertHomeNetwork(org.suppressingfire.wemi.data.HomeNetworkEntity("h2", "H2", "S2", "192.168.12", sortOrder = 2))
+                    db.switchDao().deleteHomeNetworkByKey("h0")
+                    val updatedHome = repo.saveOrUpdateHomeNetwork("h1", "H1 Renamed", "S1-2G", "192.168.11")
+                    assertEquals(1, updatedHome.sortOrder)
+                    assertFalse(updatedHome.autoReconnectOnArrival)
+                    val insertedHome = repo.saveOrUpdateHomeNetwork(null, "H3", "S3", "192.168.13")
+                    assertEquals(3, insertedHome.sortOrder)
+
+                    val stored = db.switchDao().getDeviceById(devId)!!
+                    org.junit.Assert.assertNotNull(repo.genaManager.subscribeOrRenew(stored))
+                    assertEquals(1, repo.genaManager.activeSidCount)
+                    org.junit.Assert.assertNotNull(repo.genaManager.subscribeOrRenew(stored))
+                    assertEquals(1, repo.genaManager.activeSidCount)
+                    server.simulate412OnNextGenaRenew.set(true)
+                    org.junit.Assert.assertNotNull(repo.genaManager.subscribeOrRenew(stored))
+                    assertEquals(1, repo.genaManager.activeSidCount)
+                } finally {
+                    repo.close()
+                    db.close()
+                }
+            }
+        }
 }
