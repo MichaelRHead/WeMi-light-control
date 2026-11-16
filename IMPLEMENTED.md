@@ -1,7 +1,7 @@
 # WeMi Light Control — Implemented Features & Change Log (`IMPLEMENTED.md`)
 
 **Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
-**Current Version**: `v25.0` (`versionCode = 25`)  
+**Current Version**: `v27.0` (`versionCode = 27`)  
 **Target Platforms**: Android Phones, Tablets, and Android TV (`UI_MODE_TYPE_TELEVISION` 10-foot D-Pad interface)
 
 Related documentation:
@@ -12,7 +12,7 @@ Related documentation:
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Minimal Permissive Dependency Policy (`Apache-2.0` AndroidX/Kotlin Only; Zero External HTTP/Font Bloat) & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — 5-Agent Autonomous Round-Robin Release Review Process & Live Sign-Off State Machine
-- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v25.0`)
+- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v27.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
 - [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — 5-Agent Autonomous Round-Robin Release Review & Sign-Off Coordinator Skill
@@ -36,6 +36,7 @@ Related documentation:
 
 | Landed (PST) | Version / Commit | Feature or Improvement | Primary Files |
 | :--- | :--- | :--- | :--- |
+| **2026-11-15 20:10 PST** | `v27.0` (`versionCode = 27`) | **Android TV (`wemi TV`) Google TV Remote Focusable Dimmer Slider (`Down` from Toggle → `Left`/`Right` `-10%`/`+10%` → `Down` to Next Widget) & Deterministic Room Bar (`TvRoomSectionHeader`) Up/Down Navigation from All Columns Including the Leftmost Switch Widget (`TvScreen.kt`, `TvCardsAndScenes.kt`, `TvHeadersAndScenes.kt`, `TvAndHeaderLayoutE2ETest.kt`)** | [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt), [`TvCardsAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvCardsAndScenes.kt), [`TvHeadersAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvHeadersAndScenes.kt), [`TvAndHeaderLayoutE2ETest.kt`](app/src/test/java/org/suppressingfire/wemi/TvAndHeaderLayoutE2ETest.kt), [`app/build.gradle.kts`](app/build.gradle.kts), [`UX_DESIGN.md`](UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md), [`docs/user-guide/more-and-tv-mode.md`](docs/user-guide/more-and-tv-mode.md) |
 | **2026-11-14 16:58 PST** | `v25.0` (`v25.0-rc`) | **Completed 5-Agent / 6-Stage Release Review for `v25.0` (`Stages 1 → 2 → 3 → 4 → 5 → 6`, `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `versionCode = 25`), Synced `v25.0` Telemetry & Release Scripts (`DEBUGGING_AND_SUPPORT.md`, `scripts/advance_release_turn.sh`), Updated `v25.0` Release Notes & Play Store Assets (`docs/user-guide/release-notes.md`, `play_store_assets/RELEASE_NOTES.txt` `449/500` Chars, `play_store_assets/STORE_LISTING.md`), and Verified `38/38` Tests Across 10 Suites** | [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md), [`scripts/advance_release_turn.sh`](scripts/advance_release_turn.sh), [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md), [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md), [`play_store_assets/RELEASE_NOTES.txt`](play_store_assets/RELEASE_NOTES.txt), [`play_store_assets/STORE_LISTING.md`](play_store_assets/STORE_LISTING.md), [`HeaderAndNav.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/HeaderAndNav.kt), [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt), [`SwitchViewModel.kt`](app/src/main/java/org/suppressingfire/wemi/ui/SwitchViewModel.kt), [`TvAndHeaderLayoutE2ETest.kt`](app/src/test/java/org/suppressingfire/wemi/TvAndHeaderLayoutE2ETest.kt) |
 | **2026-11-14 11:08 PST** | `v25.0` | **Added Top-Header `"All Off"` Button (`all_off_devices_button`) Next to the Refresh Button (`HeaderAndNav.kt`, `MainActivity.kt`, `SwitchViewModel.kt`, `strings.xml`) with Single-Row Alignment & Master Power-Off E2E Verification (`TvAndHeaderLayoutE2ETest.kt`)** | [`HeaderAndNav.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/HeaderAndNav.kt), [`MainActivity.kt`](app/src/main/java/org/suppressingfire/wemi/MainActivity.kt), [`SwitchViewModel.kt`](app/src/main/java/org/suppressingfire/wemi/ui/SwitchViewModel.kt), [`strings.xml`](app/src/main/res/values/strings.xml), [`TvAndHeaderLayoutE2ETest.kt`](app/src/test/java/org/suppressingfire/wemi/TvAndHeaderLayoutE2ETest.kt), [`UX_DESIGN.md`](UX_DESIGN.md), [`docs/user-guide/main-screen.md`](docs/user-guide/main-screen.md) |
 | **2026-11-11 14:28 PST** | `v25.0` | **Resolved Google Play Console App Bundle Warnings (`versionCode = 25`): Enabled Release R8 Minification & Resource Shrinking (`isMinifyEnabled = true`, `isShrinkResources = true`, Embedding `proguard.map` in `.aab`), Configured Room/Enum/Line-Number R8 Rules (`proguard-rules.pro`), Configured `ndk.debugSymbolLevel = "FULL"`, and Excluded Unused Pre-Stripped `libandroidx.graphics.path.so` (`38/38` Passing)** | [`app/build.gradle.kts`](app/build.gradle.kts), [`app/proguard-rules.pro`](app/proguard-rules.pro), [`ExampleUnitTest.kt`](app/src/test/java/org/suppressingfire/wemi/ExampleUnitTest.kt), [`AGENTS.md`](AGENTS.md) |
@@ -101,6 +102,17 @@ Related documentation:
 ---
 
 ## 2. Detailed Change Log (Newest to Oldest)
+
+### [2026-11-15 20:10 PST] — Android TV (`wemi TV`) Google TV Remote Focusable Dimmer Slider & Deterministic Room Bar D-Pad Navigation (`v27.0`, `versionCode = 27`)
+- **Focusable Dimmer Slider Inside `TvDeviceCard` for Google TV Remotes Without Play/Menu Buttons ([`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt), [`TvCardsAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvCardsAndScenes.kt))**:
+  - Split dimmer cards into two sibling focusable targets inside `TvDeviceCard`:
+    1. **On/Off Toggle (`tv_device_card_${device.id}`)**: Navigating down into a dimmer card lands on its On/Off Toggle (`FOCUSED • OK`), where `D-Pad Left / Right` moves across the 3 columns of switch cards and `OK` toggles power `ON` / `OFF`.
+    2. **Dimmer Slider (`tv_card_dim_mode_${device.id}`)**: Navigating **Down once more** from the dimmer's On/Off Toggle focuses the Dimmer Slider directly below it (highlighted with a `2.5.dp` Gold `#FBBF24` border and `◄ -10% • +10% ►` badge). Pressing `D-Pad Left / Right` steps brightness `-10%` / `+10%`, pressing `Up` returns to the dimmer's On/Off Toggle, and pressing `Down` moves to the widget below.
+- **Deterministic Room Bar (`TvRoomSectionHeader`) Navigation from All Columns Including the Leftmost Switch Widget ([`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt), [`TvHeadersAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvHeadersAndScenes.kt))**:
+  - Replaced geometric 2D `BeamSearch` vertical routing (which previously skipped the full-width Room Bar when navigating Up/Down from Column 1 due to horizontal midpoint distance penalty) with deterministic `FocusRequester` routing (`TvFocusTarget.RoomHeader`, `DeviceToggle`, `DeviceSlider`, `TopAction`) and `lastFocusedColumn` preservation across `TvDashboardScreen`.
+  - Updated [`TvAndHeaderLayoutE2ETest.kt`](app/src/test/java/org/suppressingfire/wemi/TvAndHeaderLayoutE2ETest.kt) with end-to-end D-Pad `KeyEvent` verification covering leftmost switch -> `tv_room_header_Living Room` / `tv_room_header_Unassigned` vertical navigation and On/Off Toggle -> Down -> Dimmer Slider -> Left/Right brightness stepping -> Down to next widget (`38/38` tests passing).
+
+---
 
 ### [2026-11-14 16:58 PST] — Completed 5-Agent / 6-Stage Release Review for `v25.0` (`v25.0-rc`, `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `versionCode = 25`, `38/38` Passing)
 - **Full 5-Agent / 6-Stage Round-Robin Sign-Off ([`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md), [`scripts/advance_release_turn.sh`](scripts/advance_release_turn.sh), [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md), [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md), [`play_store_assets/RELEASE_NOTES.txt`](play_store_assets/RELEASE_NOTES.txt), [`play_store_assets/STORE_LISTING.md`](play_store_assets/STORE_LISTING.md))**:

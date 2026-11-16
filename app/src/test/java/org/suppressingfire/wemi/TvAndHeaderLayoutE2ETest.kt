@@ -4,6 +4,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -26,12 +27,12 @@ import org.suppressingfire.wemi.ui.SwitchViewModel
 import kotlin.math.abs
 
 /**
- * Full-stack Jetpack Compose + Robolectric E2E validation for `v23.0` UI layout & Android TV CUJs:
- * 1. Compact single-row mobile/tablet `TopHeader` horizontal alignment and wordmark toggle.
+ * Full-stack Jetpack Compose + Robolectric E2E validation for UI layout & Android TV D-Pad CUJs:
+ * 1. Compact single-row mobile/tablet `TopHeader` horizontal alignment, `"All Off"` button, and wordmark toggle.
  * 2. Native Android TV (`UI_MODE_TYPE_TELEVISION`) 3-column room-grouped grid, `"Unassigned"`-last
- *    room ordering, hardware D-Pad `KeyEvent` dispatch (`DirectionCenter`, `MediaPlayPause`,
- *    `DirectionRight`), `"DIM -/+"` mode lifecycle, and Room Master SOAP control over live loopback
- *    [FakeUpnpServer] instances.
+ *    room ordering, leftmost switch widget Up/Down Room Bar navigation, focusable Dimmer On/Off Toggle
+ *    vs. focusable Dimmer Slider (`DirectionDown` -> `DirectionRight` / `DirectionLeft` -> `DirectionDown`),
+ *    and Room Master SOAP control over live loopback [FakeUpnpServer] instances.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -190,41 +191,93 @@ class TvAndHeaderLayoutE2ETest {
                         livingHeaderBounds.top < unassignedHeaderBounds.top
                     )
 
-                    // 3. Hardware D-Pad Key.DirectionCenter on Living Room Switch toggles relay ON over loopback SOAP
+                    // 3. Focus leftmost switch widget (Column 1: Living Room Switch) and verify Up/Down
+                    //    always selects the Room Bar (tv_room_header_Living Room / tv_room_header_Unassigned)
                     composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
                         .assertIsDisplayed()
                         .performSemanticsAction(SemanticsActions.RequestFocus)
                     composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}").assertIsFocused()
+
+                    // Pressing Up from leftmost switch widget selects the Living Room Bar above it
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionUp) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_room_header_Living Room").assertIsFocused()
+
+                    // Pressing Down from Living Room Bar returns focus to the leftmost switch widget
+                    composeTestRule.onNodeWithTag("tv_room_header_Living Room")
+                        .performKeyInput { pressKey(Key.DirectionDown) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}").assertIsFocused()
+
+                    // Pressing Down from leftmost switch widget selects the Unassigned Room Bar below it
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionDown) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_room_header_Unassigned").assertIsFocused()
+
+                    // Pressing Up from Unassigned Room Bar returns focus to the leftmost switch widget
+                    composeTestRule.onNodeWithTag("tv_room_header_Unassigned")
+                        .performKeyInput { pressKey(Key.DirectionUp) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}").assertIsFocused()
+
+                    // Hardware D-Pad Key.DirectionCenter on Living Room Switch toggles relay ON over loopback SOAP
                     composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
                         .performKeyInput { pressKey(Key.DirectionCenter) }
-
                     awaitLoopbackIo {
                         switchServer.relayStateOn.get() && vm.togglingDeviceIds.value.isEmpty()
                     }
                     assertTrue(switchServer.relayStateOn.get())
 
-                    // 4. Focus Living Room Dimmer, press MediaPlayPause to enter "DIM -/+" mode, step +10% with DirectionRight, and exit with DirectionCenter
-                    composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
-                        .assertIsDisplayed()
-                        .performSemanticsAction(SemanticsActions.RequestFocus)
+                    // 4. Navigate Right to Living Room Dimmer's On/Off Toggle; verify Left/Right moves between
+                    //    switch cards, and navigating Down once more focuses the Dimmer Slider
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionRight) }
                     composeTestRule.waitForIdle()
-                    composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
-                        .performKeyInput { pressKey(Key.MediaPlayPause) }
-                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}").assertIsFocused()
 
+                    // Moving Left from Dimmer's On/Off Toggle moves back to the switch card on the left
+                    composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionLeft) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}").assertIsFocused()
+
+                    // Move Right back onto the Dimmer's On/Off Toggle, then Down once more to focus the Dimmer Slider
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionRight) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}").assertIsFocused()
+
+                    composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionDown) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_card_dim_mode_${dimmerEntity.id}").assertIsFocused()
                     composeTestRule.onNodeWithText("DIM -/+", useUnmergedTree = true).assertIsDisplayed()
                     composeTestRule.onNodeWithText("Done Dimming", useUnmergedTree = true).assertIsDisplayed()
 
-                    composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
+                    // Pressing Right and Left on the focused Dimmer Slider raises (+10%) and lowers (-10%) brightness
+                    composeTestRule.onNodeWithTag("tv_card_dim_mode_${dimmerEntity.id}")
                         .performKeyInput { pressKey(Key.DirectionRight) }
                     awaitLoopbackIo {
                         dimmerServer.dimmerBrightness.get() == 60 && vm.togglingDeviceIds.value.isEmpty()
                     }
                     assertEquals(60, dimmerServer.dimmerBrightness.get())
+                    composeTestRule.onNodeWithTag("tv_card_dim_mode_${dimmerEntity.id}").assertIsFocused()
 
-                    composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
-                        .performKeyInput { pressKey(Key.DirectionCenter) }
+                    composeTestRule.onNodeWithTag("tv_card_dim_mode_${dimmerEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionLeft) }
+                    awaitLoopbackIo {
+                        dimmerServer.dimmerBrightness.get() == 50 && vm.togglingDeviceIds.value.isEmpty()
+                    }
+                    assertEquals(50, dimmerServer.dimmerBrightness.get())
+
+                    // Navigating Down from the Dimmer Slider moves to the widget below (Unassigned Room Bar)
+                    composeTestRule.onNodeWithTag("tv_card_dim_mode_${dimmerEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionDown) }
                     composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_room_header_Unassigned").assertIsFocused()
                     composeTestRule.onNodeWithText("DIM -/+", useUnmergedTree = true).assertDoesNotExist()
 
                     // 5. Focus Living Room section header and press DirectionCenter to trigger Room Master OFF across both switches

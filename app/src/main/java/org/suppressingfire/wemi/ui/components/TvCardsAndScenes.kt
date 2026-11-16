@@ -3,7 +3,6 @@ package org.suppressingfire.wemi.ui.components
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
@@ -31,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -62,25 +60,33 @@ internal val TvDimmingCardBg = Color(0xFF232014)
 @Composable
 internal fun TvDeviceCard(
     device: DeviceEntity,
-    isFocusedByRemote: Boolean,
-    isDimmingMode: Boolean,
+    isToggleFocusedByRemote: Boolean,
+    isSliderFocusedByRemote: Boolean,
     isToggling: Boolean,
-    focusRequester: FocusRequester? = null,
-    onSelectFocus: () -> Unit,
+    toggleFocusRequester: FocusRequester? = null,
+    sliderFocusRequester: FocusRequester? = null,
+    onSelectToggleFocus: () -> Unit,
+    onSelectSliderFocus: () -> Unit,
     onPrimaryAction: () -> Unit,
-    onToggleDimmingMode: () -> Unit,
-    onExitDimmingMode: () -> Unit,
-    onStepBrightness: (Int) -> Unit
+    onStepBrightness: (Int) -> Unit,
+    onNavigateLeft: () -> Boolean,
+    onNavigateRight: () -> Boolean,
+    onNavigateUpFromToggle: () -> Boolean,
+    onNavigateDownFromToggle: () -> Boolean,
+    onNavigateUpFromSlider: () -> Boolean,
+    onNavigateDownFromSlider: () -> Boolean
 ) {
-    var hasHardwareFocus by remember { mutableStateOf(false) }
-    val isHighlighted = isFocusedByRemote || hasHardwareFocus
+    var hasToggleHardwareFocus by remember { mutableStateOf(false) }
+    val isToggleHighlighted = isToggleFocusedByRemote || hasToggleHardwareFocus
+    val isSliderHighlighted = isSliderFocusedByRemote
+    val isCardHighlighted = isToggleHighlighted || isSliderHighlighted
     val type = device.parsedType
     val isDimmer = type == DeviceType.LIGHTBULB_DIMMER && device.isReachable
 
     val cardColor by animateColorAsState(
         targetValue = when {
-            isDimmingMode && isDimmer -> TvDimmingCardBg
-            isHighlighted -> TvFocusedCardBg
+            isSliderHighlighted && isDimmer -> TvDimmingCardBg
+            isToggleHighlighted -> TvFocusedCardBg
             !device.isReachable -> Color(0xFF111C2D)
             device.isOn && type != DeviceType.MOTION_SENSOR -> TvSurfaceCardActive
             else -> TvSurfaceCard
@@ -89,292 +95,289 @@ internal fun TvDeviceCard(
     )
 
     val borderStroke = when {
-        isDimmingMode && isDimmer -> BorderStroke(4.dp, TvDimmerGold)
-        isHighlighted -> BorderStroke(3.5.dp, TvCyanFocusBorder)
+        isSliderHighlighted && isDimmer -> BorderStroke(4.dp, TvDimmerGold)
+        isToggleHighlighted -> BorderStroke(3.5.dp, TvCyanFocusBorder)
         device.isReachable && device.isOn && type != DeviceType.MOTION_SENSOR ->
             BorderStroke(1.5.dp, WemoGreenPrimary.copy(alpha = 0.65f))
         else -> BorderStroke(1.dp, Color(0xFF1E293B))
-    }
-
-    val baseModifier = if (focusRequester != null) {
-        Modifier.focusRequester(focusRequester)
-    } else {
-        Modifier
     }
 
     Surface(
         color = cardColor,
         shape = RoundedCornerShape(14.dp),
         border = borderStroke,
-        shadowElevation = if (isHighlighted || isDimmingMode) 12.dp else 2.dp,
-        modifier = baseModifier
+        shadowElevation = if (isCardHighlighted) 12.dp else 2.dp,
+        modifier = Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                val scale = if (isHighlighted || isDimmingMode) 1.022f else 1f
+                val scale = if (isCardHighlighted) 1.022f else 1f
                 scaleX = scale
                 scaleY = scale
             }
-            .onFocusChanged { state ->
-                hasHardwareFocus = state.isFocused
-                if (state.isFocused) {
-                    onSelectFocus()
-                } else if (isDimmingMode) {
-                    onExitDimmingMode()
-                }
-            }
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown) {
-                    if (isDimmingMode && isDimmer) {
-                        when (event.key) {
-                            Key.DirectionLeft, Key.Minus -> {
-                                onStepBrightness(-10)
-                                true
-                            }
-                            Key.DirectionRight, Key.Equals, Key.Plus -> {
-                                onStepBrightness(10)
-                                true
-                            }
-                            Key.DirectionUp -> {
-                                onStepBrightness(20)
-                                true
-                            }
-                            Key.DirectionDown -> {
-                                onStepBrightness(-20)
-                                true
-                            }
-                            Key.DirectionCenter,
-                            Key.Enter,
-                            Key.NumPadEnter,
-                            Key.Back,
-                            Key.Escape,
-                            Key.MediaPlayPause,
-                            Key.Menu -> {
-                                onExitDimmingMode()
-                                true
-                            }
-                            else -> false
-                        }
-                    } else {
-                        when (event.key) {
-                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                onPrimaryAction()
-                                true
-                            }
-                            Key.MediaPlayPause,
-                            Key.Menu,
-                            Key.Info,
-                            Key.LeftBracket,
-                            Key.RightBracket -> {
-                                if (isDimmer) {
-                                    onToggleDimmingMode()
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-                            // Never hijack DirectionLeft or DirectionRight in normal mode so
-                            // 3-column D-Pad navigation between cards is always fast and predictable.
-                            else -> false
-                        }
-                    }
-                } else {
-                    false
-                }
-            }
-            .focusable()
-            .combinedClickable(
-                onClick = {
-                    onSelectFocus()
-                    if (isDimmingMode) {
-                        onExitDimmingMode()
-                    } else {
-                        onPrimaryAction()
-                    }
-                },
-                onLongClick = {
-                    onSelectFocus()
-                    if (isDimmer) {
-                        onToggleDimmingMode()
-                    } else {
-                        onPrimaryAction()
-                    }
-                }
-            )
-            .testTag("tv_device_card_${device.id}")
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 13.dp, vertical = 11.dp)
+                .padding(horizontal = 11.dp, vertical = 9.dp)
         ) {
-            // Top Line: Switch Name + unmistakable 10-foot Focus / Dimming indicator badge
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AutoResizingDeviceNameText(
-                    text = device.name,
-                    color = TvTextPrimary,
-                    initialFontSizeSp = 16.5f,
-                    minFontSizeSp = 11f,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("tv_device_name_${device.id}")
-                )
-
-                if (isDimmingMode && isDimmer) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = TvDimmerGold
-                    ) {
-                        Text(
-                            text = "DIM -/+",
-                            color = TvDeepBackground,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 10.sp,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                        )
+            // SIBLING 1: On/Off Toggle Focusable Zone (navigating Left/Right moves between switch cards;
+            // navigating Down on a dimmer card focuses the Dimmer Slider below)
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = if (isToggleHighlighted && isDimmer) {
+                    TvCyanFocusBorder.copy(alpha = 0.12f)
+                } else {
+                    Color.Transparent
+                },
+                border = if (isToggleHighlighted && isDimmer) {
+                    BorderStroke(1.5.dp, TvCyanFocusBorder.copy(alpha = 0.85f))
+                } else {
+                    null
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .let { mod ->
+                        if (toggleFocusRequester != null) mod.focusRequester(toggleFocusRequester) else mod
                     }
-                } else if (isHighlighted) {
-                    Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = TvCyanFocusBorder
-                    ) {
-                        Text(
-                            text = "FOCUSED • OK",
-                            color = TvDeepBackground,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.ExtraBold,
-                            fontSize = 10.sp,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                        )
+                    .onFocusChanged { state ->
+                        hasToggleHardwareFocus = state.isFocused
+                        if (state.isFocused) {
+                            onSelectToggleFocus()
+                        }
                     }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(7.dp))
-
-            val statusLabel = when {
-                isToggling -> "Sending SOAP SetBinaryState..."
-                !device.isReachable -> "Disconnected • Press OK to Retry"
-                type == DeviceType.MOTION_SENSOR -> "${device.connectionBadgeText} • Motion: ${device.lastMotionTime ?: "Active"}"
-                type == DeviceType.LIGHTBULB_DIMMER ->
-                    if (device.isOn) "ON • ${device.brightness}% Brightness" else "OFF • Standby (${device.brightness}%)"
-                else -> if (device.isOn) "ON • ${device.connectionBadgeText}" else "OFF • ${device.connectionBadgeText}"
-            }
-
-            // Second Line: Hardware Illustration + Category/Status Telemetry + Power Indicator Ring
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(9.dp)
-            ) {
-                DeviceCategoryIllustration(
-                    category = device.visualCategory,
-                    isReachable = device.isReachable,
-                    isOn = device.isOn,
-                    brightness = device.brightness,
-                    modifier = Modifier.size(width = 34.dp, height = 42.dp)
-                )
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Surface(
-                            shape = RoundedCornerShape(5.dp),
-                            color = if (isHighlighted) {
-                                TvCyanFocusBorder.copy(alpha = 0.22f)
-                            } else {
-                                Color.White.copy(alpha = 0.08f)
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown) {
+                            when (event.key) {
+                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                    onPrimaryAction()
+                                    true
+                                }
+                                Key.DirectionLeft -> onNavigateLeft()
+                                Key.DirectionRight -> onNavigateRight()
+                                Key.DirectionUp -> onNavigateUpFromToggle()
+                                Key.DirectionDown -> onNavigateDownFromToggle()
+                                Key.MediaPlayPause,
+                                Key.Menu,
+                                Key.Info,
+                                Key.LeftBracket,
+                                Key.RightBracket -> {
+                                    if (isDimmer) {
+                                        onNavigateDownFromToggle()
+                                    } else {
+                                        false
+                                    }
+                                }
+                                else -> false
                             }
+                        } else {
+                            false
+                        }
+                    }
+                    .focusable()
+                    .focusProperties { canFocus = false }
+                    .combinedClickable(
+                        onClick = {
+                            onSelectToggleFocus()
+                            onPrimaryAction()
+                        },
+                        onLongClick = {
+                            if (isDimmer) {
+                                onNavigateDownFromToggle()
+                            } else {
+                                onSelectToggleFocus()
+                                onPrimaryAction()
+                            }
+                        }
+                    )
+                    .testTag("tv_device_card_${device.id}")
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 3.dp)
+                ) {
+                    // Top Line: Switch Name + unmistakable 10-foot Focus / Dimming indicator badge
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        AutoResizingDeviceNameText(
+                            text = device.name,
+                            color = TvTextPrimary,
+                            initialFontSizeSp = 16.5f,
+                            minFontSizeSp = 11f,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("tv_device_name_${device.id}")
+                        )
+
+                        if (isSliderHighlighted && isDimmer) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = TvDimmerGold
+                            ) {
+                                Text(
+                                    text = "DIM -/+",
+                                    color = TvDeepBackground,
+                                    fontFamily = FontFamily.SansSerif,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                )
+                            }
+                        } else if (isToggleHighlighted) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = TvCyanFocusBorder
+                            ) {
+                                Text(
+                                    text = "FOCUSED • OK",
+                                    color = TvDeepBackground,
+                                    fontFamily = FontFamily.SansSerif,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 10.sp,
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(7.dp))
+
+                    val statusLabel = when {
+                        isToggling -> "Sending SOAP SetBinaryState..."
+                        !device.isReachable -> "Disconnected • Press OK to Retry"
+                        type == DeviceType.MOTION_SENSOR -> "${device.connectionBadgeText} • Motion: ${device.lastMotionTime ?: "Active"}"
+                        type == DeviceType.LIGHTBULB_DIMMER ->
+                            if (device.isOn) "ON • ${device.brightness}% Brightness" else "OFF • Standby (${device.brightness}%)"
+                        else -> if (device.isOn) "ON • ${device.connectionBadgeText}" else "OFF • ${device.connectionBadgeText}"
+                    }
+
+                    // Second Line: Hardware Illustration + Category/Status Telemetry + Power Indicator Ring
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(9.dp)
+                    ) {
+                        DeviceCategoryIllustration(
+                            category = device.visualCategory,
+                            isReachable = device.isReachable,
+                            isOn = device.isOn,
+                            brightness = device.brightness,
+                            modifier = Modifier.size(width = 34.dp, height = 42.dp)
+                        )
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(5.dp),
+                                    color = if (isCardHighlighted) {
+                                        TvCyanFocusBorder.copy(alpha = 0.22f)
+                                    } else {
+                                        Color.White.copy(alpha = 0.08f)
+                                    }
+                                ) {
+                                    Text(
+                                        text = device.visualCategory.displayName,
+                                        color = TvCyanFocusBorder,
+                                        fontFamily = FontFamily.SansSerif,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 10.5.sp,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                                Text(
+                                    text = device.ipAddress,
+                                    color = TvTextSecondary,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 10.sp,
+                                    maxLines = 1
+                                )
+                            }
                             Text(
-                                text = device.visualCategory.displayName,
-                                color = TvCyanFocusBorder,
+                                text = statusLabel,
+                                color = when {
+                                    !device.isReachable -> Color(0xFFF87171)
+                                    isSliderHighlighted -> TvDimmerGold
+                                    device.isOn -> TvCyanFocusBorder
+                                    else -> Color(0xFF94A3B8)
+                                },
                                 fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
-                                fontSize = 10.5.sp,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
-                        Text(
-                            text = device.ipAddress,
-                            color = TvTextSecondary,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 10.sp,
-                            maxLines = 1
-                        )
-                    }
-                    Text(
-                        text = statusLabel,
-                        color = when {
-                            !device.isReachable -> Color(0xFFF87171)
-                            isDimmingMode -> TvDimmerGold
-                            device.isOn -> TvCyanFocusBorder
-                            else -> Color(0xFF94A3B8)
-                        },
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
 
-                // Distinct Power / Connection Status Ring (ON vs OFF dark-gray vs Disconnected)
-                Surface(
-                    shape = CircleShape,
-                    color = when {
-                        !device.isReachable -> Color(0xFF450A0A)
-                        type == DeviceType.MOTION_SENSOR -> WemoGreenPrimary.copy(alpha = 0.25f)
-                        device.isOn -> WemoGreenTop
-                        else -> PowerOffDarkGray
-                    },
-                    border = BorderStroke(
-                        width = 2.dp,
-                        color = when {
-                            !device.isReachable -> Color(0xFFEF4444)
-                            device.isOn -> Color.White
-                            else -> Color(0xFF475569)
+                        // Distinct Power / Connection Status Ring (highlighted when On/Off Toggle is focused)
+                        Surface(
+                            shape = CircleShape,
+                            color = when {
+                                !device.isReachable -> Color(0xFF450A0A)
+                                type == DeviceType.MOTION_SENSOR -> WemoGreenPrimary.copy(alpha = 0.25f)
+                                device.isOn -> WemoGreenTop
+                                else -> PowerOffDarkGray
+                            },
+                            border = BorderStroke(
+                                width = if (isToggleHighlighted) 2.5.dp else 2.dp,
+                                color = when {
+                                    !device.isReachable -> Color(0xFFEF4444)
+                                    isToggleHighlighted -> TvCyanFocusBorder
+                                    device.isOn -> Color.White
+                                    else -> Color(0xFF475569)
+                                }
+                            ),
+                            modifier = Modifier.size(38.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = when {
+                                        !device.isReachable -> Icons.Default.WifiOff
+                                        type == DeviceType.MOTION_SENSOR -> Icons.Default.Sensors
+                                        else -> Icons.Default.PowerSettingsNew
+                                    },
+                                    contentDescription = "Toggle ${device.name}",
+                                    tint = when {
+                                        !device.isReachable -> Color(0xFFFCA5A5)
+                                        device.isOn -> TvDeepBackground
+                                        else -> Color(0xFF94A3B8)
+                                    },
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
-                    ),
-                    modifier = Modifier.size(38.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = when {
-                                !device.isReachable -> Icons.Default.WifiOff
-                                type == DeviceType.MOTION_SENSOR -> Icons.Default.Sensors
-                                else -> Icons.Default.PowerSettingsNew
-                            },
-                            contentDescription = "Toggle ${device.name}",
-                            tint = when {
-                                !device.isReachable -> Color(0xFFFCA5A5)
-                                device.isOn -> TvDeepBackground
-                                else -> Color(0xFF94A3B8)
-                            },
-                            modifier = Modifier.size(20.dp)
-                        )
                     }
                 }
             }
 
+            // SIBLING 2: Focusable Dimmer Slider Strip (navigating Down from On/Off Toggle focuses the slider;
+            // Left/Right lowers/raises brightness; Down moves to the widget below)
             if (isDimmer) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 TvDeviceCardDimmerStrip(
                     device = device,
-                    isDimmingMode = isDimmingMode,
-                    isHighlighted = isHighlighted,
-                    onSelectFocus = onSelectFocus,
-                    onToggleDimmingMode = onToggleDimmingMode,
-                    onStepBrightness = onStepBrightness
+                    isSliderFocused = isSliderHighlighted,
+                    isToggleHighlighted = isToggleHighlighted,
+                    sliderFocusRequester = sliderFocusRequester,
+                    onSelectSliderFocus = onSelectSliderFocus,
+                    onToggleSliderFocus = {
+                        if (isSliderHighlighted) {
+                            onNavigateUpFromSlider()
+                        } else {
+                            onNavigateDownFromToggle()
+                        }
+                    },
+                    onStepBrightness = onStepBrightness,
+                    onNavigateUp = onNavigateUpFromSlider,
+                    onNavigateDown = onNavigateDownFromSlider
                 )
             }
         }

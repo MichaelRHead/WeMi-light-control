@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,23 +34,34 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SoapLogEntry
@@ -60,19 +73,26 @@ internal val TvCyanFocusBorder = Color(0xFF22D3EE)
 internal val TvTextPrimary = Color(0xFFF8FAFC)
 internal val TvTextSecondary = Color(0xFF94A3B8)
 
+internal sealed interface TvFocusTarget {
+    data class TopAction(val index: Int) : TvFocusTarget
+    data class RoomHeader(val roomName: String) : TvFocusTarget
+    data class DeviceToggle(val deviceId: Int) : TvFocusTarget
+    data class DeviceSlider(val deviceId: Int) : TvFocusTarget
+}
+
 /**
  * 10-foot Android TV & Large-Screen Landscape Dashboard (`wemi TV`).
  *
  * Designed around three core remote-control ergonomics principles:
  * 1. Maximum Screen Real Estate: A single compact 42.dp top bar leaves ~90% of vertical screen height
  *    for the 3-column Room-Grouped Switch Grid (`GridCells.Fixed(3)`).
- * 2. Unmistakable 10-Foot Cursor Focus: Automatic initial hardware focus (`FocusRequester`) on the first
- *    switch card, paired with a high-contrast 3.5.dp Electric Cyan border (`#22D3EE`), bright illuminated
- *    card surface (`#133B66`), subtle scale (`1.022f`), and explicit `"FOCUSED • OK"` badge.
- * 3. Non-Interfering Dimmer Control: D-Pad Up/Down/Left/Right always navigates freely between the 3 columns
- *    of switch cards, and pressing OK on any card toggles power ON/OFF. Dimmer brightness is adjusted via
- *    an explicit Dimmer Adjust Mode (activated with Long-Press OK, Play/Pause, Menu, or clicking the dimmer
- *    strip) and exited immediately with OK or Back.
+ * 2. Deterministic Vertical & Horizontal D-Pad Navigation:
+ *    - Navigating Up or Down through a Room Bar (`TvRoomSectionHeader`) from ANY column (including the
+ *      leftmost switch widget in Column 1) always selects the Room Bar as the next widget.
+ *    - Navigating Down into a dimmer card focuses its On/Off Toggle (`tv_device_card_<id>`), where
+ *      Left/Right moves between switch cards and OK toggles power.
+ *    - Navigating Down once more focuses the Dimmer Slider (`tv_card_dim_mode_<id>`), where Left/Right
+ *      lowers/raises brightness (`-10%` / `+10%`) and Down moves to the widget below.
  */
 @Composable
 fun TvDashboardScreen(
@@ -114,31 +134,89 @@ fun TvDashboardScreen(
     val orderedDevices: List<DeviceEntity> = remember(groupedByRoom) {
         groupedByRoom.flatMap { it.second }
     }
-
-    var focusedDeviceId by remember(orderedDevices.size) {
-        mutableStateOf(orderedDevices.firstOrNull()?.id)
-    }
-    var dimmingDeviceId by remember { mutableStateOf<Int?>(null) }
-
-    val firstCardFocusRequester = remember { FocusRequester() }
     val firstDeviceId = orderedDevices.firstOrNull()?.id
+
+    val gridState = rememberLazyGridState()
+    val coroutineScope = rememberCoroutineScope()
+    val focusRequesters = remember { mutableMapOf<TvFocusTarget, FocusRequester>() }
+    val requesterFor: (TvFocusTarget) -> FocusRequester = { target ->
+        focusRequesters.getOrPut(target) { FocusRequester() }
+    }
+    val topActionFocusRequesters = remember {
+        (0..3).map { requesterFor(TvFocusTarget.TopAction(it)) }
+    }
+
+    val gridIndexByTarget: Map<TvFocusTarget, Int> = remember(groupedByRoom) {
+        buildMap {
+            var currentGridIndex = 0
+            groupedByRoom.forEach { (roomName, roomDevices) ->
+                put(TvFocusTarget.RoomHeader(roomName), currentGridIndex)
+                currentGridIndex += 1
+                roomDevices.forEach { device ->
+                    put(TvFocusTarget.DeviceToggle(device.id), currentGridIndex)
+                    if (device.parsedType == DeviceType.LIGHTBULB_DIMMER && device.isReachable) {
+                        put(TvFocusTarget.DeviceSlider(device.id), currentGridIndex)
+                    }
+                    currentGridIndex += 1
+                }
+            }
+        }
+    }
+
+    var activeFocusTarget by remember(orderedDevices.size) {
+        mutableStateOf<TvFocusTarget?>(firstDeviceId?.let { TvFocusTarget.DeviceToggle(it) })
+    }
+    var lastFocusedDeviceId by remember(orderedDevices.size) {
+        mutableStateOf(firstDeviceId)
+    }
+    var lastFocusedColumn by remember { mutableIntStateOf(0) }
+
+    val navigateTo: (TvFocusTarget?) -> Boolean = { target ->
+        if (target != null) {
+            activeFocusTarget = target
+            when (target) {
+                is TvFocusTarget.DeviceToggle -> lastFocusedDeviceId = target.deviceId
+                is TvFocusTarget.DeviceSlider -> lastFocusedDeviceId = target.deviceId
+                else -> Unit
+            }
+            val requester = requesterFor(target)
+            val gridIdx = gridIndexByTarget[target]
+            val isVisibleInGrid = gridIdx == null ||
+                gridState.layoutInfo.visibleItemsInfo.any { it.index == gridIdx }
+            if (isVisibleInGrid) {
+                runCatching { requester.requestFocus() }
+            } else {
+                coroutineScope.launch {
+                    gridState.scrollToItem(gridIdx)
+                    withFrameNanos { }
+                    runCatching { requester.requestFocus() }
+                }
+            }
+        }
+        true
+    }
 
     // Automatically request initial hardware D-Pad focus on the first switch card when TV dashboard loads
     LaunchedEffect(firstDeviceId) {
         if (firstDeviceId != null) {
-            if (focusedDeviceId == null || orderedDevices.none { it.id == focusedDeviceId }) {
-                focusedDeviceId = firstDeviceId
+            if (lastFocusedDeviceId == null || orderedDevices.none { it.id == lastFocusedDeviceId }) {
+                lastFocusedDeviceId = firstDeviceId
+                activeFocusTarget = TvFocusTarget.DeviceToggle(firstDeviceId)
             }
-            runCatching { firstCardFocusRequester.requestFocus() }
+            runCatching { requesterFor(TvFocusTarget.DeviceToggle(firstDeviceId)).requestFocus() }
         }
     }
 
-    val focusedDevice = orderedDevices.firstOrNull { it.id == focusedDeviceId }
+    val focusedDevice = orderedDevices.firstOrNull { it.id == lastFocusedDeviceId }
         ?: orderedDevices.firstOrNull()
+    val dimmingDeviceId: Int? = (activeFocusTarget as? TvFocusTarget.DeviceSlider)?.deviceId
 
-    // Pressing Back on the TV remote while in Dimmer Adjust Mode cleanly exits Dimmer Adjust Mode
+    // Pressing Back on the TV remote while on the Dimmer Slider returns focus to the card's On/Off Toggle
     BackHandler(enabled = dimmingDeviceId != null) {
-        dimmingDeviceId = null
+        val currentDimId = dimmingDeviceId
+        if (currentDimId != null) {
+            navigateTo(TvFocusTarget.DeviceToggle(currentDimId))
+        }
     }
 
     val triggerPrimaryAction: (DeviceEntity) -> Unit = { target ->
@@ -170,8 +248,23 @@ fun TvDashboardScreen(
             focusedDevice = focusedDevice,
             dimmingDeviceId = dimmingDeviceId,
             isRefreshing = isRefreshing,
+            topActionFocusRequesters = topActionFocusRequesters,
+            onSelectTopActionFocus = { idx -> activeFocusTarget = TvFocusTarget.TopAction(idx) },
+            onNavigateDownFromTopBar = {
+                val firstRoom = groupedByRoom.firstOrNull()?.first
+                if (firstRoom != null) navigateTo(TvFocusTarget.RoomHeader(firstRoom)) else true
+            },
+            onNavigateTopActionHorizontal = { targetIdx ->
+                navigateTo(TvFocusTarget.TopAction(targetIdx.coerceIn(0, 3)))
+            },
             onPrimaryActionOnFocused = { triggerPrimaryAction(it) },
-            onToggleDimmingFocused = { dimmingDeviceId = it },
+            onToggleDimmingFocused = { targetDimId ->
+                if (targetDimId != null) {
+                    navigateTo(TvFocusTarget.DeviceSlider(targetDimId))
+                } else if (focusedDevice != null) {
+                    navigateTo(TvFocusTarget.DeviceToggle(focusedDevice.id))
+                }
+            },
             onApplyTvScene = onApplyTvScene,
             onScanSsdpClick = onScanSsdpClick
         )
@@ -180,6 +273,7 @@ fun TvDashboardScreen(
 
         // Main Area: Full-Bleed 3-Column Room-Grouped Switch Grid
         LazyVerticalGrid(
+            state = gridState,
             columns = GridCells.Fixed(3),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -189,7 +283,16 @@ fun TvDashboardScreen(
                 .fillMaxWidth()
                 .testTag("tv_device_grid")
         ) {
-            groupedByRoom.forEach { (roomName, roomDevices) ->
+            groupedByRoom.forEachIndexed { roomIndex, (roomName, roomDevices) ->
+                val roomRows = roomDevices.chunked(3)
+                val devicePositionById: Map<Int, Pair<Int, Int>> = buildMap {
+                    roomRows.forEachIndexed { rIdx, row ->
+                        row.forEachIndexed { cIdx, dev ->
+                            put(dev.id, rIdx to cIdx)
+                        }
+                    }
+                }
+
                 item(
                     key = "room_header_$roomName",
                     span = { GridItemSpan(maxLineSpan) }
@@ -197,10 +300,48 @@ fun TvDashboardScreen(
                     val roomDimmers = roomDevices.filter {
                         it.parsedType == DeviceType.LIGHTBULB_DIMMER && it.isReachable
                     }
+                    val roomTarget = TvFocusTarget.RoomHeader(roomName)
+                    val upFromRoomTarget: TvFocusTarget = if (roomIndex > 0) {
+                        val prevRows = groupedByRoom[roomIndex - 1].second.chunked(3)
+                        val prevLastRow = prevRows.lastOrNull().orEmpty()
+                        val targetDev = prevLastRow.getOrNull(
+                            lastFocusedColumn.coerceAtMost(prevLastRow.lastIndex.coerceAtLeast(0))
+                        )
+                        if (targetDev != null) {
+                            if (targetDev.parsedType == DeviceType.LIGHTBULB_DIMMER && targetDev.isReachable) {
+                                TvFocusTarget.DeviceSlider(targetDev.id)
+                            } else {
+                                TvFocusTarget.DeviceToggle(targetDev.id)
+                            }
+                        } else {
+                            TvFocusTarget.RoomHeader(groupedByRoom[roomIndex - 1].first)
+                        }
+                    } else {
+                        TvFocusTarget.TopAction(0)
+                    }
+
+                    val downFromRoomTarget: TvFocusTarget? = run {
+                        val firstRow = roomRows.firstOrNull().orEmpty()
+                        val targetDev = firstRow.getOrNull(
+                            lastFocusedColumn.coerceAtMost(firstRow.lastIndex.coerceAtLeast(0))
+                        )
+                        when {
+                            targetDev != null -> TvFocusTarget.DeviceToggle(targetDev.id)
+                            roomIndex + 1 < groupedByRoom.size ->
+                                TvFocusTarget.RoomHeader(groupedByRoom[roomIndex + 1].first)
+                            else -> null
+                        }
+                    }
+
                     TvRoomSectionHeader(
                         roomName = roomName,
                         roomDevices = roomDevices,
+                        isFocusedByRemote = activeFocusTarget == roomTarget,
                         isTogglingRoom = togglingRooms.contains(roomName),
+                        focusRequester = requesterFor(roomTarget),
+                        onSelectRoomFocus = { activeFocusTarget = roomTarget },
+                        onNavigateUp = { navigateTo(upFromRoomTarget) },
+                        onNavigateDown = { navigateTo(downFromRoomTarget) },
                         onToggleRoomPower = { onToggleRoomPower(roomName) },
                         onStepRoomBrightness = if (roomDimmers.isNotEmpty()) {
                             { delta ->
@@ -218,34 +359,100 @@ fun TvDashboardScreen(
                     items = roomDevices,
                     key = { it.id }
                 ) { device ->
-                    val isFirstCard = device.id == firstDeviceId
-                    val isFocused = focusedDevice?.id == device.id
-                    val isDimmingThisCard = dimmingDeviceId == device.id
+                    val (rowIndex, colIndex) = devicePositionById[device.id] ?: (0 to 0)
+                    val currentRow = roomRows.getOrNull(rowIndex).orEmpty()
+                    val isDimmer = device.parsedType == DeviceType.LIGHTBULB_DIMMER && device.isReachable
+                    val toggleTarget = TvFocusTarget.DeviceToggle(device.id)
+                    val sliderTarget = TvFocusTarget.DeviceSlider(device.id)
+
+                    val leftTarget: TvFocusTarget? = if (colIndex > 0) {
+                        currentRow.getOrNull(colIndex - 1)?.let { TvFocusTarget.DeviceToggle(it.id) }
+                    } else {
+                        null
+                    }
+                    val rightTarget: TvFocusTarget? = if (colIndex < currentRow.lastIndex) {
+                        currentRow.getOrNull(colIndex + 1)?.let { TvFocusTarget.DeviceToggle(it.id) }
+                    } else {
+                        null
+                    }
+                    val upFromToggleTarget: TvFocusTarget = if (rowIndex > 0) {
+                        val prevRow = roomRows[rowIndex - 1]
+                        val aboveDev = prevRow[colIndex.coerceAtMost(prevRow.lastIndex)]
+                        if (aboveDev.parsedType == DeviceType.LIGHTBULB_DIMMER && aboveDev.isReachable) {
+                            TvFocusTarget.DeviceSlider(aboveDev.id)
+                        } else {
+                            TvFocusTarget.DeviceToggle(aboveDev.id)
+                        }
+                    } else {
+                        TvFocusTarget.RoomHeader(roomName)
+                    }
+                    val downBelowCardTarget: TvFocusTarget? = when {
+                        rowIndex + 1 < roomRows.size -> {
+                            val nextRow = roomRows[rowIndex + 1]
+                            val belowDev = nextRow[colIndex.coerceAtMost(nextRow.lastIndex)]
+                            TvFocusTarget.DeviceToggle(belowDev.id)
+                        }
+                        roomIndex + 1 < groupedByRoom.size ->
+                            TvFocusTarget.RoomHeader(groupedByRoom[roomIndex + 1].first)
+                        else -> null
+                    }
 
                     TvDeviceCard(
                         device = device,
-                        isFocusedByRemote = isFocused,
-                        isDimmingMode = isDimmingThisCard,
+                        isToggleFocusedByRemote = activeFocusTarget == toggleTarget,
+                        isSliderFocusedByRemote = activeFocusTarget == sliderTarget,
                         isToggling = togglingDeviceIds.contains(device.id),
-                        focusRequester = if (isFirstCard) firstCardFocusRequester else null,
-                        onSelectFocus = {
-                            focusedDeviceId = device.id
-                            if (dimmingDeviceId != null && dimmingDeviceId != device.id) {
-                                dimmingDeviceId = null
-                            }
+                        toggleFocusRequester = requesterFor(toggleTarget),
+                        sliderFocusRequester = if (isDimmer) requesterFor(sliderTarget) else null,
+                        onSelectToggleFocus = {
+                            activeFocusTarget = toggleTarget
+                            lastFocusedDeviceId = device.id
+                            lastFocusedColumn = colIndex
+                        },
+                        onSelectSliderFocus = {
+                            activeFocusTarget = sliderTarget
+                            lastFocusedDeviceId = device.id
+                            lastFocusedColumn = colIndex
                         },
                         onPrimaryAction = { triggerPrimaryAction(device) },
-                        onToggleDimmingMode = {
-                            focusedDeviceId = device.id
-                            dimmingDeviceId = if (dimmingDeviceId == device.id) null else device.id
-                        },
-                        onExitDimmingMode = {
-                            if (dimmingDeviceId == device.id) {
-                                dimmingDeviceId = null
-                            }
-                        },
                         onStepBrightness = { delta ->
                             onStepDeviceBrightness(device, delta)
+                        },
+                        onNavigateLeft = {
+                            if (leftTarget != null) {
+                                lastFocusedColumn = colIndex - 1
+                                navigateTo(leftTarget)
+                            } else {
+                                true
+                            }
+                        },
+                        onNavigateRight = {
+                            if (rightTarget != null) {
+                                lastFocusedColumn = colIndex + 1
+                                navigateTo(rightTarget)
+                            } else {
+                                true
+                            }
+                        },
+                        onNavigateUpFromToggle = {
+                            lastFocusedColumn = colIndex
+                            navigateTo(upFromToggleTarget)
+                        },
+                        onNavigateDownFromToggle = {
+                            lastFocusedColumn = colIndex
+                            if (isDimmer) {
+                                navigateTo(sliderTarget)
+                            } else {
+                                navigateTo(downBelowCardTarget)
+                            }
+                        },
+                        onNavigateUpFromSlider = {
+                            lastFocusedColumn = colIndex
+                            navigateTo(toggleTarget)
+                        },
+                        onNavigateDownFromSlider = {
+                            lastFocusedColumn = colIndex
+                            navigateTo(downBelowCardTarget)
                         }
                     )
                 }
@@ -257,29 +464,70 @@ fun TvDashboardScreen(
 @Composable
 internal fun TvDeviceCardDimmerStrip(
     device: DeviceEntity,
-    isDimmingMode: Boolean,
-    isHighlighted: Boolean,
-    onSelectFocus: () -> Unit,
-    onToggleDimmingMode: () -> Unit,
-    onStepBrightness: (Int) -> Unit
+    isSliderFocused: Boolean,
+    isToggleHighlighted: Boolean,
+    sliderFocusRequester: FocusRequester?,
+    onSelectSliderFocus: () -> Unit,
+    onToggleSliderFocus: () -> Unit,
+    onStepBrightness: (Int) -> Unit,
+    onNavigateUp: () -> Boolean,
+    onNavigateDown: () -> Boolean
 ) {
+    var hasSliderHardwareFocus by remember { mutableStateOf(false) }
+    val isFocused = isSliderFocused || hasSliderHardwareFocus
+
     Surface(
         shape = RoundedCornerShape(8.dp),
-        color = if (isDimmingMode) TvDimmerGold.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.06f),
+        color = if (isFocused) TvDimmerGold.copy(alpha = 0.24f) else Color.White.copy(alpha = 0.06f),
         border = BorderStroke(
-            width = 1.dp,
+            width = if (isFocused) 2.5.dp else 1.dp,
             color = when {
-                isDimmingMode -> TvDimmerGold
-                isHighlighted -> TvCyanFocusBorder.copy(alpha = 0.45f)
+                isFocused -> TvDimmerGold
+                isToggleHighlighted -> TvCyanFocusBorder.copy(alpha = 0.45f)
                 else -> Color.Transparent
             }
         ),
         modifier = Modifier
             .fillMaxWidth()
-            .focusProperties { canFocus = false }
+            .let { mod -> if (sliderFocusRequester != null) mod.focusRequester(sliderFocusRequester) else mod }
+            .onFocusChanged { state ->
+                hasSliderHardwareFocus = state.isFocused
+                if (state.isFocused) {
+                    onSelectSliderFocus()
+                }
+            }
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    when (event.key) {
+                        Key.DirectionLeft, Key.Minus -> {
+                            onStepBrightness(-10)
+                            true
+                        }
+                        Key.DirectionRight, Key.Equals, Key.Plus -> {
+                            onStepBrightness(10)
+                            true
+                        }
+                        Key.DirectionUp -> onNavigateUp()
+                        Key.DirectionDown -> onNavigateDown()
+                        Key.DirectionCenter,
+                        Key.Enter,
+                        Key.NumPadEnter,
+                        Key.Back,
+                        Key.Escape,
+                        Key.MediaPlayPause,
+                        Key.Menu -> onNavigateUp()
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            }
+            .focusable()
+            .focusProperties {
+                canFocus = false
+            }
             .clickable {
-                onSelectFocus()
-                onToggleDimmingMode()
+                onToggleSliderFocus()
             }
             .testTag("tv_card_dim_mode_${device.id}")
     ) {
@@ -296,17 +544,17 @@ internal fun TvDeviceCardDimmerStrip(
                 TvDimmerStepCircleButton(
                     icon = Icons.Default.Remove,
                     contentDescription = "Decrease brightness",
-                    tint = if (isDimmingMode) TvDimmerGold else Color.White,
+                    tint = if (isFocused) TvDimmerGold else Color.White,
                     testTag = "tv_card_dim_minus_${device.id}",
                     onClick = {
-                        onSelectFocus()
+                        onSelectSliderFocus()
                         onStepBrightness(-10)
                     }
                 )
 
                 LinearProgressIndicator(
                     progress = { (device.brightness / 100f).coerceIn(0f, 1f) },
-                    color = if (isDimmingMode) TvDimmerGold else TvCyanFocusBorder,
+                    color = if (isFocused) TvDimmerGold else TvCyanFocusBorder,
                     trackColor = Color.White.copy(alpha = 0.15f),
                     modifier = Modifier
                         .weight(1f)
@@ -316,7 +564,7 @@ internal fun TvDeviceCardDimmerStrip(
 
                 Text(
                     text = "${device.brightness}%",
-                    color = if (isDimmingMode) TvDimmerGold else Color.White,
+                    color = if (isFocused) TvDimmerGold else Color.White,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp
@@ -325,26 +573,26 @@ internal fun TvDeviceCardDimmerStrip(
                 TvDimmerStepCircleButton(
                     icon = Icons.Default.Add,
                     contentDescription = "Increase brightness",
-                    tint = if (isDimmingMode) TvDimmerGold else Color.White,
+                    tint = if (isFocused) TvDimmerGold else Color.White,
                     testTag = "tv_card_dim_plus_${device.id}",
                     onClick = {
-                        onSelectFocus()
+                        onSelectSliderFocus()
                         onStepBrightness(10)
                     }
                 )
             }
 
-            if (isDimmingMode) {
+            if (isFocused) {
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = "Left: -10%  •  Right: +10%   (OK or Back = Done)",
+                    text = "Left: -10%  •  Right: +10%   (Up: Toggle • Down: Next)",
                     color = TvDimmerGold,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.5.sp,
                     maxLines = 1
                 )
-            } else if (isHighlighted) {
+            } else if (isToggleHighlighted) {
                 Spacer(modifier = Modifier.height(2.dp))
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -357,7 +605,7 @@ internal fun TvDeviceCardDimmerStrip(
                         modifier = Modifier.size(11.dp)
                     )
                     Text(
-                        text = "Long-press OK or press Play/Menu to adjust dimmer",
+                        text = "Press Down to focus dimmer slider",
                         color = TvTextSecondary,
                         fontFamily = FontFamily.SansSerif,
                         fontSize = 10.sp,

@@ -33,7 +33,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -66,6 +68,10 @@ internal fun TvTopHeaderBar(
     focusedDevice: DeviceEntity?,
     dimmingDeviceId: Int?,
     isRefreshing: Boolean,
+    topActionFocusRequesters: List<FocusRequester>,
+    onSelectTopActionFocus: (Int) -> Unit,
+    onNavigateDownFromTopBar: () -> Boolean,
+    onNavigateTopActionHorizontal: (Int) -> Boolean,
     onPrimaryActionOnFocused: (DeviceEntity) -> Unit,
     onToggleDimmingFocused: (Int?) -> Unit,
     onApplyTvScene: (String) -> Unit,
@@ -158,7 +164,7 @@ internal fun TvTopHeaderBar(
                         )
                         Text(
                             text = if (isDimmingFocused) {
-                                "${focusedDevice.name}: ${focusedDevice.brightness}% (Left/Right Adjust • OK Done)"
+                                "${focusedDevice.name}: ${focusedDevice.brightness}% (Left/Right Adjust • Down Next)"
                             } else {
                                 "${focusedDevice.name} • OK Toggle"
                             },
@@ -219,23 +225,39 @@ internal fun TvTopHeaderBar(
             TvSceneChip(
                 title = "Movie 20%",
                 icon = Icons.Default.Movie,
+                focusRequester = topActionFocusRequesters.getOrNull(0),
+                onFocusGained = { onSelectTopActionFocus(0) },
+                onNavigateLeft = { true },
+                onNavigateRight = { onNavigateTopActionHorizontal(1) },
+                onNavigateDown = onNavigateDownFromTopBar,
                 onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.MOVIE_MODE.wireKey) },
                 testTag = "tv_scene_movie"
             )
             TvSceneChip(
                 title = "Holiday ON",
                 icon = Icons.Default.Park,
+                focusRequester = topActionFocusRequesters.getOrNull(1),
+                onFocusGained = { onSelectTopActionFocus(1) },
+                onNavigateLeft = { onNavigateTopActionHorizontal(0) },
+                onNavigateRight = { onNavigateTopActionHorizontal(2) },
+                onNavigateDown = onNavigateDownFromTopBar,
                 onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey) },
                 testTag = "tv_scene_holiday"
             )
             TvSceneChip(
                 title = "All OFF",
                 icon = Icons.Default.Bedtime,
+                focusRequester = topActionFocusRequesters.getOrNull(2),
+                onFocusGained = { onSelectTopActionFocus(2) },
+                onNavigateLeft = { onNavigateTopActionHorizontal(1) },
+                onNavigateRight = { onNavigateTopActionHorizontal(3) },
+                onNavigateDown = onNavigateDownFromTopBar,
                 onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.BEDTIME_OFF.wireKey) },
                 testTag = "tv_scene_bedtime"
             )
 
             var isScanFocused by remember { mutableStateOf(false) }
+            val scanRequester = topActionFocusRequesters.getOrNull(3)
             Surface(
                 shape = RoundedCornerShape(10.dp),
                 color = if (isScanFocused) WemoGreenPrimary else WemoGreenDark,
@@ -244,8 +266,32 @@ internal fun TvTopHeaderBar(
                     color = if (isScanFocused) Color.White else TvCyanFocusBorder.copy(alpha = 0.65f)
                 ),
                 modifier = Modifier
-                    .onFocusChanged { isScanFocused = it.isFocused }
+                    .let { mod -> if (scanRequester != null) mod.focusRequester(scanRequester) else mod }
+                    .onFocusChanged { state ->
+                        isScanFocused = state.isFocused
+                        if (state.isFocused) {
+                            onSelectTopActionFocus(3)
+                        }
+                    }
+                    .onKeyEvent { event ->
+                        if (event.type == KeyEventType.KeyDown) {
+                            when (event.key) {
+                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                                    onScanSsdpClick()
+                                    true
+                                }
+                                Key.DirectionLeft -> onNavigateTopActionHorizontal(2)
+                                Key.DirectionRight -> true
+                                Key.DirectionDown -> onNavigateDownFromTopBar()
+                                Key.DirectionUp -> true
+                                else -> false
+                            }
+                        } else {
+                            false
+                        }
+                    }
                     .focusable()
+                    .focusProperties { canFocus = false }
                     .clickable { onScanSsdpClick() }
                     .testTag("tv_scan_button")
             ) {
@@ -277,11 +323,17 @@ internal fun TvTopHeaderBar(
 internal fun TvRoomSectionHeader(
     roomName: String,
     roomDevices: List<DeviceEntity>,
+    isFocusedByRemote: Boolean,
     isTogglingRoom: Boolean,
+    focusRequester: FocusRequester? = null,
+    onSelectRoomFocus: () -> Unit,
+    onNavigateUp: () -> Boolean,
+    onNavigateDown: () -> Boolean,
     onToggleRoomPower: () -> Unit,
     onStepRoomBrightness: ((Int) -> Unit)? = null
 ) {
-    var isFocused by remember { mutableStateOf(false) }
+    var hasHardwareFocus by remember { mutableStateOf(false) }
+    val isFocused = isFocusedByRemote || hasHardwareFocus
     val controllable = roomDevices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
     val onCount = controllable.count { it.isOn && it.isReachable }
     val dimmers = roomDevices.filter { it.parsedType == DeviceType.LIGHTBULB_DIMMER && it.isReachable }
@@ -292,27 +344,44 @@ internal fun TvRoomSectionHeader(
     }
 
     Surface(
-        color = if (isFocused) Color(0xFF133B66) else Color(0xFF0B192C),
+        color = if (isFocused) TvFocusedCardBg else Color(0xFF0B192C),
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(
-            width = if (isFocused) 2.5.dp else 1.dp,
+            width = if (isFocused) 3.5.dp else 1.dp,
             color = if (isFocused) TvCyanFocusBorder else Color(0xFF1E3A5F)
         ),
+        shadowElevation = if (isFocused) 10.dp else 0.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .onFocusChanged { isFocused = it.isFocused }
+            .let { mod -> if (focusRequester != null) mod.focusRequester(focusRequester) else mod }
+            .onFocusChanged { state ->
+                hasHardwareFocus = state.isFocused
+                if (state.isFocused) {
+                    onSelectRoomFocus()
+                }
+            }
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)
-                ) {
-                    onToggleRoomPower()
-                    true
+                if (event.type == KeyEventType.KeyDown) {
+                    when (event.key) {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            onToggleRoomPower()
+                            true
+                        }
+                        Key.DirectionUp -> onNavigateUp()
+                        Key.DirectionDown -> onNavigateDown()
+                        Key.DirectionLeft, Key.DirectionRight -> true
+                        else -> false
+                    }
                 } else {
                     false
                 }
             }
             .focusable()
-            .clickable { onToggleRoomPower() }
+            .focusProperties { canFocus = false }
+            .clickable {
+                onSelectRoomFocus()
+                onToggleRoomPower()
+            }
             .testTag("tv_room_header_$roomName")
     ) {
         Row(
@@ -409,13 +478,29 @@ internal fun TvRoomSectionHeader(
                     }
                 }
 
-                Text(
-                    text = if (isFocused) "OK: Toggle Room" else "Room Master",
-                    color = if (isFocused) TvCyanFocusBorder else TvTextSecondary,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 11.sp
-                )
+                if (isFocused) {
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = TvCyanFocusBorder
+                    ) {
+                        Text(
+                            text = "FOCUSED • OK TOGGLE ROOM",
+                            color = TvDeepBackground,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.ExtraBold,
+                            fontSize = 10.sp,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Room Master",
+                        color = TvTextSecondary,
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 11.sp
+                    )
+                }
             }
         }
     }
@@ -425,6 +510,11 @@ internal fun TvRoomSectionHeader(
 internal fun TvSceneChip(
     title: String,
     icon: ImageVector,
+    focusRequester: FocusRequester? = null,
+    onFocusGained: () -> Unit = {},
+    onNavigateLeft: () -> Boolean = { false },
+    onNavigateRight: () -> Boolean = { false },
+    onNavigateDown: () -> Boolean = { false },
     onClick: () -> Unit,
     testTag: String
 ) {
@@ -437,18 +527,32 @@ internal fun TvSceneChip(
             color = if (isFocused) TvCyanFocusBorder else TvCyanFocusBorder.copy(alpha = 0.35f)
         ),
         modifier = Modifier
-            .onFocusChanged { isFocused = it.isFocused }
+            .let { mod -> if (focusRequester != null) mod.focusRequester(focusRequester) else mod }
+            .onFocusChanged { state ->
+                isFocused = state.isFocused
+                if (state.isFocused) {
+                    onFocusGained()
+                }
+            }
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter)
-                ) {
-                    onClick()
-                    true
+                if (event.type == KeyEventType.KeyDown) {
+                    when (event.key) {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
+                            onClick()
+                            true
+                        }
+                        Key.DirectionLeft -> onNavigateLeft()
+                        Key.DirectionRight -> onNavigateRight()
+                        Key.DirectionDown -> onNavigateDown()
+                        Key.DirectionUp -> true
+                        else -> false
+                    }
                 } else {
                     false
                 }
             }
             .focusable()
+            .focusProperties { canFocus = false }
             .clickable(onClick = onClick)
             .testTag(testTag)
     ) {

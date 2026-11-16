@@ -62,13 +62,13 @@ At the bottom of the **More** tab, the **Open Source License** card (`open_sourc
 ### Key Features of `wemi TV`:
 1. **Full-Height 3-Column Room-Grouped Switch Grid**:
    - A single compact top bar (`wemi TV`, active switch count, focused switch status pill, quick scenes, and `Rescan`) dedicates over 90% of vertical screen height to your switches.
-   - Switches are grouped under full-width **Room Section Headers** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `Unassigned` last) inside a 3-column grid (`GridCells.Fixed(3)`). Pressing **`OK / Select`** on any Room Header toggles all switches in that room ON or OFF.
+   - Switches are grouped under full-width **Room Section Headers** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `Unassigned` last) inside a 3-column grid (`GridCells.Fixed(3)`). Moving **`Up`** or **`Down`** through a Room Bar from any column (including the leftmost switch widget) selects the Room Bar next, and pressing **`OK / Select`** toggles all switches in that room ON or OFF.
 2. **Unmistakable 10-Foot Cursor Focus**:
    - The first switch card automatically receives D-Pad focus on launch.
    - The focused card stands out across the living room with a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated card surface (`#133B66`), subtle scale lift (`1.022x`), and a **`FOCUSED • OK`** badge in the top-right corner.
-3. **Predictable Card Navigation & Non-Interfering Dimmer Adjust Mode**:
-   - **Normal Navigation Mode**: **D-Pad `Up / Down / Left / Right`** always moves freely across the 3 columns of switch and dimmer cards without getting stuck on dimmers. Pressing **`OK / Select`** on any card (switch or dimmer) immediately toggles power **ON** or **OFF** (or triggers a 9-port reconnect if offline).
-   - **Dimmer Adjust Mode**: To adjust a dimmer's brightness, press **`Play/Pause`**, **`Menu`**, or **Long-Press `OK`** on a focused dimmer card (or click its dimmer strip). The card border turns glowing Gold (`#FBBF24`) with a **`DIM -/+`** badge: use **`Left` / `Right`** to step brightness `-10%` / `+10%` (or **`Up` / `Down`** for `±20%`), then press **`OK`** or **`Back`** to finish and return to normal card navigation.
+3. **Google TV Remote-Friendly Focusable Dimmer Slider & 3-Column Navigation**:
+   - **On/Off Toggle**: Navigating down into a switch or dimmer card focuses its **On/Off Toggle**. Pressing **D-Pad `Left` / `Right`** moves across the switch cards to the left and right, and pressing **`OK / Select`** immediately toggles power **ON** or **OFF** (or triggers a 9-port reconnect if offline).
+   - **Focusable Dimmer Slider**: Navigating **`Down` once more** from a dimmer card's On/Off Toggle focuses the **Dimmer Slider** inside the card (highlighted with a glowing Gold `#FBBF24` border and **`◄ -10% • +10% ►`** badge) — no Play or Menu button required. While the Dimmer Slider is focused, press **`Left`** / **`Right`** to lower (`-10%`) or raise (`+10%`) the dimmer brightness, press **`Up`** to return to the On/Off Toggle, or press **`Down`** to move to the widget below.
 4. **1-Click TV Lighting Scenes & Non-Blocking LAN Rescan**:
    - **`Movie 20%`**: Dims Living Room lights to a soft `20%` glow and turns off bright overhead switches.
    - **`Holiday ON`**: Turns all holiday/tree switches **ON**.
