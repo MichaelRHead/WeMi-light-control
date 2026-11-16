@@ -90,8 +90,8 @@ Format:
 [FLAGS] rtos=0 iot=0 binaryOption=0 new_algo=0 -> autoMethod=1 autoLen=true
 [ID] mac=EC1A59XXXXXX sn=221517K01018AB (src=GetMetaInfo) meta="EC1A59XXXXXX|221517K01018AB|0|0|WeMo.Switch.8AB|..."
 ```
-- **Verify `src=GetMetaInfo` or `src=setup.xml` or `src=basicevent1#GetMacAddr`**:
-  - OpenSSL AES-128-CBC key derivation ([`PasswordCrypto.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/PasswordCrypto.kt)) derives its key and IV from the switch's exact 12-hex-character `macAddress` and `serialNumber`.
+- **Verify `src=GetMetaInfo`, `src=GetMetaInfo+setup.xml`, `src=setup.xml`, or `src=basicevent1#GetMacAddr`**:
+  - OpenSSL AES-128-CBC key derivation ([`PasswordCrypto.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/PasswordCrypto.kt)) derives its key and IV from the switch's exact 12-hex-character `macAddress` and real non-placeholder `serialNumber` (`!LanRuntimeUtils.isPlaceholderSerial`).
   - If `src=MISSING(Fallback!)` or `mac=` is blank/wrong length (`!= 12` hex chars), the switch will fail to decrypt the Wi-Fi password (`NetworkStatus=2` or `0`).
 - **Verify Encryption Method (`autoMethod` & `autoLen`)**:
   - `Method 1` (`OpenWrt`, `rtos=0`): `key = MAC[0:6] + Serial + MAC[6:12]`.
@@ -140,4 +140,4 @@ Format:
 Whenever a screenshot or exported telemetry file reveals a new firmware flag, SOAP tag, or hardware SKU quirk:
 1. Add the parsed field to `SetupDeviceDescriptor` in [`NetworkModels.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) (populated by `probeSetupDevice` in [`SetupApProber.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupApProber.kt) / [`ProvisionerClient.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt)) and surface it in `SetupDebugSnapshot.toDisplayLines` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt).
 2. Add deterministic loopback regression coverage in [`GenaProvisioningAndRulesTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt) and/or [`ProvisioningAndGenaCujE2ETest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ProvisioningAndGenaCujE2ETest.kt) using [`FakeUpnpServer.kt`](../../app/src/test/java/org/suppressingfire/wemi/FakeUpnpServer.kt).
-3. Run `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`51/51` tests across 13 suites) before pushing.
+3. Run `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`53/53` tests across 13 suites) before pushing.

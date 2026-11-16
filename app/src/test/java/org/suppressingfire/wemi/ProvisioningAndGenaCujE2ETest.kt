@@ -288,6 +288,7 @@ class ProvisioningAndGenaCujE2ETest {
             composeTestRule.waitForIdle()
 
             val fullMoreExport = telemetryFile.readText()
+            assertTrue(fullMoreExport.contains("[TARGET AP] \"HeadFamily-2.4G\" found in ApList"))
             assertTrue(fullMoreExport.contains("[STEP 6 CLOSE] CloseSetup -> success"))
             assertTrue(fullMoreExport.contains("[HOME] key="))
             assertTrue(fullMoreExport.contains("Stairway 3-Way Switch"))

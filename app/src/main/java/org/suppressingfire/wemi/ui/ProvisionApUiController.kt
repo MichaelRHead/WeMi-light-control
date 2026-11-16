@@ -165,6 +165,7 @@ internal class ProvisionApUiController(
                     isWifiSocketBound = netSnap.isWifiSocketBound,
                     isDemoMode = repository.isDemoShowroomMode.value,
                     targetApHost = cleanHost,
+                    targetSsid = ssid.trim(),
                     traceLines = listOf("[START] Starting WiFiSetup1 provisioning to \"$ssid\" on $cleanHost...")
                 )
 

@@ -57,7 +57,7 @@ Inside the **`SETUP DEBUG DETAILS (SCREENSHOT)`** header bar in the **Provision 
 In the header of the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
 - **Tap `Save/Share Log`**:
   1. Generates a comprehensive 4-section report (`wemi-telemetry-latest.txt`, stamped with `App Version: v27.0 (versionCode=27, com.aistudio.wemiswitch.kxpqzr)`) containing:
-     - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, and `[STEP 1..6]` provisioning traces from your most recent setup attempt.
+     - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt.
      - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet, and gateway IP).
      - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its room, IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), latency (`ms`), hardware SKU, firmware, serial number, and MAC.
      - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries (including Top-Header **`All Off`**, Room Master toggles, and Android TV D-Pad switch/dimmer commands) with timestamps, endpoints, HTTP statuses, and XML payload summaries.
@@ -80,7 +80,7 @@ adb exec-out run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-late
 | **`[PROBE]`** | `host=10.22.22.1 -> :49152/setup.xml=HTTP_200(14ms,1420B)` | Shows per-port probe diagnostics across all 9 UPnP ports (`49151..49159`) and which descriptor path (`/setup.xml` or `/Lightsetup.xml`) responded with `HTTP_200`. |
 | **`[XML]`** | `/setup.xml :49152 name="Smart Switch" model=LightSwitch sku=... fw=WeMo_WW_...` | Hardware model name, default friendly name, SKU, and firmware version read from `/setup.xml`. |
 | **`[FLAGS]`** | `rtos=0 iot=0 binaryOption=0 new_algo=0 -> autoMethod=1 autoLen=true` | Hardware encryption flags from `/setup.xml` and which OpenSSL AES-128-CBC method (`1`, `2`, or `3`) and length suffix (`autoLen`) were auto-selected. |
-| **`[ID]`** | `mac=EC1A59... sn=221517... (src=GetMetaInfo) meta="..."` | The switch's MAC address and Serial Number (required to salt the AES-128-CBC key) and which SOAP call supplied them (`GetMetaInfo`, `setup.xml`, or `basicevent1#GetMacAddr`). |
+| **`[ID]`** | `mac=EC1A59... sn=221517... (src=GetMetaInfo) meta="..."` | The switch's MAC address and Serial Number (required to salt the AES-128-CBC key) and which SOAP/XML source supplied them (`GetMetaInfo`, `GetMetaInfo+setup.xml`, `setup.xml`, or `basicevent1#GetMacAddr`). |
 | **`[SCAN]`** | `GetApList=HTTP_200(1240ms,count=4)` | Results of the switch's `WiFiSetup1#GetApList` (or `GetNetworkList`) 2.4 GHz site survey. |
 | **`[TARGET AP]`** | `"MyHome24" found in ApList: Ch=6 Auth=WPA2PSK/AES Signal=88%` | The exact 2.4 GHz channel, authentication mode, and cipher that will be sent in `ConnectHomeNetwork`. |
 | **`[STEP 4 CRYPTO]`** | `Method=1 addLengths=true plainLen=12 encLen=68 suffix=0c40` | Confirms the password encryption parameters (`Method 1/2/3` and whether the 4-hex-char `xxyy` length suffix was appended) without exposing your password. |

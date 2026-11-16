@@ -131,7 +131,9 @@ internal class SetupApProber(
 
         val (rawMetaString, meta) = fetchSetupMetaInfo(apHost, resolvedPort)
         val metaMac = meta?.macAddress?.replace(":", "")?.replace("-", "")?.trim()?.ifBlank { null }
-        val metaSerial = meta?.serialNumber?.trim()?.ifBlank { null }
+        val rawMetaSerial = meta?.serialNumber?.trim()?.ifBlank { null }
+        val metaSerial = rawMetaSerial?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
+        val validXmlSerial = xmlSerial.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
 
         val basicMac = if (metaMac == null && xmlMac.isBlank()) {
             fetchBasicEventTag(apHost, resolvedPort, "GetMacAddr", "MacAddr")
@@ -139,23 +141,26 @@ internal class SetupApProber(
         } else {
             null
         }
-        val basicSerial = if (metaSerial == null && xmlSerial.isBlank()) {
-            fetchBasicEventTag(apHost, resolvedPort, "GetSerialNo", "SerialNo")?.trim()?.ifBlank { null }
+        val basicSerial = if (metaSerial == null && validXmlSerial == null) {
+            fetchBasicEventTag(apHost, resolvedPort, "GetSerialNo", "SerialNo")
+                ?.trim()
+                ?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
         } else {
             null
         }
 
         val macSource = when {
             metaMac != null && metaSerial != null -> "GetMetaInfo"
-            metaMac != null && xmlSerial.isNotBlank() -> "GetMetaInfo+setup.xml"
-            xmlMac.isNotBlank() && xmlSerial.isNotBlank() -> "setup.xml"
+            metaMac != null && validXmlSerial != null -> "GetMetaInfo+setup.xml"
+            xmlMac.isNotBlank() && validXmlSerial != null -> "setup.xml"
             basicMac != null || basicSerial != null -> "basicevent1#GetMacAddr"
             metaMac != null || xmlMac.isNotBlank() -> "partial(xml/meta)"
             else -> "MISSING(Fallback!)"
         }
 
         val mac = metaMac ?: xmlMac.ifBlank { null } ?: basicMac ?: LanRuntimeUtils.DEFAULT_FALLBACK_MAC
-        val serial = metaSerial ?: xmlSerial.ifBlank { null } ?: basicSerial ?: LanRuntimeUtils.DEFAULT_PLACEHOLDER_SERIAL
+        val serial = metaSerial ?: validXmlSerial ?: basicSerial
+            ?: rawMetaSerial ?: xmlSerial.ifBlank { null } ?: LanRuntimeUtils.DEFAULT_PLACEHOLDER_SERIAL
         val sku = meta?.deviceSku?.ifBlank { null } ?: modelName
         val firmware = meta?.firmwareVersion?.ifBlank { null } ?: xmlFirmware
 

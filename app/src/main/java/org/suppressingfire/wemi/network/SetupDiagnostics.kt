@@ -26,6 +26,7 @@ data class SetupDebugSnapshot(
     val isWifiSocketBound: Boolean = false,
     val isDemoMode: Boolean = false,
     val targetApHost: String = "10.22.22.1",
+    val targetSsid: String = "",
     val probeSummary: String = "Not probed yet",
     val detectedDevice: SetupDeviceDescriptor? = null,
     val apScanSummary: String = "Not scanned yet",
@@ -36,7 +37,8 @@ data class SetupDebugSnapshot(
      * Formats all setup telemetry into compact, high-signal lines designed to fit inside a single
      * phone screenshot in `ProvisionApDialog` (`provision_debug_panel`) or clipboard paste.
      */
-    fun toDisplayLines(selectedSsid: String = ""): List<String> {
+    fun toDisplayLines(selectedSsid: String = targetSsid): List<String> {
+        val effectiveSsid = selectedSsid.ifBlank { targetSsid }
         val lines = mutableListOf<String>()
         val modeTag = if (isDemoMode) "DEMO" else "REAL-LAN"
         lines.add(
@@ -58,8 +60,8 @@ data class SetupDebugSnapshot(
             lines.add("[XML/ID] No setup descriptor read from $targetApHost")
         }
         lines.add("[SCAN] $apScanSummary")
-        if (selectedSsid.isNotBlank() && scannedAps.isNotEmpty()) {
-            val match = scannedAps.firstOrNull { it.ssid.equals(selectedSsid.trim(), ignoreCase = true) }
+        if (effectiveSsid.isNotBlank() && scannedAps.isNotEmpty()) {
+            val match = scannedAps.firstOrNull { it.ssid.equals(effectiveSsid.trim(), ignoreCase = true) }
             if (match != null) {
                 lines.add(
                     "[TARGET AP] \"${match.ssid}\" found in ApList: Ch=${match.channel} Auth=${match.authMode}/${match.encryptionType} Signal=${match.signalStrengthPercent}%"
@@ -67,7 +69,7 @@ data class SetupDebugSnapshot(
             } else {
                 val sample = scannedAps.take(4).joinToString(", ") { "${it.ssid}(Ch${it.channel})" }
                 lines.add(
-                    "[TARGET AP] WARN: \"$selectedSsid\" NOT in ApList! Seen: [$sample]"
+                    "[TARGET AP] WARN: \"$effectiveSsid\" NOT in ApList! Seen: [$sample]"
                 )
             }
         }
@@ -77,7 +79,7 @@ data class SetupDebugSnapshot(
         return lines
     }
 
-    fun toClipboardText(selectedSsid: String = ""): String {
+    fun toClipboardText(selectedSsid: String = targetSsid): String {
         return buildString {
             appendLine("=== WeMi Setup AP Diagnostic Report (v${BuildConfig.VERSION_NAME} [${BuildConfig.VERSION_CODE}] • $timestamp) ===")
             toDisplayLines(selectedSsid).forEach { appendLine(it) }
@@ -117,7 +119,7 @@ object TelemetryFileExporter {
 
     fun buildFullTelemetryReport(
         setupSnapshot: SetupDebugSnapshot,
-        selectedSsid: String = "",
+        selectedSsid: String = setupSnapshot.targetSsid,
         homes: List<HomeNetworkEntity> = emptyList(),
         devices: List<DeviceEntity> = emptyList(),
         soapLogs: List<SoapLogEntry> = emptyList()

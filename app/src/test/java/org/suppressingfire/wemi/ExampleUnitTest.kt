@@ -209,6 +209,54 @@ class ExampleUnitTest {
         val realAfterDhcpHop = realBeforeDhcpHop.copy(ipAddress = "192.168.1.188", port = 49154)
         assertEquals("WLS0403SN9988", realBeforeDhcpHop.concurrencyKey())
         assertEquals(realBeforeDhcpHop.concurrencyKey(), realAfterDhcpHop.concurrencyKey())
+
+        // Verify SetupApProber skips "UNKNOWN" in GetMetaInfo in favor of real /setup.xml serialNumber
+        java.net.ServerSocket(0, 8, java.net.InetAddress.getByName("127.0.0.1")).use { server ->
+            val t = kotlin.concurrent.thread(isDaemon = true) {
+                repeat(3) {
+                    runCatching {
+                        server.accept().use { sock ->
+                            sock.soTimeout = 1000
+                            val reader = java.io.BufferedReader(
+                                java.io.InputStreamReader(sock.getInputStream(), Charsets.ISO_8859_1)
+                            )
+                            val reqLine = reader.readLine().orEmpty()
+                            if (reqLine.isBlank()) return@use
+                            var contentLength = 0
+                            while (true) {
+                                val h = reader.readLine() ?: break
+                                if (h.isEmpty()) break
+                                if (h.startsWith("Content-Length:", ignoreCase = true)) {
+                                    contentLength = h.substringAfter(':').trim().toIntOrNull() ?: 0
+                                }
+                            }
+                            var rem = contentLength
+                            while (rem > 0) {
+                                val readCount = reader.read(CharArray(rem))
+                                if (readCount <= 0) break
+                                rem -= readCount
+                            }
+                            val body = if (reqLine.contains("/setup.xml")) {
+                                "<root><device><friendlyName>Porch Switch</friendlyName><modelName>WLS040</modelName><serialNumber>221840KREAL77</serialNumber><macAddress>EC1A59AA1122</macAddress><rtos>1</rtos></device></root>"
+                            } else {
+                                "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><MetaInfo>EC1A59AA1122|UNKNOWN|WLS040|WeMo_WW_2.00|Wemo.LS3W.777|WLS040</MetaInfo></s:Body></s:Envelope>"
+                            }
+                            val bytes = body.toByteArray(Charsets.UTF_8)
+                            sock.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray(Charsets.US_ASCII))
+                            sock.getOutputStream().write(bytes)
+                            sock.getOutputStream().flush()
+                        }
+                    }
+                }
+            }
+            val desc = kotlinx.coroutines.runBlocking {
+                org.suppressingfire.wemi.network.ProvisionerClient(defaultApHost = "127.0.0.1")
+                    .probeSetupDevice("127.0.0.1", server.localPort)
+            }
+            t.join(1000)
+            assertEquals("221840KREAL77", desc?.serialNumber)
+            assertEquals("GetMetaInfo+setup.xml", desc?.macAndSerialSource)
+        }
     }
 }
 
