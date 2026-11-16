@@ -55,14 +55,14 @@ flowchart TD
     Start["Tap 'SSDP Scan'"] --> Lock["Acquire Android WifiManager.MulticastLock\n& Bind to Wi-Fi IPv4 Socket"]
     Lock --> MSearch["Send UDP M-SEARCH to 239.255.255.250:1900\n(Retransmit every 1s for 3.2s)"]
     MSearch --> Check{"Any Belkin Responses?"}
-    Check -->|Yes| Fetch["Fetch /setup.xml + GetBinaryState\n+ GetMetaInfo + GetSignalStrength"]
-    Check -->|No - Router Blocks Multicast| Unicast["Automatic /24 Unicast Sweep\n(Probe WeMo Ports 49151..49159 across Subnet)"]
+    Check -->|Yes| Fetch["Fetch /setup.xml or /Lightsetup.xml + GetBinaryState\n+ GetMetaInfo + GetSignalStrength"]
+    Check -->|No - Router Blocks Multicast| Unicast["Automatic /24 Unicast Sweep\n(Probe Ports 49153, 49152, 49154, 49151 across Subnet)"]
     Unicast --> Fetch
     Fetch --> Done["Render Live State & Adopt into Room DB"]
 ```
 
-- **Unicast `/24` Fallback for Strict Routers**: Some mesh routers and guest/IoT VLANs drop UDP multicast packets (`239.255.255.250:1900`). If multicast returns zero responses, **WeMi Light Control** automatically sweeps your active `/24` subnet across Belkin's UPnP ports (`49151–49159`) so your switches are still found.
+- **Known-Device Direct Probing & Unicast `/24` Fallback for Strict Routers**: Some mesh routers and guest/IoT VLANs drop UDP multicast packets (`239.255.255.250:1900`). Every scan also probes previously saved switch IPs directly (isolating synthetic placeholder serials so multiple manual entries never suppress each other), and if multicast + known-IP probing return zero responses on a normal LAN subnet (excluding `10.22.22.x` Setup APs), **WeMi Light Control** automatically sweeps your active `/24` subnet across primary UPnP ports (`49153, 49152, 49154, 49151`) for `/setup.xml` and `/Lightsetup.xml`.
 - **9-Port Smart Probing & Self-Healing Reconnection**:
-  Belkin WeMo firmware frequently shifts its HTTP SOAP listener across ports `49151–49159` after a power blink or firmware reboot. Whenever a switch stops responding on its old port or IP:
-  1. **Stage 1 (9-Port Sweep)**: The app probes all 9 candidate ports (`49153, 49152, 49154, 49151, 49155..49159`) at the last-known IP and verifies the hardware `<serialNumber>` in `/setup.xml`.
-  2. **Stage 2 (Serial-Matched SSDP Re-Discovery)**: If the router assigned the switch a new DHCP IP address, the app runs a discovery pass, matches the switch by its unique `<serialNumber>` / `<UDN>`, and updates its IP and port automatically.
+  Switch firmware frequently shifts its HTTP SOAP listener across ports `49151–49159` after a power blink or firmware reboot. Whenever a switch stops responding on its old port or IP:
+  1. **Stage 1 (9-Port Sweep)**: The app probes all 9 candidate ports (`49153, 49152, 49154, 49151, 49155..49159`) at the last-known IP and verifies the hardware `<serialNumber>` / `<UDN>` in `/setup.xml`.
+  2. **Stage 2 (Serial/UDN-Matched SSDP Re-Discovery)**: If the router assigned the switch a new DHCP IP address, the app runs a targeted discovery pass, matches the switch by its unique `<serialNumber>` or `<UDN>`, and updates its IP and port automatically.

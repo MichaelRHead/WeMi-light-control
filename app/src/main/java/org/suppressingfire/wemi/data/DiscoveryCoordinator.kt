@@ -96,7 +96,8 @@ internal class DiscoveryCoordinator(
         val scanReport = networkClient.performSsdpDiscoveryScan(
             searchTarget = XmlAndSkuParser.URN_BASIC_EVENT,
             knownLocalDevices = emptyList(),
-            includeDemoFallbacks = false
+            includeDemoFallbacks = false,
+            allowUnicastSubnetFallback = false
         )
         onSsdpReport(scanReport)
         val match = scanReport.discoveredDevices.find { discovered ->

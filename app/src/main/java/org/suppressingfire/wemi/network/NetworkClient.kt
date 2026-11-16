@@ -474,8 +474,9 @@ class NetworkClient(
     suspend fun performSsdpDiscoveryScan(
         searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
         knownLocalDevices: List<DeviceEntity> = emptyList(),
-        includeDemoFallbacks: Boolean = false
+        includeDemoFallbacks: Boolean = false,
+        allowUnicastSubnetFallback: Boolean = true
     ): SsdpScanReport = ssdpEngine.performSsdpDiscoveryScan(
-        searchTarget, knownLocalDevices, includeDemoFallbacks
+        searchTarget, knownLocalDevices, includeDemoFallbacks, allowUnicastSubnetFallback
     )
 }

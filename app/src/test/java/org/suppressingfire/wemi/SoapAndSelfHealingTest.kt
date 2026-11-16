@@ -238,4 +238,47 @@ class SoapAndSelfHealingTest {
             monitor.stopMonitoring()
         }
     }
+
+    @Test
+    fun `verify Stage B known-device unicast discovery isolates placeholder serials and skips 10_22_22 subnet sweep`() = runBlocking {
+        val serverA = FakeUpnpServer(
+            initialFriendlyName = "Porch Light",
+            serialNumber = org.suppressingfire.wemi.network.LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL,
+            udn = "",
+            enableSsdpResponder = false
+        )
+        val serverB = FakeUpnpServer(
+            initialFriendlyName = "Garage Light",
+            serialNumber = org.suppressingfire.wemi.network.LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL,
+            udn = "",
+            enableSsdpResponder = false
+        )
+        try {
+            val client = NetworkClient(extraCandidatePorts = listOf(serverA.port, serverB.port))
+            val knownA = DeviceEntity(
+                name = "Porch Light",
+                ipAddress = "127.0.0.1",
+                port = serverA.port,
+                serialNumber = org.suppressingfire.wemi.network.LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL
+            )
+            val knownB = DeviceEntity(
+                name = "Garage Light",
+                ipAddress = "127.0.0.1",
+                port = serverB.port,
+                serialNumber = org.suppressingfire.wemi.network.LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL
+            )
+            val report = client.performSsdpDiscoveryScan(
+                knownLocalDevices = listOf(knownA, knownB),
+                includeDemoFallbacks = false
+            )
+            assertEquals(2, report.discoveredDevices.size)
+            assertTrue(report.discoveredDevices.any { it.port == serverA.port && it.roomName == "Outdoor" })
+            assertTrue(report.discoveredDevices.any { it.port == serverB.port && it.roomName == "Garage" })
+
+            assertTrue(client.scanSubnetUnicast("10.22.22").isEmpty())
+        } finally {
+            serverA.close()
+            serverB.close()
+        }
+    }
 }
