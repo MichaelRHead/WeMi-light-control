@@ -388,9 +388,9 @@ internal class DeviceActionsUiController(
         }
     }
 
-    fun moveDevice(device: DeviceEntity, moveUp: Boolean) {
+    fun moveDevice(device: DeviceEntity, moveUp: Boolean, withinRoomOnly: Boolean = false) {
         scope.launch {
-            repository.moveDeviceOrder(device, moveUp)
+            repository.moveDeviceOrder(device, moveUp, withinRoomOnly)
         }
     }
 }

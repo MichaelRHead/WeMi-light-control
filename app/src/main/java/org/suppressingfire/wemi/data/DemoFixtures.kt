@@ -228,7 +228,7 @@ object DemoFixtures {
             latencyMs = 19,
             lastCheckedTime = "Remembered",
             serialNumber = "221517K01050C1",
-            sortOrder = 8
+            sortOrder = 9
         ),
         DeviceEntity(
             id = 10,
@@ -245,7 +245,7 @@ object DemoFixtures {
             latencyMs = 0,
             lastCheckedTime = "Tap Reconnect",
             serialNumber = "221517K01050C2",
-            sortOrder = 9
+            sortOrder = 10
         ),
         DeviceEntity(
             id = 11,
@@ -262,7 +262,7 @@ object DemoFixtures {
             latencyMs = 23,
             lastCheckedTime = "Remembered",
             serialNumber = "94103EA2B250C3",
-            sortOrder = 10
+            sortOrder = 11
         ),
 
         // --- Remembered Devices on Studio Office Wi-Fi (Studio-Guest-LAN • 10.0.10.x) ---
@@ -281,7 +281,7 @@ object DemoFixtures {
             latencyMs = 10,
             lastCheckedTime = "Remembered",
             serialNumber = "94103EA2B210F1",
-            sortOrder = 11
+            sortOrder = 12
         ),
         DeviceEntity(
             id = 13,
@@ -298,7 +298,7 @@ object DemoFixtures {
             latencyMs = 14,
             lastCheckedTime = "Remembered",
             serialNumber = "221517K01010F2",
-            sortOrder = 12
+            sortOrder = 13
         )
     )
 

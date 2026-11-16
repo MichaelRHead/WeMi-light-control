@@ -14,10 +14,10 @@ While in **Edit Mode**, the right side of every switch row replaces its Power Ri
 
 | Icon | Action | Description |
 | :--- | :--- | :--- |
-| **`↑` (Up Arrow)** | **Move Up** | Moves the switch higher in the list (`sortOrder`), persisted in the local Room database. |
-| **`↓` (Down Arrow)** | **Move Down** | Moves the switch lower in the list (`sortOrder`). |
+| **`↑` (Up Arrow)** | **Move Up** | Moves the switch higher within your active Wi-Fi Home (`sortOrder`). In **Grouped by Room** or single-room filter view, swaps directly with the switch above it in the **same room** without disturbing other rooms. |
+| **`↓` (Down Arrow)** | **Move Down** | Moves the switch lower within your active Wi-Fi Home (`sortOrder`), or within the same room when **Grouped by Room** is active. |
 | **`✎` (Pencil Icon)** | **Edit Device** | Opens the **Edit Device** dialog for that switch (you can also tap anywhere on the switch row while in Edit Mode). |
-| **`🗑` (Trash Icon)** | **Delete Device** | Removes the switch from your saved list immediately. |
+| **`🗑` (Trash Icon)** | **Delete Device** | Removes the switch from your saved list and cleans up any active UPnP GENA event subscription immediately. |
 
 Tap **`Done`** in the top-right header (or press the Android **Back** button) to exit **Edit Mode** and return to normal power toggling.
 

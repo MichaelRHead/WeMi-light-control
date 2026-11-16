@@ -61,6 +61,9 @@ internal fun TvRoomSectionHeader(
     onStepRoomBrightness: ((Int) -> Unit)? = null
 ) {
     var hasHardwareFocus by remember { mutableStateOf(false) }
+    val currentOnToggleRoomPower by rememberUpdatedState(onToggleRoomPower)
+    val currentOnNavigateUp by rememberUpdatedState(onNavigateUp)
+    val currentOnNavigateDown by rememberUpdatedState(onNavigateDown)
     val currentOnStepRoomBrightness by rememberUpdatedState(onStepRoomBrightness)
     val isFocused = isFocusedByRemote || hasHardwareFocus
     val controllable = roomDevices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
@@ -93,11 +96,11 @@ internal fun TvRoomSectionHeader(
                 if (event.type == KeyEventType.KeyDown) {
                     when (event.key) {
                         Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                            onToggleRoomPower()
+                            currentOnToggleRoomPower()
                             true
                         }
-                        Key.DirectionUp -> onNavigateUp()
-                        Key.DirectionDown -> onNavigateDown()
+                        Key.DirectionUp -> currentOnNavigateUp()
+                        Key.DirectionDown -> currentOnNavigateDown()
                         Key.DirectionLeft, Key.Minus -> {
                             currentOnStepRoomBrightness?.invoke(-10)
                             true

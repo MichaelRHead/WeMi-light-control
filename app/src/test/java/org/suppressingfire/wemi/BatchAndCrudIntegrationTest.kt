@@ -287,5 +287,195 @@ class BatchAndCrudIntegrationTest {
             }
         }
     }
+
+    @Test
+    fun `verify multi-switch GENA NOTIFY routing on shared 127_0_0_1 IP, placeholder-serial dev_id isolation, and delete or reset cleanup`() = runBlocking {
+        FakeUpnpServer(initialFriendlyName = "Hall Switch 1", serialNumber = "GENAMULTI01", initialRelayOn = false).use { s1 ->
+            FakeUpnpServer(initialFriendlyName = "Hall Switch 2", serialNumber = "GENAMULTI02", initialRelayOn = false).use { s2 ->
+                val client = NetworkClient(extraCandidatePorts = listOf(s1.port, s2.port))
+                val repo = SwitchRepository(
+                    dao = database.switchDao(),
+                    networkClient = client,
+                    initialDemoModeOverride = false
+                )
+                try {
+                    val homeKey = repo.ensureSeeded()
+                    val id1 = database.switchDao().insertDevice(
+                        DeviceEntity(
+                            name = "Hall Switch 1",
+                            roomName = "Hallway & Landing",
+                            networkKey = homeKey,
+                            ipAddress = "127.0.0.1",
+                            port = s1.port,
+                            isOn = false,
+                            isReachable = true,
+                            serialNumber = "GENAMULTI01",
+                            sortOrder = 0
+                        )
+                    ).toInt()
+                    val id2 = database.switchDao().insertDevice(
+                        DeviceEntity(
+                            name = "Hall Switch 2",
+                            roomName = "Hallway & Landing",
+                            networkKey = homeKey,
+                            ipAddress = "127.0.0.1",
+                            port = s2.port,
+                            isOn = false,
+                            isReachable = true,
+                            serialNumber = "GENAMULTI02",
+                            sortOrder = 1
+                        )
+                    ).toInt()
+
+                    // Manual switches with default placeholder serials must receive distinct dev_<id> GENA keys
+                    val manualIdA = database.switchDao().insertDevice(
+                        DeviceEntity(
+                            name = "Manual Lamp A",
+                            roomName = "Office",
+                            networkKey = homeKey,
+                            ipAddress = "127.0.0.1",
+                            port = s1.port,
+                            isOn = false,
+                            isReachable = true,
+                            serialNumber = "221517K01018NEW",
+                            sortOrder = 2
+                        )
+                    ).toInt()
+                    val manualIdB = database.switchDao().insertDevice(
+                        DeviceEntity(
+                            name = "Manual Lamp B",
+                            roomName = "Office",
+                            networkKey = homeKey,
+                            ipAddress = "127.0.0.1",
+                            port = s2.port,
+                            isOn = false,
+                            isReachable = true,
+                            serialNumber = "221517K01018NEW",
+                            sortOrder = 3
+                        )
+                    ).toInt()
+
+                    val subCount = repo.refreshGenaSubscriptionsForHome(homeKey)
+                    assertEquals(4, subCount)
+                    assertEquals(
+                        setOf("GENAMULTI01", "GENAMULTI02", "dev_$manualIdA", "dev_$manualIdB"),
+                        repo.genaManager.activeSubscriptions.keys
+                    )
+
+                    // Pushing GENA NOTIFY for Switch 2 on shared 127.0.0.1 must update ONLY Switch 2, never Switch 1
+                    val listenPort = repo.genaManager.activeListenPort
+                    assertTrue(listenPort > 0)
+                    assertTrue(s2.pushGenaNotify(listenPort, "GENAMULTI02", "1").contains("200 OK"))
+                    assertTrue(s2.pushGenaNotify(listenPort, "dev_$manualIdB", "1").contains("200 OK"))
+
+                    val deadline = System.currentTimeMillis() + 2_000L
+                    while (
+                        (!database.switchDao().getDeviceById(id2)!!.isOn ||
+                            !database.switchDao().getDeviceById(manualIdB)!!.isOn) &&
+                        System.currentTimeMillis() < deadline
+                    ) {
+                        Thread.sleep(15)
+                    }
+                    assertFalse("Switch 1 must NOT be cross-triggered by Switch 2 GENA NOTIFY", database.switchDao().getDeviceById(id1)!!.isOn)
+                    assertTrue("Switch 2 must turn ON from its GENA NOTIFY", database.switchDao().getDeviceById(id2)!!.isOn)
+                    assertFalse("Manual Lamp A must NOT collide on placeholder serial", database.switchDao().getDeviceById(manualIdA)!!.isOn)
+                    assertTrue("Manual Lamp B must turn ON from /gena/dev_<id>", database.switchDao().getDeviceById(manualIdB)!!.isOn)
+
+                    // Deleting Switch 2 unsubscribes its GENA key; resetting LAN homes stops the callback server cleanly
+                    repo.deleteDevice(id2)
+                    assertFalse(repo.genaManager.activeSubscriptions.containsKey("GENAMULTI02"))
+                    repo.resetLanHomesSwitchesAndRooms()
+                    assertTrue(repo.genaManager.activeSubscriptions.isEmpty())
+                    assertEquals(-1, repo.genaManager.activeListenPort)
+                } finally {
+                    repo.close()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `verify queued back-to-back toggleDevicePower double-toggle and port-heal preservation across consecutive commands`() = runBlocking {
+        FakeUpnpServer(
+            initialFriendlyName = "Study Rocker",
+            serialNumber = "WLS0403DBL01",
+            initialRelayOn = false,
+            registerAsCandidatePort = true
+        ).use { server ->
+            val client = NetworkClient(extraCandidatePorts = listOf(server.port))
+            val repo = SwitchRepository(
+                dao = database.switchDao(),
+                networkClient = client,
+                initialDemoModeOverride = false
+            )
+            try {
+                val homeKey = repo.ensureSeeded()
+                val id = database.switchDao().insertDevice(
+                    DeviceEntity(
+                        name = "Study Rocker",
+                        roomName = "Office",
+                        networkKey = homeKey,
+                        ipAddress = "127.0.0.1",
+                        port = 49159,
+                        isOn = false,
+                        isReachable = true,
+                        serialNumber = "WLS0403DBL01",
+                        sortOrder = 0
+                    )
+                ).toInt()
+                val staleSnapshot = database.switchDao().getDeviceById(id)!!
+
+                // Dispatch two back-to-back toggles using the SAME pre-recomposition snapshot (OFF @ stale port 49159):
+                // 1st heals port -> server.port and turns ON; 2nd reads fresh Room state inside mutex and turns back OFF.
+                coroutineScope {
+                    val firstToggle = async { repo.toggleDevicePower(staleSnapshot) }
+                    val secondToggle = async { repo.toggleDevicePower(staleSnapshot) }
+                    awaitAll(firstToggle, secondToggle)
+                }
+
+                val finalEntity = database.switchDao().getDeviceById(id)!!
+                assertEquals(server.port, finalEntity.port)
+                assertFalse("Rapid double-toggle OFF -> ON -> OFF must end OFF", finalEntity.isOn)
+                assertFalse(server.relayStateOn.get())
+            } finally {
+                repo.close()
+            }
+        }
+    }
+
+    @Test
+    fun `verify home-scoped and withinRoomOnly moveDeviceOrder preserves other Wi-Fi Homes and intermediate rooms`() = runBlocking {
+        val repo = SwitchRepository(dao = database.switchDao(), initialDemoModeOverride = false)
+        try {
+            val mainHome = repo.ensureSeeded()
+            val cabinHome = "wifi_cabin_50"
+            val bed1Id = database.switchDao().insertDevice(
+                DeviceEntity(name = "Bed 1", roomName = "Bedroom", networkKey = mainHome, ipAddress = "127.0.0.1", port = 49151, serialNumber = "MV01", sortOrder = 0)
+            ).toInt()
+            database.switchDao().insertDevice(
+                DeviceEntity(name = "Ensuite 1", roomName = "Ensuite", networkKey = mainHome, ipAddress = "127.0.0.1", port = 49152, serialNumber = "MV02", sortOrder = 1)
+            )
+            val bed2Id = database.switchDao().insertDevice(
+                DeviceEntity(name = "Bed 2", roomName = "Bedroom", networkKey = mainHome, ipAddress = "127.0.0.1", port = 49153, serialNumber = "MV03", sortOrder = 2)
+            ).toInt()
+            val cabinId = database.switchDao().insertDevice(
+                DeviceEntity(name = "Cabin 1", roomName = "Outdoor", networkKey = cabinHome, ipAddress = "192.168.50.10", port = 49153, serialNumber = "MV04", sortOrder = 0)
+            ).toInt()
+
+            // Grouped-by-room Move Up on Bed 2 swaps directly with Bed 1 in Bedroom while leaving Ensuite 1 in place
+            repo.moveDeviceOrder(database.switchDao().getDeviceById(bed2Id)!!, moveUp = true, withinRoomOnly = true)
+            val mainOrdered = database.switchDao().getAllDevices().first().filter { it.networkKey == mainHome }
+            assertEquals(listOf("Bed 2", "Ensuite 1", "Bed 1"), mainOrdered.map { it.name })
+            assertEquals(listOf(0, 1, 2), mainOrdered.map { it.sortOrder })
+
+            // Moving Cabin 1 up at top of Lake Cabin must NOT cross into Main Home
+            repo.moveDeviceOrder(database.switchDao().getDeviceById(cabinId)!!, moveUp = true, withinRoomOnly = false)
+            assertEquals(0, database.switchDao().getDeviceById(cabinId)!!.sortOrder)
+            assertEquals(0, database.switchDao().getDeviceById(bed2Id)!!.sortOrder)
+            assertEquals(2, database.switchDao().getDeviceById(bed1Id)!!.sortOrder)
+        } finally {
+            repo.close()
+        }
+    }
 }
 

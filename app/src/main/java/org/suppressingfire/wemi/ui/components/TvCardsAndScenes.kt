@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,11 +78,17 @@ internal fun TvDeviceCard(
     onNavigateDownFromSlider: () -> Boolean
 ) {
     var hasToggleHardwareFocus by remember { mutableStateOf(false) }
+    val currentOnPrimaryAction by rememberUpdatedState(onPrimaryAction)
+    val currentOnNavigateLeft by rememberUpdatedState(onNavigateLeft)
+    val currentOnNavigateRight by rememberUpdatedState(onNavigateRight)
+    val currentOnNavigateUpFromToggle by rememberUpdatedState(onNavigateUpFromToggle)
+    val currentOnNavigateDownFromToggle by rememberUpdatedState(onNavigateDownFromToggle)
     val isToggleHighlighted = isToggleFocusedByRemote || hasToggleHardwareFocus
     val isSliderHighlighted = isSliderFocusedByRemote
     val isCardHighlighted = isToggleHighlighted || isSliderHighlighted
     val type = device.parsedType
     val isDimmer = type == DeviceType.LIGHTBULB_DIMMER && device.isReachable
+    val currentIsDimmer by rememberUpdatedState(isDimmer)
 
     val cardColor by animateColorAsState(
         targetValue = when {
@@ -149,20 +156,20 @@ internal fun TvDeviceCard(
                         if (event.type == KeyEventType.KeyDown) {
                             when (event.key) {
                                 Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                    onPrimaryAction()
+                                    currentOnPrimaryAction()
                                     true
                                 }
-                                Key.DirectionLeft -> onNavigateLeft()
-                                Key.DirectionRight -> onNavigateRight()
-                                Key.DirectionUp -> onNavigateUpFromToggle()
-                                Key.DirectionDown -> onNavigateDownFromToggle()
+                                Key.DirectionLeft -> currentOnNavigateLeft()
+                                Key.DirectionRight -> currentOnNavigateRight()
+                                Key.DirectionUp -> currentOnNavigateUpFromToggle()
+                                Key.DirectionDown -> currentOnNavigateDownFromToggle()
                                 Key.MediaPlayPause,
                                 Key.Menu,
                                 Key.Info,
                                 Key.LeftBracket,
                                 Key.RightBracket -> {
-                                    if (isDimmer) {
-                                        onNavigateDownFromToggle()
+                                    if (currentIsDimmer) {
+                                        currentOnNavigateDownFromToggle()
                                     } else {
                                         false
                                     }

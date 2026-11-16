@@ -376,8 +376,11 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
 
     fun deleteDevice(device: DeviceEntity) = deviceActionsController.deleteDevice(device)
 
-    fun moveDevice(device: DeviceEntity, moveUp: Boolean) =
-        deviceActionsController.moveDevice(device, moveUp)
+    fun moveDevice(device: DeviceEntity, moveUp: Boolean) = deviceActionsController.moveDevice(
+        device = device,
+        moveUp = moveUp,
+        withinRoomOnly = _isGroupedByRoom.value || _selectedRoomFilter.value != null
+    )
 
     fun turnAllSwitches(turnOn: Boolean) = deviceActionsController.turnAllSwitches(turnOn)
 

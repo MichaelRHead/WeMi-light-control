@@ -336,5 +336,63 @@ class EndToEndUiTest {
             .performClick()
         composeTestRule.waitForIdle()
     }
+
+    @Test
+    fun `verify E2E DeviceRow Auto-Off countdown badge and grouped-by-room Move Up reordering`() {
+        val vm = androidx.lifecycle.ViewModelProvider(composeTestRule.activity)[org.suppressingfire.wemi.ui.SwitchViewModel::class.java]
+        awaitLoopbackIo { vm.devices.value.any { it.id == 14 } }
+
+        // 1. Configure a 5-minute Auto-Off timer on ON dimmer 'Lightbulb Bedroom' (id = 8) and verify 'Auto-Off' badge renders in DeviceRow
+        val bedroomDimmer = vm.devices.value.first { it.id == 8 }
+        vm.saveDevice(
+            id = bedroomDimmer.id,
+            name = bedroomDimmer.name,
+            roomName = bedroomDimmer.roomName,
+            deviceType = bedroomDimmer.parsedType,
+            ipAddress = bedroomDimmer.ipAddress,
+            port = bedroomDimmer.port,
+            brightness = bedroomDimmer.brightness,
+            isReachable = true,
+            isOn = true,
+            autoOffMinutes = 5
+        )
+        awaitLoopbackIo { (vm.activeAutoOffCountdownsSec.value[8] ?: 0) > 0 }
+
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("device_row_8"))
+        composeTestRule.onNodeWithTag("auto_off_countdown_8", useUnmergedTree = true).assertIsDisplayed()
+
+        // 2. Enter Edit Mode in Grouped-by-Room view and click Move Up on 'Bedroom Ceiling Fan' (id = 14) so it moves above 'Lightbulb Bedroom' (id = 8)
+        composeTestRule.onNodeWithTag("edit_devices_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("device_row_14"))
+        composeTestRule.onNodeWithTag("move_up_14").performClick()
+        awaitLoopbackIo {
+            val bedroomOrdered = vm.devices.value
+                .filter { it.networkKey == vm.activeNetworkKey.value && it.roomName == "Bedroom" }
+                .map { it.id }
+            bedroomOrdered == listOf(3, 14, 8)
+        }
+        assertEquals(
+            "Grouped Move Up must reorder within Main Home Bedroom without displacing Ensuite (id = 7) or Lake Cabin (id = 11)",
+            listOf(3, 14, 8),
+            vm.devices.value
+                .filter { it.networkKey == vm.activeNetworkKey.value && it.roomName == "Bedroom" }
+                .map { it.id }
+        )
+
+        // Filter to Bedroom so compact Robolectric LazyColumn viewport composes both rows simultaneously
+        vm.selectRoomFilter("Bedroom")
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("device_row_14"))
+        val fanTop = composeTestRule.onNodeWithTag("device_row_14").fetchSemanticsNode().boundsInRoot.top
+        val bulbTop = composeTestRule.onNodeWithTag("device_row_8").fetchSemanticsNode().boundsInRoot.top
+        assertTrue(
+            "Expected Bedroom Ceiling Fan (top=$fanTop) to render above Lightbulb Bedroom (top=$bulbTop) in Bedroom",
+            fanTop < bulbTop
+        )
+    }
 }
 

@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import org.suppressingfire.wemi.network.GenaEventNotification
 import org.suppressingfire.wemi.network.GenaSubscriptionManager
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkClient
 
 /**
@@ -36,29 +37,43 @@ internal class GenaAndHealthPollingCoordinator(
 
     /**
      * Handles incoming UPnP GENA `<e:propertyset>` push events from physical wall switches
-     * and 3-way traveler rockers, updating Room state immediately (`<100ms`).
+     * and 3-way traveler rockers, resolving target identity in strict 3-tier priority across
+     * all switches (`serialNumber` -> `"dev_${id}"` -> blank-key `sourceIp`) so multiple switches
+     * sharing an IP (loopback or NAT bridge) never cross-route, and serializing the Room update
+     * inside [mutexFor].
      */
     suspend fun handleGenaNotification(event: GenaEventNotification) {
         appendLog(event.logEntry)
         val devices = dao.getAllDevices().first()
-        val matched = devices.find {
-            (event.deviceKey.isNotBlank() && it.serialNumber.equals(event.deviceKey, ignoreCase = true)) ||
-                event.deviceKey == "dev_${it.id}" ||
-                (event.sourceIp.isNotBlank() && it.ipAddress == event.sourceIp)
+        val matched = when {
+            event.deviceKey.isNotBlank() -> {
+                devices.find {
+                    !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
+                        it.serialNumber.equals(event.deviceKey, ignoreCase = true)
+                } ?: devices.find { event.deviceKey == "dev_${it.id}" }
+            }
+            event.sourceIp.isNotBlank() -> {
+                devices.singleOrNull { it.ipAddress == event.sourceIp }
+                    ?: devices.find { it.ipAddress == event.sourceIp }
+            }
+            else -> null
         } ?: return
 
-        val recentSetMs = lastSetStateTimestampMs[matched.id] ?: 0L
-        if ((System.currentTimeMillis() - recentSetMs) < 1200L) {
-            return
-        }
+        mutexFor(matched).withLock {
+            val recentSetMs = lastSetStateTimestampMs[matched.id] ?: 0L
+            if ((System.currentTimeMillis() - recentSetMs) < 1200L) {
+                return@withLock
+            }
 
-        val updated = matched.copy(
-            isOn = event.binaryStateOn ?: matched.isOn,
-            brightness = event.brightness?.coerceIn(1, 100) ?: matched.brightness,
-            isReachable = true,
-            lastCheckedTime = "GENA Push • ${nowFormatted()}"
-        )
-        dao.updateDevice(updated)
+            val latest = dao.getDeviceById(matched.id) ?: return@withLock
+            val updated = latest.copy(
+                isOn = event.binaryStateOn ?: latest.isOn,
+                brightness = event.brightness?.coerceIn(1, 100) ?: latest.brightness,
+                isReachable = true,
+                lastCheckedTime = "GENA Push • ${nowFormatted()}"
+            )
+            dao.updateDevice(updated)
+        }
     }
 
     /**
@@ -135,13 +150,14 @@ internal class GenaAndHealthPollingCoordinator(
      * 2-stage self-healing port/IP recovery and Real-LAN offline rollback.
      */
     suspend fun toggleDimmerNightMode(device: DeviceEntity): DeviceEntity {
-        val priorNightMode = device.nightModeEnabled
-        val priorBrightness = device.brightness
-        val targetNightMode = !priorNightMode
-        val nextBrightness = if (targetNightMode && priorBrightness > 20) 20 else priorBrightness
-
         return mutexFor(device).withLock {
-            var activeDevice = device
+            val baseDevice = if (device.id != 0) dao.getDeviceById(device.id) ?: device else device
+            val priorNightMode = baseDevice.nightModeEnabled
+            val priorBrightness = baseDevice.brightness
+            val targetNightMode = !priorNightMode
+            val nextBrightness = if (targetNightMode && priorBrightness > 20) 20 else priorBrightness
+
+            var activeDevice = baseDevice
             var result = lanSemaphore.withPermit {
                 networkClient.configureNightMode(
                     device = activeDevice,
@@ -167,7 +183,7 @@ internal class GenaAndHealthPollingCoordinator(
             appendLog(result.logEntry)
             val updated = when {
                 result.reachableOnLan -> {
-                    lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+                    lastSetStateTimestampMs[baseDevice.id] = System.currentTimeMillis()
                     activeDevice.copy(
                         nightModeEnabled = targetNightMode,
                         brightness = nextBrightness,
@@ -178,23 +194,26 @@ internal class GenaAndHealthPollingCoordinator(
                     )
                 }
                 isDemoShowroomMode() -> {
-                    lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
+                    lastSetStateTimestampMs[baseDevice.id] = System.currentTimeMillis()
                     activeDevice.copy(
                         nightModeEnabled = targetNightMode,
                         brightness = nextBrightness,
                         isReachable = true,
                         port = result.resolvedPort,
-                        latencyMs = device.latencyMs.takeIf { it > 0 } ?: 14,
+                        latencyMs = baseDevice.latencyMs.takeIf { it > 0 } ?: 14,
                         lastCheckedTime = nowFormatted()
                     )
                 }
-                else -> activeDevice.copy(
-                    nightModeEnabled = priorNightMode,
-                    brightness = priorBrightness,
-                    isReachable = false,
-                    latencyMs = 0,
-                    lastCheckedTime = "Offline • Timeout"
-                )
+                else -> {
+                    lastSetStateTimestampMs.remove(baseDevice.id)
+                    activeDevice.copy(
+                        nightModeEnabled = priorNightMode,
+                        brightness = priorBrightness,
+                        isReachable = false,
+                        latencyMs = 0,
+                        lastCheckedTime = "Offline • Timeout"
+                    )
+                }
             }
             dao.updateDevice(updated)
             updated

@@ -264,6 +264,13 @@ class GenaSubscriptionManager(
     }
 
     /**
+     * Resolves a collision-free GENA subscription key for [device], using its hardware
+     * `serialNumber` when real or `"dev_${device.id}"` when blank or a manual placeholder serial.
+     */
+    fun deviceKeyFor(device: DeviceEntity): String =
+        device.serialNumber.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: "dev_${device.id}"
+
+    /**
      * Subscribes or renews a UPnP GENA event subscription on /upnp/event/basicevent1 for [device].
      * Automatically handles HTTP 412 Precondition Failed by falling back to a fresh SUBSCRIBE.
      */
@@ -274,7 +281,7 @@ class GenaSubscriptionManager(
         val listenPort = startServer()
         if (listenPort <= 0) return@withContext null
 
-        val deviceKey = device.serialNumber.takeIf { it.isNotBlank() } ?: "dev_${device.id}"
+        val deviceKey = deviceKeyFor(device)
         val existing = subscriptionsByDeviceKey[deviceKey]
         val now = System.currentTimeMillis()
         val endpoint = "http://${device.ipAddress}:${device.port}/upnp/event/basicevent1"
@@ -338,6 +345,13 @@ class GenaSubscriptionManager(
             // Device offline or does not accept GENA on this port
         }
         null
+    }
+
+    /**
+     * Unsubscribes an active GENA subscription for [device].
+     */
+    suspend fun unsubscribeDevice(device: DeviceEntity) {
+        unsubscribe(deviceKeyFor(device))
     }
 
     /**

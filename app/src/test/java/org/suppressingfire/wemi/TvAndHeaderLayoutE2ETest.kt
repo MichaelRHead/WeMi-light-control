@@ -266,7 +266,22 @@ class TvAndHeaderLayoutE2ETest {
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}").assertIsFocused()
 
-                    // Hardware D-Pad Key.DirectionCenter on Living Room Switch toggles relay ON over loopback SOAP
+                    // Hardware D-Pad Key.DirectionCenter on Living Room Switch toggles OFF -> ON -> OFF -> ON cleanly
+                    // without stale rememberUpdatedState closure capture
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionCenter) }
+                    awaitLoopbackIo {
+                        switchServer.relayStateOn.get() && vm.togglingDeviceIds.value.isEmpty()
+                    }
+                    assertTrue(switchServer.relayStateOn.get())
+
+                    composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
+                        .performKeyInput { pressKey(Key.DirectionCenter) }
+                    awaitLoopbackIo {
+                        !switchServer.relayStateOn.get() && vm.togglingDeviceIds.value.isEmpty()
+                    }
+                    assertFalse(switchServer.relayStateOn.get())
+
                     composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
                         .performKeyInput { pressKey(Key.DirectionCenter) }
                     awaitLoopbackIo {

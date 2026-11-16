@@ -1,5 +1,6 @@
 package org.suppressingfire.wemi.data
 
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkClient
 import org.suppressingfire.wemi.network.ProvisionResult
 import org.suppressingfire.wemi.network.ProvisionerClient
@@ -283,7 +284,7 @@ internal class ProvisioningCoordinator(
             val targetNetworkKey = matchedHomeBySsid?.networkKey ?: activeNetworkKey
             val homePrefix = homeNetworks.find { it.networkKey == targetNetworkKey }?.subnetPrefix ?: "192.168.1"
 
-            val serial = desc?.serialNumber?.takeIf { it.isNotBlank() && it != "221517K01018AB" }
+            val serial = desc?.serialNumber?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
                 ?: "221840K${(100000..999999).random()}"
             val mac = desc?.macAddress?.takeIf { it.isNotBlank() } ?: "EC1A59881122"
             val sku = desc?.hardwareSku?.takeIf { it.isNotBlank() } ?: when (resolvedType) {
@@ -294,7 +295,7 @@ internal class ProvisioningCoordinator(
             val firmware = desc?.firmwareVersion?.takeIf { it.isNotBlank() } ?: "WeMo_WW_2.00.11563.PVT"
 
             val existing = existingDevices.find {
-                (serial.isNotBlank() && it.serialNumber.equals(serial, ignoreCase = true)) ||
+                (!LanRuntimeUtils.isPlaceholderSerial(serial) && it.serialNumber.equals(serial, ignoreCase = true)) ||
                     (it.networkKey == targetNetworkKey && it.name.equals(resolvedName, ignoreCase = true))
             }
 

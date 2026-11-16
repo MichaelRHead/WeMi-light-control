@@ -209,16 +209,39 @@ internal class DeviceCrudAndRulesCoordinator(
         dao.deleteDeviceById(id)
     }
 
-    suspend fun moveDeviceOrder(device: DeviceEntity, moveUp: Boolean) {
-        val list = dao.getAllDevices().first()
-        val index = list.indexOfFirst { it.id == device.id }
-        if (index == -1) return
-        val swapIndex = if (moveUp) index - 1 else index + 1
-        if (swapIndex !in list.indices) return
-        val current = list[index]
-        val neighbor = list[swapIndex]
-        dao.updateDevice(current.copy(sortOrder = swapIndex))
-        dao.updateDevice(neighbor.copy(sortOrder = index))
+    /**
+     * Moves [device] up or down within its Wi-Fi Home (`networkKey`), and when [withinRoomOnly]
+     * is `true` (Grouped-by-Room or single-room filter view), swaps it with the adjacent device
+     * in the same `roomName` so grouped rows move immediately without scrambling room header order
+     * or crossing Wi-Fi Home boundaries.
+     */
+    suspend fun moveDeviceOrder(
+        device: DeviceEntity,
+        moveUp: Boolean,
+        withinRoomOnly: Boolean = false
+    ) {
+        val homeDevices = dao.getAllDevices().first()
+            .filter { it.networkKey == device.networkKey }
+            .toMutableList()
+        val scopedIndices = homeDevices.indices.filter { idx ->
+            !withinRoomOnly || homeDevices[idx].roomName == device.roomName
+        }
+        val posInScope = scopedIndices.indexOfFirst { idx -> homeDevices[idx].id == device.id }
+        if (posInScope == -1) return
+        val targetScopePos = if (moveUp) posInScope - 1 else posInScope + 1
+        if (targetScopePos !in scopedIndices.indices) return
+
+        val fromIdx = scopedIndices[posInScope]
+        val toIdx = scopedIndices[targetScopePos]
+        val temp = homeDevices[fromIdx]
+        homeDevices[fromIdx] = homeDevices[toIdx]
+        homeDevices[toIdx] = temp
+
+        homeDevices.forEachIndexed { normalizedOrder, entity ->
+            if (entity.sortOrder != normalizedOrder) {
+                dao.updateDevice(entity.copy(sortOrder = normalizedOrder))
+            }
+        }
     }
 
     suspend fun toggleRule(rule: RuleEntity) {

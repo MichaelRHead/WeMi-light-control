@@ -243,7 +243,8 @@ fun DeviceRow(
                                         fontSize = 11.sp,
                                         maxLines = 1,
                                         softWrap = false,
-                                        overflow = TextOverflow.Ellipsis
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.testTag("auto_off_countdown_${device.id}")
                                     )
                                 }
                                 Icon(
@@ -268,7 +269,8 @@ fun DeviceRow(
                                     label = if (device.isOn) "ON" else "OFF",
                                     modifier = Modifier.testTag("power_state_badge_${device.id}")
                                 )
-                                val subLabel = if (autoOffRemainingSeconds != null && autoOffRemainingSeconds > 0) {
+                                val hasAutoOff = autoOffRemainingSeconds != null && autoOffRemainingSeconds > 0
+                                val subLabel = if (hasAutoOff) {
                                     val mins = autoOffRemainingSeconds / 60
                                     val secs = autoOffRemainingSeconds % 60
                                     "Auto-Off ${mins}:${secs.toString().padStart(2, '0')}"
@@ -281,7 +283,12 @@ fun DeviceRow(
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 11.sp,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = if (hasAutoOff) {
+                                        Modifier.testTag("auto_off_countdown_${device.id}")
+                                    } else {
+                                        Modifier
+                                    }
                                 )
                             }
                         }
@@ -310,7 +317,9 @@ fun DeviceRow(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(
                             onClick = onMoveUp,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier
+                                .size(40.dp)
+                                .testTag("move_up_${device.id}")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ArrowUpward,
@@ -321,7 +330,9 @@ fun DeviceRow(
                         }
                         IconButton(
                             onClick = onMoveDown,
-                            modifier = Modifier.size(40.dp)
+                            modifier = Modifier
+                                .size(40.dp)
+                                .testTag("move_down_${device.id}")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ArrowDownward,
