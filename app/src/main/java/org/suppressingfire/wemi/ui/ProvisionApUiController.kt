@@ -70,65 +70,68 @@ internal class ProvisionApUiController(
     fun scanSetupApNetworks(apHost: String = "10.22.22.1") {
         scope.launch {
             _isScanningSetupAp.value = true
-            _setupApStatusMessage.value = null
-            val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
-            val netSnap = networkMonitor.refreshSnapshot()
-            _setupDebugSnapshot.value = SetupDebugSnapshot(
-                timestamp = nowTimeText(),
-                phoneLocalIp = netSnap.localIpv4,
-                phoneGatewayIp = netSnap.gatewayIp,
-                phoneInterface = netSnap.interfaceName,
-                isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
-                isWifiSocketBound = netSnap.isWifiSocketBound,
-                isDemoMode = repository.isDemoShowroomMode.value,
-                targetApHost = cleanHost,
-                probeSummary = "Probing $cleanHost (ports 49152..49159)...",
-                apScanSummary = "Waiting for probe..."
-            )
+            try {
+                _setupApStatusMessage.value = null
+                val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
+                val netSnap = networkMonitor.refreshSnapshot()
+                _setupDebugSnapshot.value = SetupDebugSnapshot(
+                    timestamp = nowTimeText(),
+                    phoneLocalIp = netSnap.localIpv4,
+                    phoneGatewayIp = netSnap.gatewayIp,
+                    phoneInterface = netSnap.interfaceName,
+                    isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
+                    isWifiSocketBound = netSnap.isWifiSocketBound,
+                    isDemoMode = repository.isDemoShowroomMode.value,
+                    targetApHost = cleanHost,
+                    probeSummary = "Probing $cleanHost (ports 49152..49159)...",
+                    apScanSummary = "Waiting for probe..."
+                )
 
-            val descriptor = repository.probeSetupApDevice(apHost = cleanHost)
-            _detectedSetupDevice.value = descriptor
-            val probeTrace = descriptor?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
-                ?: repository.latestSetupProbeSummary()
+                val descriptor = repository.probeSetupApDevice(apHost = cleanHost)
+                _detectedSetupDevice.value = descriptor
+                val probeTrace = descriptor?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
+                    ?: repository.latestSetupProbeSummary()
 
-            _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
-                timestamp = nowTimeText(),
-                detectedDevice = descriptor,
-                probeSummary = probeTrace,
-                apScanSummary = "Scanning 2.4 GHz APs via WiFiSetup1#GetApList..."
-            )
+                _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
+                    timestamp = nowTimeText(),
+                    detectedDevice = descriptor,
+                    probeSummary = probeTrace,
+                    apScanSummary = "Scanning 2.4 GHz APs via WiFiSetup1#GetApList..."
+                )
 
-            val list = repository.scanSetupApNetworks(
-                apHost = cleanHost,
-                apPort = descriptor?.port ?: 49152
-            )
-            _scannedSetupAps.value = list
-            _isScanningSetupAp.value = false
+                val list = repository.scanSetupApNetworks(
+                    apHost = cleanHost,
+                    apPort = descriptor?.port ?: 49152
+                )
+                _scannedSetupAps.value = list
 
-            val scanSummary = if (descriptor?.macAndSerialSource == "DemoShowroom") {
-                "DEMO_AP_LIST(count=${list.size})"
-            } else {
-                repository.latestSetupApScanSummary()
-            }
-            _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
-                timestamp = nowTimeText(),
-                scannedAps = list,
-                apScanSummary = scanSummary
-            )
-
-            if (list.isNotEmpty() || descriptor != null) {
-                val hwSummary = if (descriptor != null) {
-                    "Detected ${descriptor.friendlyName} (${descriptor.hardwareSku} • Port ${descriptor.port} • Auto Method ${descriptor.recommendedEncryptionMethod})"
+                val scanSummary = if (descriptor?.macAndSerialSource == "DemoShowroom") {
+                    "DEMO_AP_LIST(count=${list.size})"
                 } else {
-                    "Smart Switch Setup AP ($cleanHost)"
+                    repository.latestSetupApScanSummary()
                 }
-                val msg = "$hwSummary • Found ${list.size} nearby 2.4 GHz Wi-Fi network(s)"
-                _setupApStatusMessage.value = msg
-                onShowTransientStatus(msg)
-            } else {
-                val err = "No response from Setup AP at $cleanHost ($probeTrace) — Connect phone Wi-Fi to the switch's 10.22.22.1 setup network first."
-                _setupApStatusMessage.value = err
-                onShowTransientStatus(err)
+                _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
+                    timestamp = nowTimeText(),
+                    scannedAps = list,
+                    apScanSummary = scanSummary
+                )
+
+                if (list.isNotEmpty() || descriptor != null) {
+                    val hwSummary = if (descriptor != null) {
+                        "Detected ${descriptor.friendlyName} (${descriptor.hardwareSku} • Port ${descriptor.port} • Auto Method ${descriptor.recommendedEncryptionMethod})"
+                    } else {
+                        "Smart Switch Setup AP ($cleanHost)"
+                    }
+                    val msg = "$hwSummary • Found ${list.size} nearby 2.4 GHz Wi-Fi network(s)"
+                    _setupApStatusMessage.value = msg
+                    onShowTransientStatus(msg)
+                } else {
+                    val err = "No response from Setup AP at $cleanHost ($probeTrace) — Connect phone Wi-Fi to the switch's 10.22.22.1 setup network first."
+                    _setupApStatusMessage.value = err
+                    onShowTransientStatus(err)
+                }
+            } finally {
+                _isScanningSetupAp.value = false
             }
         }
     }
@@ -148,59 +151,62 @@ internal class ProvisionApUiController(
         keepDialogOpenOnSuccess: Boolean = false
     ) {
         scope.launch {
-            val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
-            val netSnap = networkMonitor.refreshSnapshot()
             _isProvisioningAp.value = true
-            _setupApStatusMessage.value = "Provisioning switch on $cleanHost to '$ssid'..."
-            _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
-                timestamp = nowTimeText(),
-                phoneLocalIp = netSnap.localIpv4,
-                phoneGatewayIp = netSnap.gatewayIp,
-                phoneInterface = netSnap.interfaceName,
-                isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
-                isWifiSocketBound = netSnap.isWifiSocketBound,
-                isDemoMode = repository.isDemoShowroomMode.value,
-                targetApHost = cleanHost,
-                traceLines = listOf("[START] Starting WiFiSetup1 provisioning to \"$ssid\" on $cleanHost...")
-            )
+            try {
+                val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
+                val netSnap = networkMonitor.refreshSnapshot()
+                _setupApStatusMessage.value = "Provisioning switch on $cleanHost to '$ssid'..."
+                _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
+                    timestamp = nowTimeText(),
+                    phoneLocalIp = netSnap.localIpv4,
+                    phoneGatewayIp = netSnap.gatewayIp,
+                    phoneInterface = netSnap.interfaceName,
+                    isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
+                    isWifiSocketBound = netSnap.isWifiSocketBound,
+                    isDemoMode = repository.isDemoShowroomMode.value,
+                    targetApHost = cleanHost,
+                    traceLines = listOf("[START] Starting WiFiSetup1 provisioning to \"$ssid\" on $cleanHost...")
+                )
 
-            val res = repository.provisionSetupApDevice(
-                apHost = cleanHost,
-                ssid = ssid.trim(),
-                plainPassword = password,
-                channel = channel,
-                authMode = authMode,
-                encryptionType = encryptionType,
-                encryptionMethod = encryptionMethod,
-                addPasswordLengths = addPasswordLengths,
-                customDeviceName = customDeviceName.trim(),
-                roomName = roomName.trim(),
-                deviceType = deviceType,
-                activeNetworkKey = activeNetworkKeyProvider(),
-                onProgress = { stepLine ->
-                    val current = _setupDebugSnapshot.value
-                    _setupDebugSnapshot.value = current.copy(
-                        timestamp = nowTimeText(),
-                        traceLines = (current.traceLines + stepLine).takeLast(24)
-                    )
+                val res = repository.provisionSetupApDevice(
+                    apHost = cleanHost,
+                    ssid = ssid.trim(),
+                    plainPassword = password,
+                    channel = channel,
+                    authMode = authMode,
+                    encryptionType = encryptionType,
+                    encryptionMethod = encryptionMethod,
+                    addPasswordLengths = addPasswordLengths,
+                    customDeviceName = customDeviceName.trim(),
+                    roomName = roomName.trim(),
+                    deviceType = deviceType,
+                    activeNetworkKey = activeNetworkKeyProvider(),
+                    onProgress = { stepLine ->
+                        val current = _setupDebugSnapshot.value
+                        _setupDebugSnapshot.value = current.copy(
+                            timestamp = nowTimeText(),
+                            traceLines = (current.traceLines + stepLine).takeLast(24)
+                        )
+                    }
+                )
+                _setupApStatusMessage.value = res.statusMessage
+                if (res.setupDevice != null) {
+                    _detectedSetupDevice.value = res.setupDevice
                 }
-            )
-            _isProvisioningAp.value = false
-            _setupApStatusMessage.value = res.statusMessage
-            if (res.setupDevice != null) {
-                _detectedSetupDevice.value = res.setupDevice
+                _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
+                    timestamp = nowTimeText(),
+                    detectedDevice = res.setupDevice ?: _detectedSetupDevice.value,
+                    probeSummary = res.setupDevice?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
+                        ?: _setupDebugSnapshot.value.probeSummary,
+                    traceLines = res.debugTraceLines.ifEmpty { _setupDebugSnapshot.value.traceLines }
+                )
+                if (res.success && !keepDialogOpenOnSuccess) {
+                    _showProvisionApDialog.value = false
+                }
+                onShowTransientStatus(res.statusMessage)
+            } finally {
+                _isProvisioningAp.value = false
             }
-            _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
-                timestamp = nowTimeText(),
-                detectedDevice = res.setupDevice ?: _detectedSetupDevice.value,
-                probeSummary = res.setupDevice?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
-                    ?: _setupDebugSnapshot.value.probeSummary,
-                traceLines = res.debugTraceLines.ifEmpty { _setupDebugSnapshot.value.traceLines }
-            )
-            if (res.success && !keepDialogOpenOnSuccess) {
-                _showProvisionApDialog.value = false
-            }
-            onShowTransientStatus(res.statusMessage)
         }
     }
 }

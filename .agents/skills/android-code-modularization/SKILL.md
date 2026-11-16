@@ -38,12 +38,14 @@ Avoid letting a `Repository` class grow into a 1,500+ line God object that mixes
   - Never copy-paste 70-line `mutex.withLock { optimisticWrite(); semaphore.withPermit { soapCall() }; twoStageReconnect(); commitOrRevert() }` blocks across `togglePower`, `setPowerExplicit`, and `updateBrightness`.
   - Extract a single higher-order helper (e.g., `executeOptimisticDeviceCommand(...)`) that encapsulates the concurrency lock, optimistic Room update, 2-stage self-healing retry, SOAP log recording, and offline rollback in one place.
 - **Decompose by Domain Workflow**:
-  - Keep `SwitchRepository` as a concise facade that delegates to focused internal collaborators:
-    - `DiscoveryCoordinator`: SSDP scan orchestration, `<serialNumber>`/`<UDN>` 3-tier matching (`DeviceEntity.matchesDiscovered`) across DHCP IP changes, startup parallel state probing, and `/24` subnet home resolution.
+  - Keep `SwitchRepository` (`< 500` lines) as a concise facade that delegates to focused internal collaborators:
+    - `DiscoveryCoordinator` + `HomeProfileSanitizer`: SSDP scan orchestration, `<serialNumber>`/`<UDN>` 3-tier matching (`DeviceEntity.matchesDiscovered`) across DHCP IP changes, single-pass parallel state probing, soft-AP SSID / room migration sanitization, and `/24` subnet home resolution.
+    - `GenaAndHealthPollingCoordinator`: `Semaphore(3)`-bounded concurrent UPnP GENA subscription renewals (`refreshGenaSubscriptionsForHome`), concurrent 30s health polling (`pollActiveHomeStates`), `<100ms` GENA `NOTIFY` processing, and `toggleDimmerNightMode`.
     - `ProvisioningCoordinator`: Zero-cloud `10.22.22.1` setup AP probing, AP scanning, `ConnectHomeNetwork` provisioning, and automatic Room registration.
     - `DeviceCrudAndRulesCoordinator`: Manual-IP `saveDevice` 9-port probing + `ChangeFriendlyName` hardware sync, room batch power/brightness fan-out, and local automation rule CRUD.
+    - **Placeholder-Safe Concurrency Keying (`DeviceEntity.concurrencyKey()`)**: Key per-device `Mutex` maps by `serialNumber.takeIf { !isPlaceholderSerial(it) } ?: "$ipAddress:$port"` so multiple manually added switches sharing a placeholder serial never contend on a single lock.
 
-### 2.2 Network & Wire Protocol Layer (`network/`)
+### 2.2 Network & Wire Protocol Layer (`network/` — All Files `< 500` Lines)
 Separate **stateless wire parsing, DTOs, runtime checks, and cryptography** from **stateful socket & HTTP I/O**:
 - **Shared Wire DTOs & Runtime Guards (`NetworkModels.kt` & `LanRuntimeUtils.kt`)**:
   - Keep wire data classes (`SoapCallResult`, `SwitchMetaInfo`, `SsdpScanReport`, `ScannedAp`, `SetupDeviceDescriptor`, `ProvisionResult`, `ParsedBinaryState`) in `NetworkModels.kt` and cross-layer runtime helpers (`PLACEHOLDER_SERIALS`, `isPlaceholderSerial`, null-safe `isRunningInRobolectric()`, `resolvePreferredLanInterfaceIpv4`) in `LanRuntimeUtils.kt`.
@@ -51,10 +53,10 @@ Separate **stateless wire parsing, DTOs, runtime checks, and cryptography** from
   - Keep pure functions (`buildSoapEnvelope`, `soapActionHeader`, `escapeXml`, `parseBinaryStatePayload`, `parseSsdpHeaders`, `parseSetupXmlDescriptor`, `classifyHardwareSku`, `buildSsdpMSearchPacket`) in a stateless, zero-Android-dependency file that can be unit-tested in milliseconds.
 - **Pure Cryptographic Helpers (`PasswordCrypto.kt`)**:
   - Isolate key derivation (`EVP_BytesToKey` MD5 / PBKDF2) and cipher routines (`AES/CBC/PKCS5Padding` Methods 1, 2, and 3) into a dedicated crypto utility file with round-trip `encrypt`/`decrypt` functions.
-- **Discovery vs. Control Separation**:
-  - Separate UDP multicast `M-SEARCH` + `/24` unicast subnet sweeping (`SsdpDiscoveryEngine.kt`) from point-to-point HTTP SOAP control (`NetworkClient.kt`).
+- **Discovery, Descriptor Enrichment & Setup Probing Separation**:
+  - Separate UDP multicast `M-SEARCH` + `/24` unicast subnet sweeping (`SsdpDiscoveryEngine.kt`) and secondary metadata/`/setup.xml` enrichment (`DeviceDescriptorFetcher.kt`) from point-to-point `basicevent1` HTTP SOAP control (`NetworkClient.kt`), and separate `10.22.22.1` 9-port setup probing & AP site-survey scanning (`SetupApProber.kt`) from `ConnectHomeNetwork` provisioning (`ProvisionerClient.kt`).
 
-### 2.3 Jetpack Compose UI Layer (`ui/`)
+### 2.3 Jetpack Compose UI Layer (`ui/` — All Files `< 500` Lines)
 1. **One Screen, Dialog, or Card Group Per File (`< 500` Lines Across All UI Files)**:
    - Never bundle unrelated modal dialogs (`AddOrEditDeviceDialog`, `AddRuleDialog`, `ProvisionApDialog`) into a single `Dialogs.kt` monolith. Give each dialog or bar its own file (`HeaderAndNav.kt` + `BottomNavBar.kt`, `DeviceEditDialog.kt`, `RuleDialog.kt`, `ProvisionApDialog.kt` + `ProvisionApFormSections.kt`, `SsdpScannerModal.kt` + `SsdpDiscoveryBanner.kt`), and split multi-card tabs when needed (`MoreScreen.kt` for license notices + `MoreControlAndLogCards.kt` for operational/telemetry cards).
 2. **Separate Custom Canvas Illustrations by Category (`ui/components/`)**:
@@ -62,10 +64,10 @@ Separate **stateless wire parsing, DTOs, runtime checks, and cryptography** from
 3. **Keep `MainActivity.kt` & `TvScreen.kt` as Thin Orchestration Shells (`< 500` Lines) & Bundle Tab State (`DevicesTabUiState`)**:
    - `MainActivity` / `WeMiSwitchApp` should only handle edge-to-edge system bars, TV vs. Mobile mode routing, top/bottom scaffold bars, `BackHandler`, and modal dialog hosting (`WeMiModalDialogs.kt`).
    - Bundle read-only tab state and callbacks into cohesive parameter objects (`DevicesTabUiState` & `DevicesTabActions` in `DevicesTabScreen.kt`) instead of prop-drilling 40+ flat parameters, and split the Android TV 10-foot dashboard across `TvScreen.kt` (focus/grid orchestration), `TvDimmerControls.kt` (`TvDeviceCardDimmerStrip` & `TvDimmerHudOverlay`), `TvRoomSectionHeader.kt` (focusable room bar with `OK` master toggle + `Left`/`Right` room dimmer stepping), `TvHeadersAndScenes.kt` (`TvTopHeaderBar`, `TvSceneChip`), and `TvCardsAndScenes.kt` (`TvDeviceCard` 3-state D-Pad card).
-4. **Cohesive UI State Controllers & Bounded Concurrent Batch Execution (`ProvisionApUiController` & `HomeAndRulesUiController` Pattern)**:
-   - Avoid letting a single `AndroidViewModel` accumulate 1,000+ lines by mixing core switch/room orchestration with multi-step wizard state machines (`10.22.22.1` provisioning) or secondary modal CRUD workflows (Wi-Fi Home profiles, device edit modal, rules CRUD).
-   - Extract self-contained state flows and coroutine workflows into internal ViewModel-scoped controllers (`ProvisionApUiController.kt`, `HomeAndRulesUiController.kt`) while delegating public `StateFlow` properties and action methods on `SwitchViewModel` so external callers and E2E tests experience zero API churn.
-   - Always fan out multi-switch batch operations (`toggleRoomPower`, `updateRoomBrightness`, `turnAllSwitches`, `applyTvScene`) via `coroutineScope { map { async { ... } }.awaitAll() }` over idempotent `setDevicePowerExplicit(device, targetOn)` (bounded at the repository layer by `Semaphore(3)`), rather than sequential `for` loops over non-idempotent toggles.
+4. **Cohesive UI State Controllers, `try / finally` Spinner Cleanup & Bounded Concurrent Batch Execution (`DeviceActionsUiController`, `ProvisionApUiController` & `HomeAndRulesUiController` Pattern)**:
+   - Avoid letting a single `AndroidViewModel` accumulate 1,000+ lines by mixing core state exposures with device/room/SSDP action workflows, multi-step wizard state machines (`10.22.22.1` provisioning), or secondary modal CRUD workflows (Wi-Fi Home profiles, device edit modal, rules CRUD).
+   - Extract self-contained state flows and coroutine workflows into internal ViewModel-scoped controllers (`DeviceActionsUiController.kt`, `ProvisionApUiController.kt`, `HomeAndRulesUiController.kt`) while delegating public `StateFlow` properties and action methods on `SwitchViewModel` (`< 500` lines) so external callers and E2E tests experience zero API churn.
+   - Always wrap loading spinner mutations (`_togglingRooms`, `_togglingDeviceIds`, `_isRefreshing`, `_isReconnectingHome`, `_isScanningSetupAp`, `_isProvisioningAp`) in `try { ... } finally { ... }` so coroutine cancellation never leaves stuck spinners, and fan out multi-switch batch operations (`toggleRoomPower`, `updateRoomBrightness`, `turnAllSwitches`, `applyTvScene`) via `coroutineScope { map { async { ... } }.awaitAll() }` over idempotent `setDevicePowerExplicit(device, targetOn)` bounded by `Semaphore(3)`.
 
 ---
 

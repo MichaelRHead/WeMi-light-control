@@ -54,14 +54,17 @@ internal class HomeAndRulesUiController(
         val targetKey = _activeNetworkKey.value
         scope.launch {
             _isReconnectingHome.value = true
-            val summary = repository.reconnectAndRediscoverHome(targetKey)
-            if (!repository.isDemoShowroomMode.value) {
-                repository.refreshGenaSubscriptionsForHome(targetKey)
+            try {
+                val summary = repository.reconnectAndRediscoverHome(targetKey)
+                if (!repository.isDemoShowroomMode.value) {
+                    repository.refreshGenaSubscriptionsForHome(targetKey)
+                }
+                onShowTransientStatus(
+                    "Welcome back to ${summary.homeName} (${summary.ssidLabel}): Reconnected ${summary.reconnectedCount}/${summary.totalRememberedCount} remembered switches (Avg ${summary.averageLatencyMs}ms)"
+                )
+            } finally {
+                _isReconnectingHome.value = false
             }
-            _isReconnectingHome.value = false
-            onShowTransientStatus(
-                "Welcome back to ${summary.homeName} (${summary.ssidLabel}): Reconnected ${summary.reconnectedCount}/${summary.totalRememberedCount} remembered switches (Avg ${summary.averageLatencyMs}ms)"
-            )
         }
     }
 

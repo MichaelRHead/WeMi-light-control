@@ -165,5 +165,49 @@ class ExampleUnitTest {
             "AndroidManifest.xml must declare android.hardware.wifi with required=false for Ethernet Android TV boxes",
             manifestXml.contains("android.hardware.wifi") && manifestXml.contains("android:required=\"false\"")
         )
+
+        val backupRulesXml = java.io.File(repoRoot, "app/src/main/res/xml/backup_rules.xml").readText()
+        assertTrue(
+            "backup_rules.xml must exclude ephemeral wemi-telemetry-latest.txt from Auto Backup",
+            backupRulesXml.contains("<exclude domain=\"file\" path=\"wemi-telemetry-latest.txt\"")
+        )
+
+        val dataExtractionXml = java.io.File(repoRoot, "app/src/main/res/xml/data_extraction_rules.xml").readText()
+        assertTrue(
+            "data_extraction_rules.xml must exclude ephemeral wemi-telemetry-latest.txt in cloud-backup and device-transfer",
+            dataExtractionXml.contains("<cloud-backup>") &&
+                dataExtractionXml.contains("<device-transfer>") &&
+                Regex("wemi-telemetry-latest\\.txt").findAll(dataExtractionXml).count() >= 2
+        )
+    }
+
+    @Test
+    fun `verify DeviceEntity concurrencyKey isolates placeholder serial switches by endpoint and shares real serial across IP hops`() {
+        val manualSwitchA = DeviceEntity(
+            name = "Porch Light",
+            ipAddress = "192.168.1.115",
+            port = 49153,
+            serialNumber = LanRuntimeUtils.DEFAULT_NEW_PLACEHOLDER_SERIAL
+        )
+        val manualSwitchB = DeviceEntity(
+            name = "Garage Light",
+            ipAddress = "192.168.1.116",
+            port = 49153,
+            serialNumber = LanRuntimeUtils.DEFAULT_NEW_PLACEHOLDER_SERIAL
+        )
+        assertEquals("192.168.1.115:49153", manualSwitchA.concurrencyKey())
+        assertEquals("192.168.1.116:49153", manualSwitchB.concurrencyKey())
+        assertFalse(manualSwitchA.concurrencyKey() == manualSwitchB.concurrencyKey())
+
+        val realBeforeDhcpHop = DeviceEntity(
+            name = "Hallway 3-Way",
+            ipAddress = "192.168.1.120",
+            port = 49153,
+            serialNumber = "WLS0403SN9988"
+        )
+        val realAfterDhcpHop = realBeforeDhcpHop.copy(ipAddress = "192.168.1.188", port = 49154)
+        assertEquals("WLS0403SN9988", realBeforeDhcpHop.concurrencyKey())
+        assertEquals(realBeforeDhcpHop.concurrencyKey(), realAfterDhcpHop.concurrencyKey())
     }
 }
+

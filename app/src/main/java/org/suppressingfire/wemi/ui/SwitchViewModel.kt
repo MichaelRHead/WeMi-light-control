@@ -3,9 +3,7 @@ package org.suppressingfire.wemi.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -14,7 +12,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
@@ -27,14 +24,13 @@ import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
-import org.suppressingfire.wemi.data.inferRoomFromName
 import org.suppressingfire.wemi.network.LanNetworkSnapshot
-import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkMonitor
 import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.SetupDeviceDescriptor
 import org.suppressingfire.wemi.network.SsdpScanReport
+import org.suppressingfire.wemi.network.XmlAndSkuParser
 
 enum class BottomTab {
     DEVICES,
@@ -121,35 +117,15 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
     private val _collapsedRooms = MutableStateFlow<Set<String>>(emptySet())
     val collapsedRooms: StateFlow<Set<String>> = _collapsedRooms.asStateFlow()
 
-    private val _togglingRooms = MutableStateFlow<Set<String>>(emptySet())
-    val togglingRooms: StateFlow<Set<String>> = _togglingRooms.asStateFlow()
-
     private val _isEditMode = MutableStateFlow(false)
     val isEditMode: StateFlow<Boolean> = _isEditMode.asStateFlow()
-
-    private val _isRefreshing = MutableStateFlow(false)
-    val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
-
-    private val _showSsdpScannerSheet = MutableStateFlow(false)
-    val showSsdpScannerSheet: StateFlow<Boolean> = _showSsdpScannerSheet.asStateFlow()
-
-    private val _selectedSearchTarget = MutableStateFlow("urn:Belkin:service:basicevent:1")
-    val selectedSearchTarget: StateFlow<String> = _selectedSearchTarget.asStateFlow()
 
     private val _expandedDeviceIds = MutableStateFlow<Set<Int>>(emptySet())
     val expandedDeviceIds: StateFlow<Set<Int>> = _expandedDeviceIds.asStateFlow()
 
-    private val _togglingDeviceIds = MutableStateFlow<Set<Int>>(emptySet())
-    val togglingDeviceIds: StateFlow<Set<Int>> = _togglingDeviceIds.asStateFlow()
-
-    private val _editingDevice = MutableStateFlow<DeviceEntity?>(null)
-    val editingDevice: StateFlow<DeviceEntity?> = _editingDevice.asStateFlow()
-
-    private val _showAddDeviceDialog = MutableStateFlow(false)
-    val showAddDeviceDialog: StateFlow<Boolean> = _showAddDeviceDialog.asStateFlow()
-
     private val _statusBannerMessage = MutableStateFlow<String?>(null)
     val statusBannerMessage: StateFlow<String?> = _statusBannerMessage.asStateFlow()
+    private var statusBannerJob: Job? = null
 
     private val _useWeMiWordmark = MutableStateFlow(true)
     val useWeMiWordmark: StateFlow<Boolean> = _useWeMiWordmark.asStateFlow()
@@ -163,19 +139,35 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
             _expandedDeviceIds.value = emptySet()
             _isEditMode.value = false
         },
-        onShowTransientStatus = { msg -> showTransientStatus(msg) }
+        onShowTransientStatus = ::showTransientStatus
     )
     val activeNetworkKey: StateFlow<String> = homeAndRulesController.activeNetworkKey
     val isReconnectingHome: StateFlow<Boolean> = homeAndRulesController.isReconnectingHome
     val showAddHomeDialog: StateFlow<Boolean> = homeAndRulesController.showAddHomeDialog
     val showAddRuleDialog: StateFlow<Boolean> = homeAndRulesController.showAddRuleDialog
 
+    private val deviceActionsController = DeviceActionsUiController(
+        scope = viewModelScope,
+        repository = repository,
+        activeNetworkKeyProvider = { activeNetworkKey.value },
+        currentWifiSsidProvider = ::currentWifiSsid,
+        currentDevicesProvider = { devices.value },
+        onShowTransientStatus = ::showTransientStatus
+    )
+    val togglingRooms: StateFlow<Set<String>> = deviceActionsController.togglingRooms
+    val togglingDeviceIds: StateFlow<Set<Int>> = deviceActionsController.togglingDeviceIds
+    val isRefreshing: StateFlow<Boolean> = deviceActionsController.isRefreshing
+    val showSsdpScannerSheet: StateFlow<Boolean> = deviceActionsController.showSsdpScannerSheet
+    val selectedSearchTarget: StateFlow<String> = deviceActionsController.selectedSearchTarget
+    val editingDevice: StateFlow<DeviceEntity?> = deviceActionsController.editingDevice
+    val showAddDeviceDialog: StateFlow<Boolean> = deviceActionsController.showAddDeviceDialog
+
     private val provisionApUiController = ProvisionApUiController(
         scope = viewModelScope,
         repository = repository,
         networkMonitor = networkMonitor,
         activeNetworkKeyProvider = { activeNetworkKey.value },
-        onShowTransientStatus = { msg -> showTransientStatus(msg) }
+        onShowTransientStatus = ::showTransientStatus
     )
     val showProvisionApDialog: StateFlow<Boolean> = provisionApUiController.showProvisionApDialog
     val scannedSetupAps: StateFlow<List<ScannedAp>> = provisionApUiController.scannedSetupAps
@@ -311,33 +303,10 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
         _collapsedRooms.value = if (roomName in current) current - roomName else current + roomName
     }
 
-    fun toggleRoomPower(roomName: String) {
-        viewModelScope.launch {
-            val activeKey = activeNetworkKey.value
-            val roomSwitches = devices.value.filter {
-                it.networkKey == activeKey &&
-                    it.roomName.equals(roomName, ignoreCase = true) &&
-                    it.isReachable &&
-                    it.parsedType != DeviceType.MOTION_SENSOR
-            }
-            if (roomSwitches.isEmpty()) return@launch
-            val targetOn = !roomSwitches.any { it.isOn }
+    fun toggleRoomPower(roomName: String) = deviceActionsController.toggleRoomPower(roomName)
 
-            _togglingRooms.value = _togglingRooms.value + roomName
-            val count = repository.toggleRoomPower(roomName, targetOn, activeKey)
-            _togglingRooms.value = _togglingRooms.value - roomName
-            showTransientStatus(
-                "$roomName: Turned ${if (targetOn) "ON" else "OFF"} $count light switch(es)"
-            )
-        }
-    }
-
-    fun updateRoomBrightness(roomName: String, brightness: Int) {
-        viewModelScope.launch {
-            val count = repository.updateRoomBrightness(roomName, brightness, activeNetworkKey.value)
-            showTransientStatus("$roomName: Set $count dimmable light(s) to $brightness%")
-        }
-    }
+    fun updateRoomBrightness(roomName: String, brightness: Int) =
+        deviceActionsController.updateRoomBrightness(roomName, brightness)
 
     fun toggleEditMode() {
         _isEditMode.value = !_isEditMode.value
@@ -352,157 +321,41 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
         _expandedDeviceIds.value = if (deviceId in current) current - deviceId else current + deviceId
     }
 
-    fun toggleDevicePower(device: DeviceEntity) {
-        viewModelScope.launch {
-            _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
-            val updated = repository.toggleDevicePower(device)
-            _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
-            if (updated.isReachable) {
-                showTransientStatus(
-                    "${updated.name}: Turned ${if (updated.isOn) "ON" else "OFF"} (${updated.latencyMs}ms • ${updated.ipAddress}:${updated.port})"
-                )
-            } else {
-                showTransientStatus(
-                    "${updated.name}: Offline • Unreachable at ${updated.ipAddress}:${updated.port} (State reverted)"
-                )
-            }
-        }
-    }
+    fun toggleDevicePower(device: DeviceEntity) = deviceActionsController.toggleDevicePower(device)
 
-    fun updateBrightness(device: DeviceEntity, brightness: Int) {
-        viewModelScope.launch {
-            val updated = repository.updateDeviceBrightness(device, brightness)
-            if (!updated.isReachable) {
-                showTransientStatus(
-                    "${updated.name}: Offline • Could not set brightness at ${updated.ipAddress}:${updated.port}"
-                )
-            }
-        }
-    }
+    fun updateBrightness(device: DeviceEntity, brightness: Int) =
+        deviceActionsController.updateBrightness(device, brightness)
 
-    fun simulateOrRefreshMotion(device: DeviceEntity) {
-        viewModelScope.launch {
-            repository.triggerMotionEvent(device)
-            showTransientStatus("Motion sensed on ${device.name}")
-        }
-    }
+    fun simulateOrRefreshMotion(device: DeviceEntity) =
+        deviceActionsController.simulateOrRefreshMotion(device)
 
-    fun reconnectDevice(device: DeviceEntity) {
-        viewModelScope.launch {
-            _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
-            val updated = repository.reconnectDevice(device)
-            _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
-            if (updated.isReachable) {
-                showTransientStatus(
-                    "${updated.name} Active (${updated.latencyMs}ms RTT) at ${updated.ipAddress}:${updated.port}"
-                )
-            } else {
-                showTransientStatus(
-                    "${updated.name} is Offline (No response at ${updated.ipAddress})"
-                )
-            }
-        }
-    }
+    fun reconnectDevice(device: DeviceEntity) = deviceActionsController.reconnectDevice(device)
 
-    fun pingDeviceLatency(device: DeviceEntity) {
-        viewModelScope.launch {
-            _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
-            val updated = repository.pingDeviceLatency(device)
-            _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
-            if (updated.isReachable) {
-                showTransientStatus(
-                    "${updated.name}: Connection Active • ${updated.latencyMs}ms latency (${updated.ipAddress}:${updated.port})"
-                )
-            } else {
-                showTransientStatus(
-                    "${updated.name}: Offline • Unreachable at ${updated.ipAddress}:${updated.port}"
-                )
-            }
-        }
-    }
+    fun pingDeviceLatency(device: DeviceEntity) = deviceActionsController.pingDeviceLatency(device)
 
-    fun openSsdpScannerAndScan(searchTarget: String = _selectedSearchTarget.value) {
-        _selectedSearchTarget.value = searchTarget
-        _showSsdpScannerSheet.value = true
-        runSsdpScan(searchTarget = searchTarget, autoAdoptNew = false)
-    }
+    fun openSsdpScannerAndScan(searchTarget: String = selectedSearchTarget.value) =
+        deviceActionsController.openSsdpScannerAndScan(searchTarget)
 
-    fun closeSsdpScanner() {
-        _showSsdpScannerSheet.value = false
-    }
+    fun closeSsdpScanner() = deviceActionsController.closeSsdpScanner()
 
-    fun selectSearchTargetAndScan(searchTarget: String) {
-        _selectedSearchTarget.value = searchTarget
-        runSsdpScan(searchTarget = searchTarget, autoAdoptNew = false)
-    }
+    fun selectSearchTargetAndScan(searchTarget: String) =
+        deviceActionsController.selectSearchTargetAndScan(searchTarget)
 
-    fun refreshDevicesFromNetwork() {
-        runSsdpScan(searchTarget = _selectedSearchTarget.value, autoAdoptNew = true)
-    }
+    fun refreshDevicesFromNetwork() = deviceActionsController.refreshDevicesFromNetwork()
 
-    private fun runSsdpScan(searchTarget: String, autoAdoptNew: Boolean) {
-        if (_isRefreshing.value) return
-        viewModelScope.launch {
-            _isRefreshing.value = true
-            try {
-                val activeKey = activeNetworkKey.value
-                val activeSsid = currentWifiSsid()
-                val report = repository.executeSsdpScan(
-                    searchTarget = searchTarget,
-                    autoAdoptNew = autoAdoptNew,
-                    activeNetworkKey = activeKey,
-                    activeWifiSsid = activeSsid
-                )
-                showTransientStatus(
-                    "SSDP Scan on $activeSsid (${report.scanDurationMs}ms): Found ${report.discoveredDevices.size} UPnP smart switch devices"
-                )
-            } finally {
-                _isRefreshing.value = false
-            }
-        }
-    }
+    fun adoptSsdpDevice(discovered: SsdpDiscoveredDevice) =
+        deviceActionsController.adoptSsdpDevice(discovered)
 
-    fun adoptSsdpDevice(discovered: SsdpDiscoveredDevice) {
-        viewModelScope.launch {
-            val saved = repository.adoptDiscoveredDevice(
-                discovered = discovered,
-                activeNetworkKey = activeNetworkKey.value,
-                activeWifiSsid = currentWifiSsid()
-            )
-            showTransientStatus("Remembered ${saved.name} in ${saved.roomName} on ${saved.wifiSsid}")
-        }
-    }
+    fun adoptAllSsdpDevices() = deviceActionsController.adoptAllSsdpDevices()
 
-    fun adoptAllSsdpDevices() {
-        viewModelScope.launch {
-            val list = latestSsdpReport.value?.discoveredDevices.orEmpty()
-            val added = repository.adoptDiscoveredDevices(
-                discoveredList = list,
-                activeNetworkKey = activeNetworkKey.value,
-                activeWifiSsid = currentWifiSsid()
-            )
-            showTransientStatus(
-                if (added > 0) "Adopted $added newly discovered smart switch(es) on ${currentWifiSsid()}"
-                else "All ${list.size} SSDP-discovered devices are remembered on ${currentWifiSsid()}"
-            )
-        }
-    }
+    fun openAddDeviceDialog() = deviceActionsController.openAddDeviceDialog()
 
-    fun openAddDeviceDialog() {
-        _showAddDeviceDialog.value = true
-    }
+    fun closeAddDeviceDialog() = deviceActionsController.closeAddDeviceDialog()
 
-    fun closeAddDeviceDialog() {
-        _showAddDeviceDialog.value = false
-    }
+    fun openEditDeviceDialog(device: DeviceEntity) =
+        deviceActionsController.openEditDeviceDialog(device)
 
-    fun openEditDeviceDialog(device: DeviceEntity) {
-        _editingDevice.value = device
-    }
-
-    fun closeEditDeviceDialog() {
-        _editingDevice.value = null
-    }
+    fun closeEditDeviceDialog() = deviceActionsController.closeEditDeviceDialog()
 
     fun saveDevice(
         id: Int,
@@ -516,99 +369,17 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
         isOn: Boolean,
         autoOffMinutes: Int,
         syncFriendlyNameToHardware: Boolean = false
-    ) {
-        val existing = devices.value.find { it.id == id }
-        val resolvedName = name.trim().ifEmpty { "WeMi Light Switch" }
-        val resolvedRoom = roomName.trim().ifEmpty { inferRoomFromName(resolvedName) }
-        val activeKey = existing?.networkKey ?: activeNetworkKey.value
-        val activeSsid = existing?.wifiSsid ?: currentWifiSsid()
-        val sortOrder = existing?.sortOrder ?: devices.value.size
-        _showAddDeviceDialog.value = false
-        _editingDevice.value = null
+    ) = deviceActionsController.saveDevice(
+        id, name, roomName, deviceType, ipAddress, port, brightness,
+        isReachable, isOn, autoOffMinutes, syncFriendlyNameToHardware
+    )
 
-        viewModelScope.launch {
-            val entity = DeviceEntity(
-                id = id,
-                name = resolvedName,
-                roomName = resolvedRoom,
-                networkKey = activeKey,
-                wifiSsid = activeSsid,
-                deviceType = deviceType.name,
-                ipAddress = ipAddress.trim().ifEmpty { "192.168.1.115" },
-                port = port.coerceIn(1, 65535),
-                isOn = isOn,
-                isReachable = isReachable,
-                brightness = brightness.coerceIn(1, 100),
-                latencyMs = existing?.latencyMs ?: 14,
-                lastCheckedTime = existing?.lastCheckedTime ?: "Connected now",
-                lastMotionTime = existing?.lastMotionTime ?: "4:15:15 PM",
-                serialNumber = existing?.serialNumber ?: LanRuntimeUtils.DEFAULT_NEW_PLACEHOLDER_SERIAL,
-                firmwareVersion = existing?.firmwareVersion ?: "WeMo_WW_2.00.11532.PVT",
-                hardwareModel = existing?.hardwareModel ?: "LightSwitch",
-                macAddress = existing?.macAddress.orEmpty(),
-                udn = existing?.udn.orEmpty(),
-                signalStrengthPercent = existing?.signalStrengthPercent ?: 85,
-                nightModeEnabled = existing?.nightModeEnabled ?: false,
-                sortOrder = sortOrder,
-                autoOffMinutes = autoOffMinutes.coerceIn(0, 240)
-            )
-            repository.saveDevice(entity, syncFriendlyNameToHardware = syncFriendlyNameToHardware)
-            showTransientStatus(
-                if (syncFriendlyNameToHardware) {
-                    "Saved ${entity.name} in ${entity.roomName} & synced hardware FriendlyName"
-                } else {
-                    "Remembered ${entity.name} in ${entity.roomName} (${entity.wifiSsid})"
-                }
-            )
-        }
-    }
+    fun deleteDevice(device: DeviceEntity) = deviceActionsController.deleteDevice(device)
 
-    fun deleteDevice(device: DeviceEntity) {
-        _editingDevice.value = null
-        viewModelScope.launch {
-            repository.deleteDevice(device.id)
-            showTransientStatus("Removed ${device.name}")
-        }
-    }
+    fun moveDevice(device: DeviceEntity, moveUp: Boolean) =
+        deviceActionsController.moveDevice(device, moveUp)
 
-    fun moveDevice(device: DeviceEntity, moveUp: Boolean) {
-        viewModelScope.launch {
-            repository.moveDeviceOrder(device, moveUp)
-        }
-    }
-
-    fun turnAllSwitches(turnOn: Boolean) {
-        viewModelScope.launch {
-            val activeKey = activeNetworkKey.value
-            val targets = devices.value.filter {
-                it.networkKey == activeKey &&
-                    it.isReachable &&
-                    it.parsedType != DeviceType.MOTION_SENSOR &&
-                    it.isOn != turnOn
-            }
-            val targetIds = targets.map { it.id }.toSet()
-            _togglingDeviceIds.update { it + targetIds }
-            try {
-                coroutineScope {
-                    targets.map { dev ->
-                        async {
-                            try {
-                                repository.setDevicePowerExplicit(dev, turnOn)
-                            } finally {
-                                _togglingDeviceIds.update { it - dev.id }
-                            }
-                        }
-                    }.awaitAll()
-                }
-            } finally {
-                _togglingDeviceIds.update { it - targetIds }
-            }
-            showTransientStatus(
-                if (turnOn) "All reachable switches on ${currentWifiSsid()} turned ON"
-                else "All reachable switches on ${currentWifiSsid()} turned OFF"
-            )
-        }
-    }
+    fun turnAllSwitches(turnOn: Boolean) = deviceActionsController.turnAllSwitches(turnOn)
 
     fun toggleRule(rule: RuleEntity) = homeAndRulesController.toggleRule(rule)
 
@@ -626,32 +397,13 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
         targetStateOn: Boolean,
         targetBrightness: Int
     ) = homeAndRulesController.addRule(
-        name = name,
-        ruleType = ruleType,
-        targetDevice = targetDevice,
-        triggerSummary = triggerSummary,
-        targetStateOn = targetStateOn,
-        targetBrightness = targetBrightness
+        name, ruleType, targetDevice, triggerSummary, targetStateOn, targetBrightness
     )
 
     fun deleteRule(rule: RuleEntity) = homeAndRulesController.deleteRule(rule)
 
-    fun toggleDimmerNightMode(device: DeviceEntity) {
-        viewModelScope.launch {
-            _togglingDeviceIds.value = _togglingDeviceIds.value + device.id
-            val updated = repository.toggleDimmerNightMode(device)
-            _togglingDeviceIds.value = _togglingDeviceIds.value - device.id
-            if (updated.isReachable) {
-                showTransientStatus(
-                    "${updated.name}: Hardware Night Mode (20% Cap) ${if (updated.nightModeEnabled) "ENABLED" else "DISABLED"}"
-                )
-            } else {
-                showTransientStatus(
-                    "${updated.name}: Offline • Could not configure Night Mode at ${updated.ipAddress}:${updated.port}"
-                )
-            }
-        }
-    }
+    fun toggleDimmerNightMode(device: DeviceEntity) =
+        deviceActionsController.toggleDimmerNightMode(device)
 
     fun openProvisionApDialog() = provisionApUiController.openProvisionApDialog()
 
@@ -673,22 +425,11 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
         roomName: String = "",
         deviceType: DeviceType? = null,
         keepDialogOpenOnSuccess: Boolean = false
-    ) {
-        provisionApUiController.provisionSetupAp(
-            apHost = apHost,
-            ssid = ssid,
-            password = password,
-            channel = channel,
-            authMode = authMode,
-            encryptionType = encryptionType,
-            encryptionMethod = encryptionMethod,
-            addPasswordLengths = addPasswordLengths,
-            customDeviceName = customDeviceName,
-            roomName = roomName,
-            deviceType = deviceType,
-            keepDialogOpenOnSuccess = keepDialogOpenOnSuccess
-        )
-    }
+    ) = provisionApUiController.provisionSetupAp(
+        apHost, ssid, password, channel, authMode, encryptionType,
+        encryptionMethod, addPasswordLengths, customDeviceName, roomName,
+        deviceType, keepDialogOpenOnSuccess
+    )
 
     fun toggleDemoShowroomMode(enabled: Boolean = !isDemoShowroomMode.value) =
         homeAndRulesController.toggleDemoShowroomMode(enabled) { _selectedRoomFilter.value = null }
@@ -705,19 +446,23 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun dismissBanner() {
+        statusBannerJob?.cancel()
+        statusBannerJob = null
         _statusBannerMessage.value = null
     }
 
     override fun onCleared() {
         super.onCleared()
+        statusBannerJob?.cancel()
         networkMonitor.stopMonitoring()
         ruleScheduler.stopAll()
         repository.close()
     }
 
-    private fun showTransientStatus(message: String) {
-        viewModelScope.launch {
-            _statusBannerMessage.value = message
+    internal fun showTransientStatus(message: String) {
+        statusBannerJob?.cancel()
+        _statusBannerMessage.value = message
+        statusBannerJob = viewModelScope.launch {
             delay(3200)
             if (_statusBannerMessage.value == message) {
                 _statusBannerMessage.value = null

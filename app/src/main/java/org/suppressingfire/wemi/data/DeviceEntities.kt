@@ -101,6 +101,11 @@ data class DeviceEntity(
             ConnectionQuality.SLOW -> "Slow • ${latencyMs}ms"
         }
 
+    /** Canonical per-device mutex key: real `<serialNumber>` when known, or `ipAddress:port` for placeholders. */
+    fun concurrencyKey(): String =
+        serialNumber.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: "$ipAddress:$port"
+
+
     /**
      * 3-tier hardware identity matcher between this persisted [DeviceEntity] and a [discovered]
      * SSDP/unicast node:

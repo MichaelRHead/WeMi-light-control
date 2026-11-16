@@ -2,6 +2,24 @@ package org.suppressingfire.wemi.data
 
 import android.content.Context
 import androidx.core.content.edit
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import org.suppressingfire.wemi.network.GenaEventNotification
 import org.suppressingfire.wemi.network.GenaSubscriptionManager
 import org.suppressingfire.wemi.network.LanRuntimeUtils
@@ -14,25 +32,6 @@ import org.suppressingfire.wemi.network.SetupDeviceDescriptor
 import org.suppressingfire.wemi.network.SoapCallResult
 import org.suppressingfire.wemi.network.SsdpScanReport
 import org.suppressingfire.wemi.network.XmlAndSkuParser
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.sync.withPermit
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.concurrent.ConcurrentHashMap
 
 data class HomeReconnectSummary(
     val networkKey: String,
@@ -48,11 +47,12 @@ data class HomeReconnectSummary(
  *
  * Responsibilities kept cohesive here:
  * - RTOS-safe LAN concurrency limiting (`Semaphore(3)`) and per-device `Mutex` serialization
+ *   using canonical [DeviceEntity.concurrencyKey]
  * - Unified optimistic SOAP command pipeline ([executeOptimisticDeviceCommand]) with 2-stage
  *   self-healing reconnect and offline rollback
- * - UPnP GENA push notification handling (`1200ms` echo-suppression window) and 30-second fallback polling (`2000ms` echo guard)
  *
- * Delegates SSDP discovery & startup probing to [DiscoveryCoordinator], `10.22.22.1` Setup AP
+ * Delegates SSDP discovery & startup probing to [DiscoveryCoordinator], UPnP GENA push handling &
+ * concurrent health polling to [GenaAndHealthPollingCoordinator], `10.22.22.1` Setup AP
  * provisioning to [ProvisioningCoordinator], Room/rule CRUD & manual-IP enrichment to
  * [DeviceCrudAndRulesCoordinator], and showcase presets to [DemoFixtures].
  */
@@ -78,8 +78,8 @@ class SwitchRepository(
     private val initialSeedDone = MutableStateFlow(false)
 
     /**
-     * Limits concurrent HTTP/SOAP connections across the LAN to 3 so 2nd-Gen Belkin RTOS
-     * switches (WLS040 / WLS0403 / WDS060) never suffer lwIP socket starvation.
+     * Limits concurrent HTTP/SOAP connections across the LAN to 3 so 2nd-Gen RTOS switches
+     * (`WLS040` / `WLS0403` / `WDS060`) never suffer lwIP socket starvation.
      */
     private val lanSemaphore = Semaphore(3)
     private val deviceMutexes = ConcurrentHashMap<String, Mutex>()
@@ -98,10 +98,8 @@ class SwitchRepository(
     private fun nowFormatted(): String =
         SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
 
-    private fun mutexFor(device: DeviceEntity): Mutex {
-        val key = device.serialNumber.takeIf { it.isNotBlank() } ?: "${device.ipAddress}:${device.port}"
-        return deviceMutexes.getOrPut(key) { Mutex() }
-    }
+    private fun mutexFor(device: DeviceEntity): Mutex =
+        deviceMutexes.getOrPut(device.concurrencyKey()) { Mutex() }
 
     private val discoveryCoordinator = DiscoveryCoordinator(
         dao = dao,
@@ -136,14 +134,27 @@ class SwitchRepository(
     )
 
     /**
-     * Embedded UPnP GENA event manager for <100ms physical wall-switch push notifications.
+     * Embedded UPnP GENA event manager for `<100ms` physical wall-switch push notifications.
      */
-    val genaManager = GenaSubscriptionManager(
+    val genaManager: GenaSubscriptionManager = GenaSubscriptionManager(
         localIpProvider = { detectCurrentLanIp() },
         wifiSocketFactory = NetworkMonitor.createWifiBoundSocketFactory(context),
         onNotification = { notification ->
             repoScope.launch { handleGenaNotification(notification) }
         }
+    )
+
+    private val genaPollingCoordinator: GenaAndHealthPollingCoordinator = GenaAndHealthPollingCoordinator(
+        dao = dao,
+        networkClient = networkClient,
+        genaManager = genaManager,
+        lanSemaphore = lanSemaphore,
+        deviceMutexes = deviceMutexes,
+        lastSetStateTimestampMs = lastSetStateTimestampMs,
+        isDemoShowroomMode = { _isDemoShowroomMode.value },
+        attemptTwoStageReconnect = discoveryCoordinator::attemptTwoStageReconnect,
+        appendLog = ::appendLog,
+        nowFormatted = ::nowFormatted
     )
 
     val allDevices: Flow<List<DeviceEntity>> = combine(
@@ -170,13 +181,6 @@ class SwitchRepository(
         if (list.isEmpty() && demoMode) defaultClassicRules() else list
     }
 
-    /**
-     * Initializes the database on app startup:
-     * - In Real LAN Mode (default on physical Android phones/TVs), starts clean on the
-     *   detected Wi-Fi subnet without seeding fake demo switches, creating a profile for
-     *   the active LAN subnet if none exists.
-     * - In Demo Showroom Mode, seeds the 3 showcase homes, 14 devices, and 4 rules.
-     */
     suspend fun ensureSeeded(): String {
         return if (_isDemoShowroomMode.value) {
             if (dao.getHomeNetworkCount() == 0) dao.insertHomeNetworks(defaultHomeNetworks())
@@ -207,10 +211,6 @@ class SwitchRepository(
         }
     }
 
-    /**
-     * Clears all remembered Wi-Fi Homes, discovered switches, room groupings, and rules in
-     * Real LAN Mode, and re-initializes a single clean "My Home" profile on the active subnet.
-     */
     suspend fun resetLanHomesSwitchesAndRooms(): String = setDemoShowroomMode(false)
 
     suspend fun resetToClassicScreenshotPreset() {
@@ -244,10 +244,7 @@ class SwitchRepository(
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
     ): SsdpScanReport = discoveryCoordinator.executeSsdpScan(
-        searchTarget = searchTarget,
-        autoAdoptNew = autoAdoptNew,
-        activeNetworkKey = activeNetworkKey,
-        activeWifiSsid = activeWifiSsid
+        searchTarget, autoAdoptNew, activeNetworkKey, activeWifiSsid
     )
 
     suspend fun adoptDiscoveredDevice(
@@ -255,9 +252,7 @@ class SwitchRepository(
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
     ): DeviceEntity = discoveryCoordinator.adoptDiscoveredDevice(
-        discovered = discovered,
-        activeNetworkKey = activeNetworkKey,
-        activeWifiSsid = activeWifiSsid
+        discovered, activeNetworkKey, activeWifiSsid
     )
 
     suspend fun adoptDiscoveredDevices(
@@ -265,18 +260,13 @@ class SwitchRepository(
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
     ): Int = discoveryCoordinator.adoptDiscoveredDevices(
-        discoveredList = discoveredList,
-        activeNetworkKey = activeNetworkKey,
-        activeWifiSsid = activeWifiSsid
+        discoveredList, activeNetworkKey, activeWifiSsid
     )
 
     suspend fun resolveOrCreateHomeForSubnet(
         subnetPrefix: String,
         gatewayIp: String = "$subnetPrefix.1"
-    ): HomeNetworkEntity? = discoveryCoordinator.resolveOrCreateHomeForSubnet(
-        subnetPrefix = subnetPrefix,
-        gatewayIp = gatewayIp
-    )
+    ): HomeNetworkEntity? = discoveryCoordinator.resolveOrCreateHomeForSubnet(subnetPrefix, gatewayIp)
 
     suspend fun saveOrUpdateHomeNetwork(
         existingKey: String?,
@@ -284,23 +274,16 @@ class SwitchRepository(
         ssidLabel: String,
         subnetPrefix: String
     ): HomeNetworkEntity = crudCoordinator.saveOrUpdateHomeNetwork(
-        existingKey = existingKey,
-        homeName = homeName,
-        ssidLabel = ssidLabel,
-        subnetPrefix = subnetPrefix
+        existingKey, homeName, ssidLabel, subnetPrefix
     )
 
     /**
      * Unified optimistic SOAP state-transition pipeline shared by [toggleDevicePower],
      * [setDevicePowerExplicit], and [updateDeviceBrightness]:
-     * 1. Acquires the per-device [Mutex] so rapid taps on the same switch execute in order.
-     * 2. Writes the optimistic state (`targetOn`, `optimisticBrightness`) to Room and stamps
-     *    [lastSetStateTimestampMs] before dispatching the SOAP command.
-     * 3. Dispatches `SetBinaryState` inside [lanSemaphore] (`Semaphore(3)`).
-     * 4. If unreachable in Real LAN Mode, triggers [DiscoveryCoordinator.attemptTwoStageReconnect]
-     *    (9-port probe + targeted SSDP scan by serialNumber) and retries once.
-     * 5. Stamps [lastSetStateTimestampMs] on completion and commits the confirmed state — or reverts
-     *    to `priorOn`/`priorBrightness` with `isReachable = false, latencyMs = 0` when offline.
+     * 1. Acquires the per-device [Mutex] ([DeviceEntity.concurrencyKey]) so rapid taps execute in order.
+     * 2. Writes optimistic state to Room and stamps [lastSetStateTimestampMs].
+     * 3. Dispatches `SetBinaryState` inside [lanSemaphore] (`Semaphore(3)`), healing port/IP hops on failure.
+     * 4. Commits confirmed state or reverts to `priorOn`/`priorBrightness` when offline.
      */
     private suspend fun executeOptimisticDeviceCommand(
         device: DeviceEntity,
@@ -323,11 +306,7 @@ class SwitchRepository(
 
             var activeDevice = device
             var result: SoapCallResult = lanSemaphore.withPermit {
-                networkClient.setBinaryState(
-                    device = activeDevice,
-                    targetOn = targetOn,
-                    targetBrightness = soapBrightnessArg
-                )
+                networkClient.setBinaryState(activeDevice, targetOn, soapBrightnessArg)
             }
 
             if (!result.reachableOnLan && !_isDemoShowroomMode.value) {
@@ -335,11 +314,7 @@ class SwitchRepository(
                 if (healedDevice != null) {
                     activeDevice = healedDevice
                     result = lanSemaphore.withPermit {
-                        networkClient.setBinaryState(
-                            device = activeDevice,
-                            targetOn = targetOn,
-                            targetBrightness = soapBrightnessArg
-                        )
+                        networkClient.setBinaryState(activeDevice, targetOn, soapBrightnessArg)
                     }
                 }
             }
@@ -385,30 +360,23 @@ class SwitchRepository(
         val nextOn = !device.isOn
         val restoreFullDimmer = device.parsedType == DeviceType.LIGHTBULB_DIMMER && nextOn && device.brightness == 0
         val nextBrightness = if (restoreFullDimmer) 100 else device.brightness
-        val soapBrightnessArg = if (restoreFullDimmer) 100 else null
-
         return executeOptimisticDeviceCommand(
             device = device,
             targetOn = nextOn,
             optimisticBrightness = nextBrightness,
-            soapBrightnessArg = soapBrightnessArg,
+            soapBrightnessArg = if (restoreFullDimmer) 100 else null,
             optimisticStatusLabel = "Sending..."
         )
     }
 
-    suspend fun setDevicePowerExplicit(
-        device: DeviceEntity,
-        targetOn: Boolean
-    ): DeviceEntity {
+    suspend fun setDevicePowerExplicit(device: DeviceEntity, targetOn: Boolean): DeviceEntity {
         val restoreFullDimmer = device.parsedType == DeviceType.LIGHTBULB_DIMMER && targetOn && device.brightness == 0
         val nextBrightness = if (restoreFullDimmer) 100 else device.brightness
-        val soapBrightnessArg = if (restoreFullDimmer) 100 else null
-
         return executeOptimisticDeviceCommand(
             device = device,
             targetOn = targetOn,
             optimisticBrightness = nextBrightness,
-            soapBrightnessArg = soapBrightnessArg
+            soapBrightnessArg = if (restoreFullDimmer) 100 else null
         )
     }
 
@@ -422,175 +390,28 @@ class SwitchRepository(
         )
     }
 
-    suspend fun toggleRoomPower(
-        roomName: String,
-        targetOn: Boolean,
-        networkKey: String? = null
-    ): Int = crudCoordinator.toggleRoomPower(roomName, targetOn, networkKey)
+    suspend fun toggleRoomPower(roomName: String, targetOn: Boolean, networkKey: String? = null): Int =
+        crudCoordinator.toggleRoomPower(roomName, targetOn, networkKey)
 
-    suspend fun updateRoomBrightness(
-        roomName: String,
-        newBrightness: Int,
-        networkKey: String? = null
-    ): Int = crudCoordinator.updateRoomBrightness(roomName, newBrightness, networkKey)
+    suspend fun updateRoomBrightness(roomName: String, newBrightness: Int, networkKey: String? = null): Int =
+        crudCoordinator.updateRoomBrightness(roomName, newBrightness, networkKey)
 
-    suspend fun triggerMotionEvent(device: DeviceEntity) =
-        crudCoordinator.triggerMotionEvent(device)
+    suspend fun triggerMotionEvent(device: DeviceEntity) = crudCoordinator.triggerMotionEvent(device)
 
     suspend fun setDeviceReachableState(device: DeviceEntity, reachable: Boolean) =
         crudCoordinator.setDeviceReachableState(device, reachable)
 
-    /**
-     * Handles incoming UPnP GENA `<e:propertyset>` push events from physical wall switches
-     * and 3-way traveler rockers, updating Room state immediately (`<100ms`).
-     */
-    suspend fun handleGenaNotification(event: GenaEventNotification) {
-        appendLog(event.logEntry)
-        val devices = dao.getAllDevices().first()
-        val matched = devices.find {
-            (event.deviceKey.isNotBlank() && it.serialNumber.equals(event.deviceKey, ignoreCase = true)) ||
-                event.deviceKey == "dev_${it.id}" ||
-                (event.sourceIp.isNotBlank() && it.ipAddress == event.sourceIp)
-        } ?: return
+    suspend fun handleGenaNotification(event: GenaEventNotification): Unit =
+        genaPollingCoordinator.handleGenaNotification(event)
 
-        val recentSetMs = lastSetStateTimestampMs[matched.id] ?: 0L
-        if ((System.currentTimeMillis() - recentSetMs) < 1200L) {
-            return
-        }
+    suspend fun refreshGenaSubscriptionsForHome(networkKey: String): Int =
+        genaPollingCoordinator.refreshGenaSubscriptionsForHome(networkKey)
 
-        val updated = matched.copy(
-            isOn = event.binaryStateOn ?: matched.isOn,
-            brightness = event.brightness?.coerceIn(1, 100) ?: matched.brightness,
-            isReachable = true,
-            lastCheckedTime = "GENA Push • ${nowFormatted()}"
-        )
-        dao.updateDevice(updated)
-    }
+    suspend fun pollActiveHomeStates(networkKey: String): Unit =
+        genaPollingCoordinator.pollActiveHomeStates(networkKey)
 
-    suspend fun refreshGenaSubscriptionsForHome(networkKey: String): Int {
-        if (_isDemoShowroomMode.value) return 0
-        val devices = dao.getAllDevices().first().filter {
-            it.networkKey == networkKey && it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR
-        }
-        var subscribedCount = 0
-        for (dev in devices) {
-            val rec = lanSemaphore.withPermit {
-                genaManager.subscribeOrRenew(dev, timeoutSeconds = 300)
-            }
-            if (rec != null) subscribedCount++
-        }
-        return subscribedCount
-    }
-
-    suspend fun pollActiveHomeStates(networkKey: String) {
-        if (_isDemoShowroomMode.value) return
-        val devices = dao.getAllDevices().first().filter { it.networkKey == networkKey }
-        if (devices.isEmpty()) return
-        val checkedAt = nowFormatted()
-        for (dev in devices) {
-            mutexFor(dev).withLock {
-                val recentSetMs = lastSetStateTimestampMs[dev.id] ?: 0L
-                if ((System.currentTimeMillis() - recentSetMs) < 2000L) return@withLock
-
-                val latest = dao.getDeviceById(dev.id) ?: return@withLock
-                val probe = lanSemaphore.withPermit {
-                    networkClient.getBinaryState(latest)
-                }
-
-                val postProbeSetMs = lastSetStateTimestampMs[dev.id] ?: 0L
-                if ((System.currentTimeMillis() - postProbeSetMs) < 2000L) return@withLock
-
-                val current = dao.getDeviceById(dev.id) ?: latest
-                if (probe.reachableOnLan) {
-                    dao.updateDevice(
-                        current.copy(
-                            port = probe.resolvedPort,
-                            isReachable = true,
-                            isOn = probe.binaryStateOn ?: current.isOn,
-                            brightness = probe.brightness ?: current.brightness,
-                            latencyMs = probe.latencyMs.coerceAtLeast(1),
-                            lastCheckedTime = checkedAt
-                        )
-                    )
-                } else {
-                    dao.updateDevice(
-                        current.copy(
-                            isReachable = false,
-                            latencyMs = 0,
-                            lastCheckedTime = "Offline • Timeout"
-                        )
-                    )
-                }
-            }
-        }
-    }
-
-    suspend fun toggleDimmerNightMode(device: DeviceEntity): DeviceEntity {
-        val priorNightMode = device.nightModeEnabled
-        val priorBrightness = device.brightness
-        val targetNightMode = !priorNightMode
-        val nextBrightness = if (targetNightMode && priorBrightness > 20) 20 else priorBrightness
-
-        return mutexFor(device).withLock {
-            var activeDevice = device
-            var result = lanSemaphore.withPermit {
-                networkClient.configureNightMode(
-                    device = activeDevice,
-                    enabled = targetNightMode,
-                    nightBrightness = 20
-                )
-            }
-
-            if (!result.reachableOnLan && !_isDemoShowroomMode.value) {
-                val healedDevice = discoveryCoordinator.attemptTwoStageReconnect(activeDevice)
-                if (healedDevice != null) {
-                    activeDevice = healedDevice
-                    result = lanSemaphore.withPermit {
-                        networkClient.configureNightMode(
-                            device = activeDevice,
-                            enabled = targetNightMode,
-                            nightBrightness = 20
-                        )
-                    }
-                }
-            }
-
-            appendLog(result.logEntry)
-            val updated = when {
-                result.reachableOnLan -> {
-                    lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
-                    activeDevice.copy(
-                        nightModeEnabled = targetNightMode,
-                        brightness = nextBrightness,
-                        isReachable = true,
-                        port = result.resolvedPort,
-                        latencyMs = result.latencyMs.coerceAtLeast(1),
-                        lastCheckedTime = nowFormatted()
-                    )
-                }
-                _isDemoShowroomMode.value -> {
-                    lastSetStateTimestampMs[device.id] = System.currentTimeMillis()
-                    activeDevice.copy(
-                        nightModeEnabled = targetNightMode,
-                        brightness = nextBrightness,
-                        isReachable = true,
-                        port = result.resolvedPort,
-                        latencyMs = device.latencyMs.takeIf { it > 0 } ?: 14,
-                        lastCheckedTime = nowFormatted()
-                    )
-                }
-                else -> activeDevice.copy(
-                    nightModeEnabled = priorNightMode,
-                    brightness = priorBrightness,
-                    isReachable = false,
-                    latencyMs = 0,
-                    lastCheckedTime = "Offline • Timeout"
-                )
-            }
-            dao.updateDevice(updated)
-            updated
-        }
-    }
+    suspend fun toggleDimmerNightMode(device: DeviceEntity): DeviceEntity =
+        genaPollingCoordinator.toggleDimmerNightMode(device)
 
     suspend fun turnOffDeviceById(deviceId: Int): DeviceEntity? {
         val dev = dao.getDeviceById(deviceId) ?: return null
@@ -598,21 +419,15 @@ class SwitchRepository(
         return setDevicePowerExplicit(dev, false)
     }
 
-    fun latestSetupProbeSummary(): String =
-        provisioningCoordinator.latestProbeDiagnosticSummary()
+    fun latestSetupProbeSummary(): String = provisioningCoordinator.latestProbeDiagnosticSummary()
 
-    fun latestSetupApScanSummary(): String =
-        provisioningCoordinator.latestApScanDiagnosticSummary()
+    fun latestSetupApScanSummary(): String = provisioningCoordinator.latestApScanDiagnosticSummary()
 
-    suspend fun probeSetupApDevice(
-        apHost: String = "10.22.22.1",
-        apPort: Int = 49152
-    ): SetupDeviceDescriptor? = provisioningCoordinator.probeSetupApDevice(apHost = apHost, apPort = apPort)
+    suspend fun probeSetupApDevice(apHost: String = "10.22.22.1", apPort: Int = 49152): SetupDeviceDescriptor? =
+        provisioningCoordinator.probeSetupApDevice(apHost = apHost, apPort = apPort)
 
-    suspend fun scanSetupApNetworks(
-        apHost: String = "10.22.22.1",
-        apPort: Int = 49152
-    ): List<ScannedAp> = provisioningCoordinator.scanSetupApNetworks(apHost = apHost, apPort = apPort)
+    suspend fun scanSetupApNetworks(apHost: String = "10.22.22.1", apPort: Int = 49152): List<ScannedAp> =
+        provisioningCoordinator.scanSetupApNetworks(apHost = apHost, apPort = apPort)
 
     suspend fun provisionSetupApDevice(
         apHost: String = "10.22.22.1",
@@ -632,28 +447,13 @@ class SwitchRepository(
         statusPollDelayMs: Long = 1000L,
         onProgress: ((String) -> Unit)? = null
     ): ProvisionResult = provisioningCoordinator.provisionSetupApDevice(
-        apHost = apHost,
-        apPort = apPort,
-        ssid = ssid,
-        plainPassword = plainPassword,
-        channel = channel,
-        authMode = authMode,
-        encryptionType = encryptionType,
-        encryptionMethod = encryptionMethod,
-        addPasswordLengths = addPasswordLengths,
-        customDeviceName = customDeviceName,
-        roomName = roomName,
-        deviceType = deviceType,
-        activeNetworkKey = activeNetworkKey,
-        maxStatusPolls = maxStatusPolls,
-        statusPollDelayMs = statusPollDelayMs,
-        onProgress = onProgress
+        apHost, apPort, ssid, plainPassword, channel, authMode, encryptionType,
+        encryptionMethod, addPasswordLengths, customDeviceName, roomName, deviceType,
+        activeNetworkKey, maxStatusPolls, statusPollDelayMs, onProgress
     )
 
-    suspend fun saveDevice(
-        device: DeviceEntity,
-        syncFriendlyNameToHardware: Boolean = false
-    ): DeviceEntity = crudCoordinator.saveDevice(device, syncFriendlyNameToHardware)
+    suspend fun saveDevice(device: DeviceEntity, syncFriendlyNameToHardware: Boolean = false): DeviceEntity =
+        crudCoordinator.saveDevice(device, syncFriendlyNameToHardware)
 
     suspend fun deleteDevice(id: Int) = crudCoordinator.deleteDevice(id)
 
@@ -685,13 +485,10 @@ class SwitchRepository(
 
         val DEFAULT_ROOMS: List<String> = DemoFixtures.DEFAULT_ROOMS
 
-        fun defaultHomeNetworks(): List<HomeNetworkEntity> =
-            DemoFixtures.defaultHomeNetworks()
+        fun defaultHomeNetworks(): List<HomeNetworkEntity> = DemoFixtures.defaultHomeNetworks()
 
-        fun defaultClassicDevices(): List<DeviceEntity> =
-            DemoFixtures.defaultClassicDevices()
+        fun defaultClassicDevices(): List<DeviceEntity> = DemoFixtures.defaultClassicDevices()
 
-        fun defaultClassicRules(): List<RuleEntity> =
-            DemoFixtures.defaultClassicRules()
+        fun defaultClassicRules(): List<RuleEntity> = DemoFixtures.defaultClassicRules()
     }
 }
