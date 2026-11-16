@@ -332,8 +332,16 @@ internal class DeviceActionsUiController(
     ) {
         val devices = currentDevicesProvider()
         val existing = devices.find { it.id == id }
-        val resolvedName = name.trim().ifEmpty { "WeMi Light Switch" }
-        val resolvedRoom = roomName.trim().ifEmpty { inferRoomFromName(resolvedName) }
+        val trimmedName = name.trim()
+        val resolvedName = if (id == 0) {
+            trimmedName
+        } else {
+            trimmedName.ifEmpty { existing?.name ?: "WeMi Light Switch" }
+        }
+        val resolvedRoom = roomName.trim().ifEmpty {
+            if (resolvedName.isNotEmpty()) inferRoomFromName(resolvedName) else "Unassigned"
+        }
+        val shouldSyncNameToHardware = syncFriendlyNameToHardware && trimmedName.isNotEmpty()
         val activeKey = existing?.networkKey ?: activeNetworkKeyProvider()
         val activeSsid = existing?.wifiSsid ?: currentWifiSsidProvider()
         val sortOrder = existing?.sortOrder ?: devices.size
@@ -366,12 +374,12 @@ internal class DeviceActionsUiController(
                 sortOrder = sortOrder,
                 autoOffMinutes = autoOffMinutes.coerceIn(0, 240)
             )
-            val saved = repository.saveDevice(entity, syncFriendlyNameToHardware = syncFriendlyNameToHardware)
+            val saved = repository.saveDevice(entity, syncFriendlyNameToHardware = shouldSyncNameToHardware)
             if (saved.isReachable) {
                 refreshGenaIfRealLan(saved.networkKey)
             }
             onShowTransientStatus(
-                if (syncFriendlyNameToHardware) {
+                if (shouldSyncNameToHardware) {
                     "Saved ${saved.name} in ${saved.roomName} & synced hardware FriendlyName"
                 } else {
                     "Remembered ${saved.name} in ${saved.roomName} (${saved.wifiSsid})"

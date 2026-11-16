@@ -148,42 +148,90 @@ internal class DeviceCrudAndRulesCoordinator(
             null
         }
 
+        val existingMatch = if (device.id == 0 && liveDesc != null) {
+            val existingInHome = dao.getAllDevices().first().filter { it.networkKey == device.networkKey }
+            existingInHome.find { existing ->
+                (!LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) &&
+                    !LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber) &&
+                    existing.serialNumber.equals(liveDesc.serialNumber, ignoreCase = true)) ||
+                    (LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) &&
+                        liveDesc.usn.isNotBlank() &&
+                        existing.udn.isNotBlank() &&
+                        liveDesc.usn.contains(existing.udn, ignoreCase = true))
+            }
+        } else {
+            null
+        }
+
         val enriched = if (liveDesc != null) {
-            val resolvedName = device.name.trim().ifBlank { liveDesc.name }
+            val resolvedName = device.name.trim().ifBlank {
+                liveDesc.name.ifBlank { existingMatch?.name ?: "WeMi Light Switch" }
+            }
             val resolvedRoom = if (device.name.isBlank() &&
-                (device.roomName == "Living Room" || device.roomName == "Unassigned")
+                (device.roomName.isBlank() || device.roomName == "Living Room" || device.roomName == "Unassigned")
             ) {
-                liveDesc.roomName
+                if (existingMatch != null) {
+                    resolveDeviceRoomAssignment(
+                        existingRoomName = existingMatch.roomName,
+                        deviceName = resolvedName,
+                        discoveredRoomName = liveDesc.roomName,
+                        isDemoMode = demoMode
+                    )
+                } else {
+                    liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) }
+                }
             } else {
-                device.roomName.ifBlank { liveDesc.roomName }
+                device.roomName.trim().ifBlank { liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) } }
             }
             val resolvedType = if (device.name.isBlank()) {
                 liveDesc.deviceType.name
             } else {
                 device.deviceType
             }
-            device.copy(
+            val cleanLiveSsid = liveDesc.wifiSsid.trim().takeIf {
+                it.isNotEmpty() && !org.suppressingfire.wemi.network.XmlAndSkuParser.isWemoDeviceSetupSsid(it)
+            }
+            val baseEntity = existingMatch ?: device
+            baseEntity.copy(
                 name = resolvedName,
                 roomName = resolvedRoom,
+                networkKey = device.networkKey,
                 deviceType = resolvedType,
+                ipAddress = device.ipAddress,
                 port = liveDesc.port,
                 isReachable = true,
                 isOn = liveDesc.isOn,
                 brightness = liveDesc.brightness,
                 latencyMs = liveDesc.responseTimeMs.toInt().coerceAtLeast(1),
                 lastCheckedTime = nowFormatted(),
-                serialNumber = liveDesc.serialNumber.ifBlank { device.serialNumber },
-                firmwareVersion = liveDesc.firmwareVersion.ifBlank { device.firmwareVersion },
-                hardwareModel = liveDesc.hardwareSku.ifBlank { device.hardwareModel },
-                macAddress = liveDesc.macAddress.ifBlank { device.macAddress },
-                udn = liveDesc.usn.ifBlank { device.udn },
-                wifiSsid = liveDesc.wifiSsid.ifBlank { device.wifiSsid },
-                signalStrengthPercent = liveDesc.signalStrengthPercent
+                serialNumber = liveDesc.serialNumber.ifBlank { baseEntity.serialNumber },
+                firmwareVersion = liveDesc.firmwareVersion.ifBlank { baseEntity.firmwareVersion },
+                hardwareModel = liveDesc.hardwareSku.ifBlank { baseEntity.hardwareModel },
+                macAddress = liveDesc.macAddress.ifBlank { baseEntity.macAddress },
+                udn = liveDesc.usn.ifBlank { baseEntity.udn },
+                wifiSsid = cleanLiveSsid ?: device.wifiSsid.ifBlank { baseEntity.wifiSsid },
+                signalStrengthPercent = liveDesc.signalStrengthPercent,
+                autoOffMinutes = if (device.id == 0 && device.autoOffMinutes == 0) {
+                    baseEntity.autoOffMinutes
+                } else {
+                    device.autoOffMinutes
+                }
             )
-        } else if (hasPlaceholderSerial && !demoMode) {
-            device.copy(serialNumber = "")
         } else {
-            device
+            val fallbackName = device.name.trim().ifBlank { "WeMi Light Switch" }
+            val fallbackRoom = device.roomName.trim().let { rawRoom ->
+                if (rawRoom.isBlank() || (device.name.isBlank() && rawRoom == "Living Room")) {
+                    inferRoomFromName(fallbackName)
+                } else {
+                    rawRoom
+                }
+            }
+            val cleanedSerial = if (hasPlaceholderSerial && !demoMode) "" else device.serialNumber
+            device.copy(
+                name = fallbackName,
+                roomName = fallbackRoom,
+                serialNumber = cleanedSerial
+            )
         }
 
         val saved = if (enriched.id == 0) {
@@ -196,7 +244,7 @@ internal class DeviceCrudAndRulesCoordinator(
             enriched
         }
 
-        if (syncFriendlyNameToHardware && !isSyntheticDemoEndpoint) {
+        if (syncFriendlyNameToHardware && device.name.isNotBlank() && !isSyntheticDemoEndpoint) {
             val renameResult = lanSemaphore.withPermit {
                 networkClient.changeFriendlyName(saved, saved.name)
             }
@@ -212,19 +260,21 @@ internal class DeviceCrudAndRulesCoordinator(
     /**
      * Moves [device] up or down within its Wi-Fi Home (`networkKey`), and when [withinRoomOnly]
      * is `true` (Grouped-by-Room or single-room filter view), swaps it with the adjacent device
-     * in the same `roomName` so grouped rows move immediately without scrambling room header order
-     * or crossing Wi-Fi Home boundaries.
+     * in the same normalized `roomName` so grouped rows move immediately without scrambling room
+     * header order or crossing Wi-Fi Home boundaries.
      */
     suspend fun moveDeviceOrder(
         device: DeviceEntity,
         moveUp: Boolean,
         withinRoomOnly: Boolean = false
     ) {
+        val targetRoom = device.roomName.ifBlank { "Unassigned" }
         val homeDevices = dao.getAllDevices().first()
             .filter { it.networkKey == device.networkKey }
             .toMutableList()
         val scopedIndices = homeDevices.indices.filter { idx ->
-            !withinRoomOnly || homeDevices[idx].roomName == device.roomName
+            !withinRoomOnly || homeDevices[idx].roomName.ifBlank { "Unassigned" }
+                .equals(targetRoom, ignoreCase = true)
         }
         val posInScope = scopedIndices.indexOfFirst { idx -> homeDevices[idx].id == device.id }
         if (posInScope == -1) return

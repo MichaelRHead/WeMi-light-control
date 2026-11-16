@@ -88,7 +88,9 @@ fun TvDashboardScreen(
         val base = if (selectedRoomFilter == null) {
             devices
         } else {
-            devices.filter { it.roomName == selectedRoomFilter }
+            devices.filter {
+                it.roomName.ifBlank { "Unassigned" }.equals(selectedRoomFilter, ignoreCase = true)
+            }
         }
         base.groupBy { it.roomName.ifBlank { "Unassigned" } }
             .entries

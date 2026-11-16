@@ -281,4 +281,71 @@ class SoapAndSelfHealingTest {
             serverB.close()
         }
     }
+
+    @Test
+    fun `verify manual-IP saveDevice deduplicates existing hardware serialNumber and preserves hardware friendlyName on blank add`() = runBlocking {
+        FakeUpnpServer(
+            initialFriendlyName = "Kitchen Island Dimmer",
+            deviceTypeUrn = "urn:Belkin:device:dimmer:1",
+            modelName = "WDS060",
+            serialNumber = "WDS060DEDUP88",
+            udn = "uuid:Dimmer-1_0-WDS060DEDUP88",
+            wifiSsid = "WeMo.Light.881",
+            initialRelayOn = true,
+            initialBrightness = 64
+        ).use { server ->
+            val client = NetworkClient(extraCandidatePorts = listOf(server.port))
+            val repo = SwitchRepository(
+                dao = database.switchDao(),
+                networkClient = client,
+                initialDemoModeOverride = false
+            )
+            try {
+                val homeKey = repo.ensureSeeded()
+
+                // 1. Pre-seed an offline switch with custom room 'Chef Pantry' at stale port 49159
+                val existingId = database.switchDao().insertDevice(
+                    DeviceEntity(
+                        name = "Kitchen Island Dimmer",
+                        roomName = "Chef Pantry",
+                        networkKey = homeKey,
+                        wifiSsid = "LAN 192.168.1.0/24",
+                        deviceType = org.suppressingfire.wemi.data.DeviceType.LIGHTBULB_DIMMER.name,
+                        ipAddress = "127.0.0.1",
+                        port = 49159,
+                        isReachable = false,
+                        serialNumber = "WDS060DEDUP88",
+                        autoOffMinutes = 15
+                    )
+                ).toInt()
+
+                // 2. User re-adds by manual IP (id = 0, blank name) -> must heal existing row in-place without duplicating
+                val saved = repo.saveDevice(
+                    device = DeviceEntity(
+                        id = 0,
+                        name = "",
+                        roomName = "Living Room",
+                        networkKey = homeKey,
+                        wifiSsid = "LAN 192.168.1.0/24",
+                        ipAddress = "127.0.0.1",
+                        port = 49153,
+                        serialNumber = org.suppressingfire.wemi.network.LanRuntimeUtils.DEFAULT_NEW_PLACEHOLDER_SERIAL
+                    ),
+                    syncFriendlyNameToHardware = true
+                )
+
+                assertEquals(1, database.switchDao().getDeviceCount())
+                assertEquals(existingId, saved.id)
+                assertEquals(server.port, saved.port)
+                assertEquals("Chef Pantry", saved.roomName)
+                assertEquals("LAN 192.168.1.0/24", saved.wifiSsid)
+                assertEquals(64, saved.brightness)
+                assertEquals(15, saved.autoOffMinutes)
+                assertEquals("Kitchen Island Dimmer", server.friendlyName.get())
+                assertFalse(server.receivedSoapActions.any { it.contains("ChangeFriendlyName") })
+            } finally {
+                repo.close()
+            }
+        }
+    }
 }
