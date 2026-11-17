@@ -36,38 +36,33 @@ Every Play Store release candidate (`v23.0+`) is reviewed once by each of the 5 
 
 ---
 
-## 2. Autonomous Background Wakeup Workflow (Zero Human Prompting Needed)
+## 2. Quota-Safe Background Wakeup Workflow (Zero Idle Quota Drain)
 
-Antigravity conversations automatically wake up when an asynchronous background `run_command` task (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`) exits with code `0`.
+> [!IMPORTANT]
+> **5-Hour Quota Protection Rules (Mandatory)**:
+> 1. **Never poll `24/7` between releases**: Do **NOT** arm `scripts/await_release_turn.sh` when `RELEASE_STATUS` is `APPROVED_FOR_PLAY_STORE` or `AWAITING_AI_STUDIO_INITIATION` (`CURRENT_TURN: NONE`). Non-daemon `run_command` tasks hit `exebox`'s `9m50s` ceiling and wake the full LLM conversation on every timeout!
+> 2. **Never re-arm after signing off your stage**: Once your role has recorded `SIGNED_OFF` for the current `(RELEASE_VERSION, ROUND_NUMBER)`, **end your turn immediately without re-arming `await_release_turn.sh`**.
+> 3. **Honor `[QUOTA GUARD] DO NOT RE-ARM`**: Whenever `await_release_turn.sh` prints `[QUOTA GUARD] DO NOT RE-ARM`, stop immediately and wait for the next user prompt.
+> 4. **Rotate Conversations at `>= 400` Steps**: Check `/home/antigravity/.gemini/usage/agy-usage --check-self`. Multi-day `1,000+`-step conversations cost `3.5x–5.0x` quota per turn; start a fresh specialist conversation for each new release cycle.
+> 5. **Auto-Sync Quota Guard Patch**: In a `WeMi-light-control` checkout, if `grep -q "QUOTA GUARD" scripts/await_release_turn.sh` is false and `/home/antigravity/.gemini/usage/wemi_release_patch/apply_to_wemi_repo.sh` exists, run `bash /home/antigravity/.gemini/usage/wemi_release_patch/apply_to_wemi_repo.sh` first so `origin/main` gets the quota-safe script.
 
-### Step 1: Arm Your Agent's Turn Watcher
-Whenever you finish a turn in one of the four Antigravity specialist conversations, ensure [`scripts/await_release_turn.sh`](../../scripts/await_release_turn.sh) is running in the background for your role (`IsDaemon: false`, `WaitMsBeforeAsync: 1000`, `15`s poll interval, `14400`s 4-hour timeout):
+### Step 1: Arm Your Turn Watcher *Only* During an Active `IN_REVIEW` Round While `PENDING`
+When a release review round is actively `IN_REVIEW` and your stage is still `PENDING` (waiting on an upstream stage in the ring), launch [`scripts/await_release_turn.sh`](../../scripts/await_release_turn.sh) (`WaitMsBeforeAsync: 5000`, `15`s poll interval, `510`s exebox-safe window, max `2` upstream waits):
 ```bash
-# In the Discovery & Room Grouping Agent conversation (Stage 2):
-bash scripts/await_release_turn.sh discovery_and_grouping 15 14400
-
-# In the Telemetry & Debugging Agent conversation (Stage 3):
-bash scripts/await_release_turn.sh telemetry_and_debugging 15 14400
-
-# In the Code Quality & E2E Testing Agent conversation (Stage 4):
-bash scripts/await_release_turn.sh code_quality_and_testing 15 14400
-
-# In the License & Brand Governance Agent conversation (Stage 5):
-bash scripts/await_release_turn.sh license_governance 15 14400
+# Only while RELEASE_STATUS == IN_REVIEW and your SIGN_OFF_<ROLE> == PENDING:
+bash scripts/await_release_turn.sh <your_role> 15 510
 ```
+If no release is `IN_REVIEW` or your role already `SIGNED_OFF`, `await_release_turn.sh` exits in `<1s` within `WaitMsBeforeAsync` and prints `[QUOTA GUARD] DO NOT RE-ARM`.
 
-### Step 2: Execute Your Turn When Woken Up
-When `scripts/await_release_turn.sh <your_role>` exits `0` and wakes your conversation:
+### Step 2: Execute Your Turn & Stop Cleanly After Sign-Off
+When `scripts/await_release_turn.sh <your_role>` activates your turn:
 1. Pull the latest `origin/main`:
    ```bash
    git pull --rebase origin main
    ```
-2. Perform your domain audit and run your required Gradle verification tests. If committing any domain fixes during your turn, follow [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (`bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <your_role> "<subject>" "<description>"`) so every commit description includes your canonical agent name.
-3. Record your sign-off and hand off `CURRENT_TURN` to the next agent in the ring (`advance_release_turn.sh` automatically formats its commit subject and description with your canonical agent name):
+2. Perform your domain audit and run your required Gradle verification tests. If committing any domain fixes during your turn, follow [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (`bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <your_role> "<subject>" "<description>"`).
+3. Record your sign-off and hand off `CURRENT_TURN` to the next agent in the ring:
    ```bash
    bash scripts/advance_release_turn.sh sign_off <your_role> "<concise summary of checks and tests passed>"
    ```
-4. Re-arm your background watcher before ending your turn:
-   ```bash
-   bash scripts/await_release_turn.sh <your_role> 15 14400
-   ```
+4. **End your turn cleanly** — do **not** re-arm `await_release_turn.sh` once your stage is `SIGNED_OFF`! If `/home/antigravity/.gemini/usage/agy-usage --check-self` reports `ROTATE_RECOMMENDED` or `ROTATE_URGENT` (`>= 400` steps), advise starting a fresh conversation for the next release.

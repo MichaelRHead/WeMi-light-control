@@ -69,37 +69,25 @@ Valid values for `RELEASE_STATUS`:
 - `AWAITING_FINAL_CONCLUSION` — All 5 agents have `SIGNED_OFF`; waiting for `ai_studio_ux_cuj` to conclude the release.
 - `APPROVED_FOR_PLAY_STORE` — All 5 agents signed off and `ai_studio_ux_cuj` concluded the release.
 
-### 2.2 Autonomous Reactive Wakeup for Antigravity Agents (`scripts/await_release_turn.sh`)
-Each of the four Antigravity agents (`discovery_and_grouping`, `telemetry_and_debugging`, `code_quality_and_testing`, and `license_governance`) runs inside a persistent Linux VM with Antigravity's **Reactive Wakeup** system (when an asynchronous `run_command` background task completes and exits `0`, Antigravity automatically wakes up the agent conversation without any user prompt).
+### 2.2 Quota-Safe Reactive Wakeup for Antigravity Agents (`scripts/await_release_turn.sh`)
+Each of the four Antigravity agents (`discovery_and_grouping`, `telemetry_and_debugging`, `code_quality_and_testing`, and `license_governance`) runs inside a Linux VM with Antigravity's **Reactive Wakeup** system. Because non-daemon `run_command` tasks hit `exebox`'s `~9m50s` RPC ceiling and wake the full LLM conversation on exit, **watchers must never run `24/7` between releases or after a stage has signed off**:
 
-1. **Arming the Autonomous Watcher**:
-   At the end of its turn, each Antigravity agent launches [`scripts/await_release_turn.sh`](scripts/await_release_turn.sh) via `run_command` with `IsDaemon: false`, `WaitMsBeforeAsync: 1000`, and a multi-hour `max_wait_sec` (`14400`) so it stays quietly parked until its turn arrives:
+1. **Arming Only While `IN_REVIEW` & `PENDING`**:
+   During an active `RELEASE_STATUS: IN_REVIEW` round while its own `SIGN_OFF_<ROLE>` is still `PENDING`, an upstream-waiting Antigravity specialist launches [`scripts/await_release_turn.sh`](scripts/await_release_turn.sh) (`IsDaemon: false`, `WaitMsBeforeAsync: 5000`, `15`s poll interval, `510`s exebox-safe wait window, capped at `MAX_IDLE_REARMS=2` / `~25` min max):
    ```bash
-   # Discovery & Room Grouping Agent (Stage 2):
-   bash scripts/await_release_turn.sh discovery_and_grouping 15 14400
-
-   # Telemetry & Debugging Agent (Stage 3):
-   bash scripts/await_release_turn.sh telemetry_and_debugging 15 14400
-
-   # Code Quality & E2E Testing Agent (Stage 4):
-   bash scripts/await_release_turn.sh code_quality_and_testing 15 14400
-
-   # License & Brand Governance Agent (Stage 5):
-   bash scripts/await_release_turn.sh license_governance 15 14400
+   bash scripts/await_release_turn.sh <role> 15 510
    ```
-2. **Zero-Token Background Polling**:
-   - While waiting, `scripts/await_release_turn.sh <role> 15 14400` polls `git fetch origin main --quiet` every 15 seconds inside the shell process (consuming zero LLM tokens).
-   - It inspects `git show origin/main:RELEASE_SIGN_OFF.md` for `CURRENT_TURN: <role>`.
-   - **Auto-Initiation Fallback**: If `<role>` is `discovery_and_grouping` and `ai_studio_ux_cuj` pushes a new `versionCode` in `app/build.gradle.kts` without manually updating `CURRENT_TURN`, `await_release_turn.sh` automatically detects the version bump and wakes up `discovery_and_grouping` to begin Stage 2.
-3. **Automatic Agent Wakeup, Review & Handoff (`scripts/advance_release_turn.sh`)**:
-   - As soon as `CURRENT_TURN` matches `<role>`, `scripts/await_release_turn.sh` prints the release state summary and **exits `0`**.
-   - Antigravity immediately wakes up that agent's conversation.
+2. **Immediate Quota-Guard Short-Circuits (`<1s` Synchronous Exit)**:
+   - When `RELEASE_STATUS` is `APPROVED_FOR_PLAY_STORE` or `AWAITING_AI_STUDIO_INITIATION` (`CURRENT_TURN: NONE`), or when `<role>` has already `SIGNED_OFF` the current `(RELEASE_VERSION, ROUND_NUMBER)`, `await_release_turn.sh` exits immediately with `[QUOTA GUARD] DO NOT RE-ARM` so idle specialist sessions never loop in the background.
+   - While actively waiting during `IN_REVIEW`, `scripts/await_release_turn.sh` polls `git fetch origin main --quiet` every 15 seconds (including Stage 2 fallback detection when `ai_studio_ux_cuj` marks `SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF`).
+3. **Automatic Agent Wakeup, Review, Handoff & Clean Stop (`scripts/advance_release_turn.sh`)**:
+   - As soon as `CURRENT_TURN` matches `<role>`, `scripts/await_release_turn.sh` prints the release state summary and **exits `0`**, waking that agent's conversation.
    - The agent runs `git pull --rebase origin main`, executes its domain review and tests, and advances the state machine using [`scripts/advance_release_turn.sh`](scripts/advance_release_turn.sh):
      ```bash
      bash scripts/advance_release_turn.sh sign_off <role> "<concise verification summary>"
      ```
-   - `scripts/advance_release_turn.sh` updates [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md), ensures [`gradlew`](gradlew) retains `100755` executable mode, commits with the acting agent's canonical name in both the subject and description (`Agent: <Canonical Agent Name> (<role_id>)`) per [`.agents/skills/agent-commit-attribution/SKILL.md`](.agents/skills/agent-commit-attribution/SKILL.md), rebases against `origin/main`, and pushes to GitHub — which immediately triggers the next agent's `await_release_turn.sh` watcher!
-   - Finally, the agent re-arms `bash scripts/await_release_turn.sh <role> 15 14400` in the background and ends its turn.
+   - `scripts/advance_release_turn.sh` updates [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md), ensures [`gradlew`](gradlew) retains `100755` executable mode, commits with `Agent: <Canonical Agent Name> (<role_id>)` per [`.agents/skills/agent-commit-attribution/SKILL.md`](.agents/skills/agent-commit-attribution/SKILL.md), rebases against `origin/main`, and pushes to GitHub.
+   - **Clean Stop**: Once `sign_off` succeeds, the agent **ends its turn without re-arming `await_release_turn.sh`**, and recommends rotating to a fresh conversation if `/home/antigravity/.gemini/usage/agy-usage --check-self` reports `>= 400` steps.
 
 ---
 
@@ -113,7 +101,7 @@ Each of the four Antigravity agents (`discovery_and_grouping`, `telemetry_and_de
      ```bash
      bash scripts/advance_release_turn.sh request_rereview <my_role> <target_role> "<reason for re-review>"
      ```
-   - This increments `ROUND_NUMBER`, resets affected downstream sign-offs to `PENDING`, sets `CURRENT_TURN: <target_role>`, and pushes to `origin/main` so `<target_role>` automatically wakes up for the new round.
+   - This increments `ROUND_NUMBER`, resets affected downstream sign-offs to `PENDING`, sets `CURRENT_TURN: <target_role>`, and pushes to `origin/main`.
 
 ---
 
@@ -130,7 +118,7 @@ Each of the four Antigravity agents (`discovery_and_grouping`, `telemetry_and_de
      bash scripts/advance_release_turn.sh initiate "<UX, accessibility, CUJ & release notes verification summary>"
      ```
      This sets `RELEASE_STATUS: IN_REVIEW`, `SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF`, and `CURRENT_TURN: discovery_and_grouping` in [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md).
-  4. Instruct the user to click **Sync / Push to GitHub** in AI Studio so `origin/main` receives Stage 1 and automatically wakes up Stage 2 (`discovery_and_grouping`) → Stage 3 (`telemetry_and_debugging`) → Stage 4 (`code_quality_and_testing`) → Stage 5 (`license_governance`).
+  4. Instruct the user to click **Sync / Push to GitHub** in AI Studio so `origin/main` receives Stage 1 and activates Stage 2 (`discovery_and_grouping`) → Stage 3 (`telemetry_and_debugging`) → Stage 4 (`code_quality_and_testing`) → Stage 5 (`license_governance`).
 - **To Conclude a Release Review (Stage 6)**:
   1. Once the user pulls the completed Stage 2–5 reviews from GitHub (`CURRENT_TURN: ai_studio_ux_cuj` and `RELEASE_STATUS: AWAITING_FINAL_CONCLUSION`, with all 5 `SIGN_OFF_*` fields set to `SIGNED_OFF`), perform a final check of [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md), [`IMPLEMENTED.md`](IMPLEMENTED.md), and `compile_applet`.
   2. Run:
@@ -141,9 +129,9 @@ Each of the four Antigravity agents (`discovery_and_grouping`, `telemetry_and_de
   3. Instruct the user to push the final concluded ledger to GitHub and publish to the Google Play Store.
 
 ### For Antigravity Specialist Agents (`discovery_and_grouping`, `telemetry_and_debugging`, `code_quality_and_testing`, `license_governance`)
-1. Always keep `bash scripts/await_release_turn.sh <your_role> 15 14400` running as a background task (`run_command` with `IsDaemon: false`, `WaitMsBeforeAsync: 1000`).
-2. When woken up by `await_release_turn.sh`:
+1. **Only while an active release round is `IN_REVIEW` and your stage is `PENDING`**, arm `bash scripts/await_release_turn.sh <your_role> 15 510` (`WaitMsBeforeAsync: 5000`). Never poll between releases (`APPROVED_FOR_PLAY_STORE`) or after signing off your stage.
+2. When `await_release_turn.sh` activates your turn:
    - Run `git pull --rebase origin main`.
    - Execute your stage's review checklist and automated tests from Section 1 above.
-   - Run `bash scripts/advance_release_turn.sh sign_off <your_role> "<summary of checks & tests passed>"` (which updates `RELEASE_SIGN_OFF.md`, restores `100755` on `gradlew`, commits, rebases, and pushes to `origin/main`).
-   - Re-launch `bash scripts/await_release_turn.sh <your_role> 15 14400` in the background before finishing your turn.
+   - Run `bash scripts/advance_release_turn.sh sign_off <your_role> "<summary of checks & tests passed>"`.
+   - **Stop cleanly** without re-arming `await_release_turn.sh`, and start a fresh specialist conversation before the next release if your session exceeds `~400` steps.
