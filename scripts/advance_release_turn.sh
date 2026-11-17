@@ -47,10 +47,8 @@ chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
   .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || true
 
 PST_NOW="$(TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z")"
-STAGE5_SHA="$(sed -n 's/^SIGN_OFF_LICENSE_GOVERNANCE: SIGNED_OFF (\([^ )]*\).*/\1/p' RELEASE_SIGN_OFF.md | tr -d '\r' | head -n 1 || true)"
-STAGE4_SHA="$(sed -n 's/^SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (\([^ )]*\).*/\1/p' RELEASE_SIGN_OFF.md | tr -d '\r' | head -n 1 || true)"
-BASE_SHA="$(awk -F': *' '/^CANDIDATE_BASE_SHA:/ { print $2; exit }' RELEASE_SIGN_OFF.md | tr -d '\r' || true)"
-HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "${STAGE5_SHA:-${STAGE4_SHA:-${BASE_SHA:-ai-studio}}}")"
+GRADLE_VER_NAME="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/v\1-rc/p' app/build.gradle.kts | tr -d '\r' | head -n 1 || true)"
+HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "${GRADLE_VER_NAME:-v27.0-rc}")"
 if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "NONE" ]]; then
   HEAD_SHA="v27.0-rc"
 fi
