@@ -394,5 +394,61 @@ class EndToEndUiTest {
             fanTop < bulbTop
         )
     }
+
+    @Test
+    fun `verify manual IP AddOrEditDeviceDialog with blank name adopts hardware friendlyName without overwriting NVRAM`() {
+        val vm = androidx.lifecycle.ViewModelProvider(composeTestRule.activity)[org.suppressingfire.wemi.ui.SwitchViewModel::class.java]
+        awaitLoopbackIo { vm.devices.value.isNotEmpty() }
+
+        FakeUpnpServer(
+            initialFriendlyName = "Master Bath Vanity",
+            deviceTypeUrn = "urn:Belkin:device:dimmer:1",
+            modelName = "WDS060",
+            serialNumber = "WDS060BATH777",
+            udn = "uuid:Dimmer-2_0-WDS060BATH777",
+            isRtos = true,
+            initialRelayOn = true,
+            initialBrightness = 65
+        ).use { bathServer ->
+            composeTestRule.onNodeWithTag("add_device_button").performClick()
+            composeTestRule.waitForIdle()
+
+            // Leave device_name_input blank while Sync Name to Switch Hardware stays enabled by default
+            composeTestRule.onNodeWithTag("device_ip_input")
+                .performScrollTo()
+                .performTextReplacement("127.0.0.1")
+            composeTestRule.onNodeWithTag("device_port_input")
+                .performScrollTo()
+                .performTextReplacement(bathServer.port.toString())
+            composeTestRule.onNodeWithTag("save_device_button").performClick()
+
+            awaitLoopbackIo {
+                vm.devices.value.any { it.serialNumber == "WDS060BATH777" }
+            }
+            val adopted = vm.devices.value.first { it.serialNumber == "WDS060BATH777" }
+            assertEquals("Master Bath Vanity", adopted.name)
+            assertEquals("Ensuite", adopted.roomName)
+            assertEquals(org.suppressingfire.wemi.data.DeviceType.LIGHTBULB_DIMMER, adopted.parsedType)
+            assertEquals(65, adopted.brightness)
+            assertEquals("Master Bath Vanity", bathServer.friendlyName.get())
+            assertTrue(
+                "Blank manual-IP Name must not fire ChangeFriendlyName overwriting hardware NVRAM",
+                bathServer.receivedSoapActions.none { it.contains("ChangeFriendlyName") }
+            )
+
+            // Also verify blank Rule name uses 'Custom Switch Rule' in transient status banner
+            vm.addRule(
+                name = "   ",
+                ruleType = "SCHEDULE",
+                targetDevice = adopted,
+                triggerSummary = "Daily at 8:00 PM",
+                targetStateOn = true,
+                targetBrightness = 65
+            )
+            awaitLoopbackIo { vm.rules.value.any { it.targetDeviceId == adopted.id } }
+            assertEquals("Created rule: Custom Switch Rule", vm.statusBannerMessage.value)
+        }
+    }
 }
+
 

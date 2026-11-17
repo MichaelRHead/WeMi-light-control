@@ -158,29 +158,20 @@ class SwitchRepository(
         nowFormatted = ::nowFormatted
     )
 
-    val allDevices: Flow<List<DeviceEntity>> = combine(
-        dao.getAllDevices(),
-        initialSeedDone,
-        _isDemoShowroomMode
-    ) { list, _, demoMode ->
-        if (list.isEmpty() && demoMode) defaultClassicDevices() else list
-    }
+    val allDevices: Flow<List<DeviceEntity>> =
+        combine(dao.getAllDevices(), initialSeedDone, _isDemoShowroomMode) { list, _, demoMode ->
+            if (list.isEmpty() && demoMode) defaultClassicDevices() else list
+        }
 
-    val allHomeNetworks: Flow<List<HomeNetworkEntity>> = combine(
-        dao.getAllHomeNetworks(),
-        initialSeedDone,
-        _isDemoShowroomMode
-    ) { list, _, demoMode ->
-        if (list.isEmpty() && demoMode) defaultHomeNetworks() else list
-    }
+    val allHomeNetworks: Flow<List<HomeNetworkEntity>> =
+        combine(dao.getAllHomeNetworks(), initialSeedDone, _isDemoShowroomMode) { list, _, demoMode ->
+            if (list.isEmpty() && demoMode) defaultHomeNetworks() else list
+        }
 
-    val allRules: Flow<List<RuleEntity>> = combine(
-        dao.getAllRules(),
-        initialSeedDone,
-        _isDemoShowroomMode
-    ) { list, _, demoMode ->
-        if (list.isEmpty() && demoMode) defaultClassicRules() else list
-    }
+    val allRules: Flow<List<RuleEntity>> =
+        combine(dao.getAllRules(), initialSeedDone, _isDemoShowroomMode) { list, _, demoMode ->
+            if (list.isEmpty() && demoMode) defaultClassicRules() else list
+        }
 
     suspend fun ensureSeeded(): String = seedAndModeMutex.withLock {
         if (_isDemoShowroomMode.value) {
@@ -295,13 +286,19 @@ class SwitchRepository(
      * 3. Dispatches `SetBinaryState` inside [lanSemaphore] (`Semaphore(3)`), healing port/IP hops on failure.
      * 4. Commits confirmed state or reverts to `priorOn`/`priorBrightness` when offline.
      */
+    private suspend fun awaitDemoSeedIfPending() {
+        if (_isDemoShowroomMode.value && !initialSeedDone.value) ensureSeeded()
+    }
+
     private suspend fun executeOptimisticDeviceCommand(
         device: DeviceEntity,
         computeTargetOn: (DeviceEntity) -> Boolean,
         computeOptimisticBrightness: (DeviceEntity, Boolean) -> Int,
         computeSoapBrightnessArg: (DeviceEntity, Boolean) -> Int?,
         optimisticStatusLabel: String? = null
-    ): DeviceEntity = mutexFor(device).withLock {
+    ): DeviceEntity {
+        awaitDemoSeedIfPending()
+        return mutexFor(device).withLock {
         val baseDevice = if (device.id != 0) dao.getDeviceById(device.id) ?: device else device
         val priorOn = baseDevice.isOn
         val priorBrightness = baseDevice.brightness
@@ -366,6 +363,7 @@ class SwitchRepository(
         }
         dao.updateDevice(finalEntity)
         finalEntity
+        }
     }
 
     private fun shouldRestoreFullDimmer(base: DeviceEntity, nextOn: Boolean): Boolean =
@@ -391,16 +389,25 @@ class SwitchRepository(
         return executeOptimisticDeviceCommand(device, { true }, { _, _ -> clamped }, { _, _ -> clamped })
     }
 
+    suspend fun stepDeviceBrightness(device: DeviceEntity, deltaPercent: Int): DeviceEntity =
+        executeOptimisticDeviceCommand(
+            device = device,
+            computeTargetOn = { true },
+            computeOptimisticBrightness = { base, _ -> (base.brightness + deltaPercent).coerceIn(10, 100) },
+            computeSoapBrightnessArg = { base, _ -> (base.brightness + deltaPercent).coerceIn(10, 100) }
+        )
+
     suspend fun toggleRoomPower(roomName: String, targetOn: Boolean, networkKey: String? = null): Int =
-        crudCoordinator.toggleRoomPower(roomName, targetOn, networkKey)
+        awaitDemoSeedIfPending().let { crudCoordinator.toggleRoomPower(roomName, targetOn, networkKey) }
 
     suspend fun updateRoomBrightness(roomName: String, newBrightness: Int, networkKey: String? = null): Int =
-        crudCoordinator.updateRoomBrightness(roomName, newBrightness, networkKey)
+        awaitDemoSeedIfPending().let { crudCoordinator.updateRoomBrightness(roomName, newBrightness, networkKey) }
 
-    suspend fun triggerMotionEvent(device: DeviceEntity) = crudCoordinator.triggerMotionEvent(device)
+    suspend fun triggerMotionEvent(device: DeviceEntity) =
+        awaitDemoSeedIfPending().let { crudCoordinator.triggerMotionEvent(device) }
 
     suspend fun setDeviceReachableState(device: DeviceEntity, reachable: Boolean) =
-        crudCoordinator.setDeviceReachableState(device, reachable)
+        awaitDemoSeedIfPending().let { crudCoordinator.setDeviceReachableState(device, reachable) }
 
     suspend fun handleGenaNotification(event: GenaEventNotification): Unit = genaPollingCoordinator.handleGenaNotification(event)
 
@@ -411,6 +418,7 @@ class SwitchRepository(
     suspend fun toggleDimmerNightMode(device: DeviceEntity): DeviceEntity = genaPollingCoordinator.toggleDimmerNightMode(device)
 
     suspend fun turnOffDeviceById(deviceId: Int): DeviceEntity? {
+        awaitDemoSeedIfPending()
         val dev = dao.getDeviceById(deviceId) ?: return null
         return if (!dev.isOn) dev else setDevicePowerExplicit(dev, false)
     }
@@ -438,9 +446,10 @@ class SwitchRepository(
     )
 
     suspend fun saveDevice(device: DeviceEntity, syncFriendlyNameToHardware: Boolean = false): DeviceEntity =
-        crudCoordinator.saveDevice(device, syncFriendlyNameToHardware)
+        awaitDemoSeedIfPending().let { crudCoordinator.saveDevice(device, syncFriendlyNameToHardware) }
 
     suspend fun deleteDevice(id: Int) {
+        awaitDemoSeedIfPending()
         val existing = dao.getDeviceById(id)
         crudCoordinator.deleteDevice(id)
         lastSetStateTimestampMs.remove(id)
@@ -451,15 +460,15 @@ class SwitchRepository(
     }
 
     suspend fun moveDeviceOrder(device: DeviceEntity, moveUp: Boolean, withinRoomOnly: Boolean = false) =
-        crudCoordinator.moveDeviceOrder(device, moveUp, withinRoomOnly)
+        awaitDemoSeedIfPending().let { crudCoordinator.moveDeviceOrder(device, moveUp, withinRoomOnly) }
 
-    suspend fun toggleRule(rule: RuleEntity) = crudCoordinator.toggleRule(rule)
+    suspend fun toggleRule(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.toggleRule(rule) }
 
-    suspend fun runRuleNow(rule: RuleEntity) = crudCoordinator.runRuleNow(rule)
+    suspend fun runRuleNow(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.runRuleNow(rule) }
 
-    suspend fun addRule(rule: RuleEntity) = crudCoordinator.addRule(rule)
+    suspend fun addRule(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.addRule(rule) }
 
-    suspend fun deleteRule(id: Int) = crudCoordinator.deleteRule(id)
+    suspend fun deleteRule(id: Int) = awaitDemoSeedIfPending().let { crudCoordinator.deleteRule(id) }
 
     fun clearLogs() {
         _soapLogs.value = emptyList()

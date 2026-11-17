@@ -314,6 +314,8 @@ class GenaSubscriptionManager(
                     return@withContext updated
                 }
                 // HTTP 412 Precondition Failed or error -> fall through to fresh SUBSCRIBE
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (_: Exception) {
                 // Fall through to fresh SUBSCRIBE
             }
@@ -350,6 +352,8 @@ class GenaSubscriptionManager(
                 deviceKeyBySid[sid] = deviceKey
                 return@withContext record
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Device offline or does not accept GENA on this port
         }
@@ -375,6 +379,8 @@ class GenaSubscriptionManager(
                 url = "http://${record.ipAddress}:${record.port}/upnp/event/basicevent1",
                 headers = mapOf("SID" to record.sid)
             )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Best effort
         }

@@ -220,7 +220,7 @@ internal class HomeProfileSanitizer(
             gatewayIp = gatewayIp,
             lastConnectedTime = "Connected now",
             autoReconnectOnArrival = true,
-            sortOrder = existingHomes.size
+            sortOrder = (existingHomes.maxOfOrNull { it.sortOrder } ?: -1) + 1
         )
         dao.insertHomeNetwork(newHome)
         return newHome

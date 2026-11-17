@@ -249,6 +249,8 @@ class ProvisionerClient(
                 if (resp.isSuccessful) {
                     httpSuccess = true
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 val elapsed = System.currentTimeMillis() - sendStart
                 logStep(
@@ -278,6 +280,8 @@ class ProvisionerClient(
                         .find(resp.body)?.groupValues?.getOrNull(1)?.toIntOrNull()
                     logStep("[POLL #$pollIndex] GetNetworkStatus -> Status=${code ?: "HTTP_${resp.code}"} (${elapsed}ms)")
                     code
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     val elapsed = System.currentTimeMillis() - pollStart
                     logStep("[POLL #$pollIndex] GetNetworkStatus -> ${e.javaClass.simpleName} (${elapsed}ms)")

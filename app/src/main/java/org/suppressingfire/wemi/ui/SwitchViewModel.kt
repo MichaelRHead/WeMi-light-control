@@ -33,7 +33,6 @@ import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.SetupDeviceDescriptor
 import org.suppressingfire.wemi.network.SsdpScanReport
-import org.suppressingfire.wemi.network.XmlAndSkuParser
 
 enum class BottomTab {
     DEVICES,
@@ -272,13 +271,8 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
 
     fun detectCurrentLanIp(): String = repository.detectCurrentLanIp()
 
-    fun stepDeviceBrightness(device: DeviceEntity, deltaPercent: Int) {
-        val current = devices.value.firstOrNull { it.id == device.id } ?: device
-        if (!current.isReachable || current.parsedType != DeviceType.LIGHTBULB_DIMMER) return
-        val next = (current.brightness + deltaPercent).coerceIn(10, 100)
-        updateBrightness(current, next)
-        showTransientStatus("${current.name}: Brightness ${next}% via TV Remote")
-    }
+    fun stepDeviceBrightness(device: DeviceEntity, deltaPercent: Int) =
+        deviceActionsController.stepDeviceBrightness(device, deltaPercent)
 
     fun applyTvScene(sceneKey: String) =
         homeAndRulesController.applyTvScene(

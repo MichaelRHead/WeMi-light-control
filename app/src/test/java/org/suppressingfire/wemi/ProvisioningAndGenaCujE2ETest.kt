@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -347,6 +348,8 @@ class ProvisioningAndGenaCujE2ETest {
                     assertFalse(updatedHome.autoReconnectOnArrival)
                     val insertedHome = repo.saveOrUpdateHomeNetwork(null, "H3", "S3", "192.168.13")
                     assertEquals(3, insertedHome.sortOrder)
+                    val autoSubnetHome = repo.resolveOrCreateHomeForSubnet("192.168.86")!!
+                    assertEquals(4, autoSubnetHome.sortOrder)
 
                     val stored = db.switchDao().getDeviceById(devId)!!
                     org.junit.Assert.assertNotNull(repo.genaManager.subscribeOrRenew(stored))
@@ -356,6 +359,55 @@ class ProvisioningAndGenaCujE2ETest {
                     server.simulate412OnNextGenaRenew.set(true)
                     org.junit.Assert.assertNotNull(repo.genaManager.subscribeOrRenew(stored))
                     assertEquals(1, repo.genaManager.activeSidCount)
+
+                    // Real-LAN provisioning with placeholder setup-AP serial must keep serialNumber/udn empty so Home Wi-Fi SSDP adoption merges without duplicating rows
+                    FakeUpnpServer(
+                        initialFriendlyName = "Foyer Rocker Switch",
+                        modelName = "WLS040",
+                        serialNumber = "UNKNOWN",
+                        udn = "uuid:Lightswitch-2_0-UNKNOWN",
+                        isRtos = true
+                    ).use { setupAp ->
+                        val provRes = repo.provisionSetupApDevice(
+                            apHost = "127.0.0.1",
+                            apPort = setupAp.port,
+                            ssid = "S3",
+                            plainPassword = "HomeRouterPassword88",
+                            activeNetworkKey = insertedHome.networkKey
+                        )
+                        assertTrue(provRes.success)
+                        val provisioned = db.switchDao().getAllDevices().first()
+                            .single { it.name == "Foyer Rocker Switch" }
+                        assertEquals("", provisioned.serialNumber)
+                        assertEquals("", provisioned.udn)
+
+                        val merged = repo.adoptDiscoveredDevice(
+                            discovered = org.suppressingfire.wemi.data.SsdpDiscoveredDevice(
+                                name = "Foyer Rocker Switch",
+                                roomName = "Hallway & Landing",
+                                ipAddress = "192.168.13.144",
+                                port = 49153,
+                                deviceType = org.suppressingfire.wemi.data.DeviceType.SWITCH_PLUG,
+                                modelName = "WLS040",
+                                serialNumber = "221940KREAL888",
+                                firmwareVersion = "WeMo_WW_2.00.12000.PVT",
+                                usn = "uuid:Lightswitch-2_0-221940KREAL888::urn:Belkin:service:basicevent:1",
+                                searchTarget = org.suppressingfire.wemi.network.XmlAndSkuParser.URN_BASIC_EVENT,
+                                locationUrl = "http://192.168.13.144:49153/setup.xml",
+                                responseTimeMs = 9L,
+                                isLiveUdpResponse = true
+                            ),
+                            activeNetworkKey = insertedHome.networkKey,
+                            activeWifiSsid = "S3"
+                        )
+                        assertEquals(provisioned.id, merged.id)
+                        assertEquals("221940KREAL888", merged.serialNumber)
+                        assertEquals("192.168.13.144", merged.ipAddress)
+                        assertEquals(
+                            1,
+                            db.switchDao().getAllDevices().first().count { it.networkKey == insertedHome.networkKey }
+                        )
+                    }
                 } finally {
                     repo.close()
                     db.close()
@@ -363,3 +415,4 @@ class ProvisioningAndGenaCujE2ETest {
             }
         }
 }
+

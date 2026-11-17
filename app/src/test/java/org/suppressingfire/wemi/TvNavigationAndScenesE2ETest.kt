@@ -310,6 +310,23 @@ class TvNavigationAndScenesE2ETest {
                 .performKeyInput { pressKey(Key.DirectionRight) }
             awaitLoopbackIo { dimmerServer.dimmerBrightness.get() == 60 }
             assertEquals(60, dimmerServer.dimmerBrightness.get())
+
+            // Navigate Down onto dimmer card -> Down onto inline DIM slider, then fire two back-to-back Right steps without waiting between presses
+            composeTestRule.onNodeWithTag("tv_room_header_Unassigned")
+                .performKeyInput { pressKey(Key.DirectionDown) }
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("tv_device_card_$insertedId").assertIsFocused()
+                .performKeyInput { pressKey(Key.DirectionDown) }
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("tv_card_dim_mode_$insertedId").assertIsFocused()
+                .performKeyInput {
+                    pressKey(Key.DirectionRight)
+                    pressKey(Key.DirectionRight)
+                }
+            awaitLoopbackIo { dimmerServer.dimmerBrightness.get() == 80 }
+            assertEquals(80, dimmerServer.dimmerBrightness.get())
+            assertEquals(80, vm.devices.value.first { it.id == insertedId }.brightness)
         }
     }
 }
+

@@ -128,6 +128,21 @@ internal class DeviceActionsUiController(
         }
     }
 
+    fun stepDeviceBrightness(device: DeviceEntity, deltaPercent: Int) {
+        val snapshot = currentDevicesProvider().firstOrNull { it.id == device.id } ?: device
+        if (!snapshot.isReachable || snapshot.parsedType != DeviceType.LIGHTBULB_DIMMER) return
+        scope.launch {
+            val updated = repository.stepDeviceBrightness(snapshot, deltaPercent)
+            if (updated.isReachable) {
+                onShowTransientStatus("${updated.name}: Brightness ${updated.brightness}% via TV Remote")
+            } else {
+                onShowTransientStatus(
+                    "${updated.name}: Offline • Could not set brightness at ${updated.ipAddress}:${updated.port}"
+                )
+            }
+        }
+    }
+
     fun simulateOrRefreshMotion(device: DeviceEntity) {
         scope.launch {
             repository.triggerMotionEvent(device)

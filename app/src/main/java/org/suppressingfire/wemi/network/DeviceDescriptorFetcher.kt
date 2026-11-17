@@ -117,7 +117,7 @@ internal class DeviceDescriptorFetcher(
             base.copy(
                 isOn = stateProbe.binaryStateOn ?: base.isOn,
                 brightness = stateProbe.brightness ?: base.brightness,
-                serialNumber = meta?.serialNumber?.takeIf { it.isNotBlank() } ?: base.serialNumber,
+                serialNumber = meta?.serialNumber?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: base.serialNumber,
                 firmwareVersion = meta?.firmwareVersion?.takeIf { it.isNotBlank() } ?: base.firmwareVersion,
                 hardwareSku = enrichedSku,
                 macAddress = meta?.macAddress?.takeIf { it.isNotBlank() } ?: base.macAddress,

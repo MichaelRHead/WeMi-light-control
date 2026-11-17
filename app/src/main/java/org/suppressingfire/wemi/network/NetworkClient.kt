@@ -210,6 +210,8 @@ class NetworkClient(
         try {
             val directResult = executeOnPort(device.port)
             if (directResult != null) return directResult
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Fall through to 9-port self-healing probe
         }
@@ -223,6 +225,8 @@ class NetworkClient(
             try {
                 val retryResult = executeOnPort(discoveredPort)
                 if (retryResult != null) return retryResult
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (_: Exception) {
                 // Fall through to offline result
             }
@@ -234,6 +238,8 @@ class NetworkClient(
                     }
                     val fallbackResult = executeOnPort(port)
                     if (fallbackResult != null) return fallbackResult
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (_: SocketTimeoutException) {
                     break
                 } catch (_: NoRouteToHostException) {

@@ -284,14 +284,17 @@ internal class ProvisioningCoordinator(
             val targetNetworkKey = matchedHomeBySsid?.networkKey ?: activeNetworkKey
             val homePrefix = homeNetworks.find { it.networkKey == targetNetworkKey }?.subnetPrefix ?: "192.168.1"
 
+            val demoMode = isDemoShowroomMode()
             val serial = desc?.serialNumber?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
-                ?: "221840K${(100000..999999).random()}"
+                ?: if (demoMode) "221840K${(100000..999999).random()}" else ""
             val mac = desc?.macAddress?.takeIf { it.isNotBlank() } ?: "EC1A59881122"
             val sku = desc?.hardwareSku?.takeIf { it.isNotBlank() } ?: when (resolvedType) {
                 DeviceType.LIGHTBULB_DIMMER -> NetworkClient.SKU_WDS060_DIMMER_V2
                 else -> NetworkClient.SKU_WLS040_3WAY
             }
-            val udn = desc?.udn?.takeIf { it.isNotBlank() } ?: "uuid:Lightswitch-2_0-$serial"
+            val udn = LanRuntimeUtils.canonicalHardwareUdn(desc?.udn).ifBlank {
+                if (serial.isNotEmpty()) "uuid:Lightswitch-2_0-$serial" else ""
+            }
             val firmware = desc?.firmwareVersion?.takeIf { it.isNotBlank() } ?: "WeMo_WW_2.00.11563.PVT"
 
             val existing = existingDevices.find {

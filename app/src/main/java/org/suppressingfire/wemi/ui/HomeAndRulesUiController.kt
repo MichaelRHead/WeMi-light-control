@@ -246,9 +246,10 @@ internal class HomeAndRulesUiController(
                     append(" ($targetBrightness%)")
                 }
             }
+            val resolvedRuleName = name.trim().ifEmpty { "Custom Switch Rule" }
             repository.addRule(
                 RuleEntity(
-                    name = name.trim().ifEmpty { "Custom Switch Rule" },
+                    name = resolvedRuleName,
                     ruleType = ruleType,
                     targetDeviceId = targetDevice.id,
                     targetDeviceName = targetDevice.name,
@@ -259,7 +260,7 @@ internal class HomeAndRulesUiController(
                     isEnabled = true
                 )
             )
-            onShowTransientStatus("Created rule: $name")
+            onShowTransientStatus("Created rule: $resolvedRuleName")
         }
     }
 

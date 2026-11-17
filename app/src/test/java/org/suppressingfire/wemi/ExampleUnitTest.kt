@@ -2,6 +2,7 @@ package org.suppressingfire.wemi
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -283,5 +284,98 @@ class ExampleUnitTest {
             assertEquals("GetMetaInfo+setup.xml", desc?.macAndSerialSource)
         }
     }
+
+    @Test
+    fun `verify executable script modes and DeviceDescriptorFetcher placeholder serial guard`() {
+        val repoRoot = listOf(java.io.File("."), java.io.File(".."))
+            .map { it.canonicalFile }
+            .firstOrNull { java.io.File(it, "gradlew").isFile }
+        assertNotNull("Expected repository root containing gradlew", repoRoot)
+
+        val requiredExecutables = listOf(
+            "gradlew",
+            "scripts/advance_release_turn.sh",
+            "scripts/await_release_turn.sh",
+            ".agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh",
+            ".agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh"
+        )
+        for (relPath in requiredExecutables) {
+            val f = java.io.File(repoRoot!!, relPath)
+            assertTrue("Expected script to exist: $relPath", f.isFile)
+            assertTrue("Expected +x executable permission on $relPath", f.canExecute())
+        }
+        if (java.io.File(repoRoot!!, ".git").exists()) {
+            val proc = ProcessBuilder(listOf("git", "ls-files", "-s") + requiredExecutables)
+                .directory(repoRoot)
+                .redirectErrorStream(true)
+                .start()
+            val indexOut = proc.inputStream.bufferedReader().readText()
+            if (proc.waitFor() == 0 && indexOut.isNotBlank()) {
+                for (line in indexOut.lines().filter { it.isNotBlank() }) {
+                    assertTrue(
+                        "Expected git index mode 100755 (AI Studio sync must not strip +x): $line",
+                        line.startsWith("100755 ")
+                    )
+                }
+            }
+        }
+
+        // Verify DeviceDescriptorFetcher skips "UNKNOWN" in GetMetaInfo and preserves real /setup.xml serialNumber
+        java.net.ServerSocket(0, 8, java.net.InetAddress.getByName("127.0.0.1")).use { server ->
+            val t = kotlin.concurrent.thread(isDaemon = true) {
+                repeat(4) {
+                    runCatching {
+                        server.accept().use { sock ->
+                            sock.soTimeout = 1000
+                            val reader = java.io.BufferedReader(
+                                java.io.InputStreamReader(sock.getInputStream(), Charsets.ISO_8859_1)
+                            )
+                            val reqLine = reader.readLine().orEmpty()
+                            if (reqLine.isBlank()) return@use
+                            var contentLength = 0
+                            while (true) {
+                                val h = reader.readLine() ?: break
+                                if (h.isEmpty()) break
+                                if (h.startsWith("Content-Length:", ignoreCase = true)) {
+                                    contentLength = h.substringAfter(':').trim().toIntOrNull() ?: 0
+                                }
+                            }
+                            var rem = contentLength
+                            while (rem > 0) {
+                                val readCount = reader.read(CharArray(rem))
+                                if (readCount <= 0) break
+                                rem -= readCount
+                            }
+                            val body = when {
+                                reqLine.contains("/setup.xml") ->
+                                    "<root><device><friendlyName>Master Bath Vanity</friendlyName><modelName>WLS040</modelName><serialNumber>221840KLAN99</serialNumber><macAddress>EC1A59BB2233</macAddress><UDN>uuid:Lightswitch-2_0-221840KLAN99</UDN><rtos>1</rtos></device></root>"
+                                reqLine.contains("metainfo1") ->
+                                    "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><MetaInfo>EC1A59BB2233|UNKNOWN|WLS040|WeMo_WW_2.00|HeadFamily-2.4G|WLS040</MetaInfo></s:Body></s:Envelope>"
+                                else ->
+                                    "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\"><s:Body><BinaryState>1</BinaryState><SignalStrength>-52</SignalStrength></s:Body></s:Envelope>"
+                            }
+                            val bytes = body.toByteArray(Charsets.UTF_8)
+                            sock.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n".toByteArray(Charsets.US_ASCII))
+                            sock.getOutputStream().write(bytes)
+                            sock.getOutputStream().flush()
+                        }
+                    }
+                }
+            }
+            val desc = kotlinx.coroutines.runBlocking {
+                org.suppressingfire.wemi.network.NetworkClient().fetchLiveDeviceDescriptor(
+                    locationUrl = "http://127.0.0.1:${server.localPort}/setup.xml",
+                    usnHeader = "uuid:Lightswitch-2_0-221840KLAN99::urn:Belkin:service:basicevent:1",
+                    stHeader = XmlAndSkuParser.URN_BASIC_EVENT,
+                    responseTimeMs = 8L,
+                    isLiveUdp = true
+                )
+            }
+            t.join(1000)
+            assertEquals("221840KLAN99", desc?.serialNumber)
+            assertEquals("HeadFamily-2.4G", desc?.wifiSsid)
+        }
+    }
 }
+
 

@@ -79,7 +79,7 @@ fun AddOrEditDeviceDialog(
 ) {
     val isEditing = initialDevice != null
     var name by remember { mutableStateOf(initialDevice?.name ?: "") }
-    var roomName by remember { mutableStateOf(initialDevice?.roomName ?: "Living Room") }
+    var roomName by remember { mutableStateOf(initialDevice?.roomName ?: "Unassigned") }
     var selectedType by remember {
         mutableStateOf(initialDevice?.parsedType ?: DeviceType.SWITCH_PLUG)
     }
@@ -356,8 +356,8 @@ fun AddOrEditDeviceDialog(
                 onClick = {
                     val parsedPort = portText.toIntOrNull() ?: 49153
                     val parsedAutoOff = autoOffText.toIntOrNull() ?: 0
-                    val finalName = name.ifBlank { "Living Room Switch" }
-                    val finalRoom = roomName.ifBlank { inferRoomFromName(finalName) }
+                    val finalName = name.trim()
+                    val finalRoom = roomName.trim()
                     onSave(
                         initialDevice?.id ?: 0,
                         finalName,
