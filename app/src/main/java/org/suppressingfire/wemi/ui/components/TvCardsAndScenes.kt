@@ -256,7 +256,7 @@ internal fun TvDeviceCard(
                     val statusLabel = when {
                         isToggling -> "Sending SOAP SetBinaryState..."
                         !device.isReachable -> "Disconnected • Press OK to Retry"
-                        type == DeviceType.MOTION_SENSOR -> "${device.connectionBadgeText} • Motion: ${device.lastMotionTime ?: "Active"}"
+                        type == DeviceType.MOTION_SENSOR -> "${device.connectionBadgeText} • Motion: ${device.lastMotionTime}"
                         type == DeviceType.LIGHTBULB_DIMMER ->
                             if (device.isOn) "ON • ${device.brightness}% Brightness" else "OFF • Standby (${device.brightness}%)"
                         else -> if (device.isOn) "ON • ${device.connectionBadgeText}" else "OFF • ${device.connectionBadgeText}"

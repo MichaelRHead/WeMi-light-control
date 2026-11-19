@@ -100,7 +100,7 @@ fun AddOrEditDeviceDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (isEditing) "Edit ${initialDevice?.name}" else stringResource(R.string.dialog_add_device_title),
+                text = if (initialDevice != null) "Edit ${initialDevice.name}" else stringResource(R.string.dialog_add_device_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )

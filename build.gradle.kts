@@ -5,7 +5,7 @@ plugins {
   alias(libs.plugins.google.devtools.ksp) apply false
 }
 
-val ensureDebugKeystore by tasks.registering {
+val ensureDebugKeystore = tasks.register("ensureDebugKeystore") {
   val keystoreFile = layout.projectDirectory.file("debug.keystore").asFile
   outputs.file(keystoreFile)
   onlyIf { !keystoreFile.exists() }

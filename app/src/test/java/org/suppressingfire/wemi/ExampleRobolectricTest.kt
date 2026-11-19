@@ -325,7 +325,7 @@ class ExampleRobolectricTest {
 
         // Scroll to reachable LIGHTBULB_DIMMER (id = 8, Lightbulb Bedroom), enter Dimmer Adjust Mode, and exit cleanly
         composeTestRule.onNodeWithTag("tv_device_grid")
-            .performScrollToNode(hasTestTag("tv_device_card_8"))
+            .performScrollToNode(hasTestTag("tv_card_dim_mode_8"))
         composeTestRule.onNodeWithTag("tv_card_dim_mode_8").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle").assertIsDisplayed()
