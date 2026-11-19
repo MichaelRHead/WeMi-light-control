@@ -2,15 +2,16 @@
 # ==============================================================================
 # WeMi Light Control — Commit Message Format & Attribution Validator
 # ==============================================================================
-# Validates that a Git commit message follows the readable, trailer-attributed
-# convention:
-#   1. Conventional Commits subject line (<= 72 chars, no trailing '.', and no
-#      bracketed '[...Agent]' tag on the subject line)
+# Validates that a Git commit message is clear for human readers and properly
+# attributed:
+#   1. Plain-English Conventional Commits subject (<= 72 chars, no trailing '.',
+#      and no bracketed '[...Agent]' tag on the subject line)
 #   2. Blank line separating subject and body
-#   3. Non-empty description body (no bare one-liners or trailer-only commits;
-#      clean plain text with reflowable lines — no forced 72-col hard wrapping)
+#   3. Concise, human-readable plain-text body (no walls of text > 260 chars per
+#      bullet/paragraph, no body > 1,000 chars, no semicolon chains, no nested
+#      parentheses, and no dense code-symbol dumps)
 #   4. Blank line separating body and Git trailer block
-#   5. Mandatory canonical attribution trailer:
+#   5. Brief optional 'Verified:' trailer (<= 120 chars) and mandatory:
 #        Agent: <Canonical Agent Name> (<role_id>)
 #
 # Usage:
@@ -64,6 +65,12 @@ import re
 import sys
 
 MAX_SUBJECT_LEN = 72
+MAX_BODY_LINE_LEN = 260
+MAX_BODY_TOTAL_LEN = 1000
+MAX_VERIFIED_LEN = 120
+MAX_SEMICOLONS_PER_LINE = 1
+TIP_CODE_TOKENS_PER_LINE = 5
+MAX_CODE_TOKENS_PER_LINE = 7
 
 CONVENTIONAL_RE = re.compile(
     r"^(feat|fix|refactor|test|docs|chore|perf|style|build|ci|release)"
@@ -77,7 +84,50 @@ SCISSOR_RE = re.compile(r"^# -+ >8 -+\s*$")
 TRAILER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9-]*:[ \t]+\S.*$")
 AGENT_TRAILER_KEY_RE = re.compile(r"^Agent:[ \t]*(.*)$")
 AGENT_TRAILER_VALID_RE = re.compile(r"^Agent:[ \t]+.+Agent[ \t]+\([a-z0-9_]+\)[ \t]*$")
+VERIFIED_TRAILER_RE = re.compile(r"^Verified:[ \t]*(.*)$", re.IGNORECASE)
 MARKDOWN_DECORATION_RE = re.compile(r"(\*\*[^*\n]+\*\*|`[^`\n]+`)")
+URL_RE = re.compile(r"https?://\S+")
+NESTED_PARENS_RE = re.compile(r"\([^()]*\([^()]+\)[^()]*\)")
+
+# Code-identifier heuristics (excluding everyday brand/product names)
+COMMON_PROPER_NOUNS = {
+    "github", "wemi", "wemo", "playstore", "talkback", "openwrt",
+    "androidx", "youtube", "javascript", "typescript", "devops",
+    "ios", "macos", "wifi", "upnp", "ssdp", "soap", "gena", "xml",
+    "http", "https", "json", "apk", "sdk", "jdk", "cli", "gui", "api",
+    "robolectric", "compose", "gradle", "kotlin", "android",
+}
+FILE_EXT_RE = re.compile(
+    r"^[A-Za-z0-9_.*-]+(?:/[A-Za-z0-9_.*-]+)*\.(?:kt|kts|java|xml|md|sh|json|txt|so|pro|toml|yml|yaml|py|gradle)$",
+    re.IGNORECASE,
+)
+PATH_RE = re.compile(r"^[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.*-]+)+$")
+DOTTED_SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_().]*$")
+CAMEL_SYMBOL_RE = re.compile(r"^(?:[a-z]+[A-Z][A-Za-z0-9]*|[A-Z][a-z]+[A-Z][A-Za-z0-9]*)$")
+SNAKE_SYMBOL_RE = re.compile(r"^[A-Za-z0-9]+_[A-Za-z0-9_]+$")
+CLI_FLAG_RE = re.compile(r"^--[a-z][a-z0-9-]+$")
+METRIC_TAG_RE = re.compile(r"^(?:max=\d+L?|100755|\d+/\d+L)$")
+
+
+def count_code_tokens(line: str) -> int:
+    text = URL_RE.sub("", line)
+    raw_tokens = re.findall(r"[A-Za-z0-9_./:-]+(?:--[a-z0-9-]+)?|--[a-z][a-z0-9-]+", text)
+    count = 0
+    for tok in raw_tokens:
+        clean = tok.strip(".,:;()[]{}'\"`<>")
+        if not clean or clean.lower() in COMMON_PROPER_NOUNS:
+            continue
+        if (
+            FILE_EXT_RE.match(clean)
+            or CLI_FLAG_RE.match(clean)
+            or METRIC_TAG_RE.match(clean)
+            or SNAKE_SYMBOL_RE.match(clean)
+            or DOTTED_SYMBOL_RE.match(clean)
+            or CAMEL_SYMBOL_RE.match(clean)
+            or (PATH_RE.match(clean) and clean.count("/") >= 2)
+        ):
+            count += 1
+    return count
 
 
 def read_message(path: str) -> str:
@@ -142,7 +192,6 @@ else:
 
         # Split remaining lines (with 1-based line numbers) into paragraphs
         tail = [(idx + 1, line) for idx, line in enumerate(clean_lines) if idx >= 1]
-        # Skip the expected blank line at index 1
         if tail and tail[0][1] == "":
             tail = tail[1:]
 
@@ -176,7 +225,6 @@ else:
             trailer_para = paragraphs[-1]
             body_paragraphs = paragraphs[:-1]
         elif paragraphs:
-            # Detect trailers glued directly to the bottom of the body without a blank line
             last_para = paragraphs[-1]
             split_idx = len(last_para)
             while split_idx > 0:
@@ -200,17 +248,111 @@ else:
                 "Commit description body is missing (only trailers found; explain what changed and why)."
             )
         else:
-            in_fence = False
+            bullet_re = re.compile(r"^(\s*)(?:[-*+]|\d+[.)])\s+(.*)$")
+            logical_units = []
             saw_markdown_decoration = False
-            for _, line in body_lines:
-                stripped = line.strip()
-                if stripped.startswith("```"):
-                    in_fence = not in_fence
-                    continue
-                if in_fence or line.startswith("    "):
-                    continue
-                if MARKDOWN_DECORATION_RE.search(line):
-                    saw_markdown_decoration = True
+            in_fence = False
+
+            for para in body_paragraphs:
+                i = 0
+                n = len(para)
+                while i < n:
+                    lineno, line = para[i]
+                    stripped = line.strip()
+                    if stripped.startswith("```"):
+                        in_fence = not in_fence
+                        i += 1
+                        continue
+                    if in_fence or line.startswith("    ") or stripped.startswith("|"):
+                        i += 1
+                        continue
+
+                    if MARKDOWN_DECORATION_RE.search(line):
+                        saw_markdown_decoration = True
+
+                    bm = bullet_re.match(line)
+                    if bm:
+                        parts = [line.strip()]
+                        i += 1
+                        while i < n:
+                            _, nxt = para[i]
+                            nxt_s = nxt.strip()
+                            if (
+                                nxt_s.startswith("```")
+                                or nxt_s.startswith("|")
+                                or bullet_re.match(nxt)
+                            ):
+                                break
+                            if nxt.startswith((" ", "\t")):
+                                if MARKDOWN_DECORATION_RE.search(nxt):
+                                    saw_markdown_decoration = True
+                                parts.append(nxt_s)
+                                i += 1
+                            else:
+                                break
+                        logical_units.append((lineno, " ".join(parts)))
+                        continue
+
+                    parts = [stripped]
+                    i += 1
+                    while i < n:
+                        _, nxt = para[i]
+                        nxt_s = nxt.strip()
+                        if (
+                            nxt_s.startswith("```")
+                            or nxt_s.startswith("|")
+                            or nxt.startswith("    ")
+                            or bullet_re.match(nxt)
+                        ):
+                            break
+                        if MARKDOWN_DECORATION_RE.search(nxt):
+                            saw_markdown_decoration = True
+                        parts.append(nxt_s)
+                        i += 1
+                    logical_units.append((lineno, " ".join(parts)))
+
+            total_prose_chars = 0
+            for lineno, unit in logical_units:
+                text_no_urls = URL_RE.sub("", unit).strip()
+                total_prose_chars += len(text_no_urls)
+
+                if len(text_no_urls) > MAX_BODY_LINE_LEN:
+                    errors.append(
+                        f"Body item at line {lineno} is {len(text_no_urls)} chars (max {MAX_BODY_LINE_LEN}). "
+                        "Write shorter plain-English sentences or split into concise bullets."
+                    )
+
+                if text_no_urls.count(";") > MAX_SEMICOLONS_PER_LINE:
+                    errors.append(
+                        f"Body item at line {lineno} chains multiple clauses with semicolons; "
+                        "split into separate plain-English bullets instead."
+                    )
+
+                if NESTED_PARENS_RE.search(text_no_urls):
+                    errors.append(
+                        f"Body item at line {lineno} contains nested parentheses; "
+                        "rewrite in simpler, direct sentences."
+                    )
+
+                code_toks = count_code_tokens(unit)
+                if code_toks > MAX_CODE_TOKENS_PER_LINE:
+                    errors.append(
+                        f"Body item at line {lineno} packs {code_toks} code symbols/filenames into one item "
+                        f"(max {MAX_CODE_TOKENS_PER_LINE}). Summarize what changed in plain English; "
+                        "Git already shows the diff."
+                    )
+                elif code_toks >= TIP_CODE_TOKENS_PER_LINE:
+                    warnings.append(
+                        f"Body item at line {lineno} mentions {code_toks} code symbols/filenames; "
+                        "prefer plain English explaining what changed and why."
+                    )
+
+            if total_prose_chars > MAX_BODY_TOTAL_LEN:
+                errors.append(
+                    f"Commit body is {total_prose_chars} chars (max {MAX_BODY_TOTAL_LEN}). "
+                    "Keep commit messages brief and human-readable; let the diff carry file-by-file details."
+                )
+
             if saw_markdown_decoration:
                 warnings.append(
                     "GitHub renders commit message bodies as plain text (not Markdown); "
@@ -218,9 +360,16 @@ else:
                     "(reserve Markdown for PRs and release notes)."
                 )
 
+        for _, text in trailer_para:
+            vm = VERIFIED_TRAILER_RE.match(text)
+            if vm and len(vm.group(1).strip()) > MAX_VERIFIED_LEN:
+                errors.append(
+                    f"Verified trailer is {len(vm.group(1).strip())} chars (max {MAX_VERIFIED_LEN}). "
+                    "Keep it brief (e.g. 'Verified: 73/73 tests passing, lint clean, debug APK builds')."
+                )
+
         agent_lines = [text for _, text in trailer_para if AGENT_TRAILER_KEY_RE.match(text)]
         if not agent_lines:
-            # Check if someone placed Agent: inside body instead of trailer block
             body_agent = [text for _, text in body_lines if AGENT_TRAILER_KEY_RE.match(text)]
             if body_agent:
                 errors.append(
@@ -245,12 +394,14 @@ if errors:
     for err in errors:
         sys.stderr.write(f"  - {err}\n")
     sys.stderr.write(
-        "\nRequired format (subject <= 72 chars, clean reflowable plain-text body):\n"
-        "  <type>(<scope>): <concise imperative summary>\n"
+        "\nRequired format (plain English for human readers, subject <= 72 chars):\n"
+        "  <type>(<scope>): <plain-English summary>\n"
         "\n"
-        "  - Area: concise plain-text bullet explaining what changed and why.\n"
+        "  Optional 1-sentence context explaining the problem or motivation.\n"
         "\n"
-        "  Verified: <concise test/build verification>   # optional\n"
+        "  - Short plain-English bullet (<= 260 chars, no symbol dumps or ';' chains).\n"
+        "\n"
+        "  Verified: 73/73 tests passing, lint clean, debug APK builds   # optional, <= 120 chars\n"
         "  Agent: <Canonical Agent Name> (<role_id>)\n"
         "\nCanonical Agent Names:\n"
         "  - Google AI Studio Agent (ai_studio_ux_cuj)\n"

@@ -60,9 +60,9 @@ When `scripts/await_release_turn.sh <your_role>` activates your turn:
    ```bash
    git pull --rebase origin main
    ```
-2. Perform your domain audit and run your required Gradle verification tests. If committing any domain fixes during your turn, follow [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (`bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <your_role> "<subject>" "<description>"`).
-3. Record your sign-off and hand off `CURRENT_TURN` to the next agent in the ring:
+2. Perform your domain audit and run your required Gradle verification tests. If committing any domain fixes during your turn, follow [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) — write for a human reader in plain English (what changed and why, no symbol dumps or semicolon chains) via `bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <your_role> "<plain-English subject>" "<short plain-English bullets>" --verified "<brief checks>"`.
+3. Record your sign-off and hand off `CURRENT_TURN` to the next agent in the ring with a short 1–2 sentence plain-English summary (avoid dumping long symbol lists into the commit message):
    ```bash
-   bash scripts/advance_release_turn.sh sign_off <your_role> "<concise summary of checks and tests passed>"
+   bash scripts/advance_release_turn.sh sign_off <your_role> "<short plain-English summary of what passed>" --verified "<e.g., 73/73 tests passing, lint clean, debug APK builds>"
    ```
 4. **End your turn cleanly** — do **not** re-arm `await_release_turn.sh` once your stage is `SIGNED_OFF`! If `/home/antigravity/.gemini/usage/agy-usage --check-self` reports `ROTATE_RECOMMENDED` or `ROTATE_URGENT` (`>= 400` steps), advise starting a fresh conversation for the next release.

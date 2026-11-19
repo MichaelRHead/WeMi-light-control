@@ -64,12 +64,12 @@ Whenever you implement a feature, fix a bug, or adjust existing behavior:
    - Update the summary table in [`USER_GUIDE.md`](../../USER_GUIDE.md).
 
 ### Step 4: Run Pre-Push Build & Test Gate and Commit with Agent Attribution
-Never push code or documentation to `origin/main` unless the full Gradle build and unit/Robolectric test suite succeed, and always format commits with `<= 72`-char tag-free subjects, clean plain-text reflowable bodies (`- Area: summary` bullets — no raw `**bold**`, `` `backticks` ``, `#` headings, or 72-column hard wrapping; reserve Markdown for PRs and release notes), and `Verified:` / `Agent:` trailers per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md):
+Never push code or documentation to `origin/main` unless the full Gradle build and unit/Robolectric test suite succeed, and always write human-readable plain-English commits (`<= 72`-char tag-free subject, brief reflowable plain-text bullets explaining what changed and why without symbol dumps or semicolon chains, brief `Verified:` trailer `<= 120` chars, and `Agent:` trailer) per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md):
 ```bash
 ./gradlew assembleDebug testDebugUnitTest --rerun-tasks
 bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
   <your_role_id> \
-  "<type>(<scope>): <concise summary <= 72 chars>" \
-  "- <Area>: concise plain-text bullet explaining what changed and why." \
-  --verified "<tests and build checks run>"
+  "<type>(<scope>): <plain-English summary <= 72 chars>" \
+  "- Explain what changed and why in plain English." \
+  --verified "<brief checks, e.g. 73/73 tests passing, lint clean>"
 ```

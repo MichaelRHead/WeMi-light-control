@@ -82,11 +82,11 @@ Each of the four Antigravity agents (`discovery_and_grouping`, `telemetry_and_de
    - While actively waiting during `IN_REVIEW`, `scripts/await_release_turn.sh` polls `git fetch origin main --quiet` every 15 seconds (including Stage 2 fallback detection when `ai_studio_ux_cuj` marks `SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF`).
 3. **Automatic Agent Wakeup, Review, Handoff & Clean Stop (`scripts/advance_release_turn.sh`)**:
    - As soon as `CURRENT_TURN` matches `<role>`, `scripts/await_release_turn.sh` prints the release state summary and **exits `0`**, waking that agent's conversation.
-   - The agent runs `git pull --rebase origin main`, executes its domain review and tests, and advances the state machine using [`scripts/advance_release_turn.sh`](scripts/advance_release_turn.sh):
+   - The agent runs `git pull --rebase origin main`, executes its domain review and tests, and advances the state machine using [`scripts/advance_release_turn.sh`](scripts/advance_release_turn.sh) with a short plain-English summary:
      ```bash
-     bash scripts/advance_release_turn.sh sign_off <role> "<concise verification summary>"
+     bash scripts/advance_release_turn.sh sign_off <role> "<short plain-English summary>" --verified "<brief checks>"
      ```
-   - `scripts/advance_release_turn.sh` updates [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md), ensures [`gradlew`](gradlew) retains `100755` executable mode, commits with `Agent: <Canonical Agent Name> (<role_id>)` per [`.agents/skills/agent-commit-attribution/SKILL.md`](.agents/skills/agent-commit-attribution/SKILL.md), rebases against `origin/main`, and pushes to GitHub.
+   - `scripts/advance_release_turn.sh` updates [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md), ensures [`gradlew`](gradlew) retains `100755` executable mode, formats a concise human-readable commit with `Agent: <Canonical Agent Name> (<role_id>)` per [`.agents/skills/agent-commit-attribution/SKILL.md`](.agents/skills/agent-commit-attribution/SKILL.md), rebases against `origin/main`, and pushes to GitHub.
    - **Clean Stop**: Once `sign_off` succeeds, the agent **ends its turn without re-arming `await_release_turn.sh`**, and recommends rotating to a fresh conversation if `/home/antigravity/.gemini/usage/agy-usage --check-self` reports `>= 400` steps.
 
 ---
@@ -95,7 +95,7 @@ Each of the four Antigravity agents (`discovery_and_grouping`, `telemetry_and_de
 
 1. **Scoped Domain Fixes (Default — Continue Forward)**:
    - Any self-contained domain fix landed by `discovery_and_grouping` (Stage 2) or `telemetry_and_debugging` (Stage 3) will automatically be compiled and tested against the entire `58`-test (`13`-suite) unit, Robolectric, and Compose E2E suite in Stage 4 (`code_quality_and_testing`) and audited for license/package/trademark compliance in Stage 5 (`license_governance`).
-   - For scoped domain fixes, the reviewing agent commits the fix using `bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <role> "<subject <= 72 chars>" "<body>" --verified "<checks>"`, runs its domain tests, and runs `bash scripts/advance_release_turn.sh sign_off <role> "<fix + verification summary>"` to advance forward to the next stage.
+   - For scoped domain fixes, the reviewing agent commits the fix in plain English using `bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <role> "<plain-English subject <= 72 chars>" "<short plain-English bullets>" --verified "<brief checks>"`, runs its domain tests, and runs `bash scripts/advance_release_turn.sh sign_off <role> "<short plain-English summary>" --verified "<brief checks>"` to advance forward to the next stage.
 2. **Cross-Cutting Fixes Requiring Re-Review (`request_rereview`)**:
    - If an agent in Stages 3–5 discovers a regression that requires an earlier agent in the ring to re-verify its domain (up to `MAX_ROUNDS = 3`), it runs:
      ```bash

@@ -7,9 +7,9 @@
 # agent in the 5-agent / 6-stage round-robin ring.
 #
 # Usage:
-#   bash scripts/advance_release_turn.sh initiate "<summary>" [--no-push]
-#   bash scripts/advance_release_turn.sh sign_off <role> "<summary>" [--no-push]
-#   bash scripts/advance_release_turn.sh conclude "<summary>" [--no-push]
+#   bash scripts/advance_release_turn.sh initiate "<summary>" [--verified "<checks>"] [--no-push]
+#   bash scripts/advance_release_turn.sh sign_off <role> "<summary>" [--verified "<checks>"] [--no-push]
+#   bash scripts/advance_release_turn.sh conclude "<summary>" [--verified "<checks>"] [--no-push]
 #   bash scripts/advance_release_turn.sh request_rereview <from_role> <target_role> "<reason>" [--no-push]
 # ==============================================================================
 set -euo pipefail
@@ -20,19 +20,38 @@ cd "${REPO_ROOT}"
 ACTION="${1:-}"
 if [[ -z "${ACTION}" ]]; then
   echo "Usage:" >&2
-  echo "  $0 initiate \"<summary>\" [--no-push]" >&2
-  echo "  $0 sign_off <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj> \"<summary>\" [--no-push]" >&2
-  echo "  $0 conclude \"<summary>\" [--no-push]" >&2
+  echo "  $0 initiate \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
+  echo "  $0 sign_off <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj> \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
+  echo "  $0 conclude \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
   echo "  $0 request_rereview <from_role> <target_role> \"<reason>\" [--no-push]" >&2
   exit 2
 fi
 
 NO_PUSH="false"
-for arg in "$@"; do
-  if [[ "${arg}" == "--no-push" ]]; then
-    NO_PUSH="true"
-  fi
+VERIFIED_ARG=""
+CLEAN_ARGS=()
+while (( $# > 0 )); do
+  case "$1" in
+    --no-push)
+      NO_PUSH="true"
+      shift
+      ;;
+    -v|--verified)
+      if (( $# < 2 )); then
+        echo "[ERROR] --verified requires a value." >&2
+        exit 2
+      fi
+      VERIFIED_ARG="$2"
+      shift 2
+      ;;
+    *)
+      CLEAN_ARGS+=("$1")
+      shift
+      ;;
+  esac
 done
+
+ACTION="${CLEAN_ARGS[0]:-}"
 
 # Pull latest origin/main before mutating RELEASE_SIGN_OFF.md (when .git is present)
 if [[ -d ".git" ]]; then
@@ -53,7 +72,7 @@ if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "NONE" ]]; then
   HEAD_SHA="v28.0-rc"
 fi
 
-python3 - "${ACTION}" "${PST_NOW}" "${HEAD_SHA}" "$@" <<'PYEOF'
+python3 - "${ACTION}" "${PST_NOW}" "${HEAD_SHA}" "${CLEAN_ARGS[@]}" <<'PYEOF'
 import re
 import sys
 from pathlib import Path
@@ -61,7 +80,7 @@ from pathlib import Path
 action = sys.argv[1]
 pst_now = sys.argv[2]
 head_sha = sys.argv[3]
-raw_args = [a for a in sys.argv[4:] if a != "--no-push"]
+raw_args = list(sys.argv[4:])
 
 gradle_text = Path("app/build.gradle.kts").read_text(encoding="utf-8")
 ver_code_match = re.search(r"versionCode\s*=\s*(\d+)", gradle_text)
@@ -200,54 +219,190 @@ if [[ "${NO_PUSH}" == "true" ]]; then
   exit 0
 fi
 
-CLEAN_ARGS=()
-for arg in "$@"; do
-  if [[ "${arg}" != "--no-push" ]]; then
-    CLEAN_ARGS+=("${arg}")
-  fi
-done
+TMP_COMMIT_INFO="$(mktemp)"
+trap 'rm -f "${TMP_COMMIT_INFO}"' EXIT
 
-REL_VER="$(sed -n 's/^RELEASE_VERSION:[[:space:]]*//p' RELEASE_SIGN_OFF.md | tr -d '\r' | head -n 1 || true)"
-REL_VER="${REL_VER:-${GRADLE_VER_NAME:-v28.0}}"
+python3 - "${VERIFIED_ARG}" "${TMP_COMMIT_INFO}" "${CLEAN_ARGS[@]}" <<'PYEOF'
+import json
+import re
+import sys
+from pathlib import Path
 
-case "${ACTION}" in
-  initiate)
-    ACTING_ROLE="ai_studio_ux_cuj"
-    COMMIT_SUBJECT="chore(release): initiate ${REL_VER} review"
-    COMMIT_DESC="${CLEAN_ARGS[1]:-Initiated ${REL_VER} release review in RELEASE_SIGN_OFF.md.}"
-    ;;
-  sign_off)
-    ACTING_ROLE="${CLEAN_ARGS[1]:-code_quality_and_testing}"
-    COMMIT_SUBJECT="chore(release): record ${ACTING_ROLE} sign-off"
-    COMMIT_DESC="${CLEAN_ARGS[2]:-Recorded ${ACTING_ROLE} sign-off for ${REL_VER} in RELEASE_SIGN_OFF.md.}"
-    ;;
-  conclude)
-    ACTING_ROLE="ai_studio_ux_cuj"
-    COMMIT_SUBJECT="chore(release): approve ${REL_VER} for Play Store"
-    COMMIT_DESC="${CLEAN_ARGS[1]:-Concluded ${REL_VER} release review in RELEASE_SIGN_OFF.md (APPROVED_FOR_PLAY_STORE).}"
-    ;;
-  request_rereview)
-    ACTING_ROLE="${CLEAN_ARGS[1]:-code_quality_and_testing}"
-    TARGET_ROLE="${CLEAN_ARGS[2]:-discovery_and_grouping}"
-    COMMIT_SUBJECT="chore(release): request ${TARGET_ROLE} re-review"
-    COMMIT_DESC="Requested Round re-review of ${TARGET_ROLE}: ${CLEAN_ARGS[3]:-Re-verification requested.}"
-    ;;
-  *)
-    ACTING_ROLE="antigravity_general"
-    COMMIT_SUBJECT="chore(release): update sign-off ledger (${ACTION})"
-    COMMIT_DESC="Updated RELEASE_SIGN_OFF.md (${ACTION})."
-    ;;
-esac
+verified_arg = sys.argv[1].strip()
+out_path = sys.argv[2]
+args = list(sys.argv[3:])
+action = args[0] if args else ""
+
+sign_off = Path("RELEASE_SIGN_OFF.md").read_text(encoding="utf-8")
+def state_val(key, default=""):
+    m = re.search(rf"^{re.escape(key)}:\s*(.*)$", sign_off, flags=re.MULTILINE)
+    return m.group(1).strip() if m else default
+
+rel_ver = state_val("RELEASE_VERSION", "v28.0")
+ver_code = state_val("VERSION_CODE", "28")
+round_num = state_val("ROUND_NUMBER", "1")
+
+ROLE_META = {
+    "ai_studio_ux_cuj": {
+        "short": "UX & design review",
+        "stage": "Stage 1 of 6",
+        "next": "Discovery & Room Grouping",
+        "default_bullet": "Verified UX layouts, accessibility, user journeys, and Play Store release notes.",
+    },
+    "discovery_and_grouping": {
+        "short": "discovery review",
+        "stage": "Stage 2 of 6",
+        "next": "Telemetry & Debugging",
+        "default_bullet": "Verified switch discovery, device identity matching, and automatic room grouping.",
+    },
+    "telemetry_and_debugging": {
+        "short": "telemetry review",
+        "stage": "Stage 3 of 6",
+        "next": "Code Quality & Testing",
+        "default_bullet": "Verified local setup diagnostics, telemetry export, and password redaction.",
+    },
+    "code_quality_and_testing": {
+        "short": "quality & test review",
+        "stage": "Stage 4 of 6",
+        "next": "License & Brand Governance",
+        "default_bullet": "Verified code modularity, lifecycle safety, script permissions, and full test suite.",
+    },
+    "license_governance": {
+        "short": "license & brand review",
+        "stage": "Stage 5 of 6",
+        "next": "Google AI Studio for final release approval",
+        "default_bullet": "Verified in-app MIT license parity, permissive dependencies, and Play Store trademark compliance.",
+    },
+}
+
+NESTED_PARENS_RE = re.compile(r"\([^()]*\([^()]+\)[^()]*\)")
+CODE_TOKEN_RE = re.compile(
+    r"(?:[A-Za-z0-9_.*-]+(?:/[A-Za-z0-9_.*-]+)*\.(?:kt|kts|java|xml|md|sh|json|txt|so|pro|toml|yml|yaml|py|gradle)"
+    r"|--[a-z][a-z0-9-]+"
+    r"|[A-Za-z0-9]+_[A-Za-z0-9_]+"
+    r"|[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_().]*"
+    r"|[a-z]+[A-Z][A-Za-z0-9]*)"
+)
+
+
+def is_concise_human_summary(text: str) -> bool:
+    s = " ".join(text.split()).lstrip("-*• ").strip()
+    if not s or len(s) > 220:
+        return False
+    if s.count(";") > 1 or NESTED_PARENS_RE.search(s):
+        return False
+    if len(CODE_TOKEN_RE.findall(s)) > 5:
+        return False
+    return True
+
+
+def extract_verified(raw_text: str) -> str:
+    if verified_arg:
+        return verified_arg[:120]
+    parts = []
+    m_tests = re.search(r"(\d+/\d+)[^.,;]*tests", raw_text, flags=re.IGNORECASE)
+    if m_tests:
+        parts.append(f"{m_tests.group(1)} tests passing")
+    if re.search(r"0\s+lint(?:Debug)?\s+errors", raw_text, flags=re.IGNORECASE):
+        parts.append("lint clean")
+    if re.search(r"assembleDebug\s+green|green\s+assembleDebug", raw_text, flags=re.IGNORECASE):
+        parts.append("debug APK builds")
+    return ", ".join(parts)
+
+
+def make_bullets(raw_summary: str, fallback_bullet: str):
+    clean = " ".join(raw_summary.split()).lstrip("-*• ").strip()
+    if is_concise_human_summary(clean):
+        if not clean.endswith((".", "!", "?")):
+            clean += "."
+        return [f"- {clean}", "- Full sign-off ledger updated in RELEASE_SIGN_OFF.md."]
+    if clean:
+        sys.stderr.write(
+            "[RELEASE COORDINATOR] Saved full audit notes to RELEASE_SIGN_OFF.md "
+            "and kept the Git commit message concise for human readers.\n"
+        )
+    return [f"- {fallback_bullet}", "- Full audit details are recorded in RELEASE_SIGN_OFF.md."]
+
+
+if action == "initiate":
+    acting_role = "ai_studio_ux_cuj"
+    raw_summary = args[1] if len(args) > 1 else ""
+    subject = f"chore(release): start {rel_ver} release review"
+    lead = f"Started {rel_ver} (versionCode {ver_code}) release review with UX sign-off. Handing off to Discovery & Room Grouping."
+    bullets = make_bullets(raw_summary, ROLE_META[acting_role]["default_bullet"])
+    verified = extract_verified(raw_summary)
+elif action == "sign_off":
+    acting_role = args[1] if len(args) > 1 else "code_quality_and_testing"
+    raw_summary = args[2] if len(args) > 2 else ""
+    meta = ROLE_META.get(acting_role, {
+        "short": "release review",
+        "stage": "Review stage",
+        "next": "the next reviewer",
+        "default_bullet": "Completed release verification with no blocking issues.",
+    })
+    subject = f"chore(release): sign off {rel_ver} {meta['short']}"
+    lead = f"Completed {meta['stage']} for {rel_ver} (versionCode {ver_code}). Handing off to {meta['next']}."
+    bullets = make_bullets(raw_summary, meta["default_bullet"])
+    verified = extract_verified(raw_summary)
+elif action == "conclude":
+    acting_role = "ai_studio_ux_cuj"
+    raw_summary = args[1] if len(args) > 1 else ""
+    subject = f"chore(release): approve {rel_ver} for Play Store"
+    lead = f"All 5 review stages passed for {rel_ver} (versionCode {ver_code}). Release is approved for Google Play Store."
+    bullets = make_bullets(raw_summary, "Confirmed all stage sign-offs and final release notes are ready for publishing.")
+    verified = extract_verified(raw_summary)
+elif action == "request_rereview":
+    acting_role = args[1] if len(args) > 1 else "code_quality_and_testing"
+    target_role = args[2] if len(args) > 2 else "discovery_and_grouping"
+    raw_reason = args[3] if len(args) > 3 else ""
+    target_meta = ROLE_META.get(target_role, {"short": "release review"})
+    subject = f"chore(release): request {rel_ver} {target_meta['short']}"
+    if len(subject) > 72:
+        subject = f"chore(release): request {rel_ver} re-review"
+    lead = f"Requested a Round {round_num} follow-up {target_meta['short']} for {rel_ver}."
+    bullets = make_bullets(raw_reason, "Follow-up verification requested before release sign-off.")
+    verified = verified_arg[:120]
+else:
+    acting_role = "antigravity_general"
+    subject = f"chore(release): update {rel_ver} sign-off ledger"
+    lead = f"Updated the {rel_ver} release sign-off ledger."
+    bullets = ["- Full release state recorded in RELEASE_SIGN_OFF.md."]
+    verified = verified_arg[:120]
+
+body = lead + "\n\n" + "\n\n".join(bullets)
+Path(out_path).write_text(
+    json.dumps({
+        "role": acting_role,
+        "subject": subject,
+        "body": body,
+        "verified": verified,
+    }),
+    encoding="utf-8",
+)
+PYEOF
+
+ACTING_ROLE="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["role"])' "${TMP_COMMIT_INFO}")"
+COMMIT_SUBJECT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["subject"])' "${TMP_COMMIT_INFO}")"
+COMMIT_BODY="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["body"])' "${TMP_COMMIT_INFO}")"
+COMMIT_VERIFIED="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["verified"])' "${TMP_COMMIT_INFO}")"
 
 git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
   .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
   .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || \
   git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh
 
-bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
-  "${ACTING_ROLE}" \
-  "${COMMIT_SUBJECT}" \
-  "${COMMIT_DESC}"
+if [[ -n "${COMMIT_VERIFIED}" ]]; then
+  bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
+    "${ACTING_ROLE}" \
+    "${COMMIT_SUBJECT}" \
+    "${COMMIT_BODY}" \
+    --verified "${COMMIT_VERIFIED}"
+else
+  bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
+    "${ACTING_ROLE}" \
+    "${COMMIT_SUBJECT}" \
+    "${COMMIT_BODY}"
+fi
 
 git pull --rebase origin main
 git push origin main

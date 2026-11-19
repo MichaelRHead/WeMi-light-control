@@ -97,13 +97,13 @@ Before committing or pushing your integrated changes:
    ```bash
    ./gradlew testDebugUnitTest --rerun-tasks assembleDebug
    ```
-2. Stage, commit **with clean plain-text reflowable formatting and mandatory trailer attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (`<= 72`-char Conventional Commits subject with no `[...Agent]` tag, clean plain-text body using `- Area: summary` bullets without `**bold**`, `` `backticks` ``, `#` headings, or 72-column hard wrapping — reserving Markdown for PRs and release notes — optional `Verified:` trailer, and mandatory `Agent: <Canonical Agent Name> (<role_id>)` trailer), and push atomically:
+2. Stage, commit **with a concise, human-readable plain-English message and mandatory trailer attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (plain-English `<= 72`-char Conventional Commits subject with no `[...Agent]` tag; short reflowable plain-text body explaining what changed and why without symbol dumps, semicolon chains, nested parentheses, or raw `**bold**`/`` `backticks` ``; brief `Verified:` trailer `<= 120` chars; and mandatory `Agent: <Canonical Agent Name> (<role_id>)` trailer), and push atomically:
    ```bash
    git add -A
    bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
      <your_role_id> \
-     "<type>(<scope>): <concise summary <= 72 chars>" \
-     "- <Area>: concise plain-text bullet explaining what changed and why." \
-     --verified "<tests and build checks run>"
+     "<type>(<scope>): <plain-English summary <= 72 chars>" \
+     "- Explain what changed and why in plain English." \
+     --verified "<brief checks, e.g. 73/73 tests passing, lint clean>"
    git pull --rebase origin main && git push origin main
    ```
