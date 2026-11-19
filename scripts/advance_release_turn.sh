@@ -48,9 +48,9 @@ chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
 
 PST_NOW="$(TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z")"
 GRADLE_VER_NAME="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/v\1-rc/p' app/build.gradle.kts | tr -d '\r' | head -n 1 || true)"
-HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "${GRADLE_VER_NAME:-v27.0-rc}")"
+HEAD_SHA="$(git rev-parse --short HEAD 2>/dev/null || echo "${GRADLE_VER_NAME:-v28.0-rc}")"
 if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "NONE" ]]; then
-  HEAD_SHA="v27.0-rc"
+  HEAD_SHA="v28.0-rc"
 fi
 
 python3 - "${ACTION}" "${PST_NOW}" "${HEAD_SHA}" "$@" <<'PYEOF'
@@ -66,8 +66,8 @@ raw_args = [a for a in sys.argv[4:] if a != "--no-push"]
 gradle_text = Path("app/build.gradle.kts").read_text(encoding="utf-8")
 ver_code_match = re.search(r"versionCode\s*=\s*(\d+)", gradle_text)
 ver_name_match = re.search(r'versionName\s*=\s*"([^"]+)"', gradle_text)
-gradle_ver_code = ver_code_match.group(1) if ver_code_match else "27"
-gradle_ver_name = f"v{ver_name_match.group(1)}" if ver_name_match else "v27.0"
+gradle_ver_code = ver_code_match.group(1) if ver_code_match else "28"
+gradle_ver_name = f"v{ver_name_match.group(1)}" if ver_name_match else "v28.0"
 
 sign_off_path = Path("RELEASE_SIGN_OFF.md")
 text = sign_off_path.read_text(encoding="utf-8")

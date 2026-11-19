@@ -50,13 +50,13 @@ Inside the **`SETUP DEBUG DETAILS (SCREENSHOT)`** header bar in the **Provision 
   2. Copies the entire report to your Android clipboard.
   3. Opens Android's **Share Sheet (`Save or Share WeMi Telemetry`)** so you can save `wemi-telemetry-latest.txt` to **Files / Google Drive**, email it, or send it directly to chat.
 - **Tap `Copy`**:
-  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v27.0 [27] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
+  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v28.0 [28] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
   2. Paste the copied text directly into your chat message or issue report.
 
 ### B2. Exporting from the `More` Tab (`Save/Share Log`)
 In the header of the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
 - **Tap `Save/Share Log`**:
-  1. Generates a comprehensive 4-section report (`wemi-telemetry-latest.txt`, stamped with `App Version: v27.0 (versionCode=27, com.aistudio.wemiswitch.kxpqzr)`) containing:
+  1. Generates a comprehensive 4-section report (`wemi-telemetry-latest.txt`, stamped with `App Version: v28.0 (versionCode=28, com.aistudio.wemiswitch.kxpqzr)`) containing:
      - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt.
      - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet, and gateway IP).
      - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its room, IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), latency (`ms`), hardware SKU, firmware, serial number, and MAC.

@@ -4,12 +4,16 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
@@ -58,6 +62,7 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenTop
  * hosting the brand badge, active switch count, focused card status pill, Dimmer Adjust
  * mode toggle, 1-press TV scenes, and background LAN Rescan chip.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun TvTopHeaderBar(
     activeSwitchCount: Int,
@@ -74,247 +79,345 @@ internal fun TvTopHeaderBar(
     onApplyTvScene: (String) -> Unit,
     onScanSsdpClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+    val isFocusedDimmer =
+        focusedDevice != null &&
+            focusedDevice.parsedType == DeviceType.LIGHTBULB_DIMMER &&
+            focusedDevice.isReachable
+    val isDimmingFocused = focusedDevice != null && dimmingDeviceId == focusedDevice.id && isFocusedDimmer
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("tv_top_header_bar")
+    ) {
+        val availableWidth = maxWidth
+        val isWideTvViewport = availableWidth >= 720.dp
+
+        if (isWideTvViewport) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TvBrandAndCountBadges(activeSwitchCount, totalSwitchCount)
+                    if (focusedDevice != null) {
+                        TvFocusedStatusPill(
+                            focusedDevice = focusedDevice,
+                            isDimmingFocused = isDimmingFocused,
+                            onPrimaryActionOnFocused = onPrimaryActionOnFocused,
+                            onToggleDimmingFocused = onToggleDimmingFocused,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (isFocusedDimmer) {
+                            TvDimmerModeChip(
+                                focusedDevice = focusedDevice,
+                                isDimmingFocused = isDimmingFocused,
+                                onToggleDimmingFocused = onToggleDimmingFocused
+                            )
+                        }
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TvTopRightActionChips(
+                        isRefreshing = isRefreshing,
+                        topActionFocusRequesters = topActionFocusRequesters,
+                        onSelectTopActionFocus = onSelectTopActionFocus,
+                        onNavigateDownFromTopBar = onNavigateDownFromTopBar,
+                        onNavigateTopActionHorizontal = onNavigateTopActionHorizontal,
+                        onApplyTvScene = onApplyTvScene,
+                        onScanSsdpClick = onScanSsdpClick
+                    )
+                }
+            }
+        } else {
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                TvBrandAndCountBadges(activeSwitchCount, totalSwitchCount)
+                if (focusedDevice != null) {
+                    TvFocusedStatusPill(
+                        focusedDevice = focusedDevice,
+                        isDimmingFocused = isDimmingFocused,
+                        onPrimaryActionOnFocused = onPrimaryActionOnFocused,
+                        onToggleDimmingFocused = onToggleDimmingFocused,
+                        modifier = Modifier.widthIn(max = availableWidth)
+                    )
+                    if (isFocusedDimmer) {
+                        TvDimmerModeChip(
+                            focusedDevice = focusedDevice,
+                            isDimmingFocused = isDimmingFocused,
+                            onToggleDimmingFocused = onToggleDimmingFocused
+                        )
+                    }
+                }
+                TvTopRightActionChips(
+                    isRefreshing = isRefreshing,
+                    topActionFocusRequesters = topActionFocusRequesters,
+                    onSelectTopActionFocus = onSelectTopActionFocus,
+                    onNavigateDownFromTopBar = onNavigateDownFromTopBar,
+                    onNavigateTopActionHorizontal = onNavigateTopActionHorizontal,
+                    onApplyTvScene = onApplyTvScene,
+                    onScanSsdpClick = onScanSsdpClick
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvBrandAndCountBadges(activeSwitchCount: Int, totalSwitchCount: Int) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = WemoGreenPrimary.copy(alpha = 0.25f),
+        border = BorderStroke(1.5.dp, TvCyanFocusBorder)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
         ) {
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = WemoGreenPrimary.copy(alpha = 0.25f),
-                border = BorderStroke(1.5.dp, TvCyanFocusBorder)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Tv,
-                        contentDescription = "Android TV Mode",
-                        tint = TvCyanFocusBorder,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "wemi TV",
-                        color = TvTextPrimary,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = Color(0xFF0F2540),
-                border = BorderStroke(1.dp, Color(0xFF1E3A5F))
-            ) {
-                Text(
-                    text = "$activeSwitchCount/$totalSwitchCount ON",
-                    color = TvCyanFocusBorder,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                )
-            }
-
-            // Focused Card Status & Quick Toggle Pill (non-focusable so D-Pad stays in the grid/scenes)
-            if (focusedDevice != null) {
-                val isFocusedDimmer =
-                    focusedDevice.parsedType == DeviceType.LIGHTBULB_DIMMER && focusedDevice.isReachable
-                val isDimmingFocused = dimmingDeviceId == focusedDevice.id && isFocusedDimmer
-
-                Surface(
-                    shape = RoundedCornerShape(9.dp),
-                    color = if (isDimmingFocused) TvDimmerGold else WemoGreenTop.copy(alpha = 0.20f),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        color = if (isDimmingFocused) TvDimmerGold else TvCyanFocusBorder.copy(alpha = 0.65f)
-                    ),
-                    modifier = Modifier
-                        .focusProperties { canFocus = false }
-                        .clickable {
-                            if (isDimmingFocused) {
-                                onToggleDimmingFocused(null)
-                            } else {
-                                onPrimaryActionOnFocused(focusedDevice)
-                            }
-                        }
-                        .testTag("tv_remote_dpad_ok")
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PowerSettingsNew,
-                            contentDescription = null,
-                            tint = if (isDimmingFocused) TvDeepBackground else TvCyanFocusBorder,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = if (isDimmingFocused) {
-                                "${focusedDevice.name}: ${focusedDevice.brightness}% (Left/Right Adjust • Down Next)"
-                            } else {
-                                "${focusedDevice.name} • OK Toggle"
-                            },
-                            color = if (isDimmingFocused) TvDeepBackground else Color.White,
-                            fontFamily = FontFamily.SansSerif,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.5.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                if (isFocusedDimmer) {
-                    Surface(
-                        shape = RoundedCornerShape(9.dp),
-                        color = if (isDimmingFocused) TvDimmerGold else Color(0xFF132D4E),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            color = TvDimmerGold.copy(alpha = 0.8f)
-                        ),
-                        modifier = Modifier
-                            .focusProperties { canFocus = false }
-                            .clickable {
-                                onToggleDimmingFocused(if (isDimmingFocused) null else focusedDevice.id)
-                            }
-                            .testTag("tv_dimmer_mode_toggle")
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp),
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Tune,
-                                contentDescription = "Toggle Dimmer Adjust Mode",
-                                tint = if (isDimmingFocused) TvDeepBackground else TvDimmerGold,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = if (isDimmingFocused) "Done Dimming" else "Dimmer ${focusedDevice.brightness}%",
-                                color = if (isDimmingFocused) TvDeepBackground else TvDimmerGold,
-                                fontFamily = FontFamily.SansSerif,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.5.sp
-                            )
-                        }
-                    }
-                }
-            }
+            Icon(Icons.Default.Tv, contentDescription = "Android TV Mode", tint = TvCyanFocusBorder, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "wemi TV",
+                color = TvTextPrimary,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 15.sp,
+                maxLines = 1,
+                softWrap = false
+            )
         }
+    }
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = Color(0xFF0F2540),
+        border = BorderStroke(1.dp, Color(0xFF1E3A5F))
+    ) {
+        Text(
+            text = "$activeSwitchCount/$totalSwitchCount ON",
+            color = TvCyanFocusBorder,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+        )
+    }
+}
 
-        // Right: Compact Scene Shortcuts + Background LAN Rescan
+@Composable
+private fun TvFocusedStatusPill(
+    focusedDevice: DeviceEntity,
+    isDimmingFocused: Boolean,
+    onPrimaryActionOnFocused: (DeviceEntity) -> Unit,
+    onToggleDimmingFocused: (Int?) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        shape = RoundedCornerShape(9.dp),
+        color = if (isDimmingFocused) TvDimmerGold else WemoGreenTop.copy(alpha = 0.20f),
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isDimmingFocused) TvDimmerGold else TvCyanFocusBorder.copy(alpha = 0.65f)
+        ),
+        modifier = modifier
+            .focusProperties { canFocus = false }
+            .clickable {
+                if (isDimmingFocused) {
+                    onToggleDimmingFocused(null)
+                } else {
+                    onPrimaryActionOnFocused(focusedDevice)
+                }
+            }
+            .testTag("tv_remote_dpad_ok")
+    ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
         ) {
-            TvSceneChip(
-                title = "Movie 20%",
-                icon = Icons.Default.Movie,
-                focusRequester = topActionFocusRequesters.getOrNull(0),
-                onFocusGained = { onSelectTopActionFocus(0) },
-                onNavigateLeft = { true },
-                onNavigateRight = { onNavigateTopActionHorizontal(1) },
-                onNavigateDown = onNavigateDownFromTopBar,
-                onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.MOVIE_MODE.wireKey) },
-                testTag = "tv_scene_movie"
+            Icon(
+                imageVector = Icons.Default.PowerSettingsNew,
+                contentDescription = null,
+                tint = if (isDimmingFocused) TvDeepBackground else TvCyanFocusBorder,
+                modifier = Modifier.size(14.dp)
             )
-            TvSceneChip(
-                title = "Holiday ON",
-                icon = Icons.Default.Park,
-                focusRequester = topActionFocusRequesters.getOrNull(1),
-                onFocusGained = { onSelectTopActionFocus(1) },
-                onNavigateLeft = { onNavigateTopActionHorizontal(0) },
-                onNavigateRight = { onNavigateTopActionHorizontal(2) },
-                onNavigateDown = onNavigateDownFromTopBar,
-                onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey) },
-                testTag = "tv_scene_holiday"
+            Text(
+                text = focusedDevice.name,
+                color = if (isDimmingFocused) TvDeepBackground else Color.White,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false)
             )
-            TvSceneChip(
-                title = "All OFF",
-                icon = Icons.Default.Bedtime,
-                focusRequester = topActionFocusRequesters.getOrNull(2),
-                onFocusGained = { onSelectTopActionFocus(2) },
-                onNavigateLeft = { onNavigateTopActionHorizontal(1) },
-                onNavigateRight = { onNavigateTopActionHorizontal(3) },
-                onNavigateDown = onNavigateDownFromTopBar,
-                onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.BEDTIME_OFF.wireKey) },
-                testTag = "tv_scene_bedtime"
+            Text(
+                text = if (isDimmingFocused) "• ◄/► ${focusedDevice.brightness}%" else "• OK Toggle",
+                color = if (isDimmingFocused) TvDeepBackground else Color.White,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                softWrap = false
             )
+        }
+    }
+}
 
-            var isScanFocused by remember { mutableStateOf(false) }
-            val currentOnScanSsdpClick by androidx.compose.runtime.rememberUpdatedState(onScanSsdpClick)
-            val currentOnNavigateTopHorizontal by androidx.compose.runtime.rememberUpdatedState(onNavigateTopActionHorizontal)
-            val currentOnNavigateDownFromTopBar by androidx.compose.runtime.rememberUpdatedState(onNavigateDownFromTopBar)
-            val scanRequester = topActionFocusRequesters.getOrNull(3)
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = if (isScanFocused) WemoGreenPrimary else WemoGreenDark,
-                border = BorderStroke(
-                    width = if (isScanFocused) 2.5.dp else 1.dp,
-                    color = if (isScanFocused) Color.White else TvCyanFocusBorder.copy(alpha = 0.65f)
-                ),
-                modifier = Modifier
-                    .let { mod -> if (scanRequester != null) mod.focusRequester(scanRequester) else mod }
-                    .onFocusChanged { state ->
-                        isScanFocused = state.isFocused
-                        if (state.isFocused) {
-                            onSelectTopActionFocus(3)
-                        }
+@Composable
+private fun TvDimmerModeChip(
+    focusedDevice: DeviceEntity,
+    isDimmingFocused: Boolean,
+    onToggleDimmingFocused: (Int?) -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(9.dp),
+        color = if (isDimmingFocused) TvDimmerGold else Color(0xFF132D4E),
+        border = BorderStroke(1.dp, TvDimmerGold.copy(alpha = 0.8f)),
+        modifier = Modifier
+            .focusProperties { canFocus = false }
+            .clickable { onToggleDimmingFocused(if (isDimmingFocused) null else focusedDevice.id) }
+            .testTag("tv_dimmer_mode_toggle")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Tune,
+                contentDescription = "Toggle Dimmer Adjust Mode",
+                tint = if (isDimmingFocused) TvDeepBackground else TvDimmerGold,
+                modifier = Modifier.size(13.dp)
+            )
+            Text(
+                text = if (isDimmingFocused) "Done Dimming" else "Dimmer ${focusedDevice.brightness}%",
+                color = if (isDimmingFocused) TvDeepBackground else TvDimmerGold,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+    }
+}
+
+@Composable
+private fun TvTopRightActionChips(
+    isRefreshing: Boolean,
+    topActionFocusRequesters: List<FocusRequester>,
+    onSelectTopActionFocus: (Int) -> Unit,
+    onNavigateDownFromTopBar: () -> Boolean,
+    onNavigateTopActionHorizontal: (Int) -> Boolean,
+    onApplyTvScene: (String) -> Unit,
+    onScanSsdpClick: () -> Unit
+) {
+    TvSceneChip(
+        title = "Movie 20%",
+        icon = Icons.Default.Movie,
+        focusRequester = topActionFocusRequesters.getOrNull(0),
+        onFocusGained = { onSelectTopActionFocus(0) },
+        onNavigateLeft = { true },
+        onNavigateRight = { onNavigateTopActionHorizontal(1) },
+        onNavigateDown = onNavigateDownFromTopBar,
+        onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.MOVIE_MODE.wireKey) },
+        testTag = "tv_scene_movie"
+    )
+    TvSceneChip(
+        title = "Holiday ON",
+        icon = Icons.Default.Park,
+        focusRequester = topActionFocusRequesters.getOrNull(1),
+        onFocusGained = { onSelectTopActionFocus(1) },
+        onNavigateLeft = { onNavigateTopActionHorizontal(0) },
+        onNavigateRight = { onNavigateTopActionHorizontal(2) },
+        onNavigateDown = onNavigateDownFromTopBar,
+        onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey) },
+        testTag = "tv_scene_holiday"
+    )
+    TvSceneChip(
+        title = "All OFF",
+        icon = Icons.Default.Bedtime,
+        focusRequester = topActionFocusRequesters.getOrNull(2),
+        onFocusGained = { onSelectTopActionFocus(2) },
+        onNavigateLeft = { onNavigateTopActionHorizontal(1) },
+        onNavigateRight = { onNavigateTopActionHorizontal(3) },
+        onNavigateDown = onNavigateDownFromTopBar,
+        onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.BEDTIME_OFF.wireKey) },
+        testTag = "tv_scene_bedtime"
+    )
+
+    var isScanFocused by remember { mutableStateOf(false) }
+    val currentOnScanSsdpClick by androidx.compose.runtime.rememberUpdatedState(onScanSsdpClick)
+    val currentOnNavigateTopHorizontal by androidx.compose.runtime.rememberUpdatedState(onNavigateTopActionHorizontal)
+    val currentOnNavigateDownFromTopBar by androidx.compose.runtime.rememberUpdatedState(onNavigateDownFromTopBar)
+    val scanRequester = topActionFocusRequesters.getOrNull(3)
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = if (isScanFocused) WemoGreenPrimary else WemoGreenDark,
+        border = BorderStroke(
+            width = if (isScanFocused) 2.5.dp else 1.dp,
+            color = if (isScanFocused) Color.White else TvCyanFocusBorder.copy(alpha = 0.65f)
+        ),
+        modifier = Modifier
+            .let { mod -> if (scanRequester != null) mod.focusRequester(scanRequester) else mod }
+            .onFocusChanged { state ->
+                isScanFocused = state.isFocused
+                if (state.isFocused) onSelectTopActionFocus(3)
+            }
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    when (event.key) {
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { currentOnScanSsdpClick(); true }
+                        Key.DirectionLeft -> currentOnNavigateTopHorizontal(2)
+                        Key.DirectionRight -> true
+                        Key.DirectionDown -> currentOnNavigateDownFromTopBar()
+                        Key.DirectionUp -> true
+                        else -> false
                     }
-                    .onKeyEvent { event ->
-                        if (event.type == KeyEventType.KeyDown) {
-                            when (event.key) {
-                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                                    currentOnScanSsdpClick()
-                                    true
-                                }
-                                Key.DirectionLeft -> currentOnNavigateTopHorizontal(2)
-                                Key.DirectionRight -> true
-                                Key.DirectionDown -> currentOnNavigateDownFromTopBar()
-                                Key.DirectionUp -> true
-                                else -> false
-                            }
-                        } else {
-                            false
-                        }
-                    }
-                    .focusable()
-                    .focusProperties { canFocus = false }
-                    .clickable { onScanSsdpClick() }
-                    .testTag("tv_scan_button")
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Radar,
-                        contentDescription = "Rescan LAN Switches",
-                        tint = Color.White,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isRefreshing) "Scanning..." else "Rescan",
-                        color = Color.White,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
+                } else {
+                    false
                 }
             }
+            .focusable()
+            .focusProperties { canFocus = false }
+            .clickable { onScanSsdpClick() }
+            .testTag("tv_scan_button")
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Radar,
+                contentDescription = "Rescan LAN Switches",
+                tint = Color.White,
+                modifier = Modifier.size(15.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = if (isRefreshing) "Scanning..." else "Rescan",
+                color = Color.White,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false
+            )
         }
     }
 }
@@ -348,17 +451,12 @@ internal fun TvSceneChip(
             .let { mod -> if (focusRequester != null) mod.focusRequester(focusRequester) else mod }
             .onFocusChanged { state ->
                 isFocused = state.isFocused
-                if (state.isFocused) {
-                    onFocusGained()
-                }
+                if (state.isFocused) onFocusGained()
             }
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     when (event.key) {
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> {
-                            currentOnClick()
-                            true
-                        }
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { currentOnClick(); true }
                         Key.DirectionLeft -> currentOnNavigateLeft()
                         Key.DirectionRight -> currentOnNavigateRight()
                         Key.DirectionDown -> currentOnNavigateDown()
@@ -378,19 +476,16 @@ internal fun TvSceneChip(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = TvCyanFocusBorder,
-                modifier = Modifier.size(15.dp)
-            )
+            Icon(icon, contentDescription = null, tint = TvCyanFocusBorder, modifier = Modifier.size(15.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = title,
                 color = Color.White,
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 12.sp
+                fontSize = 12.sp,
+                maxLines = 1,
+                softWrap = false
             )
         }
     }

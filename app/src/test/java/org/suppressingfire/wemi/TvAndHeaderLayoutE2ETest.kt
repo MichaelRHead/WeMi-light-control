@@ -144,7 +144,7 @@ class TvAndHeaderLayoutE2ETest {
 
     @OptIn(ExperimentalTestApi::class)
     @Test
-    @Config(sdk = [36], qualifiers = "television")
+    @Config(sdk = [36], qualifiers = "w960dp-h540dp-land-television-xhdpi")
     fun `verify v23_0 Android TV 3-column room-grouped dashboard D-Pad hardware KeyEvents DIM mode and loopback SOAP control`() {
         composeTestRule.waitForIdle()
 
@@ -308,12 +308,53 @@ class TvAndHeaderLayoutE2ETest {
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}").assertIsFocused()
 
+                    val topBarToggleBounds = composeTestRule.onNodeWithTag("tv_top_header_bar")
+                        .assertIsDisplayed()
+                        .fetchSemanticsNode().boundsInRoot
+
                     composeTestRule.onNodeWithTag("tv_device_card_${dimmerEntity.id}")
                         .performKeyInput { pressKey(Key.DirectionDown) }
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_card_dim_mode_${dimmerEntity.id}").assertIsFocused()
                     composeTestRule.onNodeWithText("DIM -/+", useUnmergedTree = true).assertIsDisplayed()
                     composeTestRule.onNodeWithText("Done Dimming", useUnmergedTree = true).assertIsDisplayed()
+
+                    // Verify TV top bar packs cleanly on a single row while dimming (no height balloon, no squished All OFF, no clipped Rescan)
+                    val topBarDimmingBounds = composeTestRule.onNodeWithTag("tv_top_header_bar")
+                        .assertIsDisplayed()
+                        .fetchSemanticsNode().boundsInRoot
+                    assertTrue(
+                        "Expected TV top bar height to remain stable while dimming ($topBarToggleBounds vs $topBarDimmingBounds)",
+                        abs(topBarDimmingBounds.height - topBarToggleBounds.height) <= 4f
+                    )
+                    val statusBounds = composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+                        .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                    val dimmerToggleBounds = composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle")
+                        .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                    val movieBounds = composeTestRule.onNodeWithTag("tv_scene_movie")
+                        .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                    val holidayBounds = composeTestRule.onNodeWithTag("tv_scene_holiday")
+                        .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                    val bedtimeBounds = composeTestRule.onNodeWithTag("tv_scene_bedtime")
+                        .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                    val scanBounds = composeTestRule.onNodeWithTag("tv_scan_button")
+                        .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+                    val topChips = listOf(statusBounds, dimmerToggleBounds, movieBounds, holidayBounds, bedtimeBounds, scanBounds)
+                    topChips.forEach { chip ->
+                        assertTrue(
+                            "Expected TV top bar chip to stay single-row horizontal ($chip vs $movieBounds)",
+                            abs(chip.center.y - movieBounds.center.y) <= 8f && chip.width > chip.height
+                        )
+                    }
+                    assertTrue(
+                        "Expected strict non-overlapping left-to-right TV top bar order without clipping Rescan ($topChips in $topBarDimmingBounds)",
+                        statusBounds.right <= dimmerToggleBounds.left + 1f &&
+                            dimmerToggleBounds.right <= movieBounds.left + 1f &&
+                            movieBounds.right <= holidayBounds.left + 1f &&
+                            holidayBounds.right <= bedtimeBounds.left + 1f &&
+                            bedtimeBounds.right <= scanBounds.left + 1f &&
+                            scanBounds.right <= topBarDimmingBounds.right + 1f
+                    )
 
                     // Pressing Right and Left on the focused Dimmer Slider raises (+10%) and lowers (-10%) brightness
                     composeTestRule.onNodeWithTag("tv_card_dim_mode_${dimmerEntity.id}")

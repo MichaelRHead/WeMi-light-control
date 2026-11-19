@@ -1,4 +1,4 @@
-WeMi Switch Control v27.0:
+WeMi Switch Control v28.0:
 • Android TV Dimmer & Room Navigation: Press Down from a dimmer toggle to focus the brightness slider (-10%/+10%), step whole-room dimmers from Room Headers, and navigate deterministically across all columns.
 • Faster Local Wi-Fi Control: Immediate <100ms physical switch push updates on adoption and parallel whole-room / "All Off" execution.
 • R8-optimized pure Kotlin/DEX bundle (minSdk 24+) & strictly local diagnostic logs.

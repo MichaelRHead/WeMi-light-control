@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v27.0 — Phone, Tablet & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v28.0 — Phone, Tablet & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `27.0` (`versionCode = 27`)
+- **Version:** `28.0` (`versionCode = 28`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,7 +17,7 @@ WeMi Switch Control brings reliable, instant local-network control back to Belki
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery and local SOAP HTTP commands—no cloud account, external server, or subscription required.
 
-### What's New in Version 27.0
+### What's New in Version 28.0
 - **Google TV Focusable Dimmer Slider & Deterministic Room-Header D-Pad Navigation:** Press `Down` from any TV dimmer's ON/OFF toggle to focus the inline brightness slider (`Left`/`Right` steps `-10%`/`+10%`, `Back`/`Up` returns to the toggle, `Down` moves to the next row), step whole-room brightness with `Left`/`Right` on any Room Master Header, and navigate `Up`/`Down` deterministically across Room Master Headers from all columns.
 - **Faster Parallel Local Wi-Fi Control & Instant `<100ms` GENA Push:** Newly discovered, adopted, and reconnected switches subscribe immediately to `<100ms` UPnP GENA physical switch events, while whole-room toggles, **`All Off`**, and health checks execute concurrently (`Semaphore(3)`-bounded for embedded RTOS switch safety).
 - **Top-Header `All Off` Button Next to Refresh:** Added a `48dp`-accessible one-tap **`All Off`** button right next to the Refresh button in the compact single-row top header bar to turn off all reachable switches and dimmers on your active Wi-Fi Home.
