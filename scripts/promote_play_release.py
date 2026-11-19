@@ -26,6 +26,7 @@ DEFAULT_SIGN_OFF_FILE = "RELEASE_SIGN_OFF.md"
 DEFAULT_POLL_ATTEMPTS = 5
 DEFAULT_POLL_INTERVAL_SEC = 20.0
 PLAY_API_BASE = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications"
+PLAY_UPLOAD_BASE = "https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications"
 PLAY_OAUTH_SCOPE = "https://www.googleapis.com/auth/androidpublisher"
 MAX_RELEASE_NOTES_CHARS = 500
 VALID_RELEASE_STATUSES = ("completed", "draft", "inProgress")
@@ -114,7 +115,8 @@ def _format_api_error(status_code: int, body_text: str) -> str:
     elif status_code == 403 and "permission" in lower:
         hints.append(
             "In Play Console -> Users and permissions, confirm this service account is invited "
-            "with app permissions ('View app information' and 'Release apps to testing tracks'). "
+            "with app permissions ('View app information', 'Release apps to testing tracks', "
+            "and 'Manage store presence' for Store Listing / graphic asset sync). "
             "New permissions can take up to 24 hours to propagate."
         )
     elif "changesnotsentforreview" in lower:
@@ -130,13 +132,15 @@ def _format_api_error(status_code: int, body_text: str) -> str:
 
 
 class PlayPublisherClient:
-    """Minimal Google Play Android Publisher API v3 client for track listing & promotion."""
+    """Minimal Google Play Android Publisher API v3 client for tracks, listings, and images."""
 
     def __init__(self, package_name: str, session: Any, timeout_sec: int = 30) -> None:
         self.package_name = package_name
         self.session = session
         self.timeout_sec = timeout_sec
-        self.base_url = f"{PLAY_API_BASE}/{quote(package_name, safe='')}"
+        encoded_pkg = quote(package_name, safe="")
+        self.base_url = f"{PLAY_API_BASE}/{encoded_pkg}"
+        self.upload_base_url = f"{PLAY_UPLOAD_BASE}/{encoded_pkg}"
 
     def _request(
         self,
@@ -145,15 +149,23 @@ class PlayPublisherClient:
         *,
         params: dict[str, str] | None = None,
         json_body: dict[str, Any] | None = None,
+        data: bytes | None = None,
+        headers: dict[str, str] | None = None,
+        upload: bool = False,
+        timeout_sec: int | None = None,
     ) -> dict[str, Any]:
-        url = f"{self.base_url}{path}"
-        response = self.session.request(
-            method,
-            url,
-            params=params,
-            json=json_body,
-            timeout=self.timeout_sec,
-        )
+        root = self.upload_base_url if upload else self.base_url
+        url = f"{root}{path}"
+        req_kwargs: dict[str, Any] = {
+            "params": params,
+            "json": json_body,
+            "timeout": timeout_sec if timeout_sec is not None else self.timeout_sec,
+        }
+        if data is not None:
+            req_kwargs["data"] = data
+        if headers is not None:
+            req_kwargs["headers"] = headers
+        response = self.session.request(method, url, **req_kwargs)
         text = getattr(response, "text", "") or ""
         if not (200 <= response.status_code < 300):
             raise PlayApiError(
@@ -200,6 +212,73 @@ class PlayPublisherClient:
             f"/edits/{quote(edit_id, safe='')}/tracks/{quote(track, safe='')}",
             json_body={"track": track, "releases": releases},
         )
+
+    def list_listings(self, edit_id: str) -> list[dict[str, Any]]:
+        data = self._request("GET", f"/edits/{quote(edit_id, safe='')}/listings")
+        return list(data.get("listings") or [])
+
+    def get_listing(self, edit_id: str, language: str) -> dict[str, Any]:
+        return self._request(
+            "GET",
+            f"/edits/{quote(edit_id, safe='')}/listings/{quote(language, safe='')}",
+        )
+
+    def update_listing(
+        self,
+        edit_id: str,
+        language: str,
+        listing: dict[str, Any],
+    ) -> dict[str, Any]:
+        return self._request(
+            "PUT",
+            f"/edits/{quote(edit_id, safe='')}/listings/{quote(language, safe='')}",
+            json_body=listing,
+        )
+
+    def list_images(
+        self,
+        edit_id: str,
+        language: str,
+        image_type: str,
+    ) -> list[dict[str, Any]]:
+        data = self._request(
+            "GET",
+            f"/edits/{quote(edit_id, safe='')}/listings/{quote(language, safe='')}/{quote(image_type, safe='')}",
+        )
+        return list(data.get("images") or [])
+
+    def delete_all_images(
+        self,
+        edit_id: str,
+        language: str,
+        image_type: str,
+    ) -> list[dict[str, Any]]:
+        data = self._request(
+            "DELETE",
+            f"/edits/{quote(edit_id, safe='')}/listings/{quote(language, safe='')}/{quote(image_type, safe='')}",
+        )
+        return list(data.get("deleted") or [])
+
+    def upload_image(
+        self,
+        edit_id: str,
+        language: str,
+        image_type: str,
+        image_path: Path,
+    ) -> dict[str, Any]:
+        suffix = image_path.suffix.lower()
+        mime_type = "image/jpeg" if suffix in (".jpg", ".jpeg") else "image/png"
+        payload = image_path.read_bytes()
+        data = self._request(
+            "POST",
+            f"/edits/{quote(edit_id, safe='')}/listings/{quote(language, safe='')}/{quote(image_type, safe='')}",
+            params={"uploadType": "media"},
+            data=payload,
+            headers={"Content-Type": mime_type},
+            upload=True,
+            timeout_sec=60,
+        )
+        return dict(data.get("image") or data)
 
     def commit_edit(
         self,

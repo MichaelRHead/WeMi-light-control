@@ -9,12 +9,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Operation: list-tracks (read-only), auto-promote (Stage 7 guarded), or promote (manual)"
+        description: "Operation: list-tracks, diff-assets (read-only), sync-assets, auto-promote (Stage 7), or promote"
         required: true
         type: choice
         default: list-tracks
         options:
           - list-tracks
+          - diff-assets
+          - sync-assets
           - auto-promote
           - promote
       from_track:
@@ -56,7 +58,7 @@ on:
           - file
           - none
       release_notes_language:
-        description: "BCP-47 language code for file release notes (default: en-US)"
+        description: "BCP-47 locale for release notes and Store Listing/graphic asset sync (default: en-US)"
         required: false
         type: string
         default: en-US
@@ -75,6 +77,16 @@ on:
         required: false
         type: boolean
         default: true
+      sync_store_assets:
+        description: "Also sync play_store_assets/ (STORE_LISTING.md & 7 PNG slots) after promoting"
+        required: false
+        type: boolean
+        default: true
+      asset_image_types:
+        description: "Optional comma-separated Play image types for diff-assets / sync-assets (blank = all 7)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: write
@@ -85,7 +97,7 @@ concurrency:
 
 jobs:
   play-store:
-    name: Google Play Track Operation
+    name: Google Play Track & Asset Operation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -120,7 +132,7 @@ jobs:
           printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON" > "$key_file"
           echo "key_file=$key_file" >> "$GITHUB_OUTPUT"
 
-      - name: Run Google Play track operation
+      - name: Run Google Play track or asset operation
         id: play
         env:
           KEY_FILE: ${{ steps.creds.outputs.key_file }}
@@ -136,6 +148,7 @@ jobs:
           INPUT_RELEASE_NOTES_LANGUAGE: ${{ inputs.release_notes_language }}
           INPUT_CHANGES_NOT_SENT_FOR_REVIEW: ${{ inputs.changes_not_sent_for_review }}
           INPUT_ALLOW_SAME_VERSION: ${{ inputs.allow_same_version }}
+          INPUT_ASSET_IMAGE_TYPES: ${{ inputs.asset_image_types }}
         run: |
           if [ "$EVENT_NAME" = "push" ]; then
             MODE="auto-promote"
@@ -145,6 +158,7 @@ jobs:
             NOTES_SOURCE="source_track"
             NOTES_LANG="en-US"
             CHANGES_NOT_SENT="false"
+            ASSET_TYPES=""
           else
             MODE="$INPUT_MODE"
             FROM_TRACK="$INPUT_FROM_TRACK"
@@ -153,6 +167,7 @@ jobs:
             NOTES_SOURCE="$INPUT_RELEASE_NOTES_SOURCE"
             NOTES_LANG="$INPUT_RELEASE_NOTES_LANGUAGE"
             CHANGES_NOT_SENT="$INPUT_CHANGES_NOT_SENT_FOR_REVIEW"
+            ASSET_TYPES="$INPUT_ASSET_IMAGE_TYPES"
           fi
 
           if [ "$MODE" = "list-tracks" ]; then
@@ -160,6 +175,21 @@ jobs:
               --credentials "$KEY_FILE" \
               --github-output "$GITHUB_OUTPUT" \
               list-tracks
+          elif [ "$MODE" = "diff-assets" ] || [ "$MODE" = "sync-assets" ]; then
+            echo "promoted=false" >> "$GITHUB_OUTPUT"
+            args=(
+              --credentials "$KEY_FILE"
+              --github-output "$GITHUB_OUTPUT"
+              "$MODE"
+              --language "$NOTES_LANG"
+            )
+            if [ -n "$ASSET_TYPES" ]; then
+              args+=(--image-types "$ASSET_TYPES")
+            fi
+            if [ "$MODE" = "sync-assets" ] && [ "$CHANGES_NOT_SENT" = "true" ]; then
+              args+=(--changes-not-sent-for-review)
+            fi
+            python3 scripts/sync_play_assets.py "${args[@]}"
           elif [ "$MODE" = "auto-promote" ]; then
             CURR_VC="$(python3 -c 'import pathlib, sys; sys.path.insert(0, "scripts"); import promote_play_release as m; v = m.parse_gradle_version_code(pathlib.Path("app/build.gradle.kts").read_text(encoding="utf-8")); print("" if v is None else v)')"
             PREV_VC=""
@@ -241,6 +271,33 @@ jobs:
             --version-code "${PROMOTED_VC}" \
             --track "${TO_TRACK}" \
             --verified "Play API promotion succeeded; build ${PROMOTED_VC} live on ${TO_TRACK}"
+
+      - name: Sync Play Store listing and graphic assets (Stage 7)
+        if: steps.play.outputs.promoted == 'true' && (github.event_name == 'push' || inputs.sync_store_assets == true)
+        env:
+          KEY_FILE: ${{ steps.creds.outputs.key_file }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RELEASE_NOTES_LANGUAGE: ${{ inputs.release_notes_language }}
+          INPUT_CHANGES_NOT_SENT_FOR_REVIEW: ${{ inputs.changes_not_sent_for_review }}
+          INPUT_ASSET_IMAGE_TYPES: ${{ inputs.asset_image_types }}
+        run: |
+          LANG="${INPUT_RELEASE_NOTES_LANGUAGE:-en-US}"
+          if [ "$EVENT_NAME" = "push" ]; then
+            LANG="en-US"
+          fi
+          args=(
+            --credentials "$KEY_FILE"
+            --github-output "$GITHUB_OUTPUT"
+            sync-assets
+            --language "$LANG"
+          )
+          if [ "$EVENT_NAME" != "push" ] && [ -n "$INPUT_ASSET_IMAGE_TYPES" ]; then
+            args+=(--image-types "$INPUT_ASSET_IMAGE_TYPES")
+          fi
+          if [ "$EVENT_NAME" != "push" ] && [ "$INPUT_CHANGES_NOT_SENT_FOR_REVIEW" = "true" ]; then
+            args+=(--changes-not-sent-for-review)
+          fi
+          python3 scripts/sync_play_assets.py "${args[@]}"
 
       - name: Clean up temporary credentials
         if: always() && steps.creds.outputs.key_file != ''

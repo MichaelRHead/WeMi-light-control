@@ -81,9 +81,10 @@ else
   NO_PUSH="true"
 fi
 
-# Ensure executable bits on gradlew, release scripts, promotion scripts, and commit attribution scripts
+# Ensure executable bits on gradlew, release scripts, promotion/asset scripts, and commit attribution scripts
 chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
   scripts/promote_play_release.py scripts/test_promote_play_release.py \
+  scripts/sync_play_assets.py scripts/test_sync_play_assets.py \
   .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
   .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || true
 
@@ -468,6 +469,7 @@ COMMIT_VERIFIED="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]
 
 git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
   scripts/promote_play_release.py scripts/test_promote_play_release.py \
+  scripts/sync_play_assets.py scripts/test_sync_play_assets.py \
   .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
   .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || \
   git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh
