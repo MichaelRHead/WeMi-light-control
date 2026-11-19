@@ -168,7 +168,8 @@ internal class DeviceCrudAndRulesCoordinator(
                 (!LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) &&
                     !LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber) &&
                     existing.serialNumber.equals(liveDesc.serialNumber, ignoreCase = true)) ||
-                    (LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) &&
+                    ((LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) ||
+                        LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber)) &&
                         cleanLiveUdn.isNotEmpty() &&
                         cleanLiveUdn.equals(LanRuntimeUtils.canonicalHardwareUdn(existing.udn), ignoreCase = true))
             }

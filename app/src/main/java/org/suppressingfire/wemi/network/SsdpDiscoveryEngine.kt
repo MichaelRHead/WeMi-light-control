@@ -49,7 +49,8 @@ internal class SsdpDiscoveryEngine(
      */
     suspend fun scanSubnetUnicast(
         subnetPrefix: String,
-        searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT
+        searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
+        skipIps: Set<String> = emptySet()
     ): List<SsdpDiscoveredDevice> = coroutineScope {
         val cleanPrefix = subnetPrefix.trim().removeSuffix(".x").removeSuffix(".0/24")
         if (cleanPrefix.isBlank() ||
@@ -61,10 +62,11 @@ internal class SsdpDiscoveryEngine(
         }
         val sweepSemaphore = Semaphore(24)
         val fastPorts = listOf(49153, 49152, 49154, 49151)
-        (1..254).map { hostOctet ->
+        (1..254).mapNotNull { hostOctet ->
+            val ip = "$cleanPrefix.$hostOctet"
+            if (ip in skipIps) return@mapNotNull null
             async(Dispatchers.IO) {
                 sweepSemaphore.withPermit {
-                    val ip = "$cleanPrefix.$hostOctet"
                     for (port in fastPorts) {
                         val start = System.currentTimeMillis()
                         try {
@@ -108,7 +110,8 @@ internal class SsdpDiscoveryEngine(
         searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
         knownLocalDevices: List<DeviceEntity> = emptyList(),
         includeDemoFallbacks: Boolean = false,
-        allowUnicastSubnetFallback: Boolean = true
+        allowUnicastSubnetFallback: Boolean = true,
+        onlySweepWhenKnownMissing: Boolean = false
     ): SsdpScanReport = withContext(Dispatchers.IO) {
         val scanStartMs = System.currentTimeMillis()
         val localIp = resolveLocalIpv4Address()
@@ -129,6 +132,7 @@ internal class SsdpDiscoveryEngine(
         val isRobolectric = LanRuntimeUtils.isRunningInRobolectric()
         val loopbackPorts = loopbackSsdpUdpPorts.toList()
         val fastMode = loopbackPorts.isNotEmpty() || isRobolectric
+        val probeSemaphore = Semaphore(3)
 
         try {
             DatagramSocket(null).use { socket ->
@@ -199,15 +203,23 @@ internal class SsdpDiscoveryEngine(
                     seenLocations.entries.toList()
                 }
 
-                for ((locUrl, triple) in orderedSeen) {
-                    val (headers, latencyMs, _) = triple
-                    val desc = fetchLiveDeviceDescriptor(
-                        locUrl,
-                        headers["USN"].orEmpty(),
-                        headers["ST"].orEmpty().ifEmpty { searchTarget },
-                        latencyMs,
-                        true
-                    )
+                val stageADescriptors = coroutineScope {
+                    orderedSeen.map { (locUrl, triple) ->
+                        async(Dispatchers.IO) {
+                            probeSemaphore.withPermit {
+                                val (headers, latencyMs, _) = triple
+                                fetchLiveDeviceDescriptor(
+                                    locUrl,
+                                    headers["USN"].orEmpty(),
+                                    headers["ST"].orEmpty().ifEmpty { searchTarget },
+                                    latencyMs,
+                                    true
+                                )
+                            }
+                        }
+                    }.awaitAll()
+                }
+                for (desc in stageADescriptors) {
                     if (desc != null && liveDiscovered.none { it.matchesEndpointOrSerial(desc) }) {
                         liveDiscovered.add(desc)
                     }
@@ -225,8 +237,8 @@ internal class SsdpDiscoveryEngine(
             }
         }
 
-        for (known in knownLocalDevices) {
-            val alreadySeen = liveDiscovered.any {
+        val unseenKnown = knownLocalDevices.filter { known ->
+            liveDiscovered.none {
                 (it.ipAddress == known.ipAddress && it.port == known.port) ||
                     (!LanRuntimeUtils.isPlaceholderSerial(known.serialNumber) &&
                         !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
@@ -236,38 +248,59 @@ internal class SsdpDiscoveryEngine(
                             cleanKnownUdn.equals(LanRuntimeUtils.canonicalHardwareUdn(it.usn), ignoreCase = true)
                     })
             }
-            if (!alreadySeen) {
-                val startProbe = System.currentTimeMillis()
-                val verifiedPort = probeWemoPort(
-                    known.ipAddress,
-                    known.port,
-                    known.serialNumber
-                )
-                if (verifiedPort != null) {
-                    val rtt = (System.currentTimeMillis() - startProbe).coerceAtLeast(1L)
-                    for (path in listOf("/setup.xml", "/Lightsetup.xml")) {
-                        val locUrl = "http://${known.ipAddress}:$verifiedPort$path"
-                        val desc = fetchLiveDeviceDescriptor(
-                            locUrl,
-                            known.udn,
-                            searchTarget,
-                            rtt,
-                            false
+        }
+        val stageBDescriptors = coroutineScope {
+            unseenKnown.map { known ->
+                async(Dispatchers.IO) {
+                    probeSemaphore.withPermit {
+                        val startProbe = System.currentTimeMillis()
+                        val expectedIdentity = LanRuntimeUtils.expectedHardwareIdentity(
+                            known.serialNumber,
+                            known.udn
                         )
-                        if (desc != null) {
-                            if (liveDiscovered.none { it.matchesEndpointOrSerial(desc) }) {
-                                liveDiscovered.add(desc)
-                            }
-                            break
+                        val verifiedPort = probeWemoPort(
+                            known.ipAddress,
+                            known.port,
+                            expectedIdentity
+                        ) ?: return@withPermit null
+                        val rtt = (System.currentTimeMillis() - startProbe).coerceAtLeast(1L)
+                        for (path in listOf("/setup.xml", "/Lightsetup.xml")) {
+                            val locUrl = "http://${known.ipAddress}:$verifiedPort$path"
+                            val desc = fetchLiveDeviceDescriptor(
+                                locUrl,
+                                known.udn,
+                                searchTarget,
+                                rtt,
+                                false
+                            )
+                            if (desc != null) return@withPermit desc
                         }
+                        null
                     }
                 }
+            }.awaitAll()
+        }
+        for (desc in stageBDescriptors) {
+            if (desc != null && liveDiscovered.none { it.matchesEndpointOrSerial(desc) }) {
+                liveDiscovered.add(desc)
             }
         }
 
-        if (liveDiscovered.isEmpty() && allowUnicastSubnetFallback && !fastMode && !includeDemoFallbacks) {
+        if (shouldRunUnicastSubnetFallback(
+                liveDiscovered = liveDiscovered,
+                knownLocalDevices = knownLocalDevices,
+                allowUnicastSubnetFallback = allowUnicastSubnetFallback,
+                fastMode = fastMode,
+                includeDemoFallbacks = includeDemoFallbacks,
+                onlyWhenKnownMissing = onlySweepWhenKnownMissing
+            )
+        ) {
             val activePrefix = localIp.substringBeforeLast('.', "")
-            val swept = scanSubnetUnicast(activePrefix, searchTarget)
+            val skipIps = buildSet {
+                add(localIp)
+                liveDiscovered.forEach { add(it.ipAddress) }
+            }
+            val swept = scanSubnetUnicast(activePrefix, searchTarget, skipIps = skipIps)
             for (desc in swept) {
                 if (liveDiscovered.none { it.matchesEndpointOrSerial(desc) }) {
                     liveDiscovered.add(desc)
@@ -374,6 +407,32 @@ internal class SsdpDiscoveryEngine(
 
         fun unregisterLoopbackSsdpPort(udpPort: Int) {
             loopbackSsdpUdpPorts.remove(udpPort)
+        }
+
+        /**
+         * Determines whether Stage C (`/24` unicast sweep) should run after Stages A & B:
+         * - Skipped when disabled, in fast/loopback/Robolectric mode, or in Demo Showroom mode.
+         * - Skipped when UDP multicast already received at least one live response (`isLiveUdpResponse`).
+         * - Otherwise, runs unconditionally during explicit LAN scans (`onlyWhenKnownMissing == false`)
+         *   or on an empty home, and runs during home reconnects (`onlyWhenKnownMissing == true`)
+         *   only when at least one remembered switch is still missing after Stage B unicast probing.
+         */
+        internal fun shouldRunUnicastSubnetFallback(
+            liveDiscovered: List<SsdpDiscoveredDevice>,
+            knownLocalDevices: List<DeviceEntity>,
+            allowUnicastSubnetFallback: Boolean,
+            fastMode: Boolean,
+            includeDemoFallbacks: Boolean,
+            onlyWhenKnownMissing: Boolean
+        ): Boolean {
+            if (!allowUnicastSubnetFallback || fastMode || includeDemoFallbacks) return false
+            if (liveDiscovered.any { it.isLiveUdpResponse }) return false
+            if (!onlyWhenKnownMissing || knownLocalDevices.isEmpty()) return true
+            return knownLocalDevices.any { known ->
+                liveDiscovered.none { discovered ->
+                    known.matchesDiscovered(discovered, requireSamePortWhenBlankSerial = false)
+                }
+            }
         }
     }
 }

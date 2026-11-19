@@ -53,15 +53,16 @@ When you open the **SSDP Network Discovery Scan** bottom sheet:
 ```mermaid
 flowchart TD
     Start["Tap 'SSDP Scan'"] --> Lock["Acquire Android WifiManager.MulticastLock\n& Bind to Wi-Fi IPv4 Socket"]
-    Lock --> MSearch["Send UDP M-SEARCH to 239.255.255.250:1900\n(Retransmit every 1s for 3.2s)"]
-    MSearch --> Check{"Any Belkin Responses?"}
+    Lock --> MSearch["Send UDP M-SEARCH to 239.255.255.250:1900\n(Retransmit at 550ms within 1.25s window)"]
+    MSearch --> Known["Probe Remembered Switch IPs Directly\n(9-Port Identity-Verified Unicast)"]
+    Known --> Check{"Any Live UDP Multicast Responses?"}
     Check -->|Yes| Fetch["Fetch /setup.xml or /Lightsetup.xml + GetBinaryState\n+ GetMetaInfo + GetSignalStrength"]
-    Check -->|No - Router Blocks Multicast| Unicast["Automatic /24 Unicast Sweep\n(Probe Ports 49153, 49152, 49154, 49151 across Subnet)"]
+    Check -->|No - Router Blocks Multicast| Unicast["Automatic /24 Unicast Sweep\n(Skip Verified IPs; Probe Ports 49153, 49152, 49154, 49151)"]
     Unicast --> Fetch
     Fetch --> Done["Render Live State & Adopt into Room DB"]
 ```
 
-- **Known-Device Direct Probing & Unicast `/24` Fallback for Strict Routers**: Some mesh routers and guest/IoT VLANs drop UDP multicast packets (`239.255.255.250:1900`). Every scan also probes previously saved switch IPs directly (isolating synthetic placeholder serials so multiple manual entries never suppress each other), and if multicast + known-IP probing return zero responses on a normal LAN subnet (excluding `10.22.22.x` Setup APs), **WeMi Light Control** automatically sweeps your active `/24` subnet across primary UPnP ports (`49153, 49152, 49154, 49151`) for `/setup.xml` and `/Lightsetup.xml`.
+- **Known-Device Direct Probing & Unicast `/24` Fallback for Strict Routers**: Some mesh routers and guest/IoT VLANs drop UDP multicast packets (`239.255.255.250:1900`). Every scan probes previously saved switch IPs directly in parallel (verifying `<serialNumber>` / `<UDN>` and isolating synthetic placeholder serials so multiple manual entries never suppress each other). Whenever UDP multicast receives zero live responses on a normal LAN subnet (excluding `10.22.22.x` Setup APs), **WeMi Light Control** automatically sweeps the remaining hosts on your active `/24` subnet (skipping your phone's IP and any already-verified switch IPs) across primary UPnP ports (`49153, 49152, 49154, 49151`) for `/setup.xml` and `/Lightsetup.xml`—so newly installed or DHCP-relocated switches are still found even when remembered switches already exist.
 - **9-Port Smart Probing & Self-Healing Reconnection**:
   Switch firmware frequently shifts its HTTP SOAP listener across ports `49151–49159` after a power blink or firmware reboot. Whenever a switch stops responding on its old port or IP:
   1. **Stage 1 (9-Port Sweep)**: The app probes all 9 candidate ports (`49153, 49152, 49154, 49151, 49155..49159`) at the last-known IP and verifies the hardware `<serialNumber>` / `<UDN>` in `/setup.xml`.

@@ -106,14 +106,7 @@ class NetworkClient(
         serialNumber: String = "",
         metaSku: String = "",
         isRtos: Boolean = false
-    ): String = XmlAndSkuParser.classifyHardwareSku(
-        modelName = modelName,
-        modelDescription = modelDescription,
-        udn = udn,
-        serialNumber = serialNumber,
-        metaSku = metaSku,
-        isRtos = isRtos
-    )
+    ): String = XmlAndSkuParser.classifyHardwareSku(modelName, modelDescription, udn, serialNumber, metaSku, isRtos)
 
     fun parseSetupXmlDescriptor(
         xml: String,
@@ -122,14 +115,7 @@ class NetworkClient(
         stHeader: String,
         responseTimeMs: Long,
         isLiveUdp: Boolean
-    ): SsdpDiscoveredDevice = XmlAndSkuParser.parseSetupXmlDescriptor(
-        xml = xml,
-        locationUrl = locationUrl,
-        usnHeader = usnHeader,
-        stHeader = stHeader,
-        responseTimeMs = responseTimeMs,
-        isLiveUdp = isLiveUdp
-    )
+    ): SsdpDiscoveredDevice = XmlAndSkuParser.parseSetupXmlDescriptor(xml, locationUrl, usnHeader, stHeader, responseTimeMs, isLiveUdp)
 
     /**
      * Probes a smart-switch host across [PROBE_PORTS] (`49153, 49152, 49154, 49151, 49155..49159`):
@@ -147,7 +133,9 @@ class NetworkClient(
     ): Int? = withContext(Dispatchers.IO) {
         val ports = candidatePortsOverride ?: orderedCandidatePorts(preferredPort)
         val cleanExpected = expectedSerialOrUdn?.trim().orEmpty()
-        val verifyIdentity = !LanRuntimeUtils.isPlaceholderSerial(cleanExpected)
+        val cleanExpectedUdn = LanRuntimeUtils.canonicalHardwareUdn(cleanExpected)
+        val isExpectedUdn = cleanExpected.startsWith("uuid:", ignoreCase = true)
+        val verifyIdentity = if (isExpectedUdn) cleanExpectedUdn.isNotEmpty() else !LanRuntimeUtils.isPlaceholderSerial(cleanExpected)
 
         for (port in ports) {
             try {
@@ -177,14 +165,21 @@ class NetworkClient(
                             xml.contains("basicevent", ignoreCase = true)
                         if (isTarget) {
                             if (verifyIdentity) {
-                                val xmlSerial = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
-                                    .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
-                                val xmlUdn = Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
-                                    .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
-                                val matches = xmlSerial.equals(cleanExpected, ignoreCase = true) ||
-                                    xmlUdn.contains(cleanExpected, ignoreCase = true) ||
-                                    (xmlSerial.isNotEmpty() && cleanExpected.contains(xmlSerial, ignoreCase = true))
-                                if (!matches && xmlSerial.isNotEmpty()) {
+                                val realXmlSerial = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
+                                    .find(xml)?.groupValues?.getOrNull(1)?.trim()
+                                    .takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty()
+                                val cleanXmlUdn = LanRuntimeUtils.canonicalHardwareUdn(
+                                    Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
+                                        .find(xml)?.groupValues?.getOrNull(1)?.trim()
+                                )
+                                val matches = (realXmlSerial.isNotEmpty() && (
+                                    realXmlSerial.equals(cleanExpected, ignoreCase = true) ||
+                                        (isExpectedUdn && cleanExpectedUdn.endsWith("-$realXmlSerial", ignoreCase = true))
+                                    )) || (cleanXmlUdn.isNotEmpty() && (
+                                    cleanXmlUdn.equals(cleanExpectedUdn, ignoreCase = true) ||
+                                        (!isExpectedUdn && cleanXmlUdn.contains(cleanExpected, ignoreCase = true))
+                                    ))
+                                if (!matches && (realXmlSerial.isNotEmpty() || cleanXmlUdn.isNotEmpty())) {
                                     return@withContext null
                                 }
                             }
@@ -221,10 +216,11 @@ class NetworkClient(
             // Fall through to 9-port self-healing probe
         }
 
+        val expectedIdentity = LanRuntimeUtils.expectedHardwareIdentity(device.serialNumber, device.udn)
         val discoveredPort = probeWemoPort(
             ipAddress = device.ipAddress,
             preferredPort = device.port,
-            expectedSerialOrUdn = device.serialNumber
+            expectedSerialOrUdn = expectedIdentity
         )
         if (discoveredPort != null && discoveredPort != device.port) {
             try {
@@ -235,7 +231,7 @@ class NetworkClient(
             } catch (_: Exception) {
                 // Fall through to offline result
             }
-        } else if (discoveredPort == null && LanRuntimeUtils.isPlaceholderSerial(device.serialNumber)) {
+        } else if (discoveredPort == null && expectedIdentity.isEmpty()) {
             for (port in orderedCandidatePorts(device.port).drop(1)) {
                 try {
                     wifiSocketFactory.createSocket().use { s ->
@@ -479,15 +475,21 @@ class NetworkClient(
 
     suspend fun scanSubnetUnicast(
         subnetPrefix: String,
-        searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT
-    ): List<SsdpDiscoveredDevice> = ssdpEngine.scanSubnetUnicast(subnetPrefix, searchTarget)
+        searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
+        skipIps: Set<String> = emptySet()
+    ): List<SsdpDiscoveredDevice> = ssdpEngine.scanSubnetUnicast(subnetPrefix, searchTarget, skipIps)
 
     suspend fun performSsdpDiscoveryScan(
         searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
         knownLocalDevices: List<DeviceEntity> = emptyList(),
         includeDemoFallbacks: Boolean = false,
-        allowUnicastSubnetFallback: Boolean = true
+        allowUnicastSubnetFallback: Boolean = true,
+        onlySweepWhenKnownMissing: Boolean = false
     ): SsdpScanReport = ssdpEngine.performSsdpDiscoveryScan(
-        searchTarget, knownLocalDevices, includeDemoFallbacks, allowUnicastSubnetFallback
+        searchTarget,
+        knownLocalDevices,
+        includeDemoFallbacks,
+        allowUnicastSubnetFallback,
+        onlySweepWhenKnownMissing
     )
 }

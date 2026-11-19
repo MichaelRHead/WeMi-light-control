@@ -101,9 +101,9 @@ data class DeviceEntity(
             ConnectionQuality.SLOW -> "Slow • ${latencyMs}ms"
         }
 
-    /** Canonical per-device mutex key: real `<serialNumber>` when known, or `ipAddress:port` for placeholders. */
+    /** Canonical per-device mutex key: real `<serialNumber>` or canonical `<UDN>`, else `ipAddress:port`. */
     fun concurrencyKey(): String =
-        serialNumber.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: "$ipAddress:$port"
+        LanRuntimeUtils.expectedHardwareIdentity(serialNumber, udn).ifEmpty { "$ipAddress:$port" }
 
 
     /**
@@ -111,11 +111,11 @@ data class DeviceEntity(
      * SSDP/unicast node:
      * 1. **Tier 1 (Hardware Serial Identity)**: When both carry a real non-placeholder `<serialNumber>`,
      *    they match if and only if the serial numbers are equal (case-insensitive).
-     * 2. **Tier 2 (UPnP UDN / USN Identity)**: When real serials are not both present and both carry
-     *    a UDN/USN, matches when `discovered.usn` contains `udn`.
-     * 3. **Tier 3 (Endpoint / Friendly Name Fallback)**: When at least one serial is blank or a
-     *    placeholder, matches by `(ipAddress, port)` (or `ipAddress` when [requireSamePortWhenBlankSerial]
-     *    is false) or case-insensitive `<friendlyName>`.
+     * 2. **Tier 2 (UPnP UDN / USN Identity)**: When both carry a real non-placeholder canonical `<UDN>`,
+     *    they match if and only if the canonical UDNs are equal (case-insensitive).
+     * 3. **Tier 3 (Endpoint / Friendly Name Fallback)**: When neither Tier 1 nor Tier 2 has real
+     *    hardware identities on both sides, matches by `(ipAddress, port)` (or `ipAddress` when
+     *    [requireSamePortWhenBlankSerial] is false) or case-insensitive `<friendlyName>`.
      */
     fun matchesDiscovered(
         discovered: SsdpDiscoveredDevice,
@@ -128,8 +128,8 @@ data class DeviceEntity(
         }
         val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(udn)
         val cleanDiscoveredUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered.usn)
-        if (cleanUdn.isNotEmpty() && cleanUdn.equals(cleanDiscoveredUdn, ignoreCase = true)) {
-            return true
+        if (cleanUdn.isNotEmpty() && cleanDiscoveredUdn.isNotEmpty()) {
+            return cleanUdn.equals(cleanDiscoveredUdn, ignoreCase = true)
         }
         val endpointMatch = ipAddress == discovered.ipAddress &&
             (!requireSamePortWhenBlankSerial || port == discovered.port)

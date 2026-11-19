@@ -43,7 +43,14 @@ internal class HomeProfileSanitizer(
         val validRouterSsid = rawDeviceSsid.takeIf {
             it.isNotEmpty() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it)
         }
+        val existingRouterSsid = existing?.wifiSsid?.trim()?.takeIf {
+            it.isNotEmpty() &&
+                !XmlAndSkuParser.isWemoDeviceSetupSsid(it) &&
+                !it.startsWith("LAN ", ignoreCase = true) &&
+                !it.startsWith("Local ", ignoreCase = true)
+        }
         val resolvedSsid = validRouterSsid
+            ?: existingRouterSsid
             ?: activeWifiSsid.takeIf { !XmlAndSkuParser.isWemoDeviceSetupSsid(it) }
             ?: "Local LAN"
         if (validRouterSsid != null) {
@@ -245,5 +252,62 @@ internal class HomeProfileSanitizer(
         if (isGenericSsid && home.ssidLabel != cleanSsid) {
             dao.updateHomeNetwork(home.copy(ssidLabel = cleanSsid))
         }
+    }
+
+    suspend fun syncFirstRouterSsid(
+        networkKey: String,
+        discovered: List<SsdpDiscoveredDevice>
+    ) {
+        discovered
+            .firstNotNullOfOrNull {
+                it.wifiSsid.trim().takeIf { s -> s.isNotEmpty() && !XmlAndSkuParser.isWemoDeviceSetupSsid(s) }
+            }
+            ?.let { syncHomeSsidFromDeviceSsid(networkKey, it) }
+    }
+
+    fun mergeDiscoveredMetadata(
+        base: DeviceEntity,
+        discovered: SsdpDiscoveredDevice?,
+        ipAddress: String,
+        port: Int,
+        isOn: Boolean,
+        brightness: Int,
+        latencyMs: Int,
+        checkedAt: String,
+        demoMode: Boolean
+    ): DeviceEntity {
+        val resolvedName = base.name.ifBlank { discovered?.name.orEmpty() }
+        val resolvedRoom = resolveDeviceRoomAssignment(
+            existingRoomName = base.roomName,
+            deviceName = resolvedName,
+            discoveredRoomName = discovered?.roomName.orEmpty(),
+            isDemoMode = demoMode
+        )
+        val cleanSerial = discovered?.serialNumber
+            ?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
+            ?: base.serialNumber
+        val cleanSsid = discovered?.wifiSsid?.trim()
+            ?.takeIf { it.isNotEmpty() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it) }
+            ?: base.wifiSsid.takeUnless { XmlAndSkuParser.isWemoDeviceSetupSsid(it) }
+            ?: "Local LAN"
+        val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered?.usn)
+            .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(base.udn) }
+        return base.copy(
+            name = resolvedName,
+            roomName = resolvedRoom,
+            ipAddress = ipAddress,
+            port = port,
+            isReachable = true,
+            isOn = isOn,
+            brightness = brightness,
+            latencyMs = latencyMs,
+            lastCheckedTime = checkedAt,
+            serialNumber = cleanSerial,
+            firmwareVersion = discovered?.firmwareVersion?.ifBlank { base.firmwareVersion } ?: base.firmwareVersion,
+            hardwareModel = discovered?.hardwareSku?.ifBlank { base.hardwareModel } ?: base.hardwareModel,
+            macAddress = discovered?.macAddress?.ifBlank { base.macAddress } ?: base.macAddress,
+            udn = cleanUdn,
+            wifiSsid = cleanSsid
+        )
     }
 }

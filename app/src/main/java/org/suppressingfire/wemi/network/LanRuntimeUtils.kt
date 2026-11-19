@@ -51,6 +51,17 @@ object LanRuntimeUtils {
     }
 
     /**
+     * Resolves the highest-priority real hardware identity for endpoint verification
+     * (`probeWemoPort`, `executeWithPortHealing`, and `DeviceEntity.concurrencyKey`):
+     * returns non-placeholder [serialNumber] first, else non-placeholder canonical [udn], else `""`.
+     */
+    fun expectedHardwareIdentity(serialNumber: String?, udn: String?): String {
+        val cleanSerial = serialNumber?.trim().orEmpty()
+        if (!isPlaceholderSerial(cleanSerial)) return cleanSerial
+        return canonicalHardwareUdn(udn)
+    }
+
+    /**
      * Returns true when executing inside a local JVM Robolectric test runner rather than on
      * physical Android / Android TV hardware.
      */

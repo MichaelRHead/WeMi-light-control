@@ -68,13 +68,20 @@ internal class DiscoveryCoordinator(
                     it.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
             }?.let { return it }
         }
-        return existingDevices.find {
-            it.networkKey == activeNetworkKey &&
-                matchesDiscoveredDevice(
-                    existing = it,
-                    discovered = discovered,
-                    requireSamePortWhenBlankSerial = true
-                )
+        val homeDevices = existingDevices.filter { it.networkKey == activeNetworkKey }
+        val cleanDiscoveredUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered.usn)
+        if (cleanDiscoveredUdn.isNotEmpty()) {
+            homeDevices.find {
+                LanRuntimeUtils.canonicalHardwareUdn(it.udn).equals(cleanDiscoveredUdn, ignoreCase = true) &&
+                    matchesDiscoveredDevice(it, discovered, requireSamePortWhenBlankSerial = true)
+            }?.let { return it }
+        }
+        homeDevices.find {
+            it.ipAddress == discovered.ipAddress && it.port == discovered.port &&
+                matchesDiscoveredDevice(it, discovered, requireSamePortWhenBlankSerial = true)
+        }?.let { return it }
+        return homeDevices.find {
+            matchesDiscoveredDevice(it, discovered, requireSamePortWhenBlankSerial = true)
         }
     }
 
@@ -87,7 +94,7 @@ internal class DiscoveryCoordinator(
         val newPort = networkClient.probeWemoPort(
             ipAddress = device.ipAddress,
             preferredPort = device.port,
-            expectedSerialOrUdn = device.serialNumber
+            expectedSerialOrUdn = LanRuntimeUtils.expectedHardwareIdentity(device.serialNumber, device.udn)
         )
         if (newPort != null) {
             return device.copy(port = newPort, isReachable = true)
@@ -198,6 +205,11 @@ internal class DiscoveryCoordinator(
                         val r = networkClient.getSignalStrength(activeDevice.ipAddress, probe.resolvedPort)
                         m to r
                     }
+                    val reportedRouterSsid = meta?.accessPointSsid?.trim()
+                        ?.takeIf { it.isNotEmpty() && !isWemoDeviceSetupSsid(it) }
+                    if (reportedRouterSsid != null) {
+                        homeSanitizer.syncHomeSsidFromDeviceSsid(activeDevice.networkKey, reportedRouterSsid)
+                    }
                     activeDevice.copy(
                         isReachable = true,
                         port = probe.resolvedPort,
@@ -207,7 +219,7 @@ internal class DiscoveryCoordinator(
                         brightness = probe.brightness ?: activeDevice.brightness,
                         firmwareVersion = meta?.firmwareVersion?.takeIf { it.isNotBlank() } ?: activeDevice.firmwareVersion,
                         macAddress = meta?.macAddress?.takeIf { it.isNotBlank() } ?: activeDevice.macAddress,
-                        wifiSsid = meta?.accessPointSsid?.takeIf { it.isNotBlank() && !isWemoDeviceSetupSsid(it) }
+                        wifiSsid = reportedRouterSsid
                             ?: activeDevice.wifiSsid.takeUnless { isWemoDeviceSetupSsid(it) }
                             ?: "Local LAN",
                         signalStrengthPercent = rssi ?: activeDevice.signalStrengthPercent
@@ -260,7 +272,8 @@ internal class DiscoveryCoordinator(
         val report = networkClient.performSsdpDiscoveryScan(
             searchTarget = XmlAndSkuParser.URN_BASIC_EVENT,
             knownLocalDevices = rememberedForHome,
-            includeDemoFallbacks = demoMode
+            includeDemoFallbacks = demoMode,
+            onlySweepWhenKnownMissing = rememberedForHome.isNotEmpty()
         )
         onSsdpReport(report)
         appendLog(report.logEntry)
@@ -271,13 +284,14 @@ internal class DiscoveryCoordinator(
                 activeNetworkKey = networkKey,
                 activeWifiSsid = homeNetwork.ssidLabel
             )
-            dao.updateHomeNetwork(homeNetwork.copy(lastConnectedTime = "Reconnected at $checkedAt"))
+            val freshHome = dao.getAllHomeNetworks().first().find { it.networkKey == networkKey } ?: homeNetwork
+            dao.updateHomeNetwork(freshHome.copy(lastConnectedTime = "Reconnected at $checkedAt"))
             val avgRtt = report.discoveredDevices.map { it.responseTimeMs }.average()
                 .takeIf { !it.isNaN() }?.roundToInt() ?: 0
             return HomeReconnectSummary(
-                networkKey = homeNetwork.networkKey,
-                homeName = homeNetwork.homeName,
-                ssidLabel = homeNetwork.ssidLabel,
+                networkKey = freshHome.networkKey,
+                homeName = freshHome.homeName,
+                ssidLabel = freshHome.ssidLabel,
                 reconnectedCount = adoptedCount,
                 totalRememberedCount = adoptedCount,
                 averageLatencyMs = avgRtt
@@ -320,38 +334,17 @@ internal class DiscoveryCoordinator(
                             }
                             val recentSetMs = lastSetStateTimestampMs[current.id] ?: 0L
                             val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
-                            val resolvedName = current.name.ifBlank { ssdpMatch?.name.orEmpty() }
-                            val resolvedRoom = resolveDeviceRoomAssignment(
-                                existingRoomName = current.roomName,
-                                deviceName = resolvedName,
-                                discoveredRoomName = ssdpMatch?.roomName.orEmpty(),
-                                isDemoMode = demoMode
-                            )
-                            val cleanSerial = ssdpMatch?.serialNumber
-                                ?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
-                                ?: current.serialNumber
-                            val cleanSsid = ssdpMatch?.wifiSsid
-                                ?.takeIf { it.isNotBlank() && !isWemoDeviceSetupSsid(it) }
-                                ?: current.wifiSsid
-                            val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(ssdpMatch?.usn)
-                                .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(current.udn) }
                             dao.updateDevice(
-                                current.copy(
-                                    name = resolvedName,
+                                homeSanitizer.mergeDiscoveredMetadata(
+                                    base = current,
+                                    discovered = ssdpMatch,
                                     ipAddress = candidateDevice.ipAddress,
-                                    roomName = resolvedRoom,
                                     port = if (probe.reachableOnLan) probe.resolvedPort else candidateDevice.port,
                                     isOn = if (allowStateOverwrite && probe.binaryStateOn != null) probe.binaryStateOn else current.isOn,
                                     brightness = if (allowStateOverwrite && probe.brightness != null) probe.brightness else current.brightness,
-                                    isReachable = true,
                                     latencyMs = resolvedLatency,
-                                    lastCheckedTime = checkedAt,
-                                    serialNumber = cleanSerial,
-                                    firmwareVersion = ssdpMatch?.firmwareVersion?.ifBlank { current.firmwareVersion } ?: current.firmwareVersion,
-                                    hardwareModel = ssdpMatch?.hardwareSku?.ifBlank { current.hardwareModel } ?: current.hardwareModel,
-                                    macAddress = ssdpMatch?.macAddress?.ifBlank { current.macAddress } ?: current.macAddress,
-                                    udn = cleanUdn,
-                                    wifiSsid = cleanSsid
+                                    checkedAt = checkedAt,
+                                    demoMode = demoMode
                                 )
                             )
                             resolvedLatency
@@ -370,13 +363,15 @@ internal class DiscoveryCoordinator(
             }.awaitAll()
         }.filterNotNull()
 
-        dao.updateHomeNetwork(homeNetwork.copy(lastConnectedTime = "Reconnected at $checkedAt"))
+        homeSanitizer.syncFirstRouterSsid(networkKey, report.discoveredDevices)
+        val freshHome = dao.getAllHomeNetworks().first().find { it.networkKey == networkKey } ?: homeNetwork
+        dao.updateHomeNetwork(freshHome.copy(lastConnectedTime = "Reconnected at $checkedAt"))
         val avgRtt = if (updatedLatencies.isNotEmpty()) updatedLatencies.average().roundToInt() else 0
 
         return HomeReconnectSummary(
-            networkKey = homeNetwork.networkKey,
-            homeName = homeNetwork.homeName,
-            ssidLabel = homeNetwork.ssidLabel,
+            networkKey = freshHome.networkKey,
+            homeName = freshHome.homeName,
+            ssidLabel = freshHome.ssidLabel,
             reconnectedCount = updatedLatencies.size,
             totalRememberedCount = rememberedForHome.size,
             averageLatencyMs = avgRtt
@@ -411,43 +406,23 @@ internal class DiscoveryCoordinator(
 
                 val recentSetMs = lastSetStateTimestampMs[latest.id] ?: 0L
                 val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L
-                val resolvedName = latest.name.ifBlank { match.name }
-                val resolvedRoom = resolveDeviceRoomAssignment(
-                    existingRoomName = latest.roomName,
-                    deviceName = resolvedName,
-                    discoveredRoomName = match.roomName,
-                    isDemoMode = demoMode
-                )
-                val cleanSerial = match.serialNumber
-                    .takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
-                    ?: latest.serialNumber
-                val cleanSsid = match.wifiSsid
-                    .takeIf { it.isNotBlank() && !isWemoDeviceSetupSsid(it) }
-                    ?: latest.wifiSsid
-                val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(match.usn)
-                    .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(latest.udn) }
                 dao.updateDevice(
-                    latest.copy(
-                        name = resolvedName,
-                        roomName = resolvedRoom,
+                    homeSanitizer.mergeDiscoveredMetadata(
+                        base = latest,
+                        discovered = match,
                         ipAddress = match.ipAddress,
                         port = match.port,
-                        isReachable = true,
                         isOn = if (allowStateOverwrite) match.isOn else latest.isOn,
                         brightness = if (allowStateOverwrite) match.brightness else latest.brightness,
                         latencyMs = match.responseTimeMs.toInt().coerceAtLeast(1),
-                        lastCheckedTime = checkedAt,
-                        serialNumber = cleanSerial,
-                        firmwareVersion = match.firmwareVersion.ifBlank { latest.firmwareVersion },
-                        hardwareModel = match.hardwareSku.ifBlank { latest.hardwareModel },
-                        macAddress = match.macAddress.ifBlank { latest.macAddress },
-                        udn = cleanUdn,
-                        wifiSsid = cleanSsid
+                        checkedAt = checkedAt,
+                        demoMode = demoMode
                     )
                 )
             }
         }
 
+        homeSanitizer.syncFirstRouterSsid(activeNetworkKey, report.discoveredDevices)
         if (autoAdoptNew || currentDevicesForHome.isEmpty()) {
             adoptDiscoveredDevices(report.discoveredDevices, activeNetworkKey, activeWifiSsid)
         }
