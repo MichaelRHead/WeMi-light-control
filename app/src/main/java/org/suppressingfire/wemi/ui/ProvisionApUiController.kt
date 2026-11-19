@@ -99,16 +99,23 @@ internal class ProvisionApUiController(
                     apScanSummary = "Scanning 2.4 GHz APs via WiFiSetup1#GetApList..."
                 )
 
-                val list = repository.scanSetupApNetworks(
-                    apHost = cleanHost,
-                    apPort = descriptor?.port ?: 49152
-                )
+                val hostUnreachable = descriptor == null &&
+                    !repository.isDemoShowroomMode.value &&
+                    (probeTrace.contains("TCP_TIMEOUT") || probeTrace.contains("NO_ROUTE"))
+                val list = if (hostUnreachable) {
+                    emptyList()
+                } else {
+                    repository.scanSetupApNetworks(
+                        apHost = cleanHost,
+                        apPort = descriptor?.port ?: 49152
+                    )
+                }
                 _scannedSetupAps.value = list
 
-                val scanSummary = if (descriptor?.macAndSerialSource == "DemoShowroom") {
-                    "DEMO_AP_LIST(count=${list.size})"
-                } else {
-                    repository.latestSetupApScanSummary()
+                val scanSummary = when {
+                    hostUnreachable -> "Skipped (Setup AP unreachable)"
+                    descriptor?.macAndSerialSource == "DemoShowroom" -> "DEMO_AP_LIST(count=${list.size})"
+                    else -> repository.latestSetupApScanSummary()
                 }
                 _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
                     timestamp = nowTimeText(),

@@ -44,10 +44,10 @@ When a trace is longer than one screen or the user prefers sharing a text file:
    - Or tap **`Copy`** (`copy_provision_debug_button`) to copy the version-stamped `=== WeMi Setup AP Diagnostic Report (v<VERSION_NAME> [<VERSION_CODE>] • <timestamp>) ===` block to the clipboard and save `wemi-telemetry-latest.txt`.
 2. **Inside the `More` Tab (`UPnP / SOAP Packet Log` header — [`MoreScreen.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) & [`MoreControlAndLogCards.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreControlAndLogCards.kt))**:
    - Tap **`Save/Share Log`** (`export_telemetry_file_button`) to generate a complete 4-section report stamped with `App Version: v<VERSION_NAME> (versionCode=<VERSION_CODE>, com.aistudio.wemiswitch.kxpqzr)` (`TelemetryFileExporter.buildFullTelemetryReport` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt)):
-     - `--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`
+     - `--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---` (session-consistent `[NET]` flags via `resolveExportSetupSnapshot`, `[PROBE]`, `[XML]`, `[FLAGS]`, `[ID]`, `[SCAN]`, `[TARGET AP]`, `[STEP 1..6]`)
      - `--- [2. REMEMBERED WI-FI HOMES] ---`
-     - `--- [3. REGISTERED SWITCHES & DEVICES] ---`
-     - `--- [4. UPNP / SOAP PACKET LOG] ---`
+     - `--- [3. REGISTERED SWITCHES & DEVICES] ---` (includes dimmer `dim=<n>%` / `night=1` and `udn=<UDN>` metadata)
+     - `--- [4. UPNP / SOAP PACKET LOG] ---` (includes single-line `xml:` payload summaries scrubbed via `TelemetryFileExporter.sanitizeXmlSnippet`)
 3. **Via `adb` (If User Has USB/Wireless Debugging Connected)**:
    ```bash
    adb shell run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-latest.txt > wemi-telemetry-latest.txt
@@ -81,7 +81,7 @@ Format:
 ```
 - **If `[XML/ID] No setup descriptor read from 10.22.22.1`**:
   - Inspect `[PROBE]`:
-    - All `TCP_TIMEOUT`: packets are not reaching `10.22.22.1` (check `ip=10.22.22.x` and `wifiBound=true`, or check if the switch uses `192.168.49.1` on rare OEM firmwares).
+    - All `TCP_TIMEOUT` or `NO_ROUTE`: packets are not reaching `10.22.22.1` (check `ip=10.22.22.x` and `wifiBound=true`, or check if the switch uses `192.168.49.1` on rare OEM firmwares). `[SCAN]` automatically fast-skips with `Skipped (Setup AP unreachable)` instead of burning an extra `8.5s` `GetApList` wait.
     - All `REFUSED`: the switch's UPnP daemon is still booting after power-on/reset; wait 10 seconds and tap **`Scan APs`** again.
 
 ### 2.3 `[FLAGS]` & `[ID]` — Password Encryption Method & Key Material
@@ -122,11 +122,11 @@ Format:
 [STEP 6 CLOSE] CloseSetup -> success
 ```
 - **`Status=1` or `Status=3`**:
-  - **Success!** The switch associated with the home router and obtained a DHCP lease (`[STEP 6 CLOSE] CloseSetup -> success`).
+  - **Success!** The switch associated with the home router and obtained a DHCP lease (`[STEP 6 CLOSE] CloseSetup -> success`). `ProvisioningCoordinator` then clears its cached `10.22.22.1` descriptor and AP scan so provisioning a second consecutive factory-reset switch always probes fresh MAC/serial keys.
 - **`Status=2` (`Bad Password / Handshake Rejected`)**:
-  - The switch attempted to join the AP on the specified channel, but the 4-way WPA2 handshake failed. Either:
-    1. The Wi-Fi password has a typo, OR
-    2. The firmware expects a different encryption permutation — ask the user to try toggling **`Append +4 Hex Lengths`** ↔ **`No Length Suffix`** (`provision_len_true_chip` / `provision_len_false_chip`) or switching between **`Method 1`** and **`Method 2`** while the `10.22.22.1` AP is still open (`[STEP 6 HOLD] ... Skipping CloseSetup so 10.22.22.1 AP stays open for retry`).
+  - The switch attempted to join the AP on the specified channel, but the 4-way WPA2 handshake failed. `ProvisionerClient` distinguishes `<8`-char password length errors from `>=8`-char password / AES encryption mismatches (`Status=2, Method=..., lengths=...`) while keeping the `10.22.22.1` AP open (`[STEP 6 HOLD] ... Skipping CloseSetup so 10.22.22.1 AP stays open for retry`). Either:
+    1. The Wi-Fi password has a typo (or is `< 8` characters on WPA2-PSK), OR
+    2. The firmware expects a different encryption permutation — ask the user to try toggling **`Append +4 Hex Lengths`** ↔ **`No Length Suffix`** (`provision_len_true_chip` / `provision_len_false_chip`) or switching between **`Method 1`** and **`Method 2`** while the `10.22.22.1` AP is still open.
 - **`Status=0` after all 18 polls**:
   - The switch never completed association on the target channel. Common causes:
     1. Target SSID is 5 GHz-only or out of 2.4 GHz range.
@@ -135,9 +135,11 @@ Format:
 
 ---
 
-## 3. Expanding Telemetry When New Hardware Quirks Are Discovered
+## 3. Expanding Telemetry & Stage 3 Release Sign-Off
 
 Whenever a screenshot or exported telemetry file reveals a new firmware flag, SOAP tag, or hardware SKU quirk:
 1. Add the parsed field to `SetupDeviceDescriptor` in [`NetworkModels.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) (populated by `probeSetupDevice` in [`SetupApProber.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupApProber.kt) / [`ProvisionerClient.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt)) and surface it in `SetupDebugSnapshot.toDisplayLines` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt).
-2. Add deterministic loopback regression coverage in [`GenaProvisioningAndRulesTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt) and/or [`ProvisioningAndGenaCujE2ETest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ProvisioningAndGenaCujE2ETest.kt) using [`FakeUpnpServer.kt`](../../app/src/test/java/org/suppressingfire/wemi/FakeUpnpServer.kt).
-3. Run `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`53/53` tests across 13 suites) before pushing.
+2. Add deterministic loopback regression coverage in [`GenaProvisioningAndRulesTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt), [`ExampleUnitTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ExampleUnitTest.kt), and/or [`ProvisioningAndGenaCujE2ETest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ProvisioningAndGenaCujE2ETest.kt) using [`FakeUpnpServer.kt`](../../app/src/test/java/org/suppressingfire/wemi/FakeUpnpServer.kt).
+3. Run `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`60/60` tests across `13` suites, `0` lint errors, `100%` of `.kt` files `< 500` lines) before pushing.
+4. **Stage 3 Release Sign-Off & Quota-Safe Clean Stop**: During active `IN_REVIEW` rounds in [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md), complete Stage 3 (`telemetry_and_debugging`) per [`RELEASE_PROCESS.md`](../../RELEASE_PROCESS.md) and sign off via `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<summary>"`. **Never** arm or re-arm `scripts/await_release_turn.sh` after recording `SIGNED_OFF` or between releases when `RELEASE_STATUS` is `APPROVED_FOR_PLAY_STORE` / `CURRENT_TURN: NONE` (always honor `[QUOTA GUARD] DO NOT RE-ARM`).
+

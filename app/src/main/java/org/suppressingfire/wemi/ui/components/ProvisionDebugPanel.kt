@@ -51,8 +51,8 @@ internal fun ProvisionDebugPanel(
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
-    var copiedFeedback by remember { mutableStateOf(false) }
-    var sharedFeedback by remember { mutableStateOf(false) }
+    var copiedFeedback by remember(debugSnapshot, selectedSsid) { mutableStateOf(false) }
+    var sharedFeedback by remember(debugSnapshot, selectedSsid) { mutableStateOf(false) }
     val displayLines = remember(debugSnapshot, selectedSsid) {
         debugSnapshot.toDisplayLines(selectedSsid)
     }

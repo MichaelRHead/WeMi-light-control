@@ -6,6 +6,7 @@ import org.suppressingfire.wemi.network.ProvisionResult
 import org.suppressingfire.wemi.network.ProvisionerClient
 import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDeviceDescriptor
+import org.suppressingfire.wemi.network.XmlAndSkuParser
 import kotlinx.coroutines.flow.first
 
 /**
@@ -250,7 +251,7 @@ internal class ProvisioningCoordinator(
                         endpoint = "http://$apHost:$apPort/upnp/control/WiFiSetup1",
                         soapAction = "WiFiSetup1#ConnectHomeNetwork($ssid, Method $effMethod, lengths=$effLengths)",
                         statusText = msg,
-                        xmlSnippet = "<ConnectHomeNetwork><ssid>$ssid</ssid><channel>$channel</channel></ConnectHomeNetwork>",
+                        xmlSnippet = "<ConnectHomeNetwork><ssid>${XmlAndSkuParser.escapeXml(ssid)}</ssid><channel>$channel</channel></ConnectHomeNetwork>",
                         isLiveLanSuccess = false
                     ),
                     closeSetupStatus = "success",
@@ -353,6 +354,8 @@ internal class ProvisioningCoordinator(
                     )
                 )
             }
+            lastDetectedDescriptor = null
+            lastScannedAps = emptyList()
         }
 
         return finalResult

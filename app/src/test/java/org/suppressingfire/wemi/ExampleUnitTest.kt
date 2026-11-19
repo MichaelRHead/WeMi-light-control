@@ -376,6 +376,112 @@ class ExampleUnitTest {
             assertEquals("HeadFamily-2.4G", desc?.wifiSsid)
         }
     }
+
+    @Test
+    fun `verify NetworkStatus 2 long-vs-short password remediation and CloseSetup hold`() =
+        kotlinx.coroutines.runBlocking {
+            FakeUpnpServer(
+                initialFriendlyName = "Porch Light",
+                modelName = "WLS040",
+                serialNumber = "221840KSTAT02",
+                macAddress = "EC1A59020202",
+                isRtos = true
+            ).use { server ->
+                server.forceNetworkStatusCode.set(2)
+                val client = org.suppressingfire.wemi.network.ProvisionerClient(defaultApHost = "127.0.0.1")
+
+                val longPwdRes = client.provisionDeviceToHomeWifi(
+                    apHost = "127.0.0.1",
+                    apPort = server.port,
+                    ssid = "HeadFamily-2.4G",
+                    plainPassword = "ValidLengthPassword99",
+                    maxStatusPolls = 2,
+                    statusPollDelayMs = 10L
+                )
+                assertFalse(longPwdRes.success)
+                assertEquals(2, longPwdRes.networkStatusCode)
+                assertEquals("kept_open_for_retry", longPwdRes.closeSetupStatus)
+                assertFalse(server.closeSetupCalled.get())
+                assertTrue(longPwdRes.statusMessage.contains("toggle AES Method / Length Suffix"))
+                assertFalse(longPwdRes.statusMessage.contains("at least 8 characters"))
+                assertFalse(longPwdRes.logEntry.xmlSnippet.contains("ValidLengthPassword99"))
+
+                val shortPwdRes = client.provisionDeviceToHomeWifi(
+                    apHost = "127.0.0.1",
+                    apPort = server.port,
+                    ssid = "HeadFamily-2.4G",
+                    plainPassword = "short",
+                    maxStatusPolls = 2,
+                    statusPollDelayMs = 10L
+                )
+                assertFalse(shortPwdRes.success)
+                assertEquals(2, shortPwdRes.networkStatusCode)
+                assertTrue(shortPwdRes.statusMessage.contains("at least 8 characters"))
+                assertFalse(server.closeSetupCalled.get())
+            }
+        }
+
+    @Test
+    fun `verify TelemetryFileExporter session-consistent NET flags, dimmer UDN details, and password-tag redaction`() {
+        val capturedSession = org.suppressingfire.wemi.network.SetupDebugSnapshot(
+            timestamp = "11:10:00 PM",
+            phoneLocalIp = "192.168.86.44",
+            phoneGatewayIp = "192.168.86.1",
+            phoneInterface = "wlan0",
+            isWemoSetupSubnet = false,
+            isWifiSocketBound = false,
+            isDemoMode = false,
+            targetSsid = "HeadFamily-2.4G"
+        )
+        val differentLiveLan = org.suppressingfire.wemi.network.LanNetworkSnapshot(
+            localIpv4 = "10.22.22.2",
+            gatewayIp = "10.22.22.1",
+            interfaceName = "wlan0",
+            isWemoSetupApSubnet = true,
+            isWifiSocketBound = true
+        )
+        val preserved = org.suppressingfire.wemi.network.TelemetryFileExporter.resolveExportSetupSnapshot(
+            setupSnapshot = capturedSession,
+            lanSnapshot = differentLiveLan,
+            isDemoMode = true
+        )
+        assertEquals("192.168.86.44", preserved.phoneLocalIp)
+        assertFalse(preserved.isWemoSetupSubnet)
+        assertFalse(preserved.isWifiSocketBound)
+        assertFalse(preserved.isDemoMode)
+
+        val dimmer = DeviceEntity(
+            id = 7,
+            name = "Dining Room Dimmer",
+            roomName = "Dining Room",
+            deviceType = org.suppressingfire.wemi.data.DeviceType.LIGHTBULB_DIMMER.name,
+            ipAddress = "192.168.86.55",
+            port = 49153,
+            isOn = true,
+            isReachable = true,
+            brightness = 45,
+            nightModeEnabled = true,
+            udn = "uuid:Dimmer-2_0-2219DIM77"
+        )
+        val rawLog = org.suppressingfire.wemi.data.SoapLogEntry(
+            timestamp = "11:12:00 PM",
+            deviceName = "Setup AP",
+            endpoint = "http://10.22.22.1:49152/upnp/control/WiFiSetup1",
+            soapAction = "WiFiSetup1#ConnectHomeNetwork",
+            statusText = "Status=2",
+            xmlSnippet = "<ConnectHomeNetwork><ssid>Home24</ssid><password>LeakedCipherOrPlaintext!</password></ConnectHomeNetwork>",
+            isLiveLanSuccess = false
+        )
+        val report = org.suppressingfire.wemi.network.TelemetryFileExporter.buildFullTelemetryReport(
+            setupSnapshot = preserved,
+            devices = listOf(dimmer),
+            soapLogs = listOf(rawLog)
+        )
+        assertTrue(report.contains("dim=45% night=1"))
+        assertTrue(report.contains("udn=uuid:Dimmer-2_0-2219DIM77"))
+        assertTrue(report.contains("  xml: <ConnectHomeNetwork><ssid>Home24</ssid><password>[REDACTED encLen=24]</password></ConnectHomeNetwork>"))
+        assertFalse(report.contains("LeakedCipherOrPlaintext!"))
+    }
 }
 
 

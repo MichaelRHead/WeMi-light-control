@@ -51,6 +51,7 @@ class FakeUpnpServer(
     val failGetApList500 = AtomicBoolean(false)
     val simulate412OnNextGenaRenew = AtomicBoolean(false)
     val forceNetworkStatusZero = AtomicBoolean(false)
+    val forceNetworkStatusCode = AtomicInteger(-1)
 
     val connectHomeNetworkCalls = AtomicInteger(0)
     val networkStatusPolls = AtomicInteger(0)
@@ -356,14 +357,13 @@ class FakeUpnpServer(
 
             soapAction.contains("GetNetworkStatus") -> {
                 val pollNum = networkStatusPolls.incrementAndGet()
-                val statusVal = if (forceNetworkStatusZero.get()) {
-                    0
-                } else {
-                    when (pollNum) {
-                        1 -> 0
-                        2 -> 3
-                        else -> 1
-                    }
+                val forcedCode = forceNetworkStatusCode.get()
+                val statusVal = when {
+                    forcedCode >= 0 -> forcedCode
+                    forceNetworkStatusZero.get() -> 0
+                    pollNum == 1 -> 0
+                    pollNum == 2 -> 3
+                    else -> 1
                 }
                 """
                 <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">

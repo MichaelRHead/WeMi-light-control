@@ -359,7 +359,9 @@ internal fun SoapPacketLogCard(
     onClearLogs: () -> Unit
 ) {
     val context = LocalContext.current
-    var exportedFeedback by remember { mutableStateOf(false) }
+    var exportedFeedback by remember(soapLogs.firstOrNull()?.timestamp, soapLogs.size, setupDebugSnapshot.timestamp) {
+        mutableStateOf(false)
+    }
 
     Card(
         colors = CardDefaults.cardColors(containerColor = WemoRowSurface),

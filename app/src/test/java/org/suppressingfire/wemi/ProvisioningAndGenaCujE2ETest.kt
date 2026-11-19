@@ -293,6 +293,9 @@ class ProvisioningAndGenaCujE2ETest {
             assertTrue(fullMoreExport.contains("[STEP 6 CLOSE] CloseSetup -> success"))
             assertTrue(fullMoreExport.contains("[HOME] key="))
             assertTrue(fullMoreExport.contains("Stairway 3-Way Switch"))
+            assertTrue(fullMoreExport.contains("udn=uuid:Lightswitch-3_0-WLS0403PROV88"))
+            assertTrue(fullMoreExport.contains("  xml: "))
+            assertTrue(fullMoreExport.contains("[REDACTED encLen="))
             assertFalse(fullMoreExport.contains("HomeRouterSecret99"))
         }
     }

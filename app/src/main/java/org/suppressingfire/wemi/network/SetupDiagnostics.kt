@@ -94,12 +94,31 @@ data class SetupDebugSnapshot(
 object TelemetryFileExporter {
     const val DEFAULT_TELEMETRY_FILENAME = "wemi-telemetry-latest.txt"
 
+    private val PASSWORD_TAG_REGEX = Regex(
+        "(<password>)([\\s\\S]*?)(</password>)",
+        RegexOption.IGNORE_CASE
+    )
+
+    fun sanitizeXmlSnippet(raw: String, maxChars: Int = 220): String {
+        val redacted = PASSWORD_TAG_REGEX.replace(raw) { match ->
+            val inner = match.groupValues[2].trim()
+            if (inner.startsWith("[REDACTED", ignoreCase = true)) {
+                match.value
+            } else {
+                "${match.groupValues[1]}[REDACTED encLen=${inner.length}]${match.groupValues[3]}"
+            }
+        }
+        val compact = redacted.replace(Regex("\\s+"), " ").trim()
+        return if (compact.length > maxChars) "${compact.take(maxChars - 1)}…" else compact
+    }
+
     fun resolveExportSetupSnapshot(
         setupSnapshot: SetupDebugSnapshot,
         lanSnapshot: LanNetworkSnapshot = LanNetworkSnapshot(),
         isDemoMode: Boolean = setupSnapshot.isDemoMode
     ): SetupDebugSnapshot {
-        val hasCapturedSession = setupSnapshot.timestamp.isNotBlank()
+        val hasCapturedSession = setupSnapshot.timestamp.isNotBlank() &&
+            setupSnapshot.phoneLocalIp.isNotBlank()
         return setupSnapshot.copy(
             timestamp = setupSnapshot.timestamp.ifBlank {
                 SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
@@ -111,9 +130,17 @@ object TelemetryFileExporter {
             } else {
                 lanSnapshot.interfaceName.ifBlank { setupSnapshot.phoneInterface }
             },
-            isWemoSetupSubnet = setupSnapshot.isWemoSetupSubnet || lanSnapshot.isWemoSetupApSubnet,
-            isWifiSocketBound = setupSnapshot.isWifiSocketBound || lanSnapshot.isWifiSocketBound,
-            isDemoMode = isDemoMode
+            isWemoSetupSubnet = if (hasCapturedSession) {
+                setupSnapshot.isWemoSetupSubnet
+            } else {
+                lanSnapshot.isWemoSetupApSubnet
+            },
+            isWifiSocketBound = if (hasCapturedSession) {
+                setupSnapshot.isWifiSocketBound
+            } else {
+                lanSnapshot.isWifiSocketBound
+            },
+            isDemoMode = if (hasCapturedSession) setupSnapshot.isDemoMode else isDemoMode
         )
     }
 
@@ -154,8 +181,14 @@ object TelemetryFileExporter {
                         d.isOn -> "ON"
                         else -> "OFF_STANDBY"
                     }
+                    val dimmerPart = if (d.parsedType == org.suppressingfire.wemi.data.DeviceType.LIGHTBULB_DIMMER) {
+                        " dim=${d.brightness}%${if (d.nightModeEnabled) " night=1" else ""}"
+                    } else {
+                        ""
+                    }
+                    val udnPart = if (d.udn.isNotBlank()) " udn=${d.udn}" else ""
                     appendLine(
-                        "[DEV #${d.id}] name=\"${d.name}\" room=\"${d.roomName}\" addr=${d.ipAddress}:${d.port} state=$stateStr rtt=${d.latencyMs}ms sku=\"${d.hardwareModel}\" fw=\"${d.firmwareVersion}\" sn=${d.serialNumber} mac=${d.macAddress} ssid=\"${d.wifiSsid}\""
+                        "[DEV #${d.id}] name=\"${d.name}\" room=\"${d.roomName}\" addr=${d.ipAddress}:${d.port} state=$stateStr$dimmerPart rtt=${d.latencyMs}ms sku=\"${d.hardwareModel}\" fw=\"${d.firmwareVersion}\" sn=${d.serialNumber} mac=${d.macAddress}$udnPart ssid=\"${d.wifiSsid}\""
                     )
                 }
             }
@@ -169,6 +202,10 @@ object TelemetryFileExporter {
                     appendLine(
                         "[${entry.timestamp}] [$okTag] ${entry.deviceName} | ${entry.soapAction} | ${entry.endpoint} -> ${entry.statusText}"
                     )
+                    val snippet = sanitizeXmlSnippet(entry.xmlSnippet)
+                    if (snippet.isNotEmpty()) {
+                        appendLine("  xml: $snippet")
+                    }
                 }
             }
         }.trim()

@@ -11,7 +11,7 @@ Whenever you need help troubleshooting `10.22.22.1` Wi-Fi setup, switch discover
 2. **Export or copy the recorded telemetry file (`wemi-telemetry-latest.txt`)** with a single tap on **`Save/Share`** or **`Copy`**.
 
 > [!NOTE]
-> **Privacy & Local-Only Storage Protection**: Neither the on-screen debug panel nor the exported `wemi-telemetry-latest.txt` file ever displays or records your plaintext Wi-Fi password (only the encryption method `Method 1/2/3`, length-suffix flag `addLengths`, and plaintext/encrypted lengths `plainLen` / `encLen` are logged). In addition, `wemi-telemetry-latest.txt` is explicitly excluded from Android cloud Auto-Backup and device-to-device transfer so diagnostic LAN metadata stays strictly local until you choose to share it.
+> **Privacy & Local-Only Storage Protection**: Neither the on-screen debug panel nor the exported `wemi-telemetry-latest.txt` file ever displays or records your plaintext or encrypted Wi-Fi password (only the encryption method `Method 1/2/3`, length-suffix flag `addLengths`, and plaintext/encrypted lengths `plainLen` / `encLen` are logged, and any `<password>` XML tags in SOAP log summaries are automatically redacted before export). In addition, `wemi-telemetry-latest.txt` is explicitly excluded from Android cloud Auto-Backup and device-to-device transfer so diagnostic LAN metadata stays strictly local until you choose to share it.
 
 ---
 
@@ -57,10 +57,10 @@ Inside the **`SETUP DEBUG DETAILS (SCREENSHOT)`** header bar in the **Provision 
 In the header of the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
 - **Tap `Save/Share Log`**:
   1. Generates a comprehensive 4-section report (`wemi-telemetry-latest.txt`, stamped with `App Version: v28.0 (versionCode=28, com.aistudio.wemiswitch.kxpqzr)`) containing:
-     - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt.
+     - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt (keeping `[NET]` subnet/Wi-Fi-binding flags consistent with the captured session).
      - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet, and gateway IP).
-     - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its room, IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), latency (`ms`), hardware SKU, firmware, serial number, and MAC.
-     - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries (including Top-Header **`All Off`**, Room Master toggles, and Android TV D-Pad switch/dimmer commands) with timestamps, endpoints, HTTP statuses, and XML payload summaries.
+     - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its room, IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), dimmer brightness/Night Mode (`dim=<n>%`, `night=1`), latency (`ms`), hardware SKU, firmware, serial number, MAC, and canonical UPnP `UDN`.
+     - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries (including Top-Header **`All Off`**, Room Master toggles, and Android TV D-Pad switch/dimmer commands) with timestamps, endpoints, HTTP statuses, and password-redacted single-line `xml:` payload summaries.
   2. Copies the full report to your clipboard and opens the Android **Share Sheet**.
 
 ### B3. Pulling `wemi-telemetry-latest.txt` via USB (`adb`)
@@ -81,9 +81,9 @@ adb exec-out run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-late
 | **`[XML]`** | `/setup.xml :49152 name="Smart Switch" model=LightSwitch sku=... fw=WeMo_WW_...` | Hardware model name, default friendly name, SKU, and firmware version read from `/setup.xml`. |
 | **`[FLAGS]`** | `rtos=0 iot=0 binaryOption=0 new_algo=0 -> autoMethod=1 autoLen=true` | Hardware encryption flags from `/setup.xml` and which OpenSSL AES-128-CBC method (`1`, `2`, or `3`) and length suffix (`autoLen`) were auto-selected. |
 | **`[ID]`** | `mac=EC1A59... sn=221517... (src=GetMetaInfo) meta="..."` | The switch's MAC address and Serial Number (required to salt the AES-128-CBC key) and which SOAP/XML source supplied them (`GetMetaInfo`, `GetMetaInfo+setup.xml`, `setup.xml`, or `basicevent1#GetMacAddr`). |
-| **`[SCAN]`** | `GetApList=HTTP_200(1240ms,count=4)` | Results of the switch's `WiFiSetup1#GetApList` (or `GetNetworkList`) 2.4 GHz site survey. |
+| **`[SCAN]`** | `GetApList=HTTP_200(1240ms,count=4)` or `Skipped (Setup AP unreachable)` | Results of the switch's `WiFiSetup1#GetApList` (or `GetNetworkList`) 2.4 GHz site survey (automatically skipped if `[PROBE]` timed out so you don't wait an extra `8.5s`). |
 | **`[TARGET AP]`** | `"MyHome24" found in ApList: Ch=6 Auth=WPA2PSK/AES Signal=88%` | The exact 2.4 GHz channel, authentication mode, and cipher that will be sent in `ConnectHomeNetwork`. |
 | **`[STEP 4 CRYPTO]`** | `Method=1 addLengths=true plainLen=12 encLen=68 suffix=0c40` | Confirms the password encryption parameters (`Method 1/2/3` and whether the 4-hex-char `xxyy` length suffix was appended) without exposing your password. |
 | **`[STEP 5 SEND #1]`** | `ConnectHomeNetwork -> HTTP_200 (18ms) PairingStatus=1` | Confirms the switch accepted the `ConnectHomeNetwork` SOAP command. |
-| **`[POLL #n]`** | `GetNetworkStatus -> Status=1 (14ms)` | Status codes from the switch while joining your router: **`1` = Connected**, **`3` = Connected (Handshake Complete)**, **`0` = Still Connecting / Handshake Failed**, **`2` = Bad Password / Auth Rejected**. |
+| **`[POLL #n]`** | `GetNetworkStatus -> Status=1 (14ms)` | Status codes from the switch while joining your router: **`1` = Connected**, **`3` = Connected (Handshake Complete)**, **`0` = Still Connecting / Handshake Failed**, **`2` = Bad Password / Auth Rejected** (reports the exact `Method` and `lengths` tried on `>=8`-char passwords so you know which encryption chip to toggle on retry). |
 | **`[STEP 6 CLOSE/HOLD]`** | `CloseSetup -> success` or `Skipping CloseSetup so 10.22.22.1 AP stays open for retry` | Shows whether the setup AP was closed after a successful connection (`1` or `3`) or intentionally kept open (`kept_open_for_retry`) so you can retry immediately. |

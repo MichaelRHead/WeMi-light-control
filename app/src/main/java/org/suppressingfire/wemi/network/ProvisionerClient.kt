@@ -165,7 +165,11 @@ class ProvisionerClient(
         } else {
             descriptor?.recommendedEncryptionMethod ?: 1
         }
-        val effectiveAddLengths = addPasswordLengths ?: (effectiveMethod != 2)
+        val effectiveAddLengths = addPasswordLengths ?: if (encryptionMethod == 0 && descriptor != null) {
+            descriptor.recommendedAddLengths
+        } else {
+            effectiveMethod != 2
+        }
 
         if (!customFriendlyName.isNullOrBlank() && descriptor != null) {
             runCatching {
@@ -374,8 +378,10 @@ class ProvisionerClient(
 
         val overallSuccess = httpSuccess && (netStatus == 1 || netStatus == 3)
         val statusDesc = when {
-            httpSuccess && netStatus == 2 ->
+            httpSuccess && netStatus == 2 && !isOpenNetwork && plainPassword.length in 1..7 ->
                 "Password rejected by switch (Status=2): Wi-Fi password must be at least 8 characters"
+            httpSuccess && netStatus == 2 ->
+                "Password or auth rejected by switch (Status=2, Method=$effectiveMethod, lengths=$effectiveAddLengths). Setup AP left open — verify your Wi-Fi password or toggle AES Method / Length Suffix and retry."
             overallSuccess ->
                 "Provisioned to '$ssid' (Status=$netStatus, Method $effectiveMethod, lengths=$effectiveAddLengths) • Setup AP closed, switch joining Home Wi-Fi"
             httpSuccess && netStatus == 0 ->
