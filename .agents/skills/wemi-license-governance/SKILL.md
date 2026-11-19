@@ -53,7 +53,7 @@ In the **5-Agent / 6-Stage Autonomous Round-Robin Release Process** ([`../../REL
    ```bash
    bash scripts/advance_release_turn.sh sign_off license_governance "<concise verification summary>"
    ```
-5. **Re-Arm Background Watcher**:
-   ```bash
-   bash scripts/await_release_turn.sh license_governance
-   ```
+5. **End Turn Cleanly (Quota-Safe Zero-Idle-Polling Policy)**:
+   - **Never re-arm `scripts/await_release_turn.sh` after signing off** (`SIGNED_OFF`) or between releases (`APPROVED_FOR_PLAY_STORE` / `CURRENT_TURN: NONE`), and always honor `[QUOTA GUARD] DO NOT RE-ARM`.
+   - Arm `bash scripts/await_release_turn.sh license_governance 15 510` (`WaitMsBeforeAsync: 5000`) **only** while an active release round is `IN_REVIEW` and `SIGN_OFF_LICENSE_GOVERNANCE` is `PENDING`.
+   - Check `/home/antigravity/.gemini/usage/agy-usage --check-self` and recommend starting a fresh specialist conversation before the next release cycle once `>= 400` steps.
