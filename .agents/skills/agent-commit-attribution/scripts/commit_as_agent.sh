@@ -157,6 +157,9 @@ WRAP_WIDTH = 72
 AGENT_TAG_RE = re.compile(r"\s*\[[^\[\]]*\bAgent\b[^\[\]]*\]\s*$", re.IGNORECASE)
 TRAILER_RE = re.compile(r"^([A-Za-z][A-Za-z0-9-]*):[ \t]+(.+)$")
 BULLET_RE = re.compile(r"^(\s*)([-*+]|\d+[.)])\s+(.*)$")
+BOLD_HEADING_RE = re.compile(r"^\*\*[^*]+\*\*:?$")
+BLOCKQUOTE_RE = re.compile(r"^(\s*>+)\s?(.*)$")
+ATX_HEADING_RE = re.compile(r"^#{1,6}\s+\S")
 
 subject = raw_subject.strip()
 stripped_subject = AGENT_TAG_RE.sub("", subject).strip()
@@ -212,6 +215,7 @@ def wrap_body(lines):
     i = 0
     n = len(lines)
     in_fence = False
+    warned_atx = False
 
     while i < n:
         line = lines[i].rstrip()
@@ -223,7 +227,7 @@ def wrap_body(lines):
             i += 1
             continue
 
-        if in_fence or line.startswith("    ") or stripped.startswith("|"):
+        if in_fence or stripped.startswith("|"):
             out.append(line)
             i += 1
             continue
@@ -233,6 +237,13 @@ def wrap_body(lines):
                 out.append("")
             i += 1
             continue
+
+        if ATX_HEADING_RE.match(stripped) and not warned_atx:
+            sys.stderr.write(
+                "[agent-commit-attribution] Tip: avoid '#' Markdown headings in commit bodies "
+                "(Git strips leading '#' lines as comments); use '**Heading**' instead.\n"
+            )
+            warned_atx = True
 
         bm = BULLET_RE.match(line)
         if bm:
@@ -244,9 +255,17 @@ def wrap_body(lines):
             while i < n:
                 nxt = lines[i].rstrip()
                 nxt_stripped = nxt.strip()
-                if not nxt_stripped or nxt_stripped.startswith("```") or nxt_stripped.startswith("|"):
+                if (
+                    not nxt_stripped
+                    or nxt_stripped.startswith("```")
+                    or nxt_stripped.startswith("|")
+                    or BULLET_RE.match(nxt)
+                    or BLOCKQUOTE_RE.match(nxt)
+                    or BOLD_HEADING_RE.match(nxt_stripped)
+                ):
                     break
-                if BULLET_RE.match(nxt) or nxt.startswith("    "):
+                leading_spaces = len(nxt) - len(nxt.lstrip(" "))
+                if leading_spaces >= len(cont_indent) + 4:
                     break
                 if nxt.startswith((" ", "\t")):
                     parts.append(nxt_stripped)
@@ -265,6 +284,43 @@ def wrap_body(lines):
             out.append(wrapped)
             continue
 
+        if line.startswith("    "):
+            out.append(line)
+            i += 1
+            continue
+
+        qm = BLOCKQUOTE_RE.match(line)
+        if qm:
+            q_prefix = f"{qm.group(1)} "
+            q_parts = [qm.group(2).strip()] if qm.group(2).strip() else []
+            i += 1
+            while i < n:
+                nxt = lines[i].rstrip()
+                nxt_qm = BLOCKQUOTE_RE.match(nxt)
+                if not nxt_qm or nxt_qm.group(1) != qm.group(1) or not nxt_qm.group(2).strip():
+                    break
+                q_parts.append(nxt_qm.group(2).strip())
+                i += 1
+            if q_parts:
+                out.append(
+                    textwrap.fill(
+                        " ".join(q_parts),
+                        width=WRAP_WIDTH,
+                        initial_indent=q_prefix,
+                        subsequent_indent=q_prefix,
+                        break_long_words=False,
+                        break_on_hyphens=False,
+                    )
+                )
+            else:
+                out.append(qm.group(1))
+            continue
+
+        if BOLD_HEADING_RE.match(stripped):
+            out.append(stripped)
+            i += 1
+            continue
+
         # Prose paragraph
         para_parts = [stripped]
         i += 1
@@ -277,6 +333,8 @@ def wrap_body(lines):
                 or nxt_stripped.startswith("|")
                 or nxt.startswith("    ")
                 or BULLET_RE.match(nxt)
+                or BLOCKQUOTE_RE.match(nxt)
+                or BOLD_HEADING_RE.match(nxt_stripped)
             ):
                 break
             para_parts.append(nxt_stripped)
