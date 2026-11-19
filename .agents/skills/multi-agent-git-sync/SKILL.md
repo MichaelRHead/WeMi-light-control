@@ -97,12 +97,13 @@ Before committing or pushing your integrated changes:
    ```bash
    ./gradlew testDebugUnitTest --rerun-tasks assembleDebug
    ```
-2. Stage, commit **with mandatory agent attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (never bare one-liners — always include `[<Short Agent Name>]` on the subject line and a commit description body ending with `Agent: <Canonical Agent Name> (<role_id>)`), and push atomically:
+2. Stage, commit **with readable formatting and mandatory trailer attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (`<= 72`-char Conventional Commits subject with no `[...Agent]` tag, 72-column wrapped/bulleted body, optional `Verified:` trailer, and mandatory `Agent: <Canonical Agent Name> (<role_id>)` trailer), and push atomically:
    ```bash
    git add -A
    bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
      <your_role_id> \
-     "<type>(<scope>): <concise summary>" \
-     "<1-4 sentence commit description explaining what changed, why, and how it was verified.>"
+     "<type>(<scope>): <concise summary <= 72 chars>" \
+     "- <concise bullet explaining what changed and why>" \
+     --verified "<tests and build checks run>"
    git pull --rebase origin main && git push origin main
    ```

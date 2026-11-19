@@ -95,7 +95,7 @@ Each of the four Antigravity agents (`discovery_and_grouping`, `telemetry_and_de
 
 1. **Scoped Domain Fixes (Default — Continue Forward)**:
    - Any self-contained domain fix landed by `discovery_and_grouping` (Stage 2) or `telemetry_and_debugging` (Stage 3) will automatically be compiled and tested against the entire `58`-test (`13`-suite) unit, Robolectric, and Compose E2E suite in Stage 4 (`code_quality_and_testing`) and audited for license/package/trademark compliance in Stage 5 (`license_governance`).
-   - For scoped domain fixes, the reviewing agent commits the fix using `bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <role> "<subject>" "<description>"`, runs its domain tests, and runs `bash scripts/advance_release_turn.sh sign_off <role> "<fix + verification summary>"` to advance forward to the next stage.
+   - For scoped domain fixes, the reviewing agent commits the fix using `bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <role> "<subject <= 72 chars>" "<body>" --verified "<checks>"`, runs its domain tests, and runs `bash scripts/advance_release_turn.sh sign_off <role> "<fix + verification summary>"` to advance forward to the next stage.
 2. **Cross-Cutting Fixes Requiring Re-Review (`request_rereview`)**:
    - If an agent in Stages 3–5 discovers a regression that requires an earlier agent in the ring to re-verify its domain (up to `MAX_ROUNDS = 3`), it runs:
      ```bash

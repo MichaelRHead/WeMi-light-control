@@ -207,26 +207,34 @@ for arg in "$@"; do
   fi
 done
 
+REL_VER="$(sed -n 's/^RELEASE_VERSION:[[:space:]]*//p' RELEASE_SIGN_OFF.md | tr -d '\r' | head -n 1 || true)"
+REL_VER="${REL_VER:-${GRADLE_VER_NAME:-v28.0}}"
+
 case "${ACTION}" in
   initiate)
     ACTING_ROLE="ai_studio_ux_cuj"
-    COMMIT_DESC="${CLEAN_ARGS[1]:-Initiated release review in RELEASE_SIGN_OFF.md.}"
+    COMMIT_SUBJECT="chore(release): initiate ${REL_VER} review"
+    COMMIT_DESC="${CLEAN_ARGS[1]:-Initiated ${REL_VER} release review in RELEASE_SIGN_OFF.md.}"
     ;;
   sign_off)
     ACTING_ROLE="${CLEAN_ARGS[1]:-code_quality_and_testing}"
-    COMMIT_DESC="${CLEAN_ARGS[2]:-Recorded ${ACTING_ROLE} sign-off in RELEASE_SIGN_OFF.md.}"
+    COMMIT_SUBJECT="chore(release): record ${ACTING_ROLE} sign-off"
+    COMMIT_DESC="${CLEAN_ARGS[2]:-Recorded ${ACTING_ROLE} sign-off for ${REL_VER} in RELEASE_SIGN_OFF.md.}"
     ;;
   conclude)
     ACTING_ROLE="ai_studio_ux_cuj"
-    COMMIT_DESC="${CLEAN_ARGS[1]:-Concluded release review in RELEASE_SIGN_OFF.md (APPROVED_FOR_PLAY_STORE).}"
+    COMMIT_SUBJECT="chore(release): approve ${REL_VER} for Play Store"
+    COMMIT_DESC="${CLEAN_ARGS[1]:-Concluded ${REL_VER} release review in RELEASE_SIGN_OFF.md (APPROVED_FOR_PLAY_STORE).}"
     ;;
   request_rereview)
     ACTING_ROLE="${CLEAN_ARGS[1]:-code_quality_and_testing}"
     TARGET_ROLE="${CLEAN_ARGS[2]:-discovery_and_grouping}"
+    COMMIT_SUBJECT="chore(release): request ${TARGET_ROLE} re-review"
     COMMIT_DESC="Requested Round re-review of ${TARGET_ROLE}: ${CLEAN_ARGS[3]:-Re-verification requested.}"
     ;;
   *)
     ACTING_ROLE="antigravity_general"
+    COMMIT_SUBJECT="chore(release): update sign-off ledger (${ACTION})"
     COMMIT_DESC="Updated RELEASE_SIGN_OFF.md (${ACTION})."
     ;;
 esac
@@ -238,7 +246,7 @@ git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advanc
 
 bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
   "${ACTING_ROLE}" \
-  "chore(release): ${ACTION} by ${ACTING_ROLE} in RELEASE_SIGN_OFF.md" \
+  "${COMMIT_SUBJECT}" \
   "${COMMIT_DESC}"
 
 git pull --rebase origin main
