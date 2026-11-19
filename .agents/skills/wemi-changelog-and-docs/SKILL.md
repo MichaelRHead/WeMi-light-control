@@ -64,12 +64,12 @@ Whenever you implement a feature, fix a bug, or adjust existing behavior:
    - Update the summary table in [`USER_GUIDE.md`](../../USER_GUIDE.md).
 
 ### Step 4: Run Pre-Push Build & Test Gate and Commit with Agent Attribution
-Never push code or documentation to `origin/main` unless the full Gradle build and unit/Robolectric test suite succeed, and always format commits with `<= 72`-char tag-free subjects, 72-column wrapped Git-safe Markdown bodies (`- ` bullets, `` `code` ``, `**Bold**` labels — no `#` headings), and `Verified:` / `Agent:` trailers per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md):
+Never push code or documentation to `origin/main` unless the full Gradle build and unit/Robolectric test suite succeed, and always format commits with `<= 72`-char tag-free subjects, clean plain-text reflowable bodies (`- Area: summary` bullets — no raw `**bold**`, `` `backticks` ``, `#` headings, or 72-column hard wrapping; reserve Markdown for PRs and release notes), and `Verified:` / `Agent:` trailers per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md):
 ```bash
 ./gradlew assembleDebug testDebugUnitTest --rerun-tasks
 bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
   <your_role_id> \
   "<type>(<scope>): <concise summary <= 72 chars>" \
-  "- **<Area>**: concise bullet with \`symbols\` explaining what changed and why." \
+  "- <Area>: concise plain-text bullet explaining what changed and why." \
   --verified "<tests and build checks run>"
 ```

@@ -97,13 +97,13 @@ Before committing or pushing your integrated changes:
    ```bash
    ./gradlew testDebugUnitTest --rerun-tasks assembleDebug
    ```
-2. Stage, commit **with Git-safe Markdown formatting and mandatory trailer attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (`<= 72`-char Conventional Commits subject with no `[...Agent]` tag, 72-column wrapped Markdown body using `- ` bullets, `` `code` ``, and `**Bold**` labels without `#` headings, optional `Verified:` trailer, and mandatory `Agent: <Canonical Agent Name> (<role_id>)` trailer), and push atomically:
+2. Stage, commit **with clean plain-text reflowable formatting and mandatory trailer attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (`<= 72`-char Conventional Commits subject with no `[...Agent]` tag, clean plain-text body using `- Area: summary` bullets without `**bold**`, `` `backticks` ``, `#` headings, or 72-column hard wrapping — reserving Markdown for PRs and release notes — optional `Verified:` trailer, and mandatory `Agent: <Canonical Agent Name> (<role_id>)` trailer), and push atomically:
    ```bash
    git add -A
    bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
      <your_role_id> \
      "<type>(<scope>): <concise summary <= 72 chars>" \
-     "- **<Area>**: concise bullet with \`symbols\` explaining what changed and why." \
+     "- <Area>: concise plain-text bullet explaining what changed and why." \
      --verified "<tests and build checks run>"
    git pull --rebase origin main && git push origin main
    ```

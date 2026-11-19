@@ -2,9 +2,10 @@
 # ==============================================================================
 # WeMi Light Control — Agent-Attributed Git Commit Helper (commit_as_agent.sh)
 # ==============================================================================
-# Formats, wraps (72 cols), validates, and executes a readable Git commit with:
+# Formats, normalizes, validates, and executes a readable Git commit with:
 #   - Clean <= 72-char Conventional Commits subject (no '[...Agent]' subject tag)
-#   - 72-column wrapped paragraphs / bullet list with hanging indentation
+#   - Reflowable plain-text paragraphs / bullet list (no 72-col hard wrapping
+#     that causes jagged double-wrapping on mobile GitHub)
 #   - Optional 'Verified: <summary>' trailer
 #   - Mandatory 'Agent: <Canonical Agent Name> (<role_id>)' Git trailer
 #
@@ -149,17 +150,24 @@ trap 'rm -f "${TMP_MSG}"' EXIT
 python3 - "${RAW_SUBJECT}" "${DESCRIPTION_BODY}" "${VERIFIED_TEXT}" "${CANONICAL_NAME}" "${ROLE_ID}" "${TMP_MSG}" <<'PYEOF'
 import re
 import sys
-import textwrap
 
 raw_subject, raw_body, verified_arg, canonical_name, role_id, out_path = sys.argv[1:7]
 
-WRAP_WIDTH = 72
+LONG_BULLET_THRESHOLD = 80
 AGENT_TAG_RE = re.compile(r"\s*\[[^\[\]]*\bAgent\b[^\[\]]*\]\s*$", re.IGNORECASE)
 TRAILER_RE = re.compile(r"^([A-Za-z][A-Za-z0-9-]*):[ \t]+(.+)$")
 BULLET_RE = re.compile(r"^(\s*)([-*+]|\d+[.)])\s+(.*)$")
+SECTION_LABEL_RE = re.compile(r"^[A-Za-z][A-Za-z0-9 &/_-]{0,28}:$")
 BOLD_HEADING_RE = re.compile(r"^\*\*[^*]+\*\*:?$")
 BLOCKQUOTE_RE = re.compile(r"^(\s*>+)\s?(.*)$")
 ATX_HEADING_RE = re.compile(r"^#{1,6}\s+\S")
+
+
+def is_section_label(text: str) -> bool:
+    if BOLD_HEADING_RE.match(text):
+        return True
+    return bool(SECTION_LABEL_RE.match(text) and len(text.split()) <= 3)
+
 
 subject = raw_subject.strip()
 stripped_subject = AGENT_TAG_RE.sub("", subject).strip()
@@ -210,12 +218,14 @@ if found_trailers and (idx == 0 or not body_lines[idx - 1].strip()):
 verified_final = verified_arg.strip() or extracted_verified
 
 
-def wrap_body(lines):
+def format_body(lines):
     out = []
     i = 0
     n = len(lines)
     in_fence = False
     warned_atx = False
+    in_bullet_block = False
+    prev_bullet_block_long = False
 
     while i < n:
         line = lines[i].rstrip()
@@ -224,24 +234,30 @@ def wrap_body(lines):
         if stripped.startswith("```"):
             in_fence = not in_fence
             out.append(line)
+            in_bullet_block = False
+            prev_bullet_block_long = False
             i += 1
             continue
 
         if in_fence or stripped.startswith("|"):
             out.append(line)
+            in_bullet_block = False
+            prev_bullet_block_long = False
             i += 1
             continue
 
         if not stripped:
             if out and out[-1] != "":
                 out.append("")
+            in_bullet_block = False
+            prev_bullet_block_long = False
             i += 1
             continue
 
         if ATX_HEADING_RE.match(stripped) and not warned_atx:
             sys.stderr.write(
-                "[agent-commit-attribution] Tip: avoid '#' Markdown headings in commit bodies "
-                "(Git strips leading '#' lines as comments); use '**Heading**' instead.\n"
+                "[agent-commit-attribution] Tip: avoid '#' headings in commit bodies "
+                "(Git strips leading '#' lines as comments); use a plain section label like 'Changes:' instead.\n"
             )
             warned_atx = True
 
@@ -261,7 +277,7 @@ def wrap_body(lines):
                     or nxt_stripped.startswith("|")
                     or BULLET_RE.match(nxt)
                     or BLOCKQUOTE_RE.match(nxt)
-                    or BOLD_HEADING_RE.match(nxt_stripped)
+                    or is_section_label(nxt_stripped)
                 ):
                     break
                 leading_spaces = len(nxt) - len(nxt.lstrip(" "))
@@ -272,20 +288,23 @@ def wrap_body(lines):
                     i += 1
                 else:
                     break
-            joined = " ".join(parts)
-            wrapped = textwrap.fill(
-                joined,
-                width=WRAP_WIDTH,
-                initial_indent=prefix,
-                subsequent_indent=cont_indent,
-                break_long_words=False,
-                break_on_hyphens=False,
-            )
-            out.append(wrapped)
+            formatted = f"{prefix}{' '.join(parts)}"
+            is_long = len(formatted) > LONG_BULLET_THRESHOLD
+            if indent == "":
+                if in_bullet_block and out and out[-1] != "" and (prev_bullet_block_long or is_long):
+                    out.append("")
+                prev_bullet_block_long = is_long
+            else:
+                if is_long:
+                    prev_bullet_block_long = True
+            in_bullet_block = True
+            out.append(formatted)
             continue
 
         if line.startswith("    "):
             out.append(line)
+            in_bullet_block = False
+            prev_bullet_block_long = False
             i += 1
             continue
 
@@ -302,26 +321,21 @@ def wrap_body(lines):
                 q_parts.append(nxt_qm.group(2).strip())
                 i += 1
             if q_parts:
-                out.append(
-                    textwrap.fill(
-                        " ".join(q_parts),
-                        width=WRAP_WIDTH,
-                        initial_indent=q_prefix,
-                        subsequent_indent=q_prefix,
-                        break_long_words=False,
-                        break_on_hyphens=False,
-                    )
-                )
+                out.append(f"{q_prefix}{' '.join(q_parts)}")
             else:
                 out.append(qm.group(1))
+            in_bullet_block = False
+            prev_bullet_block_long = False
             continue
 
-        if BOLD_HEADING_RE.match(stripped):
+        if is_section_label(stripped):
             out.append(stripped)
+            in_bullet_block = False
+            prev_bullet_block_long = False
             i += 1
             continue
 
-        # Prose paragraph
+        # Prose paragraph — unfold wrapped continuation lines into one reflowable line
         para_parts = [stripped]
         i += 1
         while i < n:
@@ -334,26 +348,21 @@ def wrap_body(lines):
                 or nxt.startswith("    ")
                 or BULLET_RE.match(nxt)
                 or BLOCKQUOTE_RE.match(nxt)
-                or BOLD_HEADING_RE.match(nxt_stripped)
+                or is_section_label(nxt_stripped)
             ):
                 break
             para_parts.append(nxt_stripped)
             i += 1
-        joined = " ".join(para_parts)
-        wrapped = textwrap.fill(
-            joined,
-            width=WRAP_WIDTH,
-            break_long_words=False,
-            break_on_hyphens=False,
-        )
-        out.append(wrapped)
+        out.append(" ".join(para_parts))
+        in_bullet_block = False
+        prev_bullet_block_long = False
 
     while out and out[-1] == "":
         out.pop()
     return "\n".join(out)
 
 
-formatted_body = wrap_body(body_lines)
+formatted_body = format_body(body_lines)
 
 trailer_lines = list(preserved_trailers)
 if verified_final:

@@ -8,7 +8,7 @@
 #      bracketed '[...Agent]' tag on the subject line)
 #   2. Blank line separating subject and body
 #   3. Non-empty description body (no bare one-liners or trailer-only commits;
-#      prose/bullet lines wrapped cleanly, hard max 100 chars, target <= 72)
+#      clean plain text with reflowable lines — no forced 72-col hard wrapping)
 #   4. Blank line separating body and Git trailer block
 #   5. Mandatory canonical attribution trailer:
 #        Agent: <Canonical Agent Name> (<role_id>)
@@ -64,7 +64,6 @@ import re
 import sys
 
 MAX_SUBJECT_LEN = 72
-MAX_BODY_LINE_LEN = 100
 
 CONVENTIONAL_RE = re.compile(
     r"^(feat|fix|refactor|test|docs|chore|perf|style|build|ci|release)"
@@ -78,7 +77,7 @@ SCISSOR_RE = re.compile(r"^# -+ >8 -+\s*$")
 TRAILER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9-]*:[ \t]+\S.*$")
 AGENT_TRAILER_KEY_RE = re.compile(r"^Agent:[ \t]*(.*)$")
 AGENT_TRAILER_VALID_RE = re.compile(r"^Agent:[ \t]+.+Agent[ \t]+\([a-z0-9_]+\)[ \t]*$")
-BULLET_PREFIX_RE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+")
+MARKDOWN_DECORATION_RE = re.compile(r"(\*\*[^*\n]+\*\*|`[^`\n]+`)")
 
 
 def read_message(path: str) -> str:
@@ -106,6 +105,7 @@ while clean_lines and clean_lines[-1] == "":
     clean_lines.pop()
 
 errors = []
+warnings = []
 
 if not clean_lines:
     errors.append("Commit message is empty.")
@@ -201,24 +201,22 @@ else:
             )
         else:
             in_fence = False
-            for lineno, line in body_lines:
+            saw_markdown_decoration = False
+            for _, line in body_lines:
                 stripped = line.strip()
                 if stripped.startswith("```"):
                     in_fence = not in_fence
                     continue
-                if in_fence or line.startswith("    ") or stripped.startswith("|"):
+                if in_fence or line.startswith("    "):
                     continue
-                if len(line) > MAX_BODY_LINE_LEN:
-                    content = BULLET_PREFIX_RE.sub("", line).strip()
-                    tokens = content.split()
-                    if len(tokens) > 1:
-                        longest = max(len(t) for t in tokens)
-                        # Only reject wrappable prose (skip lines dominated by one long URL/path)
-                        if len(line) - longest > 24:
-                            errors.append(
-                                f"Body line {lineno} is {len(line)} chars "
-                                f"(max {MAX_BODY_LINE_LEN}; wrap prose/bullets at <= 72 chars)."
-                            )
+                if MARKDOWN_DECORATION_RE.search(line):
+                    saw_markdown_decoration = True
+            if saw_markdown_decoration:
+                warnings.append(
+                    "GitHub renders commit message bodies as plain text (not Markdown); "
+                    "prefer clean plain text without **bold** or `backticks` in commits "
+                    "(reserve Markdown for PRs and release notes)."
+                )
 
         agent_lines = [text for _, text in trailer_para if AGENT_TRAILER_KEY_RE.match(text)]
         if not agent_lines:
@@ -247,10 +245,10 @@ if errors:
     for err in errors:
         sys.stderr.write(f"  - {err}\n")
     sys.stderr.write(
-        "\nRequired format (subject <= 72 chars, body wrapped <= 72 chars):\n"
+        "\nRequired format (subject <= 72 chars, clean reflowable plain-text body):\n"
         "  <type>(<scope>): <concise imperative summary>\n"
         "\n"
-        "  - <concise bullet or short paragraph explaining what changed and why>\n"
+        "  - Area: concise plain-text bullet explaining what changed and why.\n"
         "\n"
         "  Verified: <concise test/build verification>   # optional\n"
         "  Agent: <Canonical Agent Name> (<role_id>)\n"
@@ -264,6 +262,9 @@ if errors:
         "==============================================================================\n"
     )
     sys.exit(1)
+
+for tip in warnings:
+    sys.stderr.write(f"[agent-commit-attribution] Tip: {tip}\n")
 
 sys.exit(0)
 PYEOF
