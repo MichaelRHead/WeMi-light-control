@@ -4,9 +4,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SwitchRepository
@@ -48,6 +51,9 @@ internal class ProvisionApUiController(
     private val _isProvisioningAp = MutableStateFlow(false)
     val isProvisioningAp: StateFlow<Boolean> = _isProvisioningAp.asStateFlow()
 
+    @Volatile
+    private var scanJob: Job? = null
+
     private fun nowTimeText(): String =
         SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
 
@@ -68,8 +74,9 @@ internal class ProvisionApUiController(
     }
 
     fun scanSetupApNetworks(apHost: String = "10.22.22.1") {
-        scope.launch {
-            _isScanningSetupAp.value = true
+        if (_isProvisioningAp.value || !_isScanningSetupAp.compareAndSet(false, true)) return
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            val self = coroutineContext[Job]
             try {
                 _setupApStatusMessage.value = null
                 val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
@@ -92,12 +99,14 @@ internal class ProvisionApUiController(
                 val probeTrace = descriptor?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
                     ?: repository.latestSetupProbeSummary()
 
-                _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
-                    timestamp = nowTimeText(),
-                    detectedDevice = descriptor,
-                    probeSummary = probeTrace,
-                    apScanSummary = "Scanning 2.4 GHz APs via WiFiSetup1#GetApList..."
-                )
+                _setupDebugSnapshot.update { current ->
+                    current.copy(
+                        timestamp = nowTimeText(),
+                        detectedDevice = descriptor,
+                        probeSummary = probeTrace,
+                        apScanSummary = "Scanning 2.4 GHz APs via WiFiSetup1#GetApList..."
+                    )
+                }
 
                 val hostUnreachable = descriptor == null &&
                     !repository.isDemoShowroomMode.value &&
@@ -117,11 +126,13 @@ internal class ProvisionApUiController(
                     descriptor?.macAndSerialSource == "DemoShowroom" -> "DEMO_AP_LIST(count=${list.size})"
                     else -> repository.latestSetupApScanSummary()
                 }
-                _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
-                    timestamp = nowTimeText(),
-                    scannedAps = list,
-                    apScanSummary = scanSummary
-                )
+                _setupDebugSnapshot.update { current ->
+                    current.copy(
+                        timestamp = nowTimeText(),
+                        scannedAps = list,
+                        apScanSummary = scanSummary
+                    )
+                }
 
                 if (list.isNotEmpty() || descriptor != null) {
                     val hwSummary = if (descriptor != null) {
@@ -138,9 +149,14 @@ internal class ProvisionApUiController(
                     onShowTransientStatus(err)
                 }
             } finally {
-                _isScanningSetupAp.value = false
+                if (scanJob === self) {
+                    scanJob = null
+                    _isScanningSetupAp.value = false
+                }
             }
         }
+        scanJob = job
+        job.start()
     }
 
     fun provisionSetupAp(
@@ -157,24 +173,31 @@ internal class ProvisionApUiController(
         deviceType: DeviceType? = null,
         keepDialogOpenOnSuccess: Boolean = false
     ) {
+        if (!_isProvisioningAp.compareAndSet(false, true)) return
+        val supersededScan = scanJob
+        scanJob = null
+        supersededScan?.cancel()
+        _isScanningSetupAp.value = false
+
         scope.launch {
-            _isProvisioningAp.value = true
             try {
                 val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
                 val netSnap = networkMonitor.refreshSnapshot()
                 _setupApStatusMessage.value = "Provisioning switch on $cleanHost to '$ssid'..."
-                _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
-                    timestamp = nowTimeText(),
-                    phoneLocalIp = netSnap.localIpv4,
-                    phoneGatewayIp = netSnap.gatewayIp,
-                    phoneInterface = netSnap.interfaceName,
-                    isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
-                    isWifiSocketBound = netSnap.isWifiSocketBound,
-                    isDemoMode = repository.isDemoShowroomMode.value,
-                    targetApHost = cleanHost,
-                    targetSsid = ssid.trim(),
-                    traceLines = listOf("[START] Starting WiFiSetup1 provisioning to \"$ssid\" on $cleanHost...")
-                )
+                _setupDebugSnapshot.update { current ->
+                    current.copy(
+                        timestamp = nowTimeText(),
+                        phoneLocalIp = netSnap.localIpv4,
+                        phoneGatewayIp = netSnap.gatewayIp,
+                        phoneInterface = netSnap.interfaceName,
+                        isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
+                        isWifiSocketBound = netSnap.isWifiSocketBound,
+                        isDemoMode = repository.isDemoShowroomMode.value,
+                        targetApHost = cleanHost,
+                        targetSsid = ssid.trim(),
+                        traceLines = listOf("[START] Starting WiFiSetup1 provisioning to \"$ssid\" on $cleanHost...")
+                    )
+                }
 
                 val res = repository.provisionSetupApDevice(
                     apHost = cleanHost,
@@ -190,24 +213,27 @@ internal class ProvisionApUiController(
                     deviceType = deviceType,
                     activeNetworkKey = activeNetworkKeyProvider(),
                     onProgress = { stepLine ->
-                        val current = _setupDebugSnapshot.value
-                        _setupDebugSnapshot.value = current.copy(
-                            timestamp = nowTimeText(),
-                            traceLines = (current.traceLines + stepLine).takeLast(24)
-                        )
+                        _setupDebugSnapshot.update { current ->
+                            current.copy(
+                                timestamp = nowTimeText(),
+                                traceLines = (current.traceLines + stepLine).takeLast(24)
+                            )
+                        }
                     }
                 )
                 _setupApStatusMessage.value = res.statusMessage
                 if (res.setupDevice != null) {
                     _detectedSetupDevice.value = res.setupDevice
                 }
-                _setupDebugSnapshot.value = _setupDebugSnapshot.value.copy(
-                    timestamp = nowTimeText(),
-                    detectedDevice = res.setupDevice ?: _detectedSetupDevice.value,
-                    probeSummary = res.setupDevice?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
-                        ?: _setupDebugSnapshot.value.probeSummary,
-                    traceLines = res.debugTraceLines.ifEmpty { _setupDebugSnapshot.value.traceLines }
-                )
+                _setupDebugSnapshot.update { current ->
+                    current.copy(
+                        timestamp = nowTimeText(),
+                        detectedDevice = res.setupDevice ?: _detectedSetupDevice.value,
+                        probeSummary = res.setupDevice?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
+                            ?: current.probeSummary,
+                        traceLines = res.debugTraceLines.ifEmpty { current.traceLines }
+                    )
+                }
                 if (res.success && !keepDialogOpenOnSuccess) {
                     _showProvisionApDialog.value = false
                 }

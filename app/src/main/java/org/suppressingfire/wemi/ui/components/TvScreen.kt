@@ -89,10 +89,10 @@ fun TvDashboardScreen(
             devices
         } else {
             devices.filter {
-                it.roomName.ifBlank { "Unassigned" }.equals(selectedRoomFilter, ignoreCase = true)
+                it.roomName.trim().ifBlank { "Unassigned" }.equals(selectedRoomFilter, ignoreCase = true)
             }
         }
-        base.groupBy { it.roomName.ifBlank { "Unassigned" } }
+        base.groupBy { it.roomName.trim().ifBlank { "Unassigned" } }
             .entries
             .sortedWith(
                 compareBy<Map.Entry<String, List<DeviceEntity>>> {

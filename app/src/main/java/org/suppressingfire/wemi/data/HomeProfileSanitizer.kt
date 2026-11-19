@@ -29,7 +29,13 @@ internal class HomeProfileSanitizer(
         discovered: SsdpDiscoveredDevice,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
-    ): DeviceEntity = adoptMutex.withLock {
+    ): DeviceEntity = adoptDiscoveredDeviceWithStatus(discovered, activeNetworkKey, activeWifiSsid).first
+
+    private suspend fun adoptDiscoveredDeviceWithStatus(
+        discovered: SsdpDiscoveredDevice,
+        activeNetworkKey: String,
+        activeWifiSsid: String
+    ): Pair<DeviceEntity, Boolean> = adoptMutex.withLock {
         val currentDevices = dao.getAllDevices().first()
         val existing = findMatchingExistingDevice(currentDevices, discovered, activeNetworkKey)
 
@@ -77,7 +83,7 @@ internal class HomeProfileSanitizer(
                 sortOrder = nextSortOrder
             )
             val newId = dao.insertDevice(newEntity).toInt()
-            newEntity.copy(id = newId)
+            newEntity.copy(id = newId) to true
         } else {
             val resolvedName = discovered.name.ifBlank { existing.name }
             val resolvedRoom = resolveDeviceRoomAssignment(
@@ -106,7 +112,7 @@ internal class HomeProfileSanitizer(
                 signalStrengthPercent = discovered.signalStrengthPercent
             )
             dao.updateDevice(updated)
-            updated
+            updated to false
         }
     }
 
@@ -117,10 +123,7 @@ internal class HomeProfileSanitizer(
     ): Int {
         var newlyAdded = 0
         for (item in discoveredList) {
-            val currentDevices = dao.getAllDevices().first()
-            val existedBefore = findMatchingExistingDevice(currentDevices, item, activeNetworkKey) != null
-            adoptDiscoveredDevice(item, activeNetworkKey, activeWifiSsid)
-            if (!existedBefore) {
+            if (adoptDiscoveredDeviceWithStatus(item, activeNetworkKey, activeWifiSsid).second) {
                 newlyAdded++
             }
         }

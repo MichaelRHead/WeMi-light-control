@@ -303,12 +303,19 @@ class TvNavigationAndScenesE2ETest {
 
             composeTestRule.onNodeWithTag("tv_room_header_Unassigned")
                 .performKeyInput { pressKey(Key.DirectionCenter) }
-            awaitLoopbackIo { dimmerServer.relayStateOn.get() && vm.togglingRooms.value.isEmpty() }
+            awaitLoopbackIo {
+                dimmerServer.relayStateOn.get() &&
+                    vm.togglingRooms.value.isEmpty() &&
+                    vm.devices.value.firstOrNull { it.id == insertedId }?.isOn == true
+            }
             assertTrue(dimmerServer.relayStateOn.get())
 
             composeTestRule.onNodeWithTag("tv_room_header_Unassigned")
                 .performKeyInput { pressKey(Key.DirectionRight) }
-            awaitLoopbackIo { dimmerServer.dimmerBrightness.get() == 60 }
+            awaitLoopbackIo {
+                dimmerServer.dimmerBrightness.get() == 60 &&
+                    vm.devices.value.firstOrNull { it.id == insertedId }?.brightness == 60
+            }
             assertEquals(60, dimmerServer.dimmerBrightness.get())
 
             // Navigate Down onto dimmer card -> Down onto inline DIM slider, then fire two back-to-back Right steps without waiting between presses
@@ -323,7 +330,10 @@ class TvNavigationAndScenesE2ETest {
                     pressKey(Key.DirectionRight)
                     pressKey(Key.DirectionRight)
                 }
-            awaitLoopbackIo { dimmerServer.dimmerBrightness.get() == 80 }
+            awaitLoopbackIo {
+                dimmerServer.dimmerBrightness.get() == 80 &&
+                    vm.devices.value.firstOrNull { it.id == insertedId }?.brightness == 80
+            }
             assertEquals(80, dimmerServer.dimmerBrightness.get())
             assertEquals(80, vm.devices.value.first { it.id == insertedId }.brightness)
         }

@@ -6,6 +6,7 @@ import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -82,6 +83,8 @@ internal class SsdpDiscoveryEngine(
                                 )
                                 if (desc != null) return@withPermit desc
                             }
+                        } catch (e: CancellationException) {
+                            throw e
                         } catch (_: ConnectException) {
                             continue
                         } catch (_: Exception) {
@@ -178,6 +181,8 @@ internal class SsdpDiscoveryEngine(
                                 break
                             }
                         }
+                    } catch (e: CancellationException) {
+                        throw e
                     } catch (_: SocketTimeoutException) {
                         if (retransmitted) break
                     } catch (_: Exception) {
@@ -208,6 +213,8 @@ internal class SsdpDiscoveryEngine(
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Multicast socket restricted in container/emulator environment
         } finally {

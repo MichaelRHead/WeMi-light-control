@@ -154,7 +154,11 @@ class GenaSubscriptionManager(
             }
 
             val path = requestLine.split(" ").getOrNull(1).orEmpty()
-            val pathDeviceKey = path.substringAfterLast("/gena/", "").trim()
+            val pathDeviceKey = path
+                .substringAfterLast("/gena/", "")
+                .substringBefore('?')
+                .trimEnd('/')
+                .trim()
 
             var contentLength = -1
             var sidHeader = ""
@@ -210,12 +214,19 @@ class GenaSubscriptionManager(
                 }
                 val record = subscriptionsByDeviceKey[resolvedKey]
                 val devName = record?.deviceName ?: resolvedKey.ifEmpty { sourceIp }
+                val binaryOn = parsed.first
+                val pushedBrightness = parsed.second
+                val pushStatusText = when {
+                    binaryOn != null ->
+                        "Push State: ${if (binaryOn) "ON" else "OFF"}${if (pushedBrightness != null) " ($pushedBrightness%)" else ""}"
+                    else -> "Push Brightness: $pushedBrightness%"
+                }
                 val log = SoapLogEntry(
                     timestamp = nowTime(),
                     deviceName = devName,
                     endpoint = "NOTIFY http://${localIpProvider()}:${activeListenPort}$path",
                     soapAction = "GENA PropChange (${sidHeader.take(22)})",
-                    statusText = "Push State: ${if (parsed.first == true) "ON" else "OFF"}${if (parsed.second != null) " (${parsed.second}%)" else ""}",
+                    statusText = pushStatusText,
                     xmlSnippet = xmlBody.take(260),
                     isLiveLanSuccess = true
                 )
@@ -273,6 +284,17 @@ class GenaSubscriptionManager(
     fun deviceKeyFor(device: DeviceEntity): String =
         device.serialNumber.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: "dev_${device.id}"
 
+    private fun evictStalePlaceholderSubscription(device: DeviceEntity, activeDeviceKey: String) {
+        if (device.id <= 0) return
+        val placeholderKey = "dev_${device.id}"
+        if (activeDeviceKey != placeholderKey) {
+            val stale = subscriptionsByDeviceKey.remove(placeholderKey)
+            if (stale != null) {
+                deviceKeyBySid.remove(stale.sid, placeholderKey)
+            }
+        }
+    }
+
     /**
      * Subscribes or renews a UPnP GENA event subscription on /upnp/event/basicevent1 for [device].
      * Automatically handles HTTP 412 Precondition Failed by falling back to a fresh SUBSCRIBE.
@@ -311,6 +333,7 @@ class GenaSubscriptionManager(
                     )
                     subscriptionsByDeviceKey[deviceKey] = updated
                     deviceKeyBySid[sid] = deviceKey
+                    evictStalePlaceholderSubscription(device, deviceKey)
                     return@withContext updated
                 }
                 // HTTP 412 Precondition Failed or error -> fall through to fresh SUBSCRIBE
@@ -350,6 +373,7 @@ class GenaSubscriptionManager(
                 )
                 subscriptionsByDeviceKey[deviceKey] = record
                 deviceKeyBySid[sid] = deviceKey
+                evictStalePlaceholderSubscription(device, deviceKey)
                 return@withContext record
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -364,7 +388,11 @@ class GenaSubscriptionManager(
      * Unsubscribes an active GENA subscription for [device].
      */
     suspend fun unsubscribeDevice(device: DeviceEntity) {
-        unsubscribe(deviceKeyFor(device))
+        val activeKey = deviceKeyFor(device)
+        unsubscribe(activeKey)
+        if (device.id > 0 && activeKey != "dev_${device.id}") {
+            unsubscribe("dev_${device.id}")
+        }
     }
 
     /**

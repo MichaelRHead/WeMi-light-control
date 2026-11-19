@@ -78,18 +78,19 @@ fun AddOrEditDeviceDialog(
     onOpenProvisionWizard: (() -> Unit)? = null
 ) {
     val isEditing = initialDevice != null
-    var name by remember { mutableStateOf(initialDevice?.name ?: "") }
-    var roomName by remember { mutableStateOf(initialDevice?.roomName ?: "Unassigned") }
-    var selectedType by remember {
+    val formKey = initialDevice?.id
+    var name by remember(formKey) { mutableStateOf(initialDevice?.name ?: "") }
+    var roomName by remember(formKey) { mutableStateOf(initialDevice?.roomName ?: "Unassigned") }
+    var selectedType by remember(formKey) {
         mutableStateOf(initialDevice?.parsedType ?: DeviceType.SWITCH_PLUG)
     }
-    var ipAddress by remember { mutableStateOf(initialDevice?.ipAddress ?: "192.168.1.115") }
-    var portText by remember { mutableStateOf((initialDevice?.port ?: 49153).toString()) }
-    var brightness by remember { mutableFloatStateOf((initialDevice?.brightness ?: 100).toFloat()) }
-    var isReachable by remember { mutableStateOf(initialDevice?.isReachable ?: true) }
-    var isOn by remember { mutableStateOf(initialDevice?.isOn ?: true) }
-    var autoOffText by remember { mutableStateOf((initialDevice?.autoOffMinutes ?: 0).toString()) }
-    var syncNameToHardware by remember { mutableStateOf(true) }
+    var ipAddress by remember(formKey) { mutableStateOf(initialDevice?.ipAddress ?: "192.168.1.115") }
+    var portText by remember(formKey) { mutableStateOf((initialDevice?.port ?: 49153).toString()) }
+    var brightness by remember(formKey) { mutableFloatStateOf((initialDevice?.brightness ?: 100).toFloat()) }
+    var isReachable by remember(formKey) { mutableStateOf(initialDevice?.isReachable ?: true) }
+    var isOn by remember(formKey) { mutableStateOf(initialDevice?.isOn ?: true) }
+    var autoOffText by remember(formKey) { mutableStateOf((initialDevice?.autoOffMinutes ?: 0).toString()) }
+    var syncNameToHardware by remember(formKey) { mutableStateOf(true) }
     val detectedCategory = classifyDeviceCategory(
         name = name.ifBlank { "Switch" },
         deviceType = selectedType

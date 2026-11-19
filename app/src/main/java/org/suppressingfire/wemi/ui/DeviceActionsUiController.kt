@@ -70,7 +70,7 @@ internal class DeviceActionsUiController(
             val activeKey = activeNetworkKeyProvider()
             val roomSwitches = currentDevicesProvider().filter {
                 it.networkKey == activeKey &&
-                    it.roomName.ifBlank { "Unassigned" }.equals(displayRoom, ignoreCase = true) &&
+                    it.roomName.trim().ifBlank { "Unassigned" }.equals(displayRoom, ignoreCase = true) &&
                     it.isReachable &&
                     it.parsedType != DeviceType.MOTION_SENSOR
             }
@@ -265,9 +265,8 @@ internal class DeviceActionsUiController(
     }
 
     private fun runSsdpScan(searchTarget: String, autoAdoptNew: Boolean) {
-        if (_isRefreshing.value) return
+        if (!_isRefreshing.compareAndSet(false, true)) return
         scope.launch {
-            _isRefreshing.value = true
             try {
                 val activeKey = activeNetworkKeyProvider()
                 val activeSsid = currentWifiSsidProvider()

@@ -117,7 +117,7 @@ fun WeMiSwitchApp(
 
     val availableRooms = remember(homeDevices) {
         homeDevices
-            .map { it.roomName.ifBlank { "Unassigned" } }
+            .map { it.roomName.trim().ifBlank { "Unassigned" } }
             .distinct()
             .sortedBy { it.equals("Unassigned", ignoreCase = true) }
     }
@@ -127,13 +127,13 @@ fun WeMiSwitchApp(
             homeDevices
         } else {
             homeDevices.filter {
-                it.roomName.ifBlank { "Unassigned" }.equals(selectedRoomFilter, ignoreCase = true)
+                it.roomName.trim().ifBlank { "Unassigned" }.equals(selectedRoomFilter, ignoreCase = true)
             }
         }
     }
 
     val groupedDevicesByRoom = remember(filteredDevices) {
-        val rawGroups = filteredDevices.groupBy { it.roomName.ifBlank { "Unassigned" } }
+        val rawGroups = filteredDevices.groupBy { it.roomName.trim().ifBlank { "Unassigned" } }
         val assigned = rawGroups.filterKeys { !it.equals("Unassigned", ignoreCase = true) }
         val unassigned = rawGroups.filterKeys { it.equals("Unassigned", ignoreCase = true) }
         assigned + unassigned

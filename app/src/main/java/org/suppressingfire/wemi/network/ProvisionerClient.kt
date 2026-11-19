@@ -4,6 +4,7 @@ import android.content.Context
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -172,7 +173,7 @@ class ProvisionerClient(
         }
 
         if (!customFriendlyName.isNullOrBlank() && descriptor != null) {
-            runCatching {
+            try {
                 val cleanFriendly = customFriendlyName.trim()
                 val renameBody = XmlAndSkuParser.buildSoapEnvelope(
                     serviceUrn = XmlAndSkuParser.URN_BASIC_EVENT,
@@ -185,7 +186,9 @@ class ProvisionerClient(
                     soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_BASIC_EVENT, "ChangeFriendlyName")
                 )
                 logStep("[RENAME] ChangeFriendlyName(\"$cleanFriendly\") -> HTTP_${resp.code}")
-            }.onFailure { e ->
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
                 logStep("[RENAME] ChangeFriendlyName failed: ${e.javaClass.simpleName}")
             }
         }
@@ -253,7 +256,7 @@ class ProvisionerClient(
                 if (resp.isSuccessful) {
                     httpSuccess = true
                 }
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 val elapsed = System.currentTimeMillis() - sendStart
@@ -284,7 +287,7 @@ class ProvisionerClient(
                         .find(resp.body)?.groupValues?.getOrNull(1)?.toIntOrNull()
                     logStep("[POLL #$pollIndex] GetNetworkStatus -> Status=${code ?: "HTTP_${resp.code}"} (${elapsed}ms)")
                     code
-                } catch (e: kotlinx.coroutines.CancellationException) {
+                } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     val elapsed = System.currentTimeMillis() - pollStart
@@ -351,12 +354,14 @@ class ProvisionerClient(
                         if (resp.isSuccessful) "success" else "HTTP ${resp.code}"
                     }
                     logStep("[STEP 6 CLOSE] CloseSetup -> $closeStatus")
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     closeStatus = "ap_closed"
                     logStep("[STEP 6 CLOSE] CloseSetup -> ap_closed (${e.javaClass.simpleName})")
                 }
 
-                runCatching {
+                try {
                     val doneBody = XmlAndSkuParser.buildSoapEnvelope(
                         serviceUrn = XmlAndSkuParser.URN_BASIC_EVENT,
                         action = "SetSetupDoneStatus"
@@ -367,6 +372,10 @@ class ProvisionerClient(
                         soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_BASIC_EVENT, "SetSetupDoneStatus")
                     )
                     logStep("[STEP 6 DONE] SetSetupDoneStatus -> HTTP_${resp.code}")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    // Best-effort completion marker after CloseSetup
                 }
             } else {
                 closeStatus = "kept_open_for_retry"

@@ -1,10 +1,13 @@
 package org.suppressingfire.wemi.data
 
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkClient
@@ -18,12 +21,15 @@ internal class DeviceCrudAndRulesCoordinator(
     private val dao: SwitchDao,
     private val networkClient: NetworkClient,
     private val lanSemaphore: Semaphore,
+    private val deviceMutexes: ConcurrentHashMap<String, Mutex>,
     private val isDemoShowroomMode: () -> Boolean,
     private val appendLog: (SoapLogEntry) -> Unit,
     private val nowFormatted: () -> String,
     private val setDevicePowerExplicit: suspend (DeviceEntity, Boolean) -> DeviceEntity,
     private val updateDeviceBrightness: suspend (DeviceEntity, Int) -> DeviceEntity
 ) {
+    private fun mutexFor(device: DeviceEntity): Mutex =
+        deviceMutexes.getOrPut(device.concurrencyKey()) { Mutex() }
 
     suspend fun saveOrUpdateHomeNetwork(
         existingKey: String?,
@@ -170,93 +176,117 @@ internal class DeviceCrudAndRulesCoordinator(
             null
         }
 
-        val enriched = if (liveDesc != null) {
-            val resolvedName = device.name.trim().ifBlank {
-                liveDesc.name.ifBlank { existingMatch?.name ?: "WeMi Light Switch" }
-            }
-            val resolvedRoom = if (device.name.isBlank() &&
-                (device.roomName.isBlank() || device.roomName == "Living Room" || device.roomName == "Unassigned")
-            ) {
-                if (existingMatch != null) {
-                    resolveDeviceRoomAssignment(
-                        existingRoomName = existingMatch.roomName,
-                        deviceName = resolvedName,
-                        discoveredRoomName = liveDesc.roomName,
-                        isDemoMode = demoMode
-                    )
-                } else {
-                    liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) }
+        suspend fun buildAndPersist(liveRow: DeviceEntity?): DeviceEntity {
+            val enriched = if (liveDesc != null) {
+                val baseEntity = existingMatch ?: liveRow ?: device
+                val resolvedName = device.name.trim().ifBlank {
+                    liveDesc.name.ifBlank { baseEntity.name.ifBlank { "WeMi Light Switch" } }
                 }
+                val resolvedRoom = if (device.name.isBlank() &&
+                    (device.roomName.isBlank() || device.roomName == "Living Room" || device.roomName == "Unassigned")
+                ) {
+                    if (existingMatch != null) {
+                        resolveDeviceRoomAssignment(
+                            existingRoomName = existingMatch.roomName,
+                            deviceName = resolvedName,
+                            discoveredRoomName = liveDesc.roomName,
+                            isDemoMode = demoMode
+                        )
+                    } else {
+                        liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) }
+                    }
+                } else {
+                    device.roomName.trim().ifBlank { liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) } }
+                }
+                val resolvedType = if (device.name.isBlank()) {
+                    liveDesc.deviceType.name
+                } else {
+                    device.deviceType
+                }
+                val cleanLiveSsid = liveDesc.wifiSsid.trim().takeIf {
+                    it.isNotEmpty() && !org.suppressingfire.wemi.network.XmlAndSkuParser.isWemoDeviceSetupSsid(it)
+                }
+                baseEntity.copy(
+                    name = resolvedName,
+                    roomName = resolvedRoom,
+                    networkKey = device.networkKey,
+                    deviceType = resolvedType,
+                    ipAddress = device.ipAddress,
+                    port = liveDesc.port,
+                    isReachable = true,
+                    isOn = liveDesc.isOn,
+                    brightness = liveDesc.brightness,
+                    latencyMs = liveDesc.responseTimeMs.toInt().coerceAtLeast(1),
+                    lastCheckedTime = nowFormatted(),
+                    serialNumber = liveDesc.serialNumber
+                        .takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
+                        ?: baseEntity.serialNumber.takeUnless { !demoMode && LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
+                    firmwareVersion = liveDesc.firmwareVersion.ifBlank { baseEntity.firmwareVersion },
+                    hardwareModel = liveDesc.hardwareSku.ifBlank { baseEntity.hardwareModel },
+                    macAddress = liveDesc.macAddress.ifBlank { baseEntity.macAddress },
+                    udn = LanRuntimeUtils.canonicalHardwareUdn(liveDesc.usn)
+                        .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(baseEntity.udn) },
+                    wifiSsid = cleanLiveSsid ?: device.wifiSsid.ifBlank { baseEntity.wifiSsid },
+                    signalStrengthPercent = liveDesc.signalStrengthPercent,
+                    autoOffMinutes = if (device.id == 0 && device.autoOffMinutes == 0) {
+                        baseEntity.autoOffMinutes
+                    } else {
+                        device.autoOffMinutes
+                    }
+                )
             } else {
-                device.roomName.trim().ifBlank { liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) } }
-            }
-            val resolvedType = if (device.name.isBlank()) {
-                liveDesc.deviceType.name
-            } else {
-                device.deviceType
-            }
-            val cleanLiveSsid = liveDesc.wifiSsid.trim().takeIf {
-                it.isNotEmpty() && !org.suppressingfire.wemi.network.XmlAndSkuParser.isWemoDeviceSetupSsid(it)
-            }
-            val baseEntity = existingMatch ?: device
-            baseEntity.copy(
-                name = resolvedName,
-                roomName = resolvedRoom,
-                networkKey = device.networkKey,
-                deviceType = resolvedType,
-                ipAddress = device.ipAddress,
-                port = liveDesc.port,
-                isReachable = true,
-                isOn = liveDesc.isOn,
-                brightness = liveDesc.brightness,
-                latencyMs = liveDesc.responseTimeMs.toInt().coerceAtLeast(1),
-                lastCheckedTime = nowFormatted(),
-                serialNumber = liveDesc.serialNumber
+                val fallbackName = device.name.trim().ifBlank { liveRow?.name?.ifBlank { null } ?: "WeMi Light Switch" }
+                val fallbackRoom = device.roomName.trim().let { rawRoom ->
+                    if (rawRoom.isBlank() || (device.name.isBlank() && rawRoom == "Living Room")) {
+                        inferRoomFromName(fallbackName)
+                    } else {
+                        rawRoom
+                    }
+                }
+                val baseEntity = liveRow ?: device
+                val preservedSerial = baseEntity.serialNumber
                     .takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
-                    ?: baseEntity.serialNumber.takeUnless { !demoMode && LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
-                firmwareVersion = liveDesc.firmwareVersion.ifBlank { baseEntity.firmwareVersion },
-                hardwareModel = liveDesc.hardwareSku.ifBlank { baseEntity.hardwareModel },
-                macAddress = liveDesc.macAddress.ifBlank { baseEntity.macAddress },
-                udn = LanRuntimeUtils.canonicalHardwareUdn(liveDesc.usn)
-                    .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(baseEntity.udn) },
-                wifiSsid = cleanLiveSsid ?: device.wifiSsid.ifBlank { baseEntity.wifiSsid },
-                signalStrengthPercent = liveDesc.signalStrengthPercent,
-                autoOffMinutes = if (device.id == 0 && device.autoOffMinutes == 0) {
-                    baseEntity.autoOffMinutes
-                } else {
-                    device.autoOffMinutes
-                }
-            )
-        } else {
-            val fallbackName = device.name.trim().ifBlank { "WeMi Light Switch" }
-            val fallbackRoom = device.roomName.trim().let { rawRoom ->
-                if (rawRoom.isBlank() || (device.name.isBlank() && rawRoom == "Living Room")) {
-                    inferRoomFromName(fallbackName)
-                } else {
-                    rawRoom
-                }
+                    ?: if (hasPlaceholderSerial && !demoMode) "" else device.serialNumber
+                baseEntity.copy(
+                    name = fallbackName,
+                    roomName = fallbackRoom,
+                    networkKey = device.networkKey,
+                    wifiSsid = device.wifiSsid.ifBlank { baseEntity.wifiSsid },
+                    deviceType = device.deviceType,
+                    ipAddress = device.ipAddress,
+                    port = device.port,
+                    isOn = device.isOn,
+                    isReachable = device.isReachable,
+                    brightness = device.brightness,
+                    serialNumber = preservedSerial,
+                    autoOffMinutes = device.autoOffMinutes
+                )
             }
-            val cleanedSerial = if (hasPlaceholderSerial && !demoMode) "" else device.serialNumber
-            device.copy(
-                name = fallbackName,
-                roomName = fallbackRoom,
-                serialNumber = cleanedSerial
-            )
+
+            return if (enriched.id == 0) {
+                val nextSortOrder = (
+                    dao.getAllDevices().first()
+                        .filter { it.networkKey == enriched.networkKey }
+                        .maxOfOrNull { it.sortOrder }
+                        ?: -1
+                    ) + 1
+                val toInsert = enriched.copy(sortOrder = nextSortOrder)
+                val newId = dao.insertDevice(toInsert).toInt()
+                toInsert.copy(id = newId)
+            } else {
+                dao.updateDevice(enriched)
+                enriched
+            }
         }
 
-        val saved = if (enriched.id == 0) {
-            val nextSortOrder = (
-                dao.getAllDevices().first()
-                    .filter { it.networkKey == enriched.networkKey }
-                    .maxOfOrNull { it.sortOrder }
-                    ?: -1
-                ) + 1
-            val toInsert = enriched.copy(sortOrder = nextSortOrder)
-            val newId = dao.insertDevice(toInsert).toInt()
-            toInsert.copy(id = newId)
+        val lockTarget = existingMatch ?: device.takeIf { it.id != 0 }
+        var saved = if (lockTarget != null) {
+            mutexFor(lockTarget).withLock {
+                val liveRow = dao.getDeviceById(lockTarget.id)
+                buildAndPersist(liveRow)
+            }
         } else {
-            dao.updateDevice(enriched)
-            enriched
+            buildAndPersist(null)
         }
 
         if (syncFriendlyNameToHardware && device.name.isNotBlank() && !isSyntheticDemoEndpoint) {
@@ -264,6 +294,19 @@ internal class DeviceCrudAndRulesCoordinator(
                 networkClient.changeFriendlyName(saved, saved.name)
             }
             appendLog(renameResult.logEntry)
+            if (renameResult.reachableOnLan && renameResult.resolvedPort != saved.port) {
+                saved = mutexFor(saved).withLock {
+                    val latest = dao.getDeviceById(saved.id) ?: saved
+                    val healed = latest.copy(
+                        port = renameResult.resolvedPort,
+                        isReachable = true,
+                        latencyMs = renameResult.latencyMs.coerceAtLeast(1),
+                        lastCheckedTime = nowFormatted()
+                    )
+                    dao.updateDevice(healed)
+                    healed
+                }
+            }
         }
         return saved
     }
@@ -283,12 +326,12 @@ internal class DeviceCrudAndRulesCoordinator(
         moveUp: Boolean,
         withinRoomOnly: Boolean = false
     ) {
-        val targetRoom = device.roomName.ifBlank { "Unassigned" }
+        val targetRoom = device.roomName.trim().ifBlank { "Unassigned" }
         val homeDevices = dao.getAllDevices().first()
             .filter { it.networkKey == device.networkKey }
             .toMutableList()
         val scopedIndices = homeDevices.indices.filter { idx ->
-            !withinRoomOnly || homeDevices[idx].roomName.ifBlank { "Unassigned" }
+            !withinRoomOnly || homeDevices[idx].roomName.trim().ifBlank { "Unassigned" }
                 .equals(targetRoom, ignoreCase = true)
         }
         val posInScope = scopedIndices.indexOfFirst { idx -> homeDevices[idx].id == device.id }

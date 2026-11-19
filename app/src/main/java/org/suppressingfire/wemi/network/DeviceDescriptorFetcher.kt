@@ -1,5 +1,6 @@
 package org.suppressingfire.wemi.network
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.suppressingfire.wemi.data.DeviceEntity
@@ -35,6 +36,8 @@ internal class DeviceDescriptorFetcher(
             )
             if (!resp.isSuccessful) return@withContext null
             XmlAndSkuParser.parseMetaInfoSoapResponse(resp.body)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         }
@@ -56,6 +59,8 @@ internal class DeviceDescriptorFetcher(
             )
             if (!resp.isSuccessful) return@withContext null
             XmlAndSkuParser.parseSignalStrengthSoapResponse(resp.body)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         }
@@ -124,6 +129,8 @@ internal class DeviceDescriptorFetcher(
                 wifiSsid = meta?.accessPointSsid.orEmpty(),
                 signalStrengthPercent = rssi ?: 85
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         }

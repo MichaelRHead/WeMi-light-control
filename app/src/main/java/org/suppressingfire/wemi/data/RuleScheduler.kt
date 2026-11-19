@@ -1,6 +1,8 @@
 package org.suppressingfire.wemi.data
 
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -8,6 +10,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -33,6 +36,22 @@ class RuleScheduler(
 
     private var scheduleLoopJob: Job? = null
     private val triggeredMinuteKeys = ConcurrentHashMap<Int, String>()
+
+    /**
+     * Cancels any active Auto-Off countdown timers whose devices were deleted or wiped during a
+     * Wi-Fi Home / LAN reset so orphaned timers never fire against removed switches.
+     */
+    fun pruneRemovedDevices(activeDeviceIds: Set<Int>) {
+        val trackedIds = HashSet<Int>()
+        trackedIds.addAll(countdownJobs.keys)
+        trackedIds.addAll(configuredDurationSec.keys)
+        trackedIds.addAll(_activeCountdownsSec.value.keys)
+        for (trackedId in trackedIds) {
+            if (trackedId !in activeDeviceIds) {
+                cancelAutoOff(trackedId)
+            }
+        }
+    }
 
     /**
      * Starts or cancels the Auto-Off countdown for [device] whenever its power state changes.
@@ -79,39 +98,48 @@ class RuleScheduler(
         countdownJobs.remove(deviceId)?.cancel()
         if (durationSeconds <= 0) {
             configuredDurationSec.remove(deviceId)
-            _activeCountdownsSec.value = _activeCountdownsSec.value - deviceId
+            _activeCountdownsSec.update { if (deviceId in it) it - deviceId else it }
             return
         }
 
         configuredDurationSec[deviceId] = durationSeconds
-        _activeCountdownsSec.value = _activeCountdownsSec.value + (deviceId to durationSeconds)
-        val job = scope.launch {
+        _activeCountdownsSec.update { it + (deviceId to durationSeconds) }
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            val self = coroutineContext[Job]
             var remaining = durationSeconds
             while (isActive && remaining > 0) {
-                _activeCountdownsSec.value = _activeCountdownsSec.value + (deviceId to remaining)
+                if (countdownJobs[deviceId] !== self) break
+                _activeCountdownsSec.update { it + (deviceId to remaining) }
                 delay(1000L)
                 remaining--
             }
-            _activeCountdownsSec.value = _activeCountdownsSec.value - deviceId
-            countdownJobs.remove(deviceId)
-            configuredDurationSec.remove(deviceId)
-            if (isActive) {
-                onAutoOffExpired(deviceId)
+            val completedAsCurrent = self != null && countdownJobs.remove(deviceId, self)
+            if (completedAsCurrent) {
+                configuredDurationSec.remove(deviceId)
+                _activeCountdownsSec.update { it - deviceId }
+                if (isActive) {
+                    try {
+                        onAutoOffExpired(deviceId)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // Keep scheduler healthy if a single Auto-Off callback fails
+                    }
+                }
             }
         }
         countdownJobs[deviceId] = job
+        job.start()
     }
 
     fun cancelAutoOff(deviceId: Int) {
         countdownJobs.remove(deviceId)?.cancel()
         configuredDurationSec.remove(deviceId)
-        if (deviceId in _activeCountdownsSec.value) {
-            _activeCountdownsSec.value = _activeCountdownsSec.value - deviceId
-        }
+        _activeCountdownsSec.update { if (deviceId in it) it - deviceId else it }
     }
 
     /**
-     * Starts the periodic 30-second schedule evaluator loop for [rulesProvider].
+     * Starts the periodic 20-second schedule evaluator loop for [rulesProvider].
      */
     fun startScheduleLoop(rulesProvider: () -> List<RuleEntity>) {
         if (scheduleLoopJob?.isActive == true) return
@@ -124,13 +152,19 @@ class RuleScheduler(
 
                 val rules = rulesProvider()
                 for (rule in rules) {
-                    if (!rule.isEnabled || rule.parsedRuleType == RuleType.MOTION_TRIGGER) continue
+                    if (!rule.isEnabled || rule.parsedRuleType != RuleType.SCHEDULE) continue
                     val targetTime = parseScheduleTime24h(rule.triggerSummary) ?: continue
                     if (targetTime.first == hour24 && targetTime.second == minute) {
                         val prevKey = triggeredMinuteKeys[rule.id]
                         if (prevKey != dayKey) {
                             triggeredMinuteKeys[rule.id] = dayKey
-                            onScheduleRuleTriggered(rule)
+                            try {
+                                onScheduleRuleTriggered(rule)
+                            } catch (e: CancellationException) {
+                                throw e
+                            } catch (_: Exception) {
+                                // Keep schedule loop running if one rule dispatch throws
+                            }
                         }
                     }
                 }
@@ -145,6 +179,7 @@ class RuleScheduler(
         countdownJobs.values.forEach { it.cancel() }
         countdownJobs.clear()
         configuredDurationSec.clear()
+        triggeredMinuteKeys.clear()
         _activeCountdownsSec.value = emptyMap()
     }
 

@@ -288,7 +288,10 @@ internal class ProvisioningCoordinator(
             val demoMode = isDemoShowroomMode()
             val serial = desc?.serialNumber?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
                 ?: if (demoMode) "221840K${(100000..999999).random()}" else ""
-            val mac = desc?.macAddress?.takeIf { it.isNotBlank() } ?: "EC1A59881122"
+            val realMac = desc?.macAddress?.takeIf {
+                it.isNotBlank() && !it.equals(LanRuntimeUtils.DEFAULT_FALLBACK_MAC, ignoreCase = true)
+            }
+            val mac = realMac ?: if (demoMode) "EC1A59881122" else ""
             val sku = desc?.hardwareSku?.takeIf { it.isNotBlank() } ?: when (resolvedType) {
                 DeviceType.LIGHTBULB_DIMMER -> NetworkClient.SKU_WDS060_DIMMER_V2
                 else -> NetworkClient.SKU_WLS040_3WAY
@@ -346,11 +349,11 @@ internal class ProvisioningCoordinator(
                         port = desc?.port ?: existing.port,
                         isReachable = true,
                         lastCheckedTime = "Provisioned • ${nowFormatted()}",
-                        serialNumber = serial,
-                        firmwareVersion = firmware,
-                        hardwareModel = sku,
-                        macAddress = mac,
-                        udn = udn
+                        serialNumber = serial.ifBlank { existing.serialNumber },
+                        firmwareVersion = firmware.ifBlank { existing.firmwareVersion },
+                        hardwareModel = sku.ifBlank { existing.hardwareModel },
+                        macAddress = realMac ?: existing.macAddress.ifBlank { mac },
+                        udn = udn.ifBlank { LanRuntimeUtils.canonicalHardwareUdn(existing.udn) }
                     )
                 )
             }

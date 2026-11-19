@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -93,7 +94,7 @@ class SwitchRepository(
     val latestSsdpReport: StateFlow<SsdpScanReport?> = _latestSsdpReport.asStateFlow()
 
     private fun appendLog(entry: SoapLogEntry) {
-        _soapLogs.value = (listOf(entry) + _soapLogs.value).take(50)
+        _soapLogs.update { (listOf(entry) + it).take(50) }
     }
 
     private fun nowFormatted(): String =
@@ -124,14 +125,10 @@ class SwitchRepository(
     )
 
     private val crudCoordinator = DeviceCrudAndRulesCoordinator(
-        dao = dao,
-        networkClient = networkClient,
-        lanSemaphore = lanSemaphore,
-        isDemoShowroomMode = { _isDemoShowroomMode.value },
-        appendLog = ::appendLog,
-        nowFormatted = ::nowFormatted,
-        setDevicePowerExplicit = ::setDevicePowerExplicit,
-        updateDeviceBrightness = ::updateDeviceBrightness
+        dao = dao, networkClient = networkClient, lanSemaphore = lanSemaphore,
+        deviceMutexes = deviceMutexes, isDemoShowroomMode = { _isDemoShowroomMode.value },
+        appendLog = ::appendLog, nowFormatted = ::nowFormatted,
+        setDevicePowerExplicit = ::setDevicePowerExplicit, updateDeviceBrightness = ::updateDeviceBrightness
     )
 
     /**
@@ -415,7 +412,8 @@ class SwitchRepository(
 
     suspend fun pollActiveHomeStates(networkKey: String): Unit = genaPollingCoordinator.pollActiveHomeStates(networkKey)
 
-    suspend fun toggleDimmerNightMode(device: DeviceEntity): DeviceEntity = genaPollingCoordinator.toggleDimmerNightMode(device)
+    suspend fun toggleDimmerNightMode(device: DeviceEntity): DeviceEntity =
+        awaitDemoSeedIfPending().let { genaPollingCoordinator.toggleDimmerNightMode(device) }
 
     suspend fun turnOffDeviceById(deviceId: Int): DeviceEntity? {
         awaitDemoSeedIfPending()

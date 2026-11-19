@@ -216,6 +216,7 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
         viewModelScope.launch {
             combine(devices, rules) { devList, ruleList -> Pair(devList, ruleList) }
                 .collectLatest { (devList, ruleList) ->
+                    ruleScheduler.pruneRemovedDevices(devList.mapTo(HashSet()) { it.id })
                     devList.forEach { dev ->
                         ruleScheduler.onDeviceStateUpdated(dev, ruleList)
                     }

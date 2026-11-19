@@ -5,6 +5,7 @@ import java.net.InetSocketAddress
 import java.net.NoRouteToHostException
 import java.net.SocketTimeoutException
 import javax.net.SocketFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.suppressingfire.wemi.data.DeviceType
@@ -60,6 +61,8 @@ internal class SetupApProber(
                 wifiSocketFactory.createSocket().use { sock ->
                     sock.connect(InetSocketAddress(apHost, port), tcpConnectTimeoutMs)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: ConnectException) {
                 portLogs.add(":$port=REFUSED")
                 continue
@@ -101,6 +104,8 @@ internal class SetupApProber(
                     } else {
                         portLogs.add(":$port$path=HTTP_${resp.code}(${elapsed}ms)")
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     val elapsed = System.currentTimeMillis() - reqStartMs
                     portLogs.add(":$port$path=${e.javaClass.simpleName}(${elapsed}ms)")
@@ -283,6 +288,8 @@ internal class SetupApProber(
                 } else {
                     actionLogs.add("$action=HTTP_${resp.code}(${elapsed}ms)")
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 val elapsed = System.currentTimeMillis() - startMs
                 actionLogs.add("$action=${e.javaClass.simpleName}(${elapsed}ms)")

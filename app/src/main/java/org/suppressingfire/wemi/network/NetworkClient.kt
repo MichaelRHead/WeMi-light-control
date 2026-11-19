@@ -8,6 +8,7 @@ import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.suppressingfire.wemi.data.DeviceEntity
@@ -153,6 +154,8 @@ class NetworkClient(
                 wifiSocketFactory.createSocket().use { tcpSocket ->
                     tcpSocket.connect(InetSocketAddress(ipAddress, port), 550)
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (_: SocketTimeoutException) {
                 return@withContext null
             } catch (_: NoRouteToHostException) {
@@ -188,6 +191,8 @@ class NetworkClient(
                             return@withContext port
                         }
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (_: SocketTimeoutException) {
                     // HTTP read timed out on a wedged port after firmware port-hop; try next port
                 } catch (_: Exception) {
@@ -210,7 +215,7 @@ class NetworkClient(
         try {
             val directResult = executeOnPort(device.port)
             if (directResult != null) return directResult
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: CancellationException) {
             throw e
         } catch (_: Exception) {
             // Fall through to 9-port self-healing probe
@@ -225,7 +230,7 @@ class NetworkClient(
             try {
                 val retryResult = executeOnPort(discoveredPort)
                 if (retryResult != null) return retryResult
-            } catch (e: kotlinx.coroutines.CancellationException) {
+            } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
                 // Fall through to offline result
@@ -238,7 +243,7 @@ class NetworkClient(
                     }
                     val fallbackResult = executeOnPort(port)
                     if (fallbackResult != null) return fallbackResult
-                } catch (e: kotlinx.coroutines.CancellationException) {
+                } catch (e: CancellationException) {
                     throw e
                 } catch (_: SocketTimeoutException) {
                     break

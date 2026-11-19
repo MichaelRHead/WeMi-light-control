@@ -1,6 +1,8 @@
 package org.suppressingfire.wemi.ui
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -40,6 +42,16 @@ internal class HomeAndRulesUiController(
     private val _showAddRuleDialog = MutableStateFlow(false)
     val showAddRuleDialog: StateFlow<Boolean> = _showAddRuleDialog.asStateFlow()
 
+    @Volatile
+    private var reconnectJob: Job? = null
+
+    private fun cancelActiveReconnect() {
+        val prior = reconnectJob
+        reconnectJob = null
+        prior?.cancel()
+        _isReconnectingHome.value = false
+    }
+
     fun setActiveNetworkKey(networkKey: String) {
         _activeNetworkKey.value = networkKey
     }
@@ -52,8 +64,12 @@ internal class HomeAndRulesUiController(
 
     fun reconnectCurrentHomeNetwork() {
         val targetKey = _activeNetworkKey.value
-        scope.launch {
-            _isReconnectingHome.value = true
+        val superseded = reconnectJob
+        reconnectJob = null
+        superseded?.cancel()
+        _isReconnectingHome.value = true
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            val self = coroutineContext[Job]
             try {
                 val summary = repository.reconnectAndRediscoverHome(targetKey)
                 if (!repository.isDemoShowroomMode.value) {
@@ -63,9 +79,14 @@ internal class HomeAndRulesUiController(
                     "Welcome back to ${summary.homeName} (${summary.ssidLabel}): Reconnected ${summary.reconnectedCount}/${summary.totalRememberedCount} remembered switches (Avg ${summary.averageLatencyMs}ms)"
                 )
             } finally {
-                _isReconnectingHome.value = false
+                if (reconnectJob === self) {
+                    reconnectJob = null
+                    _isReconnectingHome.value = false
+                }
             }
         }
+        reconnectJob = job
+        job.start()
     }
 
     fun openAddHomeDialog() {
@@ -122,6 +143,7 @@ internal class HomeAndRulesUiController(
         rediscoverAfterReset: Boolean,
         onTriggerNetworkRefresh: () -> Unit
     ) {
+        cancelActiveReconnect()
         onClearRoomFilterAndSelection()
         scope.launch {
             val freshKey = repository.resetLanHomesSwitchesAndRooms { resolvedKey ->
@@ -141,6 +163,7 @@ internal class HomeAndRulesUiController(
         enabled: Boolean,
         onResetRoomFilter: () -> Unit
     ) {
+        cancelActiveReconnect()
         scope.launch {
             val nextKey = repository.setDemoShowroomMode(enabled) { resolvedKey ->
                 _activeNetworkKey.value = resolvedKey
@@ -158,6 +181,7 @@ internal class HomeAndRulesUiController(
     }
 
     fun resetToClassicScreenshotDevices(onResetRoomFilter: () -> Unit) {
+        cancelActiveReconnect()
         _activeNetworkKey.value = DEFAULT_MAIN_HOME_KEY
         onResetRoomFilter()
         scope.launch {
