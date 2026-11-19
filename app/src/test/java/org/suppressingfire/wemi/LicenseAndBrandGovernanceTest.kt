@@ -7,7 +7,9 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -49,21 +51,40 @@ class LicenseAndBrandGovernanceTest {
             licenseText.contains("Permission is hereby granted, free of charge, to any person obtaining a copy")
         )
 
+        // Word-for-word MIT LICENSE parity with MoreScreen.kt (OpenSourceLicenseCard)
+        val moreScreenFile = File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt")
+        assertTrue("MoreScreen.kt must exist", moreScreenFile.exists())
+        val mitConstMatch = Regex(
+            pattern = "private val MIT_LICENSE_TEXT = \"\"\"(.*?)\"\"\"\\.trimIndent\\(\\)",
+            option = RegexOption.DOT_MATCHES_ALL
+        ).find(moreScreenFile.readText())
+        assertNotNull("MoreScreen.kt must define MIT_LICENSE_TEXT", mitConstMatch)
+        val whitespaceRegex = Regex("\\s+")
+        val rootLicenseWords = licenseText.trim().split(whitespaceRegex)
+        val inAppLicenseWords = mitConstMatch!!.groupValues[1].trim().split(whitespaceRegex)
+        assertEquals(
+            "In-app MIT_LICENSE_TEXT in MoreScreen.kt must match root LICENSE word-for-word",
+            rootLicenseWords,
+            inAppLicenseWords
+        )
+
         val governanceDoc = File(repoRoot, "LICENSE_GOVERNANCE.md")
         assertTrue("Root LICENSE_GOVERNANCE.md specification must exist", governanceDoc.exists())
 
-        val libsToml = File(repoRoot, "gradle/libs.versions.toml")
-        assertTrue("gradle/libs.versions.toml must exist", libsToml.exists())
-        val libsTomlLower = libsToml.readText().lowercase()
         val forbiddenTokens = listOf(
             "gpl", "agpl", "lgpl", "sspl", "commons-clause",
             "okhttp", "retrofit", "moshi", "coil", "firebase", "play-services"
         )
-        for (token in forbiddenTokens) {
-            assertFalse(
-                "gradle/libs.versions.toml must not reference prohibited or unapproved third-party token '$token'",
-                libsTomlLower.contains(token)
-            )
+        for (manifestRel in listOf("gradle/libs.versions.toml", "build.gradle.kts", "settings.gradle.kts")) {
+            val manifestFile = File(repoRoot, manifestRel)
+            assertTrue("$manifestRel must exist", manifestFile.exists())
+            val manifestLower = manifestFile.readText().lowercase()
+            for (token in forbiddenTokens) {
+                assertFalse(
+                    "$manifestRel must not reference prohibited or unapproved third-party token '$token'",
+                    manifestLower.contains(token)
+                )
+            }
         }
 
         val appBuildGradle = File(repoRoot, "app/build.gradle.kts")
@@ -85,15 +106,28 @@ class LicenseAndBrandGovernanceTest {
             "app/proguard-rules.pro must exist for R8 release shrinking & deobfuscation",
             File(repoRoot, "app/proguard-rules.pro").exists()
         )
-        assertFalse(
-            "app/build.gradle.kts must not depend on okhttp",
-            buildGradleText.lowercase().contains("okhttp")
-        )
+        val buildGradleLower = buildGradleText.lowercase()
+        for (token in forbiddenTokens) {
+            assertFalse(
+                "app/build.gradle.kts must not reference prohibited or unapproved third-party token '$token'",
+                buildGradleLower.contains(token)
+            )
+        }
 
-        // Verify zero custom bundled font files remain in app/src/main/res/font
+        // Verify zero custom bundled font or binary archive/native files remain anywhere under app/src/main
         assertFalse(
             "No custom font files may be bundled in app/src/main/res/font",
             File(repoRoot, "app/src/main/res/font").exists()
+        )
+        val disallowedAssetExtensions = setOf("so", "ttf", "otf", "jar", "aar")
+        val disallowedMainAssets = File(repoRoot, "app/src/main")
+            .walkTopDown()
+            .filter { it.isFile && it.extension.lowercase() in disallowedAssetExtensions }
+            .map { it.relativeTo(repoRoot).path }
+            .toList()
+        assertTrue(
+            "app/src/main must remain pure Kotlin/DEX without bundled .so/.ttf/.otf/.jar/.aar files, found: $disallowedMainAssets",
+            disallowedMainAssets.isEmpty()
         )
 
         // Verify zero okhttp3 imports and zero pywemo references across production Kotlin sources
@@ -202,11 +236,72 @@ class LicenseAndBrandGovernanceTest {
             disallowedUiStrings.isEmpty()
         )
 
-        // 5. Google Play Store What's New release notes must fit within the 500-character Play Console limit
+        // 5. Google Play Console listing character limits & graphic asset inventory
         val releaseNotesText = File(repoRoot, "play_store_assets/RELEASE_NOTES.txt").readText().trim()
         assertTrue(
             "play_store_assets/RELEASE_NOTES.txt must be <= 500 characters (found ${releaseNotesText.length})",
             releaseNotesText.length <= 500
+        )
+
+        val storeListingText = File(repoRoot, "play_store_assets/STORE_LISTING.md").readText()
+        val appTitleMatch = Regex("\\*\\*App Title.*?:\\*\\*\\s*`([^`]+)`").find(storeListingText)
+        assertNotNull("play_store_assets/STORE_LISTING.md must declare App Title", appTitleMatch)
+        val appTitle = appTitleMatch!!.groupValues[1].trim()
+        assertTrue(
+            "Google Play App Title must be <= 30 characters (found ${appTitle.length}: '$appTitle')",
+            appTitle.length <= 30
+        )
+        val shortDescMatch = Regex("## Short Description[^\\n]*\\n([^\\n]+)").find(storeListingText)
+        assertNotNull("play_store_assets/STORE_LISTING.md must declare Short Description", shortDescMatch)
+        val shortDesc = shortDescMatch!!.groupValues[1].trim()
+        assertTrue(
+            "Google Play Short Description must be <= 80 characters (found ${shortDesc.length}: '$shortDesc')",
+            shortDesc.length <= 80
+        )
+
+        val dataSafetyText = File(repoRoot, "play_store_assets/DATA_SAFETY_GUIDE.md").readText()
+        val declaredPlayAssets = Regex("`(play_store_assets/[^`]+\\.png)`")
+            .findAll(dataSafetyText)
+            .map { it.groupValues[1] }
+            .distinct()
+            .toList()
+        assertTrue(
+            "DATA_SAFETY_GUIDE.md must inventory at least 15 Play Store PNG assets (found ${declaredPlayAssets.size})",
+            declaredPlayAssets.size >= 15
+        )
+        val missingPlayAssets = declaredPlayAssets.filterNot { File(repoRoot, it).isFile }
+        assertTrue(
+            "All Play Store PNG graphic assets listed in DATA_SAFETY_GUIDE.md must exist, missing: $missingPlayAssets",
+            missingPlayAssets.isEmpty()
+        )
+
+        // 6. Active feature User Guides (excluding historical release-notes.md) must not quote removed pre-sanitization "WeMo" UI labels
+        val staleUiLabels = listOf(
+            "Provision New WeMo AP",
+            "New WeMo Switch Rule",
+            "All WeMi/WeMo Devices",
+            "Setup Factory-Reset WeMo AP",
+            "Belkin WeMo Setup AP Detected",
+            "classic wemo",
+            "Sync Name to WeMo Hardware"
+        )
+        val userGuideDir = File(repoRoot, "docs/user-guide")
+        assertTrue("docs/user-guide directory must exist", userGuideDir.isDirectory)
+        val staleGuideHits = mutableListOf<String>()
+        userGuideDir.listFiles()
+            .orEmpty()
+            .filter { it.isFile && it.extension == "md" && it.name != "release-notes.md" }
+            .forEach { guideFile ->
+                val guideText = guideFile.readText()
+                for (label in staleUiLabels) {
+                    if (guideText.contains(label, ignoreCase = true)) {
+                        staleGuideHits += "${guideFile.name} -> \"$label\""
+                    }
+                }
+            }
+        assertTrue(
+            "Active User Guide docs must match neutral current UI labels without stale 'WeMo' UI strings, found: $staleGuideHits",
+            staleGuideHits.isEmpty()
         )
     }
 

@@ -2,7 +2,7 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-The **Rules** tab lets you automate your Belkin WeMo switches, dimmers, and plugs directly over your local Wi-Fi network — with zero dependency on external cloud servers.
+The **Rules** tab lets you automate switches, dimmers, and plugs from Belkin's discontinued smart switch platform directly over your local Wi-Fi network — with zero dependency on external cloud servers.
 
 ---
 
@@ -14,7 +14,7 @@ The **Rules** tab lets you automate your Belkin WeMo switches, dimmers, and plug
 | :--- | :--- | :--- | :--- |
 | **Schedule (`SCHEDULE`)** | Calendar / Clock | Runs daily at a specified clock time (`6:30 PM`, `07:00`, `11:15 PM`) or solar keyword (`Sunset` = `6:00 PM`, `Sunrise` = `6:30 AM`). | `Daily at 6:30 PM` or `Sunset` |
 | **Auto-Off Timer (`AUTO_OFF`)** | Stopwatch / Timer | Automatically starts a countdown whenever the target switch turns **ON** (whether toggled in the app or pressed physically on the wall) and turns the switch **OFF** when the timer reaches `00:00`. | `After 30 minutes ON` |
-| **Motion Trigger (`MOTION_TRIGGER`)** | Motion Sensor Waves | Triggers the target switch or dimmer whenever a WeMo Motion Sensor detects movement. | `When Hallway Motion senses movement` |
+| **Motion Trigger (`MOTION_TRIGGER`)** | Motion Sensor Waves | Triggers the target switch or dimmer whenever a smart Motion Sensor detects movement. | `When Hallway Motion senses movement` |
 
 ---
 
@@ -29,8 +29,8 @@ When an **Auto-Off Timer** rule is enabled for a switch (or when a switch has a 
 
 ## 3. Creating a New Rule
 
-1. Open the **Rules** tab from the bottom navigation bar and tap **`+ New Rule`** (or tap **`+`** in the top green header).
-2. In the **New WeMo Switch Rule** dialog:
+1. Open the **Rules** tab from the bottom navigation bar and tap **`+ New Rule`** (or tap **`+`** in the top header).
+2. In the **New Smart Switch Rule** dialog:
    - **Rule Name**: Give your rule a clear name (e.g., `Porch Sunset Timer` or `Hallway 15m Auto-Off`).
    - **Rule Type**: Select **`Schedule`**, **`Motion Trigger`**, or **`Auto-Off Timer`**.
    - **Target Switch / Bulb**: Tap the chip for the switch or dimmer you want this rule to control.

@@ -2,7 +2,7 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-If you have Belkin WeMo switches across multiple locations — such as a **Main Home**, a **Lake Cabin**, and a **Studio Office** — **WeMi Light Control** keeps each location's switches, rooms, and IP subnets cleanly separated using **Wi-Fi Home Profiles**.
+If you have switches from Belkin's discontinued smart switch platform across multiple locations — such as a **Main Home**, a **Lake Cabin**, and a **Studio Office** — **WeMi Light Control** keeps each location's switches, rooms, and IP subnets cleanly separated using **Wi-Fi Home Profiles**.
 
 ---
 
@@ -26,7 +26,7 @@ Unlike apps that require intrusive Android fine-location permissions (`ACCESS_FI
 1. **Zero-Permission `/24` Subnet Detection**:
    **WeMi Light Control** inspects your active Wi-Fi interface's IPv4 address (e.g., `192.168.86.50` → subnet `192.168.86`) using Android's `ConnectivityManager` without asking for GPS or Location permissions.
 2. **Smart Wi-Fi SSID Sync & Belkin Soft-AP Filtering (`GetMetaInfo`)**:
-   When the app queries a Belkin WeMo switch's `metainfo1#GetMetaInfo` SOAP action, it inspects the reported `AccessPointSSID` field. Because many Belkin firmwares (such as 2nd-Gen 3-Way switches `Wemo.LS3W.xxx` and 1st-Gen `WeMo.Switch.xxx` / `WeMo.Light.xxx`) return the switch's own factory setup hotspot name in that field, **WeMi Light Control** automatically filters out all `WeMo.*` / `Belkin.*` soft-AP SSIDs and never overwrites your Home Name (`My Home`) with a device SSID.
+   When the app queries a smart switch's `metainfo1#GetMetaInfo` SOAP action, it inspects the reported `AccessPointSSID` field. Because many Belkin firmwares (such as 2nd-Gen 3-Way switches `Wemo.LS3W.xxx` and 1st-Gen `WeMo.Switch.xxx` / `WeMo.Light.xxx`) return the switch's own factory setup hotspot name in that field, **WeMi Light Control** automatically filters out all `WeMo.*` / `Belkin.*` soft-AP SSIDs and never overwrites your Home Name (`My Home`) with a device SSID.
 
 ---
 

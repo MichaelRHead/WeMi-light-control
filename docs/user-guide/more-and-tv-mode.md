@@ -26,7 +26,7 @@ Inside the **Offline Local UPnP / SOAP Engine** card on the **More** tab:
   - Tapping **`Reset Preset`** restores the 14 classic showcase switches at any time.
 
 Other quick settings in this card:
-- **Header Logo Wordmark Switch**: Toggles the top header logo between **`wemi`** and classic **`wemo`**.
+- **Header Logo Wordmark Switch**: Controls the top header **`wemi`** wordmark display (`Showing 'wemi' wordmark in top bar`).
 - **`Scan LAN (SSDP)`**: Opens the SSDP network discovery sheet.
 - **`Reset Homes, Discovered Switches & Rooms`**: Clears all remembered Wi-Fi Homes, discovered switches, and room assignments in Real LAN Mode, resets your primary LAN profile back to a clean **`My Home`**, and triggers a fresh SSDP discovery scan.
 - **`Provision New Switch AP (10.22.22.1)`**: Opens the zero-cloud Wi-Fi setup wizard.

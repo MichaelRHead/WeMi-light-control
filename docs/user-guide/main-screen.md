@@ -2,7 +2,7 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-The **Main Screen** (**Devices** tab) is your primary control center in **WeMi Light Control**. It displays your active Wi-Fi Home, network discovery status, room filters, and every Belkin WeMo switch, dimmer, motion sensor, and smart plug configured for your home.
+The **Main Screen** (**Devices** tab) is your primary control center in **WeMi Light Control**. It displays your active Wi-Fi Home, network discovery status, room filters, and every switch, dimmer, motion sensor, and smart plug from Belkin's discontinued smart switch platform configured for your home.
 
 ---
 
@@ -12,7 +12,7 @@ At the top of the screen, the compact single-row WeMi header provides quick acce
 
 | Control | Location | What It Does |
 | :--- | :--- | :--- |
-| **`wemi` Wordmark** | Top-left | Tap the brand logo to toggle the top-left wordmark display. |
+| **`wemi` Wordmark** | Top-left | Displays the **`wemi`** brand wordmark. |
 | **`All Off` Button** | Next to Refresh | Turns **OFF** all reachable switches and dimmers on your active Wi-Fi Home in one tap (`all_off_devices_button`). |
 | **Refresh Icon** | Top-right | Opens the live **SSDP Network Discovery Scanner** and starts an immediate local Wi-Fi scan (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
 | **`Edit` / `Done` Button** | Top-right | Toggles **Edit Mode** so you can reorder, rename, reconfigure, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
@@ -49,7 +49,7 @@ Every switch row automatically displays a custom illustration and category badge
 | **`Tree Lights`** | `tree`, `christmas`, `xmas`, `holiday`, `evergreen`, `spruce`, `fir`, `garland`, `wreath`, `tinsel`, `noel` | **3-Tiered Evergreen Christmas Tree**: Glowing gold star topper and 9 multi-color string lights when **ON**; dark pine canopy with unlit frosted bulbs and a warm amber standby base LED when **OFF**. |
 | **`Fan`** | `fan`, `blower`, `vent`, `exhaust`, `ventilat`, `circulator`, `ceiling fan`, `box fan`, `attic fan` | **4-Blade Air Circulator Fan**: Smoothly **animated 360° spinning blades** with cyan airflow glow when **ON**; stationary brushed-steel blades with a warm amber center hub LED when **OFF**. |
 | **`Light`** | `light`, `lights`, `lamp`, `bulb`, `chandelier`, `sconce`, `lantern`, `pendant`, `flood`, `spot`, `dimmer`, `led`, `candle`, `strip`, `fixture` (or any **Dimmer** hardware) | **Smart LED Lightbulb**: Luminous cyan-white globe scaled to dimmer brightness when **ON**; smoke-slate glass dome showing the unlit internal filament coil and warm amber neck collar when **OFF**. |
-| **`Motion`** | `motion`, `sensor` (or **Motion Sensor** hardware) | **WeMo Motion Sensor Dome**: Glowing green radial wave arcs when motion is sensed. |
+| **`Motion`** | `motion`, `sensor` (or **Motion Sensor** hardware) | **Smart Motion Sensor Dome**: Glowing green radial wave arcs when motion is sensed. |
 | **`Switch`** | All other switch or outlet names (e.g., `Coffee Maker`, `Space Heater`, `Dehumidifier`) | **Belkin In-Wall Switch / Smart Plug**: Tactile wall plate with glowing status bar and power indicator. |
 
 ---
@@ -89,7 +89,7 @@ Tap the body of any reachable switch or dimmer row to expand its **Inline Contro
 
 ## 6. Real-Time Physical Switch Sync & Pull-to-Refresh
 
-- **Instant Wall-Switch Push Updates (`<100ms`)**: When someone physically presses a Belkin WeMo wall paddle, 3-way rocker, or mini plug button, the switch sends a local UPnP GENA `NOTIFY` event directly to the app so the icon and power ring update immediately.
+- **Instant Wall-Switch Push Updates (`<100ms`)**: When someone physically presses a smart wall paddle, 3-way rocker, or mini plug button, the switch sends a local UPnP GENA `NOTIFY` event directly to the app so the icon and power ring update immediately.
 - **Pull-to-Refresh**: Swipe down anywhere on the **Devices** list to re-probe all saved switches and run a background SSDP discovery pass.
 
 ---
@@ -97,7 +97,7 @@ Tap the body of any reachable switch or dimmer row to expand its **Inline Contro
 ## 7. Empty Wi-Fi Home Onboarding Card
 
 When a Wi-Fi Home has `0` saved switches (such as on first launch in **Real LAN Mode** before scanning your network), the **Devices** tab displays an onboarding card with a 4-icon category showcase (**Switch**, **Lightbulb**, **Christmas Tree**, and **Fan** in standby) and four quick-start actions:
-- **`Scan Local Network (SSDP)`**: Broadcasts a live UPnP SSDP scan (`239.255.255.250:1900`) and automatically adopts discovered Belkin WeMo switches onto the current Wi-Fi Home.
-- **`Setup Factory-Reset WeMo AP (10.22.22.1)`**: Opens the zero-cloud `WiFiSetup1` provisioning wizard.
-- **`Add Switch Manually`**: Opens the manual IP/Port entry dialog (which automatically probes all 9 WeMo ports at that IP).
-- **`Restore Classic Setup`**: Enables **Demo Showroom Mode** with the 13 sample switches across 3 Wi-Fi Homes.
+- **`Scan Local Network (SSDP)`**: Broadcasts a live UPnP SSDP scan (`239.255.255.250:1900`) and automatically adopts discovered smart switches onto the current Wi-Fi Home.
+- **`Setup Factory-Reset Switch AP (10.22.22.1)`**: Opens the zero-cloud `WiFiSetup1` provisioning wizard.
+- **`Add Switch Manually`**: Opens the manual IP/Port entry dialog (which automatically probes all 9 UPnP ports `49151–49159` at that IP).
+- **`Restore Classic Setup`**: Enables **Demo Showroom Mode** with the 14 showcase switches across 3 Wi-Fi Homes.

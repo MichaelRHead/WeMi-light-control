@@ -2,17 +2,17 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-**WeMi Light Control** includes a built-in, zero-cloud **Belkin WeMo Wi-Fi Setup Provisioner** (`WiFiSetup1`). You can configure brand-new or factory-reset Belkin WeMo switches, dimmers, and mini plugs onto your 2.4 GHz home Wi-Fi without needing the discontinued Belkin cloud service or an account.
+**WeMi Light Control** includes a built-in, zero-cloud **Wi-Fi Setup Provisioner** (`WiFiSetup1`). You can configure brand-new or factory-reset switches, dimmers, and mini plugs from Belkin's discontinued smart switch platform onto your 2.4 GHz home Wi-Fi without needing the discontinued Belkin cloud service or an account.
 
 ---
 
-## 1. Preparing Your Belkin WeMo Switch for Setup
+## 1. Preparing Your Smart Switch for Setup
 
-1. Power on your Belkin WeMo switch, dimmer, or mini plug.
+1. Power on your smart switch, dimmer, or mini plug.
 2. Verify the LED indicator is blinking **Setup Mode**:
    - **1st Gen In-Wall Switch (`F7C030`) / Mini Plug (`F7C063`)**: Blinking **amber and green** (or blinking **white and amber** on newer models).
    - **In-Wall Smart Dimmer (`F7C059` / `WDS060`)**: Blinking light bar ready for pairing.
-   - *Tip*: To factory-reset a WeMo switch into Setup Mode, hold down the reset/bar button for 5–10 seconds until the status LED blinks amber.
+   - *Tip*: To factory-reset a switch into Setup Mode, hold down the reset/bar button for 5–10 seconds until the status LED blinks amber.
 3. Open your Android device's **Wi-Fi Settings** and connect to the switch's open setup network (for example, `WeMo.Light.xxx`, `WeMo.Switch.xxx`, `WeMo.Mini.xxx`, or `WeMo.Dimmer.xxx`).
    - If Android prompts *"This network has no internet access — Stay connected?"*, tap **Yes / Always Connect**.
    - **WeMi Light Control** automatically binds its setup sockets directly to your Wi-Fi interface even while cellular mobile data remains active.
@@ -24,14 +24,14 @@
 Once connected to the `WeMo.*` setup Wi-Fi network (which uses the `10.22.22.x` subnet):
 
 - **Automatic Setup Banner (Fastest)**:
-  A green banner automatically appears at the top of the **Devices** tab:
-  > **Belkin WeMo Setup AP Detected (`10.22.22.x`)**
-  > *Tap here to provision this factory-reset WeMo switch (`10.22.22.1`) onto your 2.4 GHz Home Wi-Fi.*
-  Tap this banner to open the **Provision New WeMo AP (`10.22.22.1`)** dialog.
+  A banner automatically appears at the top of the **Devices** tab:
+  > **Smart Switch Setup AP Detected (`10.22.22.x`)**
+  > *Tap here to provision this factory-reset smart switch (`10.22.22.1`) onto your 2.4 GHz Home Wi-Fi.*
+  Tap this banner to open the **Provision New Switch AP (`10.22.22.1`)** dialog.
 - **Manual Launch**:
   You can also open the wizard anytime from:
-  - **Top Header `+` Button** → **`Provision New WeMo AP (10.22.22.1)`**
-  - **`More` Tab** → **`Provision New WeMo AP (10.22.22.1)`**
+  - **Top Header `+` Button** → **`Provision New Switch AP (10.22.22.1)`**
+  - **`More` Tab** → **`Provision New Switch AP (10.22.22.1)`**
 
 ---
 
@@ -41,23 +41,23 @@ Once connected to the `WeMo.*` setup Wi-Fi network (which uses the `10.22.22.x` 
 sequenceDiagram
     participant User as User (Android)
     participant App as WeMi Light Control
-    participant WeMo as Unconfigured WeMo Switch (10.22.22.1)
+    participant Switch as Unconfigured Switch (10.22.22.1)
 
-    User->>App: Opens Provision WeMo AP Dialog
-    App->>WeMo: 1. Probe ports 49152..49159 (/setup.xml + GetMetaInfo)
-    WeMo-->>App: Model, MAC, Serial, Firmware & Encryption Type
-    App->>WeMo: 2. SOAP WiFiSetup1#GetApList
-    WeMo-->>App: List of nearby 2.4 GHz Wi-Fi SSIDs & Channels
+    User->>App: Opens Provision New Switch AP Dialog
+    App->>Switch: 1. Probe ports 49152..49159 (/setup.xml + GetMetaInfo)
+    Switch-->>App: Model, MAC, Serial, Firmware & Encryption Type
+    App->>Switch: 2. SOAP WiFiSetup1#GetApList
+    Switch-->>App: List of nearby 2.4 GHz Wi-Fi SSIDs & Channels
     User->>App: 3. Tap Home 2.4 GHz SSID, enter Password, Name & Room
-    App->>WeMo: 4. Encrypt Password (AES-128-CBC Method 1/2/3)\n& double-send ConnectHomeNetwork
-    App->>WeMo: 5. Poll GetNetworkStatus + CloseSetup + SetSetupDoneStatus
+    App->>Switch: 4. Encrypt Password (AES-128-CBC Method 1/2/3)\n& double-send ConnectHomeNetwork
+    App->>Switch: 5. Poll GetNetworkStatus + CloseSetup + SetSetupDoneStatus
     App-->>User: Switch joins Home Wi-Fi & is saved to your Room list!
 ```
 
-Inside the **Provision New WeMo AP (`10.22.22.1`)** dialog:
+Inside the **Provision New Switch AP (`10.22.22.1`)** dialog:
 
 1. **Detected Hardware & Connection Status Banner**:
-   - The dialog automatically probes `10.22.22.1` across ports `49151–49159` and displays a green detected hardware banner (e.g., `Detected: WeMo Light Switch`, `Port 49152 • MAC EC1A59XXXXXX • SN 2213... • Auto Method 1`).
+   - The dialog automatically probes `10.22.22.1` across ports `49151–49159` and displays a detected hardware banner (e.g., `Detected: Light Switch`, `Port 49152 • MAC EC1A59XXXXXX • SN 2213... • Auto Method 1`).
    - If the switch is unreachable (for example, if your phone is not yet connected to the `WeMo.*` Setup AP) or rejects a short/invalid password, the status box highlights the error in soft red (`#FEF2F2`) with a clear diagnostic message.
 2. **Select Your 2.4 GHz Home Wi-Fi (`Scan APs`)**:
    - Tap **`Scan APs`** to query the switch for visible 2.4 GHz Wi-Fi networks (`GetApList` / `GetNetworkList`).
@@ -84,7 +84,7 @@ Inside the **Provision New WeMo AP (`10.22.22.1`)** dialog:
 
 ## 4. On-Screen Setup Debug Details (`Setup Debug Details (Screenshot)`) & Telemetry Export
 
-At the bottom of the **Provision New WeMo AP (`10.22.22.1`)** dialog, a high-contrast dark terminal card (**`Setup Debug Details (Screenshot)`**) prints real-time hardware and protocol diagnostics directly on screen so you can take a single screenshot, tap **`Copy`** (`copy_provision_debug_button`), or tap **`Save/Share`** (`share_provision_debug_button`) to save `wemi-telemetry-latest.txt` and open Android's share sheet:
+At the bottom of the **Provision New Switch AP (`10.22.22.1`)** dialog, a high-contrast dark terminal card (**`Setup Debug Details (Screenshot)`**) prints real-time hardware and protocol diagnostics directly on screen so you can take a single screenshot, tap **`Copy`** (`copy_provision_debug_button`), or tap **`Save/Share`** (`share_provision_debug_button`) to save `wemi-telemetry-latest.txt` and open Android's share sheet:
 
 - **`[NET]`**: Your phone's active Wi-Fi interface (`wlan0`), IP address (`10.22.22.x`), `setupAp=true/false`, and whether sockets are bound directly to the unvalidated Wi-Fi network (`wifiBound=true/false`).
 - **`[PROBE]` & `[PROBE TRACE]`**: The exact port (`49151..49159`) and XML path (`/setup.xml` or `/Lightsetup.xml`) that responded on `10.22.22.1`, plus per-port status codes.
