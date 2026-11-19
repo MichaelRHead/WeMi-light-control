@@ -275,12 +275,27 @@ def _fetch_remote_images_or_empty(
         raise
 
 
+def _short_hash_summary(local_assets: list[LocalImageAsset], remote_images: list[dict[str, Any]]) -> str:
+    local_prefix = ",".join(a.sha256[:8] for a in local_assets[:3])
+    if len(local_assets) > 3:
+        local_prefix += ",..."
+    remote_hashes: list[str] = []
+    for item in remote_images[:3]:
+        h = str(item.get("sha256") or item.get("sha1") or "none").strip().lower()
+        remote_hashes.append(h[:8])
+    remote_prefix = ",".join(remote_hashes) if remote_hashes else "none"
+    if len(remote_images) > 3:
+        remote_prefix += ",..."
+    return f"local=`{local_prefix}` vs play=`{remote_prefix}`"
+
+
 def format_asset_report_markdown(
     *,
     heading: str,
     package_name: str,
     language: str,
     listing_spec: StoreListingSpec | None,
+    remote_listing: dict[str, Any] | None,
     listing_diffs: list[str],
     listing_updated: bool,
     image_rows: list[dict[str, Any]],
@@ -300,13 +315,21 @@ def format_asset_report_markdown(
         else:
             listing_status = "IN SYNC"
             diff_detail = "none"
+        remote = remote_listing or {}
+        remote_title = normalize_listing_text(str(remote.get("title") or ""))
+        remote_short = normalize_listing_text(str(remote.get("shortDescription") or ""))
+        remote_full_len = len(normalize_listing_text(str(remote.get("fullDescription") or "")))
         lines.extend(
             [
                 f"- **Store Listing Copy (`STORE_LISTING.md`):** `{listing_status}` "
                 f"(changed fields: {diff_detail})",
-                f"  - Title: `{len(listing_spec.title)}/{MAX_TITLE_CHARS}` chars (`{listing_spec.title}`)",
-                f"  - Short description: `{len(listing_spec.short_description)}/{MAX_SHORT_DESCRIPTION_CHARS}` chars",
-                f"  - Full description: `{len(listing_spec.full_description)}/{MAX_FULL_DESCRIPTION_CHARS}` chars",
+                f"  - Title: local `{listing_spec.title}` ({len(listing_spec.title)}/{MAX_TITLE_CHARS}) "
+                f"| play `{remote_title or '(empty)'}`",
+                f"  - Short description: local `{len(listing_spec.short_description)}/{MAX_SHORT_DESCRIPTION_CHARS}` chars "
+                f"| play `{len(remote_short)}` chars"
+                + (f" (`{remote_short}`)" if remote_short and "shortDescription" in listing_diffs else ""),
+                f"  - Full description: local `{len(listing_spec.full_description)}/{MAX_FULL_DESCRIPTION_CHARS}` chars "
+                f"| play `{remote_full_len}` chars",
                 "",
             ]
         )
@@ -314,14 +337,14 @@ def format_asset_report_markdown(
     if image_rows:
         lines.extend(
             [
-                "| Play Image Type | Label | Local Files | Play Files | Status |",
-                "| :--- | :--- | :---: | :---: | :---: |",
+                "| Play Image Type | Label | Local Files | Play Files | Status | Hash Check |",
+                "| :--- | :--- | :---: | :---: | :---: | :--- |",
             ]
         )
         for row in image_rows:
             lines.append(
                 f"| `{row['image_type']}` | {row['label']} | {row['local_count']} | "
-                f"{row['remote_count']} | `{row['status']}` |"
+                f"{row['remote_count']} | `{row['status']}` | {row.get('hash_detail', '—')} |"
             )
         lines.append("")
 
@@ -387,6 +410,7 @@ def run_asset_sync(
                     "remote_count": len(remote_list),
                     "in_sync": in_sync,
                     "status": "IN SYNC" if in_sync else ("WOULD UPDATE" if dry_run else "PENDING"),
+                    "hash_detail": "match" if in_sync else _short_hash_summary(local_list, remote_list),
                 }
             )
 
@@ -418,6 +442,7 @@ def run_asset_sync(
                     client.upload_image(edit_id, language, image_type, asset.path)
                 row["status"] = "UPDATED"
                 row["remote_count"] = len(local_images[image_type])
+                row["hash_detail"] = "synced"
 
             client.commit_edit(
                 edit_id,
@@ -443,6 +468,7 @@ def run_asset_sync(
             package_name=client.package_name,
             language=language,
             listing_spec=listing_spec,
+            remote_listing=remote_listing,
             listing_diffs=listing_diffs,
             listing_updated=listing_updated,
             image_rows=image_rows,
