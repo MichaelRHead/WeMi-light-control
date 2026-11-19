@@ -3,13 +3,15 @@
 # WeMi Light Control — Release State Machine Transition (advance_release_turn.sh)
 # ==============================================================================
 # Atomically updates RELEASE_SIGN_OFF.md, preserves +x on gradlew and scripts,
-# commits, rebases against origin/main, and pushes to GitHub to wake the next
-# agent in the 5-agent / 6-stage round-robin ring.
+# commits, rebases against origin/main, and pushes to GitHub to advance the
+# 6-agent / 7-stage release process (Stages 1-6 review ring + Stage 7 automated
+# Closed testing promotion).
 #
 # Usage:
 #   bash scripts/advance_release_turn.sh initiate "<summary>" [--verified "<checks>"] [--no-push]
 #   bash scripts/advance_release_turn.sh sign_off <role> "<summary>" [--verified "<checks>"] [--no-push]
 #   bash scripts/advance_release_turn.sh conclude "<summary>" [--verified "<checks>"] [--no-push]
+#   bash scripts/advance_release_turn.sh promote "<summary>" [--version-code "<vc>"] [--track "<track>"] [--verified "<checks>"] [--no-push]
 #   bash scripts/advance_release_turn.sh request_rereview <from_role> <target_role> "<reason>" [--no-push]
 # ==============================================================================
 set -euo pipefail
@@ -23,12 +25,15 @@ if [[ -z "${ACTION}" ]]; then
   echo "  $0 initiate \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
   echo "  $0 sign_off <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj> \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
   echo "  $0 conclude \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
+  echo "  $0 promote \"<summary>\" [--version-code \"<vc>\"] [--track \"<track>\"] [--verified \"<checks>\"] [--no-push]" >&2
   echo "  $0 request_rereview <from_role> <target_role> \"<reason>\" [--no-push]" >&2
   exit 2
 fi
 
 NO_PUSH="false"
 VERIFIED_ARG=""
+PROMO_VC_ARG=""
+PROMO_TRACK_ARG=""
 CLEAN_ARGS=()
 while (( $# > 0 )); do
   case "$1" in
@@ -42,6 +47,22 @@ while (( $# > 0 )); do
         exit 2
       fi
       VERIFIED_ARG="$2"
+      shift 2
+      ;;
+    --version-code)
+      if (( $# < 2 )); then
+        echo "[ERROR] --version-code requires a value." >&2
+        exit 2
+      fi
+      PROMO_VC_ARG="$2"
+      shift 2
+      ;;
+    --track)
+      if (( $# < 2 )); then
+        echo "[ERROR] --track requires a value." >&2
+        exit 2
+      fi
+      PROMO_TRACK_ARG="$2"
       shift 2
       ;;
     *)
@@ -60,8 +81,9 @@ else
   NO_PUSH="true"
 fi
 
-# Ensure executable bits on gradlew, release scripts, and commit attribution scripts
+# Ensure executable bits on gradlew, release scripts, promotion scripts, and commit attribution scripts
 chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
+  scripts/promote_play_release.py scripts/test_promote_play_release.py \
   .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
   .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || true
 
@@ -72,7 +94,7 @@ if [[ -z "${HEAD_SHA}" || "${HEAD_SHA}" == "NONE" ]]; then
   HEAD_SHA="v28.0-rc"
 fi
 
-python3 - "${ACTION}" "${PST_NOW}" "${HEAD_SHA}" "${CLEAN_ARGS[@]}" <<'PYEOF'
+python3 - "${ACTION}" "${PST_NOW}" "${HEAD_SHA}" "${PROMO_VC_ARG}" "${PROMO_TRACK_ARG}" "${CLEAN_ARGS[@]}" <<'PYEOF'
 import re
 import sys
 from pathlib import Path
@@ -80,7 +102,9 @@ from pathlib import Path
 action = sys.argv[1]
 pst_now = sys.argv[2]
 head_sha = sys.argv[3]
-raw_args = list(sys.argv[4:])
+promo_vc_arg = sys.argv[4].strip()
+promo_track_arg = sys.argv[5].strip()
+raw_args = list(sys.argv[6:])
 
 gradle_text = Path("app/build.gradle.kts").read_text(encoding="utf-8")
 ver_code_match = re.search(r"versionCode\s*=\s*(\d+)", gradle_text)
@@ -96,11 +120,13 @@ def get_state(key: str, default: str = "") -> str:
     return m.group(1).strip() if m else default
 
 def set_state(content: str, key: str, value: str) -> str:
-    return re.sub(
-        rf"^{re.escape(key)}:\s*.*$",
-        f"{key}: {value}",
-        content,
-        flags=re.MULTILINE,
+    pattern = rf"^{re.escape(key)}:\s*.*$"
+    if re.search(pattern, content, flags=re.MULTILINE):
+        return re.sub(pattern, f"{key}: {value}", content, flags=re.MULTILINE)
+    return content.replace(
+        "<!-- RELEASE_STATE_END -->",
+        f"{key}: {value}\n<!-- RELEASE_STATE_END -->",
+        1,
     )
 
 def update_table_row(content: str, stage_prefix: str, status: str, sha: str, ts: str, summary: str) -> str:
@@ -129,8 +155,12 @@ if action == "initiate":
     text = set_state(text, "SIGN_OFF_TELEMETRY_AND_DEBUGGING", "PENDING")
     text = set_state(text, "SIGN_OFF_CODE_QUALITY_AND_TESTING", "PENDING")
     text = set_state(text, "SIGN_OFF_LICENSE_GOVERNANCE", "PENDING")
+    text = set_state(text, "SIGN_OFF_APP_PROMOTER", "PENDING")
     text = set_state(text, "FINAL_RELEASE_SHA", "NONE")
     text = set_state(text, "CONCLUDED_AT", "NONE")
+    text = set_state(text, "PROMOTED_VERSION_CODE", "NONE")
+    text = set_state(text, "PROMOTED_TRACK", "NONE")
+    text = set_state(text, "PROMOTED_AT", "NONE")
     text = re.sub(
         r"^## 2\. Current Release Candidate Sign-Off Status \(`v[^`]+` / `versionCode = \d+`\)$",
         f"## 2. Current Release Candidate Sign-Off Status (`{gradle_ver_name}` / `versionCode = {gradle_ver_code}`)",
@@ -144,6 +174,7 @@ if action == "initiate":
     text = update_table_row(text, "4 (Review 3)", "PENDING", "-", "-", "Awaiting Code Quality & E2E Testing Agent review.")
     text = update_table_row(text, "5 (Review 4)", "PENDING", "-", "-", "Awaiting License & Brand Governance Agent review.")
     text = update_table_row(text, "6 (Conclude)", "PENDING", "-", "-", "Awaiting Stages 1-5 sign-off.")
+    text = update_table_row(text, "7 (Promote)", "PENDING", "-", "-", "Awaiting Stage 6 approval and AI Studio internal testing upload.")
     text = append_audit_row(text, "1", "ai_studio_ux_cuj", "INITIATED_RELEASE", "discovery_and_grouping", head_sha, summary)
 
 elif action == "sign_off":
@@ -175,8 +206,26 @@ elif action == "conclude":
     text = set_state(text, "CURRENT_TURN", "NONE")
     text = set_state(text, "FINAL_RELEASE_SHA", head_sha)
     text = set_state(text, "CONCLUDED_AT", pst_now)
+    text = set_state(text, "SIGN_OFF_APP_PROMOTER", "PENDING")
+    text = set_state(text, "PROMOTED_VERSION_CODE", "NONE")
+    text = set_state(text, "PROMOTED_TRACK", "NONE")
+    text = set_state(text, "PROMOTED_AT", "NONE")
     text = update_table_row(text, "6 (Conclude)", "SIGNED_OFF", head_sha, pst_now, summary)
+    text = update_table_row(text, "7 (Promote)", "PENDING", "-", "-", "Ready for automatic Closed testing promotion once AI Studio pushes internal build and version bump.")
     text = append_audit_row(text, round_num, "ai_studio_ux_cuj", "APPROVED_FOR_PLAY_STORE", "NONE", head_sha, summary)
+
+elif action == "promote":
+    promo_vc = promo_vc_arg or gradle_ver_code
+    promo_track = promo_track_arg or "alpha"
+    summary = raw_args[1] if len(raw_args) > 1 else f"Promoted build {promo_vc} from internal to {promo_track} (Closed testing) via Google Play Developer API."
+    text = set_state(text, "RELEASE_STATUS", "PROMOTED_TO_CLOSED_TESTING")
+    text = set_state(text, "CURRENT_TURN", "NONE")
+    text = set_state(text, "SIGN_OFF_APP_PROMOTER", f"PROMOTED (vc={promo_vc} internal -> {promo_track} @ {pst_now})")
+    text = set_state(text, "PROMOTED_VERSION_CODE", promo_vc)
+    text = set_state(text, "PROMOTED_TRACK", promo_track)
+    text = set_state(text, "PROMOTED_AT", pst_now)
+    text = update_table_row(text, "7 (Promote)", "PROMOTED", head_sha, pst_now, summary)
+    text = append_audit_row(text, round_num, "app_promoter", "PROMOTED_TO_CLOSED_TESTING", "NONE", head_sha, summary)
 
 elif action == "request_rereview":
     if len(raw_args) < 4:
@@ -188,6 +237,10 @@ elif action == "request_rereview":
     text = set_state(text, "ROUND_NUMBER", new_round)
     text = set_state(text, "RELEASE_STATUS", "IN_REVIEW")
     text = set_state(text, "CURRENT_TURN", target_role)
+    text = set_state(text, "SIGN_OFF_APP_PROMOTER", "PENDING")
+    text = set_state(text, "PROMOTED_VERSION_CODE", "NONE")
+    text = set_state(text, "PROMOTED_TRACK", "NONE")
+    text = set_state(text, "PROMOTED_AT", "NONE")
 
     order = [
         "discovery_and_grouping",
@@ -207,6 +260,7 @@ elif action == "request_rereview":
             k, stg = key_map[r]
             text = set_state(text, k, "PENDING")
             text = update_table_row(text, stg, "PENDING", "-", "-", f"Re-review requested in Round {new_round} by {from_role}.")
+    text = update_table_row(text, "7 (Promote)", "PENDING", "-", "-", f"Awaiting Round {new_round} re-review and Stage 6 approval.")
     text = append_audit_row(text, new_round, from_role, "REQUESTED_REREVIEW", target_role, head_sha, reason)
 else:
     sys.exit(f"Unknown action: {action}")
@@ -222,7 +276,7 @@ fi
 TMP_COMMIT_INFO="$(mktemp)"
 trap 'rm -f "${TMP_COMMIT_INFO}"' EXIT
 
-python3 - "${VERIFIED_ARG}" "${TMP_COMMIT_INFO}" "${CLEAN_ARGS[@]}" <<'PYEOF'
+python3 - "${VERIFIED_ARG}" "${TMP_COMMIT_INFO}" "${PROMO_VC_ARG}" "${PROMO_TRACK_ARG}" "${CLEAN_ARGS[@]}" <<'PYEOF'
 import json
 import re
 import sys
@@ -230,7 +284,9 @@ from pathlib import Path
 
 verified_arg = sys.argv[1].strip()
 out_path = sys.argv[2]
-args = list(sys.argv[3:])
+promo_vc_arg = sys.argv[3].strip()
+promo_track_arg = sys.argv[4].strip()
+args = list(sys.argv[5:])
 action = args[0] if args else ""
 
 sign_off = Path("RELEASE_SIGN_OFF.md").read_text(encoding="utf-8")
@@ -245,33 +301,39 @@ round_num = state_val("ROUND_NUMBER", "1")
 ROLE_META = {
     "ai_studio_ux_cuj": {
         "short": "UX & design review",
-        "stage": "Stage 1 of 6",
+        "stage": "Stage 1 of 7",
         "next": "Discovery & Room Grouping",
         "default_bullet": "Verified UX layouts, accessibility, user journeys, and Play Store release notes.",
     },
     "discovery_and_grouping": {
         "short": "discovery review",
-        "stage": "Stage 2 of 6",
+        "stage": "Stage 2 of 7",
         "next": "Telemetry & Debugging",
         "default_bullet": "Verified switch discovery, device identity matching, and automatic room grouping.",
     },
     "telemetry_and_debugging": {
         "short": "telemetry review",
-        "stage": "Stage 3 of 6",
+        "stage": "Stage 3 of 7",
         "next": "Code Quality & Testing",
         "default_bullet": "Verified local setup diagnostics, telemetry export, and password redaction.",
     },
     "code_quality_and_testing": {
         "short": "quality & test review",
-        "stage": "Stage 4 of 6",
+        "stage": "Stage 4 of 7",
         "next": "License & Brand Governance",
         "default_bullet": "Verified code modularity, lifecycle safety, script permissions, and full test suite.",
     },
     "license_governance": {
         "short": "license & brand review",
-        "stage": "Stage 5 of 6",
+        "stage": "Stage 5 of 7",
         "next": "Google AI Studio for final release approval",
         "default_bullet": "Verified in-app MIT license parity, permissive dependencies, and Play Store trademark compliance.",
+    },
+    "app_promoter": {
+        "short": "closed testing promotion",
+        "stage": "Stage 7 of 7",
+        "next": "Closed testing testers on Google Play",
+        "default_bullet": "Promoted internal Play Store build to Closed testing via Google Play Developer API.",
     },
 }
 
@@ -351,6 +413,24 @@ elif action == "conclude":
     lead = f"All 5 review stages passed for {rel_ver} (versionCode {ver_code}). Release is approved for Google Play Store."
     bullets = make_bullets(raw_summary, "Confirmed all stage sign-offs and final release notes are ready for publishing.")
     verified = extract_verified(raw_summary)
+elif action == "promote":
+    acting_role = "app_promoter"
+    raw_summary = args[1] if len(args) > 1 else ""
+    promo_vc = promo_vc_arg or state_val("PROMOTED_VERSION_CODE", ver_code)
+    promo_track = promo_track_arg or state_val("PROMOTED_TRACK", "alpha")
+    track_label = "closed testing" if promo_track == "alpha" else f"{promo_track} track"
+    if promo_vc and promo_vc != ver_code:
+        subject = f"chore(release): promote {rel_ver} build {promo_vc} to {track_label}"
+    else:
+        subject = f"chore(release): promote {rel_ver} to {track_label}"
+    if len(subject) > 72:
+        subject = f"chore(release): promote build {promo_vc} to {track_label}"
+    lead = f"Completed Stage 7 of 7 for {rel_ver}. Promoted Play build {promo_vc} to {track_label}."
+    bullets = make_bullets(
+        raw_summary,
+        f"Promoted build {promo_vc} from internal testing to {track_label} via Google Play Developer API.",
+    )
+    verified = extract_verified(raw_summary)
 elif action == "request_rereview":
     acting_role = args[1] if len(args) > 1 else "code_quality_and_testing"
     target_role = args[2] if len(args) > 2 else "discovery_and_grouping"
@@ -387,6 +467,7 @@ COMMIT_BODY="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["
 COMMIT_VERIFIED="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["verified"])' "${TMP_COMMIT_INFO}")"
 
 git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
+  scripts/promote_play_release.py scripts/test_promote_play_release.py \
   .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
   .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || \
   git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh

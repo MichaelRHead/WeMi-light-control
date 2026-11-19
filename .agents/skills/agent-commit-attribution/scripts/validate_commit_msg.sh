@@ -409,6 +409,7 @@ if errors:
         "  - Antigravity Telemetry & Debugging Agent (telemetry_and_debugging)\n"
         "  - Antigravity Code Quality & E2E Testing Agent (code_quality_and_testing)\n"
         "  - Antigravity License & Brand Governance Agent (license_governance)\n"
+        "  - Antigravity App Promoter Agent (app_promoter)\n"
         "  - Antigravity General Agent (antigravity_general)\n"
         "==============================================================================\n"
     )

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Inspect Google Play tracks and promote releases between tracks via androidpublisher v3.
 
-Supports read-only track inspection (`list-tracks`) and track-to-track release promotion
-(`promote`, e.g. `internal` -> `alpha` or a custom closed testing track) without needing
-the Android upload signing keystore.
+Supports read-only track inspection (`list-tracks`), manual track-to-track promotion
+(`promote`), and guarded event-driven promotion (`auto-promote`, Stage 7 `app_promoter`
+workflow for `internal` -> `alpha` Closed testing after `APPROVED_FOR_PLAY_STORE`)
+without needing the Android upload signing keystore.
 """
 
 from __future__ import annotations
@@ -11,19 +12,25 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
+import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import quote
 
 DEFAULT_PACKAGE_NAME = "com.aistudio.wemiswitch.kxpqzr"
 DEFAULT_RELEASE_NOTES_FILE = "play_store_assets/RELEASE_NOTES.txt"
 DEFAULT_RELEASE_NOTES_LANGUAGE = "en-US"
+DEFAULT_SIGN_OFF_FILE = "RELEASE_SIGN_OFF.md"
+DEFAULT_POLL_ATTEMPTS = 5
+DEFAULT_POLL_INTERVAL_SEC = 20.0
 PLAY_API_BASE = "https://androidpublisher.googleapis.com/androidpublisher/v3/applications"
 PLAY_OAUTH_SCOPE = "https://www.googleapis.com/auth/androidpublisher"
 MAX_RELEASE_NOTES_CHARS = 500
 VALID_RELEASE_STATUSES = ("completed", "draft", "inProgress")
 VALID_NOTES_SOURCES = ("source_track", "file", "none")
+REQUIRED_APPROVAL_STATUS = "APPROVED_FOR_PLAY_STORE"
 
 
 class PlayApiError(RuntimeError):
@@ -339,6 +346,50 @@ def format_tracks_markdown(package_name: str, tracks: list[dict[str, Any]]) -> s
     return "\n".join(lines) + "\n"
 
 
+def parse_gradle_version_code(gradle_text: str) -> int | None:
+    """Extract Android defaultConfig versionCode from app/build.gradle.kts."""
+    match = re.search(r"\bversionCode\s*=\s*(\d+)", gradle_text)
+    return int(match.group(1)) if match else None
+
+
+def read_release_sign_off_state(sign_off_path: Path) -> dict[str, str]:
+    """Parse key: value fields from RELEASE_SIGN_OFF.md's RELEASE_STATE block."""
+    if not sign_off_path.is_file():
+        return {}
+    text = sign_off_path.read_text(encoding="utf-8")
+    block_match = re.search(
+        r"<!--\s*RELEASE_STATE_BEGIN\s*-->(.*?)<!--\s*RELEASE_STATE_END\s*-->",
+        text,
+        flags=re.DOTALL,
+    )
+    scope = block_match.group(1) if block_match else text
+    state: dict[str, str] = {}
+    for line in scope.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        clean_key = key.strip()
+        if clean_key and re.match(r"^[A-Z0-9_]+$", clean_key):
+            state[clean_key] = value.strip()
+    return state
+
+
+def highest_track_version_code(track_data: dict[str, Any]) -> int | None:
+    """Return the highest numeric versionCode among active (non-halted) releases on a track."""
+    releases = [rel for rel in (track_data.get("releases") or []) if rel.get("versionCodes")]
+    if not releases:
+        return None
+    non_halted = [rel for rel in releases if rel.get("status") != "halted"]
+    candidates = non_halted or releases
+    codes = [
+        int(vc)
+        for rel in candidates
+        for vc in rel.get("versionCodes", [])
+        if str(vc).isdigit()
+    ]
+    return max(codes) if codes else None
+
+
 def write_step_summary(markdown: str) -> None:
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY", "").strip()
     if not summary_path:
@@ -347,6 +398,64 @@ def write_step_summary(markdown: str) -> None:
         handle.write(markdown)
         if not markdown.endswith("\n"):
             handle.write("\n")
+
+
+def write_github_output(output_path: Path | None, values: dict[str, str]) -> None:
+    if output_path is None:
+        return
+    with open(output_path, "a", encoding="utf-8") as handle:
+        for key, value in values.items():
+            clean_val = str(value).replace("\r", " ").replace("\n", " ").strip()
+            handle.write(f"{key}={clean_val}\n")
+
+
+def check_auto_promote_preconditions(
+    *,
+    current_version_code: int | None,
+    previous_version_code: int | None,
+    sign_off_path: Path,
+    require_approved: bool,
+) -> str | None:
+    """Validate local git versionCode bump and RELEASE_SIGN_OFF.md approval gates.
+
+    Returns a human-readable skip reason string if promotion should be skipped cleanly,
+    or None if preconditions pass and Google Play tracks should be inspected.
+    """
+    if previous_version_code is not None and current_version_code is not None:
+        if current_version_code <= previous_version_code:
+            return (
+                f"versionCode did not increase ({previous_version_code} -> {current_version_code}); "
+                "skipping automatic Closed testing promotion."
+            )
+
+    if require_approved:
+        state = read_release_sign_off_state(sign_off_path)
+        release_status = state.get("RELEASE_STATUS", "")
+        if release_status != REQUIRED_APPROVAL_STATUS:
+            return (
+                f"{sign_off_path} has RELEASE_STATUS='{release_status or 'MISSING'}' "
+                f"(auto-promote requires '{REQUIRED_APPROVAL_STATUS}')."
+            )
+
+    return None
+
+
+def _emit_auto_promote_skip(package_name: str, reason: str, from_track: str, to_track: str) -> dict[str, Any]:
+    summary_md = (
+        f"### Google Play Auto-Promote Skipped (`{package_name}`)\n\n"
+        f"- **Route:** `{from_track}` -> `{to_track}`\n"
+        f"- **Reason:** {reason}\n"
+    )
+    print(summary_md)
+    write_step_summary(summary_md)
+    return {
+        "promoted": False,
+        "version_code": "",
+        "release_name": "",
+        "from_track": from_track,
+        "to_track": to_track,
+        "skip_reason": reason,
+    }
 
 
 def run_list_tracks(client: PlayPublisherClient) -> list[dict[str, Any]]:
@@ -482,19 +591,141 @@ def run_promote(
             client.delete_edit(edit_id)
 
 
+def run_auto_promote(
+    client: PlayPublisherClient,
+    *,
+    from_track: str,
+    to_track: str,
+    current_version_code: int | None,
+    previous_version_code: int | None,
+    sign_off_path: Path,
+    require_approved: bool,
+    poll_attempts: int,
+    poll_interval_sec: float,
+    status: str,
+    notes_source: str,
+    notes_file: Path,
+    notes_language: str,
+    changes_not_sent_for_review: bool,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    """Run Stage 7 guarded automatic promotion from internal to Closed testing (alpha)."""
+    skip_reason = check_auto_promote_preconditions(
+        current_version_code=current_version_code,
+        previous_version_code=previous_version_code,
+        sign_off_path=sign_off_path,
+        require_approved=require_approved,
+    )
+    if skip_reason:
+        return _emit_auto_promote_skip(client.package_name, skip_reason, from_track, to_track)
+
+    attempts = max(1, int(poll_attempts))
+    source_vc: int | None = None
+    target_vc: int | None = None
+    candidate_vc: str | None = None
+
+    for attempt in range(1, attempts + 1):
+        edit_id = client.insert_edit()
+        try:
+            source_track_data = client.get_track(edit_id, from_track)
+            target_track_data = client.get_track(edit_id, to_track)
+        finally:
+            client.delete_edit(edit_id)
+
+        source_vc = highest_track_version_code(source_track_data)
+        target_vc = highest_track_version_code(target_track_data)
+
+        # Case A: source track already has the bumped versionCode (or manual auto-promote)
+        if source_vc is not None and (current_version_code is None or source_vc >= current_version_code):
+            if target_vc is not None and target_vc >= source_vc:
+                return _emit_auto_promote_skip(
+                    client.package_name,
+                    f"Target track '{to_track}' already serves versionCode {target_vc} "
+                    f"(source '{from_track}' is {source_vc}).",
+                    from_track,
+                    to_track,
+                )
+            candidate_vc = str(source_vc)
+            break
+
+        if attempt < attempts:
+            print(
+                f"Attempt {attempt}/{attempts}: '{from_track}' has versionCode={source_vc} "
+                f"(waiting for >= {current_version_code}); retrying in {poll_interval_sec:g}s..."
+            )
+            sleep_fn(poll_interval_sec)
+
+    # Case B: post-upload version bump convention (AI Studio uploaded previous_vc, then bumped)
+    if candidate_vc is None:
+        if (
+            source_vc is not None
+            and previous_version_code is not None
+            and source_vc >= previous_version_code
+            and (target_vc is None or source_vc > target_vc)
+        ):
+            candidate_vc = str(source_vc)
+        else:
+            return _emit_auto_promote_skip(
+                client.package_name,
+                f"No promotable newer release on '{from_track}' yet "
+                f"(from={source_vc}, to={target_vc}, expected>={current_version_code}). "
+                "Re-run workflow_dispatch with mode=auto-promote once Play upload finishes.",
+                from_track,
+                to_track,
+            )
+
+    promoted = run_promote(
+        client,
+        from_track=from_track,
+        to_track=to_track,
+        version_code=candidate_vc,
+        status=status,
+        user_fraction=None,
+        notes_source=notes_source,
+        notes_file=notes_file,
+        notes_language=notes_language,
+        release_name_override="",
+        changes_not_sent_for_review=changes_not_sent_for_review,
+        allow_same_version=False,
+    )
+    promoted_codes = [str(vc) for vc in promoted.get("versionCodes", [])]
+    return {
+        "promoted": True,
+        "version_code": promoted_codes[0] if promoted_codes else candidate_vc,
+        "release_name": str(promoted.get("name") or candidate_vc),
+        "from_track": from_track,
+        "to_track": to_track,
+        "skip_reason": "",
+    }
+
+
+def _parse_optional_int(raw: str, flag_name: str) -> int | None:
+    cleaned = (raw or "").strip()
+    if not cleaned:
+        return None
+    if not cleaned.isdigit():
+        raise ValueError(f"{flag_name} must be a positive integer, got '{cleaned}'.")
+    return int(cleaned)
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Inspect Google Play tracks and promote releases between tracks."
     )
     parser.add_argument(
         "--credentials",
-        required=True,
+        default="",
         help="Path to the Google Cloud service account JSON key file.",
     )
     parser.add_argument(
         "--package-name",
         default=DEFAULT_PACKAGE_NAME,
         help=f"Android applicationId (default: {DEFAULT_PACKAGE_NAME}).",
+    )
+    parser.add_argument(
+        "--github-output",
+        default="",
+        help="Optional path (e.g. $GITHUB_OUTPUT) to emit promoted/version_code outputs.",
     )
 
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -523,13 +754,76 @@ def build_arg_parser() -> argparse.ArgumentParser:
     promote_parser.add_argument("--release-name", default="")
     promote_parser.add_argument("--changes-not-sent-for-review", action="store_true")
     promote_parser.add_argument("--allow-same-version", action="store_true")
+
+    auto_parser = subparsers.add_parser(
+        "auto-promote",
+        help="Stage 7 guarded promotion from internal to Closed testing after APPROVED_FOR_PLAY_STORE.",
+    )
+    auto_parser.add_argument("--from-track", default="internal")
+    auto_parser.add_argument("--to-track", default="alpha")
+    auto_parser.add_argument("--current-version-code", default="")
+    auto_parser.add_argument("--previous-version-code", default="")
+    auto_parser.add_argument("--sign-off-file", default=DEFAULT_SIGN_OFF_FILE)
+    auto_parser.add_argument("--no-require-approved", action="store_true")
+    auto_parser.add_argument("--poll-attempts", type=int, default=DEFAULT_POLL_ATTEMPTS)
+    auto_parser.add_argument("--poll-interval-sec", type=float, default=DEFAULT_POLL_INTERVAL_SEC)
+    auto_parser.add_argument(
+        "--status",
+        choices=("completed", "draft"),
+        default="completed",
+    )
+    auto_parser.add_argument(
+        "--release-notes-source",
+        choices=VALID_NOTES_SOURCES,
+        default="source_track",
+    )
+    auto_parser.add_argument("--release-notes-file", default=DEFAULT_RELEASE_NOTES_FILE)
+    auto_parser.add_argument("--release-notes-language", default=DEFAULT_RELEASE_NOTES_LANGUAGE)
+    auto_parser.add_argument("--changes-not-sent-for-review", action="store_true")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_arg_parser().parse_args(argv)
-    creds_path = Path(args.credentials)
+    output_path = Path(args.github_output) if (args.github_output or "").strip() else None
+
     try:
+        if args.command == "auto-promote":
+            current_vc = _parse_optional_int(args.current_version_code, "--current-version-code")
+            previous_vc = _parse_optional_int(args.previous_version_code, "--previous-version-code")
+            sign_off_path = Path(args.sign_off_file)
+            require_approved = not bool(args.no_require_approved)
+            from_track = args.from_track.strip()
+            to_track = args.to_track.strip()
+
+            # Check local git bump + RELEASE_SIGN_OFF.md gates before authenticating with Play API.
+            early_skip = check_auto_promote_preconditions(
+                current_version_code=current_vc,
+                previous_version_code=previous_vc,
+                sign_off_path=sign_off_path,
+                require_approved=require_approved,
+            )
+            if early_skip:
+                result = _emit_auto_promote_skip(args.package_name, early_skip, from_track, to_track)
+                write_github_output(
+                    output_path,
+                    {
+                        "promoted": "false",
+                        "version_code": "",
+                        "release_name": "",
+                        "from_track": from_track,
+                        "to_track": to_track,
+                        "skip_reason": result["skip_reason"],
+                    },
+                )
+                return 0
+
+        raw_creds = (args.credentials or "").strip()
+        if not raw_creds:
+            raise ValueError(
+                "Missing --credentials path (ensure repository secret PLAY_SERVICE_ACCOUNT_JSON is configured)."
+            )
+        creds_path = Path(raw_creds)
         client_email = validate_service_account_file(creds_path)
         print(f"Authenticated as service account: {client_email}")
         session = build_authorized_session(creds_path)
@@ -537,6 +831,37 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.command == "list-tracks":
             run_list_tracks(client)
+            write_github_output(output_path, {"promoted": "false"})
+            return 0
+
+        if args.command == "auto-promote":
+            result = run_auto_promote(
+                client,
+                from_track=args.from_track.strip(),
+                to_track=args.to_track.strip(),
+                current_version_code=current_vc,
+                previous_version_code=previous_vc,
+                sign_off_path=sign_off_path,
+                require_approved=require_approved,
+                poll_attempts=args.poll_attempts,
+                poll_interval_sec=args.poll_interval_sec,
+                status=args.status,
+                notes_source=args.release_notes_source,
+                notes_file=Path(args.release_notes_file),
+                notes_language=args.release_notes_language.strip() or DEFAULT_RELEASE_NOTES_LANGUAGE,
+                changes_not_sent_for_review=bool(args.changes_not_sent_for_review),
+            )
+            write_github_output(
+                output_path,
+                {
+                    "promoted": "true" if result["promoted"] else "false",
+                    "version_code": result["version_code"],
+                    "release_name": result["release_name"],
+                    "from_track": result["from_track"],
+                    "to_track": result["to_track"],
+                    "skip_reason": result["skip_reason"],
+                },
+            )
             return 0
 
         raw_fraction = (args.user_fraction or "").strip()
@@ -546,10 +871,12 @@ def main(argv: list[str] | None = None) -> int:
         if version_code is not None and not version_code.isdigit():
             raise ValueError(f"--version-code must be numeric, got '{version_code}'.")
 
-        run_promote(
+        from_track = args.from_track.strip()
+        to_track = args.to_track.strip()
+        promoted = run_promote(
             client,
-            from_track=args.from_track.strip(),
-            to_track=args.to_track.strip(),
+            from_track=from_track,
+            to_track=to_track,
             version_code=version_code,
             status=args.status,
             user_fraction=user_fraction,
@@ -559,6 +886,18 @@ def main(argv: list[str] | None = None) -> int:
             release_name_override=args.release_name,
             changes_not_sent_for_review=bool(args.changes_not_sent_for_review),
             allow_same_version=bool(args.allow_same_version),
+        )
+        promoted_codes = [str(vc) for vc in promoted.get("versionCodes", [])]
+        write_github_output(
+            output_path,
+            {
+                "promoted": "true",
+                "version_code": promoted_codes[0] if promoted_codes else "",
+                "release_name": str(promoted.get("name") or ""),
+                "from_track": from_track,
+                "to_track": to_track,
+                "skip_reason": "",
+            },
         )
         return 0
     except (ValueError, PlayApiError) as exc:

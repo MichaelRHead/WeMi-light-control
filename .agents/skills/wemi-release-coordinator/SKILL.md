@@ -1,17 +1,17 @@
 ---
 name: wemi-release-coordinator
-description: Coordinate the 5-agent autonomous round-robin Google Play Store release review process (AI Studio UX/CUJs -> Discovery & Room Grouping -> Telemetry & Debugging -> Code Quality & E2E Testing -> License & Brand Governance -> AI Studio Final Conclusion) via RELEASE_SIGN_OFF.md, RELEASE_PROCESS.md, scripts/await_release_turn.sh, and scripts/advance_release_turn.sh.
+description: Coordinate the 6-agent / 7-stage autonomous Google Play Store release review and Closed testing promotion process (AI Studio UX/CUJs -> Discovery & Room Grouping -> Telemetry & Debugging -> Code Quality & E2E Testing -> License & Brand Governance -> AI Studio Final Conclusion -> Event-Driven App Promoter Closed Testing Promotion) via RELEASE_SIGN_OFF.md, RELEASE_PROCESS.md, scripts/await_release_turn.sh, scripts/advance_release_turn.sh, and .github/workflows/play-store-promote.yml.
 ---
 
-# WeMi 5-Agent Autonomous Round-Robin Release Coordinator (`wemi-release-coordinator`)
+# WeMi 6-Agent / 7-Stage Autonomous Release Coordinator (`wemi-release-coordinator`)
 
-Use this skill whenever preparing, reviewing, advancing, or monitoring a Google Play Store release in `MichaelRHead/WeMi-light-control`.
+Use this skill whenever preparing, reviewing, advancing, monitoring, or promoting a Google Play Store release in `MichaelRHead/WeMi-light-control`.
 
 ---
 
-## 1. The 5-Agent / 6-Stage Round-Robin Ring
+## 1. The 6-Agent / 7-Stage Release Ring
 
-Every Play Store release candidate (`v23.0+`) is reviewed once by each of the 5 domain agents in a deterministic 6-stage round-robin ring synchronized via [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md) on `origin/main`:
+Every Play Store release candidate traverses 6 review stages synchronized via [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md) on `origin/main`, followed by event-driven Stage 7 promotion to Google Play Closed testing (`alpha`):
 
 1. **Stage 1 (Initiate) — `ai_studio_ux_cuj` (Google AI Studio Agent)**:
    - Verifies `versionCode` / `versionName` and `namespace = "org.suppressingfire.wemi"` in `app/build.gradle.kts`, audits UX/accessibility/navigation/CUJs (`UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`), updates `docs/user-guide/release-notes.md` & `play_store_assets/RELEASE_NOTES.txt` (do not create a root `RELEASE_NOTES.md`), runs `bash scripts/advance_release_turn.sh initiate "<summary>"` (recording `SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF`, `RELEASE_STATUS: IN_REVIEW`, `CURRENT_TURN: discovery_and_grouping`), and syncs to `origin/main`.
@@ -25,14 +25,19 @@ Every Play Store release candidate (`v23.0+`) is reviewed once by each of the 5 
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<verification summary>"` (setting `CURRENT_TURN: code_quality_and_testing`).
 4. **Stage 4 (Review 3) — `code_quality_and_testing` (Antigravity Code Quality & End-to-End Testing Agent)**:
    - Audits file modularity & readability (`.agents/skills/android-code-modularization/SKILL.md`), Wi-Fi socket binding (`wifiSocketFactory`), SQLite/GENA/coroutine lifecycle cleanup, and `gradlew` & `scripts/*.sh` executable mode (`100755`).
-   - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`58/58+` unit, protocol, governance, and Compose E2E tests across `13` suites).
+   - Runs the full release gate: `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`73/73` unit, protocol, governance, and Compose E2E tests across `15` suites).
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off code_quality_and_testing "<verification summary>"` (setting `CURRENT_TURN: license_governance`).
 5. **Stage 5 (Review 4) — `license_governance` (Antigravity License & Brand Governance Agent)**:
    - Audits root `LICENSE` (**MIT License**) parity with `MoreScreen.kt` (`open_source_licenses_card`, `mit_license_text_surface`, and `third_party_notices_surface`), permissive-only dependency allowlist (`gradle/libs.versions.toml` & `app/build.gradle.kts` with `includeInApk = false`), `org.suppressingfire.wemi` package/filename hygiene, and Play Store trademark boundaries (`LICENSE_GOVERNANCE.md`).
    - Runs `./gradlew testDebugUnitTest --tests org.suppressingfire.wemi.LicenseAndBrandGovernanceTest`.
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off license_governance "<verification summary>"` (setting `RELEASE_STATUS: AWAITING_FINAL_CONCLUSION` and `CURRENT_TURN: ai_studio_ux_cuj`).
 6. **Stage 6 (Conclude) — `ai_studio_ux_cuj` (Google AI Studio Agent)**:
-   - Verifies all 5 stages are `SIGNED_OFF` in `RELEASE_SIGN_OFF.md`, confirms `docs/user-guide/release-notes.md` & `play_store_assets/RELEASE_NOTES.txt` completeness, runs `bash scripts/advance_release_turn.sh conclude "<summary>"` (setting `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `CURRENT_TURN: NONE`, `FINAL_RELEASE_SHA`, and `CONCLUDED_AT`), and syncs to `origin/main`.
+   - Verifies all 5 review stages are `SIGNED_OFF` in `RELEASE_SIGN_OFF.md`, confirms `docs/user-guide/release-notes.md` & `play_store_assets/RELEASE_NOTES.txt` completeness, runs `bash scripts/advance_release_turn.sh conclude "<summary>"` (setting `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, `CURRENT_TURN: NONE`, `FINAL_RELEASE_SHA`, and `CONCLUDED_AT`), syncs to `origin/main`, and publishes the signed `.aab` to Google Play **Internal testing** + pushes the `app/build.gradle.kts` version bump.
+7. **Stage 7 (Promote) — `app_promoter` (Antigravity App Promoter Agent — Event-Driven GitHub Actions)**:
+   - Fires automatically via [`.github/workflows/play-store-promote.yml`](../../.github/workflows/play-store-promote.yml) on `push` to `main` touching `app/build.gradle.kts` (zero Antigravity LLM quota cost).
+   - Validates via [`scripts/promote_play_release.py`](../../scripts/promote_play_release.py) (`auto-promote`) that `versionCode` increased, `RELEASE_SIGN_OFF.md` has `RELEASE_STATUS: APPROVED_FOR_PLAY_STORE`, and Google Play `internal` holds a newer build than `alpha` (polling briefly for Play processing), then promotes `internal` → `alpha` (Closed testing) with `play_store_assets/RELEASE_NOTES.txt` fallback.
+   - Records `RELEASE_STATUS: PROMOTED_TO_CLOSED_TESTING`, `SIGN_OFF_APP_PROMOTER: PROMOTED`, `PROMOTED_VERSION_CODE`, `PROMOTED_TRACK`, and `PROMOTED_AT` via `bash scripts/advance_release_turn.sh promote ...` (`Agent: Antigravity App Promoter Agent (app_promoter)`).
+   - Manual fallback: `gh workflow run play-store-promote.yml -f mode=list-tracks` (read-only), `-f mode=auto-promote` (re-check/promote), or `-f mode=promote -f from_track=internal -f to_track=alpha`.
 
 ---
 
@@ -40,19 +45,19 @@ Every Play Store release candidate (`v23.0+`) is reviewed once by each of the 5 
 
 > [!IMPORTANT]
 > **5-Hour Quota Protection Rules (Mandatory)**:
-> 1. **Never poll `24/7` between releases**: Do **NOT** arm `scripts/await_release_turn.sh` when `RELEASE_STATUS` is `APPROVED_FOR_PLAY_STORE` or `AWAITING_AI_STUDIO_INITIATION` (`CURRENT_TURN: NONE`). Non-daemon `run_command` tasks hit `exebox`'s `9m50s` ceiling and wake the full LLM conversation on every timeout!
+> 1. **Never poll `24/7` between releases**: Do **NOT** arm `scripts/await_release_turn.sh` when `RELEASE_STATUS` is `APPROVED_FOR_PLAY_STORE`, `PROMOTED_TO_CLOSED_TESTING`, or `AWAITING_AI_STUDIO_INITIATION` (`CURRENT_TURN: NONE`), and never poll for event-driven Stage 7 (`app_promoter`). Non-daemon `run_command` tasks hit `exebox`'s `9m50s` ceiling and wake the full LLM conversation on every timeout!
 > 2. **Never re-arm after signing off your stage**: Once your role has recorded `SIGNED_OFF` for the current `(RELEASE_VERSION, ROUND_NUMBER)`, **end your turn immediately without re-arming `await_release_turn.sh`**.
 > 3. **Honor `[QUOTA GUARD] DO NOT RE-ARM`**: Whenever `await_release_turn.sh` prints `[QUOTA GUARD] DO NOT RE-ARM`, stop immediately and wait for the next user prompt.
 > 4. **Rotate Conversations at `>= 400` Steps**: Check `/home/antigravity/.gemini/usage/agy-usage --check-self`. Multi-day `1,000+`-step conversations cost `3.5x–5.0x` quota per turn; start a fresh specialist conversation for each new release cycle.
 > 5. **Auto-Sync Quota Guard Patch**: In a `WeMi-light-control` checkout, if `grep -q "QUOTA GUARD" scripts/await_release_turn.sh` is false and `/home/antigravity/.gemini/usage/wemi_release_patch/apply_to_wemi_repo.sh` exists, run `bash /home/antigravity/.gemini/usage/wemi_release_patch/apply_to_wemi_repo.sh` first so `origin/main` gets the quota-safe script.
 
 ### Step 1: Arm Your Turn Watcher *Only* During an Active `IN_REVIEW` Round While `PENDING`
-When a release review round is actively `IN_REVIEW` and your stage is still `PENDING` (waiting on an upstream stage in the ring), launch [`scripts/await_release_turn.sh`](../../scripts/await_release_turn.sh) (`WaitMsBeforeAsync: 5000`, `15`s poll interval, `510`s exebox-safe window, max `2` upstream waits):
+When a release review round is actively `IN_REVIEW` and your stage (Stages 2–5) is still `PENDING`, launch [`scripts/await_release_turn.sh`](../../scripts/await_release_turn.sh) (`WaitMsBeforeAsync: 5000`, `15`s poll interval, `510`s exebox-safe window, max `2` upstream waits):
 ```bash
 # Only while RELEASE_STATUS == IN_REVIEW and your SIGN_OFF_<ROLE> == PENDING:
 bash scripts/await_release_turn.sh <your_role> 15 510
 ```
-If no release is `IN_REVIEW` or your role already `SIGNED_OFF`, `await_release_turn.sh` exits in `<1s` within `WaitMsBeforeAsync` and prints `[QUOTA GUARD] DO NOT RE-ARM`.
+If no release is `IN_REVIEW`, your role already `SIGNED_OFF`, or `<your_role>` is `app_promoter`, `await_release_turn.sh` exits in `<1s` within `WaitMsBeforeAsync` and prints `[QUOTA GUARD] DO NOT RE-ARM`.
 
 ### Step 2: Execute Your Turn & Stop Cleanly After Sign-Off
 When `scripts/await_release_turn.sh <your_role>` activates your turn:

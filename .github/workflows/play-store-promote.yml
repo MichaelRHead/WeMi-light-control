@@ -1,15 +1,21 @@
 name: Promote Play Store Release
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - "app/build.gradle.kts"
   workflow_dispatch:
     inputs:
       mode:
-        description: "Operation: list-tracks (read-only) or promote"
+        description: "Operation: list-tracks (read-only), auto-promote (Stage 7 guarded), or promote (manual)"
         required: true
         type: choice
         default: list-tracks
         options:
           - list-tracks
+          - auto-promote
           - promote
       from_track:
         description: "Source Play track (e.g. internal, alpha, beta)"
@@ -22,7 +28,7 @@ on:
         type: string
         default: alpha
       version_code:
-        description: "Optional versionCode to promote (blank = latest release on from_track)"
+        description: "Optional versionCode to promote (promote mode only; blank = latest release on from_track)"
         required: false
         type: string
         default: ""
@@ -36,7 +42,7 @@ on:
           - draft
           - inProgress
       user_fraction:
-        description: "Staged rollout fraction between 0 and 1 (only when release_status is inProgress)"
+        description: "Staged rollout fraction between 0 and 1 (promote mode only, when release_status is inProgress)"
         required: false
         type: string
         default: ""
@@ -60,13 +66,18 @@ on:
         type: boolean
         default: false
       allow_same_version:
-        description: "Allow updating target track even if it already has the same versionCode and status"
+        description: "Allow updating target track even if it already has the same versionCode and status (promote mode)"
         required: false
         type: boolean
         default: false
+      update_sign_off:
+        description: "Record Stage 7 promotion in RELEASE_SIGN_OFF.md after promoting"
+        required: false
+        type: boolean
+        default: true
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: play-store-promote
@@ -79,6 +90,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -92,10 +105,15 @@ jobs:
         id: creds
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           if [ -z "$PLAY_SERVICE_ACCOUNT_JSON" ]; then
-            echo "::error::Missing repository secret PLAY_SERVICE_ACCOUNT_JSON."
-            exit 1
+            if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+              echo "::error::Missing repository secret PLAY_SERVICE_ACCOUNT_JSON."
+              exit 1
+            fi
+            echo "key_file=" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           key_file="$(mktemp "${RUNNER_TEMP}/play-sa-XXXXXX.json")"
           chmod 600 "$key_file"
@@ -103,8 +121,11 @@ jobs:
           echo "key_file=$key_file" >> "$GITHUB_OUTPUT"
 
       - name: Run Google Play track operation
+        id: play
         env:
           KEY_FILE: ${{ steps.creds.outputs.key_file }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_BEFORE: ${{ github.event.before }}
           INPUT_MODE: ${{ inputs.mode }}
           INPUT_FROM_TRACK: ${{ inputs.from_track }}
           INPUT_TO_TRACK: ${{ inputs.to_track }}
@@ -116,19 +137,72 @@ jobs:
           INPUT_CHANGES_NOT_SENT_FOR_REVIEW: ${{ inputs.changes_not_sent_for_review }}
           INPUT_ALLOW_SAME_VERSION: ${{ inputs.allow_same_version }}
         run: |
-          if [ "$INPUT_MODE" = "list-tracks" ]; then
+          if [ "$EVENT_NAME" = "push" ]; then
+            MODE="auto-promote"
+            FROM_TRACK="internal"
+            TO_TRACK="alpha"
+            RELEASE_STATUS="completed"
+            NOTES_SOURCE="source_track"
+            NOTES_LANG="en-US"
+            CHANGES_NOT_SENT="false"
+          else
+            MODE="$INPUT_MODE"
+            FROM_TRACK="$INPUT_FROM_TRACK"
+            TO_TRACK="$INPUT_TO_TRACK"
+            RELEASE_STATUS="$INPUT_RELEASE_STATUS"
+            NOTES_SOURCE="$INPUT_RELEASE_NOTES_SOURCE"
+            NOTES_LANG="$INPUT_RELEASE_NOTES_LANGUAGE"
+            CHANGES_NOT_SENT="$INPUT_CHANGES_NOT_SENT_FOR_REVIEW"
+          fi
+
+          if [ "$MODE" = "list-tracks" ]; then
             python3 scripts/promote_play_release.py \
               --credentials "$KEY_FILE" \
+              --github-output "$GITHUB_OUTPUT" \
               list-tracks
+          elif [ "$MODE" = "auto-promote" ]; then
+            CURR_VC="$(python3 -c 'import pathlib, sys; sys.path.insert(0, "scripts"); import promote_play_release as m; v = m.parse_gradle_version_code(pathlib.Path("app/build.gradle.kts").read_text(encoding="utf-8")); print("" if v is None else v)')"
+            PREV_VC=""
+            if [ "$EVENT_NAME" = "push" ]; then
+              BEFORE_REF="$EVENT_BEFORE"
+              if [ -z "$BEFORE_REF" ] || [ "$BEFORE_REF" = "0000000000000000000000000000000000000000" ]; then
+                BEFORE_REF="HEAD~1"
+              fi
+              if PREV_GRADLE="$(git show "${BEFORE_REF}:app/build.gradle.kts" 2>/dev/null)"; then
+                PREV_VC="$(printf '%s' "$PREV_GRADLE" | python3 -c 'import sys; sys.path.insert(0, "scripts"); import promote_play_release as m; v = m.parse_gradle_version_code(sys.stdin.read()); print("" if v is None else v)')"
+              fi
+            fi
+
+            args=(
+              --credentials "$KEY_FILE"
+              --github-output "$GITHUB_OUTPUT"
+              auto-promote
+              --from-track "$FROM_TRACK"
+              --to-track "$TO_TRACK"
+              --status "$RELEASE_STATUS"
+              --release-notes-source "$NOTES_SOURCE"
+              --release-notes-language "$NOTES_LANG"
+            )
+            if [ -n "$CURR_VC" ]; then
+              args+=(--current-version-code "$CURR_VC")
+            fi
+            if [ -n "$PREV_VC" ]; then
+              args+=(--previous-version-code "$PREV_VC")
+            fi
+            if [ "$CHANGES_NOT_SENT" = "true" ]; then
+              args+=(--changes-not-sent-for-review)
+            fi
+            python3 scripts/promote_play_release.py "${args[@]}"
           else
             args=(
               --credentials "$KEY_FILE"
+              --github-output "$GITHUB_OUTPUT"
               promote
-              --from-track "$INPUT_FROM_TRACK"
-              --to-track "$INPUT_TO_TRACK"
-              --status "$INPUT_RELEASE_STATUS"
-              --release-notes-source "$INPUT_RELEASE_NOTES_SOURCE"
-              --release-notes-language "$INPUT_RELEASE_NOTES_LANGUAGE"
+              --from-track "$FROM_TRACK"
+              --to-track "$TO_TRACK"
+              --status "$RELEASE_STATUS"
+              --release-notes-source "$NOTES_SOURCE"
+              --release-notes-language "$NOTES_LANG"
             )
             if [ -n "$INPUT_VERSION_CODE" ]; then
               args+=(--version-code "$INPUT_VERSION_CODE")
@@ -136,7 +210,7 @@ jobs:
             if [ -n "$INPUT_USER_FRACTION" ]; then
               args+=(--user-fraction "$INPUT_USER_FRACTION")
             fi
-            if [ "$INPUT_CHANGES_NOT_SENT_FOR_REVIEW" = "true" ]; then
+            if [ "$CHANGES_NOT_SENT" = "true" ]; then
               args+=(--changes-not-sent-for-review)
             fi
             if [ "$INPUT_ALLOW_SAME_VERSION" = "true" ]; then
@@ -144,6 +218,29 @@ jobs:
             fi
             python3 scripts/promote_play_release.py "${args[@]}"
           fi
+
+      - name: Record Stage 7 promotion in RELEASE_SIGN_OFF.md
+        if: steps.play.outputs.promoted == 'true' && (github.event_name == 'push' || inputs.mode == 'auto-promote' || inputs.update_sign_off == true)
+        env:
+          PROMOTED_VC: ${{ steps.play.outputs.version_code }}
+          PROMOTED_NAME: ${{ steps.play.outputs.release_name }}
+          FROM_TRACK: ${{ steps.play.outputs.from_track }}
+          TO_TRACK: ${{ steps.play.outputs.to_track }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          git config user.name "Antigravity App Promoter Agent"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          NAME_SUFFIX=""
+          if [ -n "${PROMOTED_NAME}" ]; then
+            NAME_SUFFIX=" release ${PROMOTED_NAME}"
+          fi
+          bash scripts/advance_release_turn.sh promote \
+            "Promoted Play build ${PROMOTED_VC}${NAME_SUFFIX} from ${FROM_TRACK} to ${TO_TRACK} via GitHub Actions run ${RUN_ID}." \
+            --version-code "${PROMOTED_VC}" \
+            --track "${TO_TRACK}" \
+            --verified "Play API promotion succeeded; build ${PROMOTED_VC} live on ${TO_TRACK}"
 
       - name: Clean up temporary credentials
         if: always() && steps.creds.outputs.key_file != ''

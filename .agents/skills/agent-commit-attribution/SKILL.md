@@ -41,6 +41,7 @@ Every agent must identify itself in the `Agent:` trailer using its canonical nam
 | **10.22.22.1 Setup Telemetry, SOAP Logs & Support** | `telemetry_and_debugging` | `Agent: Antigravity Telemetry & Debugging Agent (telemetry_and_debugging)` |
 | **Modularity, Build Hygiene & Hermetic/E2E Testing** | `code_quality_and_testing` | `Agent: Antigravity Code Quality & E2E Testing Agent (code_quality_and_testing)` |
 | **MIT License Parity, Dependencies & Brand Hygiene** | `license_governance` | `Agent: Antigravity License & Brand Governance Agent (license_governance)` |
+| **Play Store Track Promotion (Closed Testing)** | `app_promoter` | `Agent: Antigravity App Promoter Agent (app_promoter)` |
 | *(General / Cross-Repo Task Agent)* | `antigravity_general` | `Agent: Antigravity General Agent (antigravity_general)` |
 
 ---

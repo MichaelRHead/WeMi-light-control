@@ -8,9 +8,10 @@
 #
 # Quota Protection Invariants:
 #   1. Immediate exit (no background loop, DO NOT RE-ARM) when RELEASE_STATUS is
-#      APPROVED_FOR_PLAY_STORE or CURRENT_TURN is NONE.
+#      APPROVED_FOR_PLAY_STORE, PROMOTED_TO_CLOSED_TESTING, or CURRENT_TURN is NONE.
 #   2. Immediate exit (DO NOT RE-ARM) as soon as <agent_role> has SIGNED_OFF the
-#      current (RELEASE_VERSION, ROUND_NUMBER).
+#      current (RELEASE_VERSION, ROUND_NUMBER), or for event-driven Stage 7
+#      (`app_promoter`, triggered automatically via GitHub Actions).
 #   3. Clamps MAX_WAIT_SEC <= 510s (8.5m) so exebox never hits its 9m50s RPC
 #      deadline crash, and caps consecutive upstream idle waits to MAX_IDLE_REARMS=2
 #      (~25m max) so stalled upstream stages can never drain 5-hour LLM quota.
@@ -26,12 +27,17 @@ MAX_WAIT_SEC="${3:-510}"
 MAX_IDLE_REARMS="${MAX_IDLE_REARMS:-2}"
 
 if [[ -z "${ROLE}" ]]; then
-  echo "Usage: $0 <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj> [poll_interval_sec] [max_wait_sec]" >&2
+  echo "Usage: $0 <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj|app_promoter> [poll_interval_sec] [max_wait_sec]" >&2
   exit 2
 fi
 
 case "${ROLE}" in
   discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj)
+    ;;
+  app_promoter)
+    echo "[RELEASE COORDINATOR] Role 'app_promoter' (Stage 7) is event-driven via .github/workflows/play-store-promote.yml on push to app/build.gradle.kts."
+    echo "[QUOTA GUARD] DO NOT RE-ARM await_release_turn.sh for app_promoter. Promotion runs automatically in GitHub Actions at zero LLM quota cost."
+    exit 0
     ;;
   *)
     echo "[ERROR] Invalid agent role '${ROLE}'." >&2
@@ -136,7 +142,7 @@ while true; do
     fi
 
     # 3. Quota Guard A: No active release review in progress -> STOP IMMEDIATELY
-    if [[ "${REL_STATUS}" == "APPROVED_FOR_PLAY_STORE" || "${CUR_TURN}" == "NONE" || "${REL_STATUS}" == "AWAITING_AI_STUDIO_INITIATION" ]]; then
+    if [[ "${REL_STATUS}" == "APPROVED_FOR_PLAY_STORE" || "${REL_STATUS}" == "PROMOTED_TO_CLOSED_TESTING" || "${CUR_TURN}" == "NONE" || "${REL_STATUS}" == "AWAITING_AI_STUDIO_INITIATION" ]]; then
       rm -f "${REARM_FILE}" 2>/dev/null || true
       echo "[RELEASE COORDINATOR] No active review in progress (${REL_VER}: RELEASE_STATUS=${REL_STATUS}, CURRENT_TURN=${CUR_TURN})."
       echo "[QUOTA GUARD] DO NOT RE-ARM await_release_turn.sh between releases. End your turn cleanly now to preserve 5-hour quota."
