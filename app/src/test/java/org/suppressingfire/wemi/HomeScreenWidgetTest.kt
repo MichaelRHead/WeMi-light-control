@@ -283,4 +283,74 @@ class HomeScreenWidgetTest {
             assertEquals("Living Room", saved?.normalizedRoomName())
         }
     }
+
+    @Test
+    fun widgetConfigStoreRemapIdsPreservesOverlappingDestinationsAndHealsLearnedSerial() = runBlocking {
+        // 1) Overlapping shift [101, 102] -> [102, 103] and swap [102, 103] -> [103, 102] must not clobber configs
+        WidgetConfigStore.save(
+            context,
+            WidgetTargetConfig.forRoom(101, "Kitchen", DEFAULT_MAIN_HOME_KEY)
+        )
+        WidgetConfigStore.save(
+            context,
+            WidgetTargetConfig.forRoom(102, "Patio", DEFAULT_MAIN_HOME_KEY)
+        )
+
+        WidgetConfigStore.remapIds(context, intArrayOf(101, 102), intArrayOf(102, 103))
+        assertNull(WidgetConfigStore.load(context, 101))
+        assertEquals("Kitchen", WidgetConfigStore.load(context, 102)?.normalizedRoomName())
+        assertEquals("Patio", WidgetConfigStore.load(context, 103)?.normalizedRoomName())
+
+        WidgetConfigStore.remapIds(context, intArrayOf(102, 103), intArrayOf(103, 102))
+        assertEquals("Patio", WidgetConfigStore.load(context, 102)?.normalizedRoomName())
+        assertEquals("Kitchen", WidgetConfigStore.load(context, 103)?.normalizedRoomName())
+        assertEquals(setOf(102, 103), WidgetConfigStore.allConfiguredWidgetIds(context).toSet())
+
+        // 2) Toggling a device widget heals a previously blank/placeholder serialNumber once real hardware reports it
+        FakeUpnpServer(
+            initialFriendlyName = "Porch Sconce",
+            modelName = "WLS040",
+            serialNumber = "WLS040HEAL99",
+            udn = "uuid:Lightswitch-3_0-WLS040HEAL99",
+            initialRelayOn = false
+        ).use { server ->
+            val dao = SwitchDatabase.getDatabase(context).switchDao()
+            val repo = SwitchRepository(
+                dao = dao,
+                context = context,
+                initialDemoModeOverride = false
+            )
+            try {
+                val insertedId = dao.insertDevice(
+                    DeviceEntity(
+                        name = "Porch Sconce",
+                        roomName = "Porch",
+                        networkKey = DEFAULT_MAIN_HOME_KEY,
+                        deviceType = DeviceType.SWITCH_PLUG.name,
+                        ipAddress = "127.0.0.1",
+                        port = server.port,
+                        isOn = false,
+                        isReachable = true,
+                        serialNumber = "WLS040HEAL99"
+                    )
+                ).toInt()
+                WidgetConfigStore.save(
+                    context,
+                    WidgetTargetConfig(
+                        appWidgetId = 601,
+                        targetType = WidgetTargetType.DEVICE,
+                        deviceId = insertedId,
+                        serialNumber = "",
+                        roomName = "Porch",
+                        networkKey = DEFAULT_MAIN_HOME_KEY,
+                        displayName = "Porch Sconce"
+                    )
+                )
+                assertTrue(WidgetActionExecutor.toggleWidgetTarget(context, 601, repositoryOverride = repo))
+                assertEquals("WLS040HEAL99", WidgetConfigStore.load(context, 601)?.serialNumber)
+            } finally {
+                repo.close()
+            }
+        }
+    }
 }

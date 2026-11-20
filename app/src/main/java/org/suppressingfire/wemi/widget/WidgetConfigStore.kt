@@ -118,13 +118,20 @@ object WidgetConfigStore {
 
     fun remapIds(context: Context, oldIds: IntArray, newIds: IntArray) {
         val count = minOf(oldIds.size, newIds.size)
-        for (i in 0 until count) {
+        val remapped = (0 until count).mapNotNull { i ->
             val oldId = oldIds[i]
             val newId = newIds[i]
-            if (oldId == newId) continue
-            val existing = load(context, oldId) ?: continue
-            save(context, existing.copy(appWidgetId = newId))
-            delete(context, oldId)
+            if (oldId == newId) return@mapNotNull null
+            load(context, oldId)?.let { existing -> oldId to existing.copy(appWidgetId = newId) }
+        }
+        val destinationIds = remapped.map { it.second.appWidgetId }.toSet()
+        remapped.forEach { (oldId, _) ->
+            if (oldId !in destinationIds) {
+                delete(context, oldId)
+            }
+        }
+        remapped.forEach { (_, updatedConfig) ->
+            save(context, updatedConfig)
         }
     }
 

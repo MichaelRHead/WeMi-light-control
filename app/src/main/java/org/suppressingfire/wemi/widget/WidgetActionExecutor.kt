@@ -59,8 +59,11 @@ object WidgetActionExecutor {
                     val targetDevice = WidgetRemoteViewsBuilder.resolveTargetDevice(config, currentDevices)
                     if (targetDevice != null) {
                         val updated = repository.toggleDevicePower(targetDevice)
-                        // Heal persisted config if device ID or name changed
-                        if (updated.id != config.deviceId || updated.name != config.displayName) {
+                        val learnedRealSerial =
+                            !org.suppressingfire.wemi.network.LanRuntimeUtils.isPlaceholderSerial(updated.serialNumber) &&
+                                !updated.serialNumber.equals(config.serialNumber, ignoreCase = true)
+                        // Heal persisted config if device ID, name, or real hardware serial changed
+                        if (updated.id != config.deviceId || updated.name != config.displayName || learnedRealSerial) {
                             WidgetConfigStore.save(
                                 appCtx,
                                 WidgetTargetConfig.forDevice(appWidgetId, updated)

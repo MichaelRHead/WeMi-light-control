@@ -81,8 +81,9 @@ else
   NO_PUSH="true"
 fi
 
-# Ensure executable bits on gradlew, release scripts, promotion/asset scripts, and commit attribution scripts
+# Ensure executable bits on gradlew, release scripts, setup script, promotion/asset scripts, and commit attribution scripts
 chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
+  scripts/setup_dev_env.sh \
   scripts/promote_play_release.py scripts/test_promote_play_release.py \
   scripts/sync_play_assets.py scripts/test_sync_play_assets.py \
   .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
@@ -468,11 +469,12 @@ COMMIT_BODY="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["
 COMMIT_VERIFIED="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["verified"])' "${TMP_COMMIT_INFO}")"
 
 git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
+  scripts/setup_dev_env.sh \
   scripts/promote_play_release.py scripts/test_promote_play_release.py \
   scripts/sync_play_assets.py scripts/test_sync_play_assets.py \
   .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
   .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || \
-  git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh
+  git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh scripts/setup_dev_env.sh
 
 if [[ -n "${COMMIT_VERIFIED}" ]]; then
   bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \

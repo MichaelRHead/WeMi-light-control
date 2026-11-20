@@ -296,6 +296,9 @@ class ExampleUnitTest {
             "gradlew",
             "scripts/advance_release_turn.sh",
             "scripts/await_release_turn.sh",
+            "scripts/setup_dev_env.sh",
+            "scripts/promote_play_release.py",
+            "scripts/sync_play_assets.py",
             ".agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh",
             ".agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh"
         )
