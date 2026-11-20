@@ -1,6 +1,6 @@
 ---
 name: android-e2e-testing
-description: End-to-end (E2E) testing, loopback hardware simulation, and multi-layer validation methodology for Android & Android TV apps using Robolectric, Jetpack Compose UI testing, and embedded UPnP/SOAP/GENA servers. Use when designing, writing, splitting, or validating unit, protocol, and full-stack UI tests.
+description: Hermetic JVM/Robolectric E2E testing and loopback UPnP/SOAP/GENA simulation for Android & Android TV. Use when writing or validating tests.
 ---
 
 # Android End-to-End (E2E) Testing & Implementation Validation Skill

@@ -1,6 +1,6 @@
 ---
 name: android-code-modularization
-description: Guidelines and refactoring patterns for keeping Android & Jetpack Compose codebases exceptionally readable for humans. Use when auditing file complexity, decomposing large Repository/Network/ViewModel/Compose files into single-responsibility modules, eliminating duplicated state-transition boilerplate, or enforcing file-size and cohesion standards without breaking public APIs or package imports.
+description: Android & Jetpack Compose modularization and readability rules (<500-line files). Use when auditing complexity or refactoring large classes.
 ---
 
 # Android Code Modularization & Human Readability Skill

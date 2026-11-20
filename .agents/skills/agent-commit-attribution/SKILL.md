@@ -1,6 +1,6 @@
 ---
 name: agent-commit-attribution
-description: "Mandatory Git commit message formatting, human-readability, and attribution convention for all agents. Enforces plain-English <=72-char Conventional Commits subjects (no '[...Agent]' tags), concise reflowable plain-text bodies written for humans (what changed and why, no diff narration or symbol dumps, <=260 chars/bullet, <=1000 chars total), brief 'Verified:' trailers (<=120 chars), and mandatory 'Agent: <Canonical Agent Name> (<role_id>)' trailers. Use before every git commit, git commit --amend, automated release script commit, or AI Studio GitHub export."
+description: "Mandatory plain-English Git commit formatting and Agent trailer attribution. Use before every git commit, amend, or release commit."
 ---
 
 # Agent Commit Attribution & Human-Readable Formatting Skill (`agent-commit-attribution`)

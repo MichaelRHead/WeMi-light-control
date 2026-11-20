@@ -1,6 +1,6 @@
 ---
 name: wemi-app-promoter
-description: Operate Stage 7 (app_promoter) Google Play Store track promotion (internal -> Closed testing / alpha / beta / production) and idempotent Play Store asset syncing (play_store_assets/STORE_LISTING.md copy and all 7 PNG graphic/screenshot slots) via GitHub Actions (.github/workflows/play-store-promote.yml), scripts/promote_play_release.py, and scripts/sync_play_assets.py.
+description: Stage 7 Play Store track promotion (internal to Closed testing) and Play Store listing/graphic asset sync via GitHub Actions and scripts.
 ---
 
 # WeMi App Promoter & Play Store Asset Sync (`wemi-app-promoter`)

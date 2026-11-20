@@ -1,6 +1,6 @@
 ---
 name: wemi-changelog-and-docs
-description: Maintain the top-level reverse-chronological Change Log (IMPLEMENTED.md), Upcoming Features roadmap (UPCOMING_FEATURES.md), and modular User Guide (USER_GUIDE.md & docs/user-guide/*.md) for the WeMi Light Control repository. Use whenever implementing a new feature, fixing a bug, refactoring architecture, or completing an item from UPCOMING_FEATURES.md.
+description: Maintain root IMPLEMENTED.md, UPCOMING_FEATURES.md, USER_GUIDE.md, and docs/user-guide/*.md whenever landing features or fixes.
 ---
 
 # WeMi Change Log & Documentation Maintenance Skill (`wemi-changelog-and-docs`)
@@ -14,7 +14,7 @@ Use this skill whenever you land a feature, bug fix, UI change, or architectural
 > [!IMPORTANT]
 > **NO DUPLICATE `ALL_CAPS.md` FILES IN `docs/`**:
 > - **All `ALL_CAPS.md` documentation files live EXCLUSIVELY at the top level (`/`) of the repository**:
->   - [`AGENTS.md`](../../AGENTS.md)
+>   - [`AGENTS.md`](../../AGENTS.md) & [`ARCHITECTURE.md`](../../ARCHITECTURE.md)
 >   - [`UX_DESIGN.md`](../../UX_DESIGN.md) *(Owned Exclusively by the Google AI Studio Agent — Read-Only for other agents)*
 >   - [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md) *(Owned Exclusively by the Google AI Studio Agent — Read-Only for other agents)*
 >   - [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) *(Owned Exclusively by the Antigravity Debugging & Support Agent — Read-Only for other agents)*

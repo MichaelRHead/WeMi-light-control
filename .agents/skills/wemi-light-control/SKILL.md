@@ -1,6 +1,6 @@
 ---
 name: wemi-light-control
-description: Architecture, Belkin WeMo UPnP/SSDP/SOAP/GENA protocol reference, Room v5 schema, and production implementation guide for the WeMi Light Control Android & Android TV app (MichaelRHead/WeMi-light-control). Use whenever inspecting, modifying, testing, or extending local LAN discovery, GENA push events, rules, and 10.22.22.1 zero-cloud provisioning for WeMo In-Wall Switches (1st Gen & 2nd Gen 3-Way), In-Wall Dimmers, and WeMo Mini Smart Plugs.
+description: "WeMi Light Control domain guide: local UPnP/SSDP/SOAP/GENA protocol, Room v5 schema, and 10.22.22.1 setup for switches, dimmers, and plugs."
 ---
 
 # WeMi Light Control Skill (`MichaelRHead/WeMi-light-control`)

@@ -1,6 +1,6 @@
 ---
 name: wemi-release-coordinator
-description: Coordinate the 6-agent / 7-stage autonomous Google Play Store release review and Closed testing promotion process (AI Studio UX/CUJs -> Discovery & Room Grouping -> Telemetry & Debugging -> Code Quality & E2E Testing -> License & Brand Governance -> AI Studio Final Conclusion -> Event-Driven App Promoter Closed Testing Promotion) via RELEASE_SIGN_OFF.md, RELEASE_PROCESS.md, scripts/await_release_turn.sh, scripts/advance_release_turn.sh, and .github/workflows/play-store-promote.yml.
+description: 6-agent / 7-stage release review and Play Store promotion coordinator via RELEASE_SIGN_OFF.md, await_release_turn.sh, and advance_release_turn.sh.
 ---
 
 # WeMi 6-Agent / 7-Stage Autonomous Release Coordinator (`wemi-release-coordinator`)
