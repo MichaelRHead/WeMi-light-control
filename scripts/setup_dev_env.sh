@@ -1,26 +1,54 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# WeMi Light Control — Repeatable Cloud & Developer Environment Setup
+# WeMi Light Control — Fast, Cache-Backed Cloud & Developer Environment Setup
 # ==============================================================================
-# Installs Temurin JDK 21, Android SDK Command-Line Tools, Android SDK 36/36.1
-# platforms & build-tools, and a dynamic JVM/Gradle proxy & TLS CA sync helper
+# Configures Temurin JDK 21, Android SDK 36/36.1, Robolectric SDK 36 artifacts,
+# Gradle 9.3.1 warm caches, and dynamic JVM/Gradle proxy & TLS CA syncing
 # completely in user space ($HOME) without root/sudo.
+#
+# Performance Architecture:
+#   - On fresh cloud VMs, restores immutable lz4/gzip archives in parallel from
+#     persistent $HOME/.gemini/caches/wemi-android-v1/ onto fast local disk
+#     ($HOME on xfs) in ~15-20s, avoiding virtiofs lock contention and avoiding
+#     multi-minute cold Maven/SDK downloads.
+#   - Falls back cleanly to direct network downloads on a cache miss or outside
+#     Antigravity VMs (when $HOME/.gemini is absent).
+#   - Pass --save-caches after a warm build/test run to refresh shared caches.
 #
 # Idempotent and non-interactive: safe to run repeatedly on fresh cloud VMs and
 # across VM sleep/wake cycles.
 # ==============================================================================
 set -euo pipefail
 
+SAVE_CACHES=0
+for arg in "$@"; do
+  case "$arg" in
+    --save-caches) SAVE_CACHES=1 ;;
+    -h|--help)
+      echo "Usage: $0 [--save-caches]"
+      exit 0
+      ;;
+    *)
+      echo "[env-setup] Unknown argument: $arg" >&2
+      exit 2
+      ;;
+  esac
+done
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
 JAVA_HOME_DIR="$HOME/.local/jdk-21"
 ANDROID_SDK_DIR="$HOME/android-sdk"
 LOCAL_BIN_DIR="$HOME/.local/bin"
 GRADLE_DIR="$HOME/.gradle"
+M2_DIR="$HOME/.m2"
 SYNC_HELPER="$LOCAL_BIN_DIR/wemi-sync-java-proxy.sh"
 CMDLINE_TOOLS_URL="https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip"
 
-mkdir -p "$LOCAL_BIN_DIR" "$ANDROID_SDK_DIR/cmdline-tools" "$GRADLE_DIR"
+mkdir -p "$LOCAL_BIN_DIR" "$HOME/.local" "$ANDROID_SDK_DIR/cmdline-tools" "$GRADLE_DIR" "$M2_DIR"
 
-# 1. Install Temurin JDK 21 into $HOME/.local/jdk-21 if not already present
+# Detect CPU architecture
 ARCH="$(uname -m)"
 case "$ARCH" in
   x86_64) ADOPTIUM_ARCH="x64" ;;
@@ -31,10 +59,151 @@ case "$ARCH" in
     ;;
 esac
 
+# Detect fast persistent shared cache tier ($HOME/.gemini/caches) & compressor
+CACHE_DIR=""
+if [ -n "${WEMI_CACHE_DIR:-}" ]; then
+  CACHE_DIR="$WEMI_CACHE_DIR"
+elif [ -d "$HOME/.gemini" ] && [ -w "$HOME/.gemini" ]; then
+  CACHE_DIR="$HOME/.gemini/caches/wemi-android-v1"
+fi
+if [ -n "$CACHE_DIR" ]; then
+  mkdir -p "$CACHE_DIR" 2>/dev/null || CACHE_DIR=""
+fi
+
+if command -v lz4 >/dev/null 2>&1; then
+  ARCHIVE_EXT="tar.lz4"
+  compress_stream() { lz4 -1 -q; }
+  decompress_stream() { lz4 -dc "$1"; }
+elif command -v pigz >/dev/null 2>&1; then
+  ARCHIVE_EXT="tar.gz"
+  compress_stream() { pigz -1; }
+  decompress_stream() { pigz -dc "$1"; }
+else
+  ARCHIVE_EXT="tar.gz"
+  compress_stream() { gzip -1; }
+  decompress_stream() { gzip -dc "$1"; }
+fi
+
+# Compute Gradle dependency cache key (ignores routine versionCode/versionName bumps)
+compute_deps_key() {
+  {
+    for f in \
+      "$REPO_ROOT/gradle/wrapper/gradle-wrapper.properties" \
+      "$REPO_ROOT/gradle/libs.versions.toml" \
+      "$REPO_ROOT/settings.gradle.kts" \
+      "$REPO_ROOT/build.gradle.kts"; do
+      [ -f "$f" ] && cat "$f"
+    done
+    if [ -f "$REPO_ROOT/app/build.gradle.kts" ]; then
+      grep -vE '^\s*(versionCode|versionName)\s*=' "$REPO_ROOT/app/build.gradle.kts" || true
+    fi
+  } | sha256sum | awk '{print substr($1, 1, 12)}'
+}
+
+DEPS_KEY="$(compute_deps_key)"
+JDK_CACHE="${CACHE_DIR:+${CACHE_DIR}/jdk-21-${ADOPTIUM_ARCH}.${ARCHIVE_EXT}}"
+SDK_CACHE="${CACHE_DIR:+${CACHE_DIR}/android-sdk-36.1-${ADOPTIUM_ARCH}.${ARCHIVE_EXT}}"
+M2_CACHE="${CACHE_DIR:+${CACHE_DIR}/robolectric-m2-sdk36.${ARCHIVE_EXT}}"
+GRADLE_CACHE="${CACHE_DIR:+${CACHE_DIR}/gradle-warm-cache-${DEPS_KEY}.${ARCHIVE_EXT}}"
+
+save_archive_atomic() {
+  local dest="$1"
+  shift
+  [ -n "$dest" ] || return 0
+  local tmp="${dest}.tmp.$$"
+  if tar "$@" | compress_stream > "$tmp"; then
+    mv -f "$tmp" "$dest"
+  else
+    rm -f "$tmp"
+    return 1
+  fi
+}
+
+# 1. Fast parallel restore from persistent shared cache onto local fast disk
+RESTORE_PIDS=()
+RESTORE_NAMES=()
+
+need_sdk_restore() {
+  [ ! -x "$ANDROID_SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ] ||
+  [ ! -x "$ANDROID_SDK_DIR/platform-tools/adb" ] ||
+  [ ! -f "$ANDROID_SDK_DIR/platforms/android-36/android.jar" ] ||
+  [ ! -f "$ANDROID_SDK_DIR/platforms/android-36.1/android.jar" ] ||
+  [ ! -x "$ANDROID_SDK_DIR/build-tools/36.0.0/aapt2" ] ||
+  [ ! -x "$ANDROID_SDK_DIR/build-tools/36.1.0/aapt2" ]
+}
+
+if [ -n "$CACHE_DIR" ]; then
+  if [ ! -x "$JAVA_HOME_DIR/bin/java" ] && [ -f "$JDK_CACHE" ]; then
+    (
+      tmp_parent="$HOME/.local/.jdk-restore.$$"
+      rm -rf "$tmp_parent" && mkdir -p "$tmp_parent"
+      decompress_stream "$JDK_CACHE" | tar -xf - -C "$tmp_parent"
+      rm -rf "$JAVA_HOME_DIR"
+      mv "$tmp_parent/jdk-21" "$JAVA_HOME_DIR"
+      rm -rf "$tmp_parent"
+    ) &
+    RESTORE_PIDS+=("$!")
+    RESTORE_NAMES+=("jdk-21")
+  fi
+
+  if need_sdk_restore && [ -f "$SDK_CACHE" ]; then
+    (
+      tmp_parent="$HOME/.android-sdk-restore.$$"
+      rm -rf "$tmp_parent" && mkdir -p "$tmp_parent"
+      decompress_stream "$SDK_CACHE" | tar -xf - -C "$tmp_parent"
+      rm -rf "$ANDROID_SDK_DIR"
+      mv "$tmp_parent/android-sdk" "$ANDROID_SDK_DIR"
+      rm -rf "$tmp_parent"
+    ) &
+    RESTORE_PIDS+=("$!")
+    RESTORE_NAMES+=("android-sdk")
+  fi
+
+  if [ ! -f "$M2_DIR/.wemi-robolectric-seeded" ] && \
+     [ ! -d "$M2_DIR/repository/org/robolectric/android-all-instrumented" ] && \
+     [ -f "$M2_CACHE" ]; then
+    (
+      decompress_stream "$M2_CACHE" | tar -xf - -C "$M2_DIR"
+      touch "$M2_DIR/.wemi-robolectric-seeded"
+    ) &
+    RESTORE_PIDS+=("$!")
+    RESTORE_NAMES+=("robolectric-m2")
+  fi
+
+  if [ ! -f "$GRADLE_DIR/.wemi-cache-seeded" ] && \
+     [ ! -d "$GRADLE_DIR/caches/modules-2/files-2.1" ]; then
+    GRADLE_RESTORE_SRC=""
+    if [ -f "$GRADLE_CACHE" ]; then
+      GRADLE_RESTORE_SRC="$GRADLE_CACHE"
+    else
+      # Fall back to the newest prior dependency cache so upgraded deps only download deltas
+      GRADLE_RESTORE_SRC="$(ls -t "$CACHE_DIR"/gradle-warm-cache-*."$ARCHIVE_EXT" 2>/dev/null | head -n 1 || true)"
+    fi
+    if [ -n "$GRADLE_RESTORE_SRC" ] && [ -f "$GRADLE_RESTORE_SRC" ]; then
+      (
+        decompress_stream "$GRADLE_RESTORE_SRC" | tar -xf - -C "$GRADLE_DIR"
+        touch "$GRADLE_DIR/.wemi-cache-seeded"
+      ) &
+      RESTORE_PIDS+=("$!")
+      RESTORE_NAMES+=("gradle-cache")
+    fi
+  fi
+
+  if [ "${#RESTORE_PIDS[@]}" -gt 0 ]; then
+    echo "[env-setup] Restoring cached toolchains/dependencies in parallel: ${RESTORE_NAMES[*]}..."
+    for i in "${!RESTORE_PIDS[@]}"; do
+      if ! wait "${RESTORE_PIDS[$i]}"; then
+        echo "[env-setup] Warning: cache restore failed for ${RESTORE_NAMES[$i]}; falling back to network." >&2
+      fi
+    done
+  fi
+fi
+
+# 2. Network fallback: Install Temurin JDK 21 if still missing
+JDK_FRESHLY_INSTALLED=0
 if [ ! -x "$JAVA_HOME_DIR/bin/java" ]; then
-  echo "[env-setup] Installing Temurin JDK 21 (${ADOPTIUM_ARCH}) into $JAVA_HOME_DIR..."
+  echo "[env-setup] Downloading Temurin JDK 21 (${ADOPTIUM_ARCH}) into $JAVA_HOME_DIR..."
   TMP_JDK="$(mktemp /tmp/temurin-jdk21-XXXXXX.tar.gz)"
-  trap 'rm -f "${TMP_JDK:-}" "${TMP_CLI:-}"' EXIT
   curl -fSL \
     "https://api.adoptium.net/v3/binary/latest/21/ga/linux/${ADOPTIUM_ARCH}/jdk/hotspot/normal/eclipse" \
     -o "$TMP_JDK"
@@ -44,17 +213,18 @@ if [ ! -x "$JAVA_HOME_DIR/bin/java" ]; then
   rm -f "$TMP_JDK"
   rm -rf "$JAVA_HOME_DIR"
   mv "${JAVA_HOME_DIR}.tmp" "$JAVA_HOME_DIR"
+  JDK_FRESHLY_INSTALLED=1
 fi
 
 if [ ! -f "$JAVA_HOME_DIR/lib/security/cacerts.orig" ]; then
   cp "$JAVA_HOME_DIR/lib/security/cacerts" "$JAVA_HOME_DIR/lib/security/cacerts.orig"
 fi
 
-# 2. Install Android SDK Command-Line Tools into $HOME/android-sdk/cmdline-tools/latest
+# 3. Network fallback: Install Android SDK cmdline-tools if still missing
+SDK_FRESHLY_INSTALLED=0
 if [ ! -x "$ANDROID_SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]; then
-  echo "[env-setup] Installing Android SDK command-line tools into $ANDROID_SDK_DIR..."
+  echo "[env-setup] Downloading Android SDK command-line tools into $ANDROID_SDK_DIR..."
   TMP_CLI="$(mktemp /tmp/android-cmdline-tools-XXXXXX.zip)"
-  trap 'rm -f "${TMP_JDK:-}" "${TMP_CLI:-}"' EXIT
   curl -fSL "$CMDLINE_TOOLS_URL" -o "$TMP_CLI"
   rm -rf "$ANDROID_SDK_DIR/cmdline-tools/latest.tmp"
   mkdir -p "$ANDROID_SDK_DIR/cmdline-tools/latest.tmp"
@@ -63,9 +233,10 @@ if [ ! -x "$ANDROID_SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]; then
   rm -rf "$ANDROID_SDK_DIR/cmdline-tools/latest"
   mv "$ANDROID_SDK_DIR/cmdline-tools/latest.tmp/cmdline-tools" "$ANDROID_SDK_DIR/cmdline-tools/latest"
   rm -rf "$ANDROID_SDK_DIR/cmdline-tools/latest.tmp"
+  SDK_FRESHLY_INSTALLED=1
 fi
 
-# 3. Install/update fast (<15ms) dynamic proxy & CA truststore sync helper
+# 4. Install/update fast (<15ms) dynamic proxy & TLS CA sync helper
 TMP_SYNC="${SYNC_HELPER}.tmp.$$"
 cat <<'EOF' > "$TMP_SYNC"
 #!/usr/bin/env bash
@@ -251,7 +422,7 @@ EOF
 chmod +x "$TMP_SYNC"
 mv "$TMP_SYNC" "$SYNC_HELPER"
 
-# 4. Persist environment variables & proxy sync hook idempotently in ~/.bashrc
+# 5. Persist environment variables & proxy sync hook idempotently in ~/.bashrc
 touch "$HOME/.bashrc"
 sed -i '/case \$- in/,/esac/d' "$HOME/.bashrc" 2>/dev/null || true
 
@@ -298,7 +469,7 @@ unset _wemi_dir
 BASH_ENV= "$SYNC_HELPER"
 [ -f "$GRADLE_DIR/proxy.env" ] && . "$GRADLE_DIR/proxy.env"
 
-# 5. Install required Android SDK 36 / 36.1 packages if any are missing
+# 6. Network fallback: Install missing Android SDK 36 / 36.1 packages
 MISSING_PKGS=()
 [ -x "$ANDROID_HOME/platform-tools/adb" ] || MISSING_PKGS+=("platform-tools")
 [ -f "$ANDROID_HOME/platforms/android-36/android.jar" ] || MISSING_PKGS+=("platforms;android-36")
@@ -323,12 +494,65 @@ if [ "${#MISSING_PKGS[@]}" -gt 0 ]; then
   fi
   ( yes || true ) | sdkmanager --sdk_root="$ANDROID_HOME" "${PROXY_ARGS[@]}" --licenses >/dev/null || true
   sdkmanager --sdk_root="$ANDROID_HOME" "${PROXY_ARGS[@]}" "${MISSING_PKGS[@]}"
+  SDK_FRESHLY_INSTALLED=1
 fi
 
-# 6. Ensure gradlew is executable and pre-warm Gradle wrapper distribution
-if [ -f "./gradlew" ]; then
-  chmod +x ./gradlew
-  ./gradlew --version --no-daemon >/dev/null
+# 7. Ensure gradlew is executable and pre-warm Gradle wrapper only if absent
+GRADLE_VER="$(sed -n 's/.*gradle-\([0-9.]*\)-bin\.zip.*/\1/p' "$REPO_ROOT/gradle/wrapper/gradle-wrapper.properties" 2>/dev/null | head -n 1 || true)"
+if [ -f "$REPO_ROOT/gradlew" ]; then
+  chmod +x "$REPO_ROOT/gradlew"
+  if [ -z "$GRADLE_VER" ] || [ ! -d "$GRADLE_DIR/wrapper/dists/gradle-${GRADLE_VER}-bin" ]; then
+    (cd "$REPO_ROOT" && ./gradlew --version --no-daemon >/dev/null)
+  fi
 fi
 
-echo "[env-setup] Ready: $(java -version 2>&1 | head -n 1) | ANDROID_HOME=$ANDROID_HOME"
+# 8. Populate or refresh persistent shared caches when missing or --save-caches is passed
+if [ -n "$CACHE_DIR" ]; then
+  if [ "$SAVE_CACHES" -eq 1 ] || [ "$JDK_FRESHLY_INSTALLED" -eq 1 ] || [ ! -f "$JDK_CACHE" ]; then
+    if [ -x "$JAVA_HOME_DIR/bin/java" ]; then
+      echo "[env-setup] Saving JDK 21 archive to $JDK_CACHE..."
+      save_archive_atomic "$JDK_CACHE" -cf - -C "$HOME/.local" jdk-21 || true
+    fi
+  fi
+
+  if [ "$SAVE_CACHES" -eq 1 ] || [ "$SDK_FRESHLY_INSTALLED" -eq 1 ] || [ ! -f "$SDK_CACHE" ]; then
+    if ! need_sdk_restore; then
+      echo "[env-setup] Saving Android SDK 36/36.1 archive to $SDK_CACHE..."
+      save_archive_atomic "$SDK_CACHE" -cf - -C "$HOME" android-sdk || true
+    fi
+  fi
+
+  if [ "$SAVE_CACHES" -eq 1 ] || [ ! -f "$M2_CACHE" ]; then
+    if [ -d "$M2_DIR/repository/org/robolectric/android-all-instrumented" ]; then
+      echo "[env-setup] Saving Robolectric SDK 36 archive to $M2_CACHE..."
+      save_archive_atomic "$M2_CACHE" -cf - -C "$M2_DIR" repository/org/robolectric || true
+    fi
+  fi
+
+  if [ "$SAVE_CACHES" -eq 1 ] || [ ! -f "$GRADLE_CACHE" ]; then
+    if [ -d "$GRADLE_DIR/caches/modules-2/files-2.1" ]; then
+      echo "[env-setup] Saving warm Gradle dependency cache (${DEPS_KEY}) to $GRADLE_CACHE..."
+      [ -f "$REPO_ROOT/gradlew" ] && (cd "$REPO_ROOT" && ./gradlew --stop >/dev/null 2>&1 || true)
+      GRADLE_TAR_PATHS=()
+      [ -d "$GRADLE_DIR/wrapper/dists" ] && GRADLE_TAR_PATHS+=("wrapper/dists")
+      [ -d "$GRADLE_DIR/caches/modules-2" ] && GRADLE_TAR_PATHS+=("caches/modules-2")
+      [ -n "$GRADLE_VER" ] && [ -d "$GRADLE_DIR/caches/$GRADLE_VER" ] && GRADLE_TAR_PATHS+=("caches/$GRADLE_VER")
+      [ -d "$GRADLE_DIR/caches/journal-1" ] && GRADLE_TAR_PATHS+=("caches/journal-1")
+      [ -d "$GRADLE_DIR/caches/build-cache-1" ] && GRADLE_TAR_PATHS+=("caches/build-cache-1")
+      if [ "${#GRADLE_TAR_PATHS[@]}" -gt 0 ]; then
+        if save_archive_atomic "$GRADLE_CACHE" \
+          --exclude='*.lock' --exclude='daemon' --exclude='notifications' \
+          --exclude='workers' --exclude='kotlin-profile' --exclude='.tmp' \
+          --exclude='proxy-*' --exclude='gradle.properties' \
+          -cf - -C "$GRADLE_DIR" "${GRADLE_TAR_PATHS[@]}"; then
+          # Prune superseded Gradle cache snapshots
+          for old in "$CACHE_DIR"/gradle-warm-cache-*."$ARCHIVE_EXT"; do
+            [ -f "$old" ] && [ "$old" != "$GRADLE_CACHE" ] && rm -f "$old"
+          done
+        fi
+      fi
+    fi
+  fi
+fi
+
+echo "[env-setup] Ready: $(java -version 2>&1 | head -n 1) | ANDROID_HOME=$ANDROID_HOME | cache=${CACHE_DIR:-disabled} (deps=${DEPS_KEY})"
