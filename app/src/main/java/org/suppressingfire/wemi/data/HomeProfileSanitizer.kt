@@ -166,10 +166,17 @@ internal class HomeProfileSanitizer(
             }
         }
 
+        val homeByKey = existingHomes.associateBy { it.networkKey }
         val rawDevices = dao.getAllDevices().first()
         rawDevices.forEach { dev ->
             val cleanSsid = if (XmlAndSkuParser.isWemoDeviceSetupSsid(dev.wifiSsid)) {
-                "LAN $subnetPrefix.0/24"
+                val homeSsid = homeByKey[dev.networkKey]?.ssidLabel?.takeIf {
+                    it.isNotBlank() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it)
+                }
+                val deviceSubnet = dev.ipAddress.substringBeforeLast('.', "").takeIf {
+                    it.count { ch -> ch == '.' } == 2 && it != "127.0.0" && it != "10.22.22"
+                }
+                homeSsid ?: "LAN ${deviceSubnet ?: subnetPrefix}.0/24"
             } else {
                 dev.wifiSsid
             }

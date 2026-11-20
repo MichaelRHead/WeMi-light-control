@@ -416,7 +416,11 @@ class LifecycleAndConcurrencyTest {
             val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             val repo = SwitchRepository(dao = database.switchDao(), networkClient = NetworkClient(), initialDemoModeOverride = true)
             repo.ensureSeeded()
-            val monitor = NetworkMonitor(app, fallbackIpResolver = { "127.0.0.1" })
+            val monitor = NetworkMonitor(
+                app,
+                fallbackIpResolver = { "127.0.0.1" },
+                interfaceIpResolver = { "127.0.0.1" to "lo" }
+            )
             val provisionCalls = AtomicInteger(0)
             val provisionController = ProvisionApUiController(
                 scope = controllerScope, repository = repo, networkMonitor = monitor,

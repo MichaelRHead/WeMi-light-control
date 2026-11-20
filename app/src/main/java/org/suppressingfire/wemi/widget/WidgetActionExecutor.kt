@@ -1,10 +1,13 @@
 package org.suppressingfire.wemi.widget
 
 import android.content.Context
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
@@ -16,6 +19,7 @@ import org.suppressingfire.wemi.network.LanRuntimeUtils
  * launching the app UI.
  */
 object WidgetActionExecutor {
+    private val widgetMutexes = ConcurrentHashMap<Int, Mutex>()
 
     private suspend fun loadAllDevices(repository: SwitchRepository): List<DeviceEntity> {
         if (repository.isDemoShowroomMode.value) {
@@ -26,7 +30,8 @@ object WidgetActionExecutor {
 
     /**
      * Toggles the light or room bound to [appWidgetId] and refreshes all placed WeMi widgets
-     * with the resulting hardware/Room state.
+     * with the resulting hardware/Room state. Serializes rapid taps on the same widget ID so
+     * back-to-back taps read fresh Room state instead of racing separate repositories.
      *
      * @param repositoryOverride Optional repository injection for hermetic loopback tests.
      */
@@ -34,9 +39,9 @@ object WidgetActionExecutor {
         context: Context,
         appWidgetId: Int,
         repositoryOverride: SwitchRepository? = null
-    ): Boolean {
+    ): Boolean = widgetMutexes.computeIfAbsent(appWidgetId) { Mutex() }.withLock {
         val appCtx = context.applicationContext
-        val config = WidgetConfigStore.load(appCtx, appWidgetId) ?: return false
+        val config = WidgetConfigStore.load(appCtx, appWidgetId) ?: return@withLock false
 
         val ownsRepo = repositoryOverride == null
         val repository = repositoryOverride ?: SwitchRepository(
@@ -44,7 +49,7 @@ object WidgetActionExecutor {
             context = appCtx
         )
 
-        return try {
+        try {
             val currentDevices = loadAllDevices(repository)
             // Push instant visual feedback on the tapped widget before LAN SOAP round-trip
             WidgetUpdater.updateSingleWidget(
@@ -81,14 +86,14 @@ object WidgetActionExecutor {
                     if (roomSwitches.isEmpty()) {
                         false
                     } else {
+                        val resolvedHomeKey = roomSwitches.first().networkKey
                         val reachable = roomSwitches.filter { it.isReachable }
                         if (reachable.isNotEmpty()) {
                             val targetOn = reachable.none { it.isOn }
-                            val homeKey = reachable.first().networkKey
                             repository.toggleRoomPower(
                                 roomName = config.normalizedRoomName(),
                                 targetOn = targetOn,
-                                networkKey = homeKey
+                                networkKey = resolvedHomeKey
                             )
                         } else {
                             // All switches in this room were previously marked offline — actively probe/wake them
@@ -97,6 +102,9 @@ object WidgetActionExecutor {
                                     async { repository.setDevicePowerExplicit(dev, true) }
                                 }.awaitAll()
                             }
+                        }
+                        if (resolvedHomeKey.isNotBlank() && resolvedHomeKey != config.networkKey) {
+                            WidgetConfigStore.save(appCtx, config.copy(networkKey = resolvedHomeKey))
                         }
                         true
                     }

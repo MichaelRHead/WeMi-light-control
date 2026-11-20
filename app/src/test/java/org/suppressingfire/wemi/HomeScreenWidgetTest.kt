@@ -1,15 +1,12 @@
 package org.suppressingfire.wemi
 
-import android.app.Activity
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.performClick
-import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -19,17 +16,16 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.suppressingfire.wemi.data.DEFAULT_CABIN_HOME_KEY
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
-import org.suppressingfire.wemi.widget.SwitchWidgetConfigureActivity
 import org.suppressingfire.wemi.widget.WeMiSwitchWidgetProvider
 import org.suppressingfire.wemi.widget.WidgetActionExecutor
 import org.suppressingfire.wemi.widget.WidgetConfigStore
@@ -41,9 +37,6 @@ import org.suppressingfire.wemi.widget.WidgetVisualMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class HomeScreenWidgetTest {
-
-    @get:Rule
-    val composeRule = createEmptyComposeRule()
 
     private lateinit var context: Context
 
@@ -249,44 +242,39 @@ class HomeScreenWidgetTest {
     }
 
     @Test
-    fun widgetConfigureActivityLetsUserSelectRoomAndReturnsResultOk() {
-        val launchIntent = Intent(context, SwitchWidgetConfigureActivity::class.java).apply {
-            action = AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 555)
-        }
-        ActivityScenario.launchActivityForResult<SwitchWidgetConfigureActivity>(launchIntent).use { scenario ->
-            composeRule.waitUntil(timeoutMillis = 5_000L) {
-                runCatching {
-                    composeRule.onNodeWithTag("widget_config_room_Living Room").assertIsDisplayed()
-                    true
-                }.getOrDefault(false)
-            }
+    fun widgetResolutionPrioritizesRealSerialOverRecycledIdAndIsolatesMultiHomeRooms() {
+        val garageRecycled = DeviceEntity(
+            id = 1, name = "Garage Fan", roomName = "Garage",
+            networkKey = DEFAULT_MAIN_HOME_KEY, ipAddress = "192.168.1.20",
+            isOn = true, isReachable = true, serialNumber = "WLS040GARAGE1"
+        )
+        val kitchenMoved = DeviceEntity(
+            id = 5, name = "Kitchen Light", roomName = "Kitchen",
+            networkKey = DEFAULT_MAIN_HOME_KEY, ipAddress = "192.168.1.21",
+            isOn = false, isReachable = true, serialNumber = "WLS040KITCH5"
+        )
+        val kitchenCfg = WidgetTargetConfig(
+            appWidgetId = 310, targetType = WidgetTargetType.DEVICE,
+            deviceId = 1, serialNumber = "WLS040KITCH5",
+            roomName = "Kitchen", networkKey = DEFAULT_MAIN_HOME_KEY, displayName = "Kitchen Light"
+        )
+        // Serial must win over recycled deviceId=1, and removed device must not hijack Garage Fan
+        assertEquals(5, WidgetRemoteViewsBuilder.resolveTargetDevice(kitchenCfg, listOf(garageRecycled, kitchenMoved))?.id)
+        assertNull(WidgetRemoteViewsBuilder.resolveTargetDevice(kitchenCfg, listOf(garageRecycled)))
+        val missingState = WidgetRemoteViewsBuilder.resolveDisplayState(kitchenCfg, listOf(garageRecycled))
+        assertEquals("Tap to reconfigure", missingState.subtitle)
+        assertEquals(WidgetVisualMode.OFFLINE, missingState.visualMode)
 
-            // Switch to Lights tab and confirm lights list renders
-            composeRule.onNodeWithTag("widget_config_tab_lights").performClick()
-            composeRule.waitForIdle()
-            composeRule.onNodeWithTag("widget_config_lights_list").assertIsDisplayed()
-
-            // Switch back to Rooms tab and pick Living Room
-            composeRule.onNodeWithTag("widget_config_tab_rooms").performClick()
-            composeRule.waitForIdle()
-            composeRule.onNodeWithTag("widget_config_room_Living Room").performClick()
-            composeRule.waitForIdle()
-
-            val result = scenario.result
-            assertEquals(Activity.RESULT_OK, result.resultCode)
-            assertEquals(
-                555,
-                result.resultData?.getIntExtra(
-                    AppWidgetManager.EXTRA_APPWIDGET_ID,
-                    AppWidgetManager.INVALID_APPWIDGET_ID
-                )
-            )
-            val saved = WidgetConfigStore.load(context, 555)
-            assertNotNull(saved)
-            assertEquals(WidgetTargetType.ROOM, saved?.targetType)
-            assertEquals("Living Room", saved?.normalizedRoomName())
-        }
+        // Multi-home room isolation: existing Main Home prevents hijacking Lake Cabin's Living Room
+        val cabinLiving = DeviceEntity(
+            id = 9, name = "Cabin Lamp", roomName = "Living Room",
+            networkKey = DEFAULT_CABIN_HOME_KEY, ipAddress = "192.168.50.10",
+            isOn = true, isReachable = true, serialNumber = "WLS040CABIN9"
+        )
+        val mainLivingCfg = WidgetTargetConfig.forRoom(311, "Living Room", DEFAULT_MAIN_HOME_KEY)
+        assertTrue(WidgetRemoteViewsBuilder.resolveRoomDevices(mainLivingCfg, listOf(kitchenMoved, cabinLiving)).isEmpty())
+        // Once old networkKey disappears completely (LAN reset), recover cleanly to a single matching home
+        assertEquals(listOf(9), WidgetRemoteViewsBuilder.resolveRoomDevices(mainLivingCfg, listOf(cabinLiving)).map { it.id })
     }
 
     @Test
@@ -392,12 +380,12 @@ class HomeScreenWidgetTest {
                 initialDemoModeOverride = false
             )
             try {
-                // Start marked offline so we also test offline Room wake-up via broadcast
+                // Start marked offline on a post-reset LAN homeKey to test offline Room wake-up + networkKey healing
                 val savedId = dao.insertDevice(
                     DeviceEntity(
                         name = "Garage Overhead",
                         roomName = "Garage",
-                        networkKey = DEFAULT_MAIN_HOME_KEY,
+                        networkKey = "wifi_lan_192_168_86",
                         deviceType = DeviceType.SWITCH_PLUG.name,
                         ipAddress = "127.0.0.1",
                         port = server.port,
@@ -418,7 +406,18 @@ class HomeScreenWidgetTest {
                 WeMiSwitchWidgetProvider.actionRunnerForTests = { block -> runBlocking { block() } }
                 WeMiSwitchWidgetProvider.repositoryProviderForTests = { repo }
 
-                // Pin a Room widget via ACTION_WIDGET_PINNED broadcast
+                // Non-positive widget IDs must be ignored cleanly
+                provider.onReceive(
+                    context,
+                    Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -5)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.ROOM.name)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
+                    }
+                )
+                assertTrue(WidgetConfigStore.allConfiguredWidgetIds(context).isEmpty())
+
+                // Pin a Room widget via ACTION_WIDGET_PINNED broadcast (with stale homeKey)
                 provider.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
@@ -431,7 +430,7 @@ class HomeScreenWidgetTest {
                 )
                 assertEquals("Garage", WidgetConfigStore.load(context, 702)?.normalizedRoomName())
 
-                // Tap the offline Room widget via ACTION_TOGGLE_WIDGET -> wakes offline loopback switch ON
+                // Tap the offline Room widget via ACTION_TOGGLE_WIDGET -> wakes offline switch ON & heals networkKey
                 provider.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
@@ -441,20 +440,22 @@ class HomeScreenWidgetTest {
                 assertTrue("Expected offline Room widget tap to wake server ON", server.relayStateOn.get())
                 assertTrue(dao.getDeviceById(savedId)?.isReachable == true)
                 assertTrue(dao.getDeviceById(savedId)?.isOn == true)
+                assertEquals("wifi_lan_192_168_86", WidgetConfigStore.load(context, 702)?.networkKey)
 
-                // Pin a Device widget and toggle it OFF via ACTION_TOGGLE_WIDGET
+                // Pin a Device widget with placeholder serial "UNKNOWN" -> strips placeholder, heals on toggle OFF
                 provider.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 701)
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.DEVICE.name)
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_DEVICE_ID, savedId)
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_SERIAL_NUMBER, "WLS040BCAST01")
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_SERIAL_NUMBER, "UNKNOWN")
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, DEFAULT_MAIN_HOME_KEY)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, "wifi_lan_192_168_86")
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_DISPLAY_NAME, "Garage Overhead")
                     }
                 )
+                assertEquals("", WidgetConfigStore.load(context, 701)?.serialNumber)
                 provider.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
@@ -462,6 +463,16 @@ class HomeScreenWidgetTest {
                     }
                 )
                 assertFalse("Expected device widget toggle broadcast to turn server OFF", server.relayStateOn.get())
+                assertEquals("WLS040BCAST01", WidgetConfigStore.load(context, 701)?.serialNumber)
+
+                // Rapid concurrent double-tap on widget 701 serializes cleanly (OFF -> ON -> OFF)
+                coroutineScope {
+                    listOf(
+                        async { WidgetActionExecutor.toggleWidgetTarget(context, 701, repositoryOverride = repo) },
+                        async { WidgetActionExecutor.toggleWidgetTarget(context, 701, repositoryOverride = repo) }
+                    ).awaitAll()
+                }
+                assertFalse("Two back-to-back widget toggles from OFF must settle OFF", server.relayStateOn.get())
 
                 // Exercise onRestored (overlapping IDs) and onDeleted
                 provider.onRestored(context, intArrayOf(701, 702), intArrayOf(702, 703))

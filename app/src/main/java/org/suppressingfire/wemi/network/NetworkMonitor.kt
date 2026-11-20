@@ -34,7 +34,10 @@ data class LanNetworkSnapshot(
  */
 class NetworkMonitor(
     private val context: Context?,
-    private val fallbackIpResolver: () -> String = { "192.168.1.50" }
+    private val fallbackIpResolver: () -> String = { "192.168.1.50" },
+    private val interfaceIpResolver: () -> Pair<String, String> = {
+        LanRuntimeUtils.resolvePreferredLanInterfaceIpv4(fallbackIp = fallbackIpResolver())
+    }
 ) {
     private val connectivityManager =
         context?.applicationContext?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
@@ -142,9 +145,7 @@ class NetworkMonitor(
     }
 
     private fun computeSnapshotFromInterfaces(): LanNetworkSnapshot {
-        val (ip, resolvedIfName) = LanRuntimeUtils.resolvePreferredLanInterfaceIpv4(
-            fallbackIp = fallbackIpResolver()
-        )
+        val (ip, resolvedIfName) = interfaceIpResolver()
         val prefix = ip.substringBeforeLast('.', "192.168.1")
         val cm = connectivityManager
         val boundNet = findPreferredWifiOrLanNetwork(cm)

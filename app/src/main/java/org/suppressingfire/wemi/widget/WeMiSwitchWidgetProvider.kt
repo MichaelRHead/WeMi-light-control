@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 /**
  * Android Home Screen AppWidgetProvider for one-tap Light & Room power control without opening
@@ -59,7 +60,7 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
                     AppWidgetManager.EXTRA_APPWIDGET_ID,
                     AppWidgetManager.INVALID_APPWIDGET_ID
                 )
-                if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
+                if (appWidgetId <= 0) return
                 runAsyncBroadcast {
                     WidgetActionExecutor.toggleWidgetTarget(
                         context = context,
@@ -75,13 +76,14 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
                     AppWidgetManager.INVALID_APPWIDGET_ID
                 )
                 val targetType = WidgetTargetType.fromRaw(intent.getStringExtra(EXTRA_TARGET_TYPE))
-                if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID || targetType == null) return
+                if (appWidgetId <= 0 || targetType == null) return
 
+                val rawSerial = intent.getStringExtra(EXTRA_SERIAL_NUMBER).orEmpty()
                 val config = WidgetTargetConfig(
                     appWidgetId = appWidgetId,
                     targetType = targetType,
                     deviceId = intent.getIntExtra(EXTRA_DEVICE_ID, 0),
-                    serialNumber = intent.getStringExtra(EXTRA_SERIAL_NUMBER).orEmpty(),
+                    serialNumber = rawSerial.takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
                     roomName = intent.getStringExtra(EXTRA_ROOM_NAME).orEmpty(),
                     networkKey = intent.getStringExtra(EXTRA_NETWORK_KEY).orEmpty(),
                     displayName = intent.getStringExtra(EXTRA_DISPLAY_NAME).orEmpty()

@@ -38,18 +38,22 @@ object WidgetRemoteViewsBuilder {
     private const val COLOR_TEXT_STANDBY = 0xFF64748B.toInt()
     private const val COLOR_TEXT_OFFLINE = 0xFFDC2626.toInt()
 
+    private fun hasConflictingRealSerial(candidate: DeviceEntity, configSerial: String): Boolean =
+        !LanRuntimeUtils.isPlaceholderSerial(configSerial) &&
+            !LanRuntimeUtils.isPlaceholderSerial(candidate.serialNumber) &&
+            !candidate.serialNumber.equals(configSerial, ignoreCase = true)
+
     /**
      * Resolves a configured [WidgetTargetConfig] targeting a single device against the latest
-     * Room device list, falling back to real serial number or `(displayName, networkKey)` if
-     * the device row ID changed after re-adoption.
+     * Room device list. Prioritizes real hardware [DeviceEntity.serialNumber] so recycled SQLite
+     * row IDs after a LAN reset never hijack a different switch, then falls back to `deviceId`
+     * or `(displayName, networkKey)` while rejecting any candidate with a conflicting real serial.
      */
     fun resolveTargetDevice(
         config: WidgetTargetConfig,
         devices: List<DeviceEntity>
     ): DeviceEntity? {
         if (config.targetType != WidgetTargetType.DEVICE) return null
-        val byId = if (config.deviceId > 0) devices.firstOrNull { it.id == config.deviceId } else null
-        if (byId != null) return byId
 
         if (!LanRuntimeUtils.isPlaceholderSerial(config.serialNumber)) {
             val bySerial = devices.firstOrNull {
@@ -59,19 +63,32 @@ object WidgetRemoteViewsBuilder {
             if (bySerial != null) return bySerial
         }
 
+        if (config.deviceId > 0) {
+            val byId = devices.firstOrNull {
+                it.id == config.deviceId && !hasConflictingRealSerial(it, config.serialNumber)
+            }
+            if (byId != null) return byId
+        }
+
         if (config.displayName.isNotBlank()) {
             val byNameInHome = devices.firstOrNull {
                 it.name.equals(config.displayName, ignoreCase = true) &&
-                    (config.networkKey.isBlank() || it.networkKey == config.networkKey)
+                    (config.networkKey.isBlank() || it.networkKey == config.networkKey) &&
+                    !hasConflictingRealSerial(it, config.serialNumber)
             }
             if (byNameInHome != null) return byNameInHome
-            return devices.firstOrNull { it.name.equals(config.displayName, ignoreCase = true) }
+            return devices.firstOrNull {
+                it.name.equals(config.displayName, ignoreCase = true) &&
+                    !hasConflictingRealSerial(it, config.serialNumber)
+            }
         }
         return null
     }
 
     /**
      * Resolves all controllable lights/switches belonging to a configured Room widget.
+     * Keeps widgets isolated to their configured Wi-Fi Home while that home still exists in Room,
+     * and recovers cleanly to a single matching home if the old `networkKey` was replaced by a LAN reset.
      */
     fun resolveRoomDevices(
         config: WidgetTargetConfig,
@@ -80,19 +97,20 @@ object WidgetRemoteViewsBuilder {
         if (config.targetType != WidgetTargetType.ROOM) return emptyList()
         val normalizedRoom = config.normalizedRoomName()
         val controllable = devices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
-        val inConfiguredHome = if (config.networkKey.isNotBlank()) {
-            controllable.filter {
+        if (config.networkKey.isNotBlank()) {
+            val inConfiguredHome = controllable.filter {
                 it.networkKey == config.networkKey &&
                     it.normalizedRoomName.equals(normalizedRoom, ignoreCase = true)
             }
-        } else {
-            emptyList()
+            if (inConfiguredHome.isNotEmpty()) return inConfiguredHome
+            if (devices.any { it.networkKey == config.networkKey }) return emptyList()
         }
-        if (inConfiguredHome.isNotEmpty()) return inConfiguredHome
 
-        return controllable.filter {
+        val fallbackMatches = controllable.filter {
             it.normalizedRoomName.equals(normalizedRoom, ignoreCase = true)
         }
+        val fallbackHomeKey = fallbackMatches.firstOrNull()?.networkKey ?: return emptyList()
+        return fallbackMatches.filter { it.networkKey == fallbackHomeKey }
     }
 
     fun resolveDisplayState(

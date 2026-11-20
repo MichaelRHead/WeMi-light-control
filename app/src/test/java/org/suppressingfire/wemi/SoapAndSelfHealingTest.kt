@@ -219,7 +219,8 @@ class SoapAndSelfHealingTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val monitor = org.suppressingfire.wemi.network.NetworkMonitor(
             context = context,
-            fallbackIpResolver = { "10.22.22.142" }
+            fallbackIpResolver = { "10.22.22.142" },
+            interfaceIpResolver = { "10.22.22.142" to "wlan0" }
         )
         try {
             val snap = monitor.refreshSnapshot()
