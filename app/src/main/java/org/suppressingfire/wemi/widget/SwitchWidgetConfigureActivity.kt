@@ -202,7 +202,7 @@ internal fun WidgetConfigureScreen(
     }
 
     val roomsWithDevices = remember(scopedDevices) {
-        val grouped = scopedDevices.groupBy { it.roomName.trim().ifBlank { "Unassigned" } }
+        val grouped = scopedDevices.groupBy { it.normalizedRoomName }
         val assigned = grouped.filterKeys { !it.equals("Unassigned", ignoreCase = true) }
         val unassigned = grouped.filterKeys { it.equals("Unassigned", ignoreCase = true) }
         (assigned + unassigned).toList()
@@ -432,7 +432,7 @@ internal fun WidgetConfigureScreen(
                                 }
                                 WidgetSelectableCard(
                                     title = device.name,
-                                    subtitle = "${device.roomName.trim().ifBlank { "Unassigned" }} • ${device.ipAddress}",
+                                    subtitle = "${device.normalizedRoomName} • ${device.ipAddress}",
                                     isOn = device.isReachable && device.isOn,
                                     stateLabel = stateLabel,
                                     leadingIcon = Icons.Default.Lightbulb,

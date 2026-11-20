@@ -83,7 +83,7 @@ object WidgetRemoteViewsBuilder {
         val inConfiguredHome = if (config.networkKey.isNotBlank()) {
             controllable.filter {
                 it.networkKey == config.networkKey &&
-                    it.roomName.trim().ifBlank { "Unassigned" }.equals(normalizedRoom, ignoreCase = true)
+                    it.normalizedRoomName.equals(normalizedRoom, ignoreCase = true)
             }
         } else {
             emptyList()
@@ -91,7 +91,7 @@ object WidgetRemoteViewsBuilder {
         if (inConfiguredHome.isNotEmpty()) return inConfiguredHome
 
         return controllable.filter {
-            it.roomName.trim().ifBlank { "Unassigned" }.equals(normalizedRoom, ignoreCase = true)
+            it.normalizedRoomName.equals(normalizedRoom, ignoreCase = true)
         }
     }
 
@@ -138,8 +138,8 @@ object WidgetRemoteViewsBuilder {
                         !device.isReachable -> "Offline • Tap to retry"
                         device.parsedType == DeviceType.LIGHTBULB_DIMMER && device.isOn ->
                             "ON • ${device.brightness}%"
-                        device.isOn -> "ON • ${device.roomName.trim().ifBlank { "Unassigned" }}"
-                        else -> "OFF • ${device.roomName.trim().ifBlank { "Unassigned" }}"
+                        device.isOn -> "ON • ${device.normalizedRoomName}"
+                        else -> "OFF • ${device.normalizedRoomName}"
                     }
                     val stateWord = when (mode) {
                         WidgetVisualMode.ON -> "on"

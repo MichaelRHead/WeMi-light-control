@@ -55,8 +55,13 @@ enum class TvScene(val wireKey: String) {
     }
 }
 
-class SwitchViewModel(application: Application) : AndroidViewModel(application) {
-    private val repository: SwitchRepository = SwitchRepository(
+class SwitchViewModel internal constructor(
+    application: Application,
+    repositoryOverride: SwitchRepository?
+) : AndroidViewModel(application) {
+    constructor(application: Application) : this(application, null)
+
+    private val repository: SwitchRepository = repositoryOverride ?: SwitchRepository(
         dao = SwitchDatabase.getDatabase(application).switchDao(),
         context = application.applicationContext
     )
@@ -291,13 +296,9 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun toggleGroupByRoom() {
-        _isGroupedByRoom.value = !_isGroupedByRoom.value
-    }
+    fun toggleGroupByRoom() { _isGroupedByRoom.value = !_isGroupedByRoom.value }
 
-    fun selectRoomFilter(roomName: String?) {
-        _selectedRoomFilter.value = roomName
-    }
+    fun selectRoomFilter(roomName: String?) { _selectedRoomFilter.value = roomName }
 
     fun toggleRoomCollapse(roomName: String) {
         val current = _collapsedRooms.value
@@ -309,13 +310,9 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
     fun updateRoomBrightness(roomName: String, brightness: Int) =
         deviceActionsController.updateRoomBrightness(roomName, brightness)
 
-    fun toggleEditMode() {
-        _isEditMode.value = !_isEditMode.value
-    }
+    fun toggleEditMode() { _isEditMode.value = !_isEditMode.value }
 
-    fun setEditMode(enabled: Boolean) {
-        _isEditMode.value = enabled
-    }
+    fun setEditMode(enabled: Boolean) { _isEditMode.value = enabled }
 
     fun toggleExpandDevice(deviceId: Int) {
         val current = _expandedDeviceIds.value

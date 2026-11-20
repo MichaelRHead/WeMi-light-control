@@ -7,6 +7,11 @@ import org.suppressingfire.wemi.network.LanRuntimeUtils
 const val DEFAULT_MAIN_HOME_KEY = "wifi_home_192_168_1"
 const val DEFAULT_CABIN_HOME_KEY = "wifi_cabin_192_168_50"
 const val DEFAULT_OFFICE_HOME_KEY = "wifi_office_10_0_10"
+const val UNASSIGNED_ROOM = "Unassigned"
+
+/** Canonicalizes a room name so blank or whitespace-only values consistently map to [UNASSIGNED_ROOM]. */
+fun normalizeRoomName(rawRoom: String?): String =
+    rawRoom?.trim().orEmpty().ifBlank { UNASSIGNED_ROOM }
 
 enum class DeviceType {
     SWITCH_PLUG,
@@ -81,6 +86,9 @@ data class DeviceEntity(
     val parsedType: DeviceType
         get() = runCatching { DeviceType.valueOf(deviceType) }
             .getOrDefault(DeviceType.SWITCH_PLUG)
+
+    val normalizedRoomName: String
+        get() = normalizeRoomName(roomName)
 
     val visualCategory: DeviceCategory
         get() = classifyDeviceCategory(name = name, deviceType = parsedType)
@@ -214,6 +222,17 @@ data class SsdpDiscoveredDevice(
     }
 }
 
+private val CHRISTMAS_TREE_KEYWORDS = listOf(
+    "tree", "xmas", "evergreen", "spruce", "fir ", "garland", "wreath", "tinsel", "noel"
+)
+private val CHRISTMAS_LIGHT_EXCLUSIONS = listOf("candle", "lamp", "sconce", "lantern")
+private val FAN_KEYWORDS = listOf("fan", "blower", "vent", "exhaust", "ventilat", "circulator")
+private val LIGHT_KEYWORDS = listOf(
+    "lamp", "light", "bulb", "candle", "sconce", "chandelier", "lantern", "pendant",
+    "flood", "spot", "downlight", "uplight", "strip", "neon", "torch", "dimmer", "led", "fixture"
+)
+private val MOTION_KEYWORDS = listOf("motion", "sensor")
+
 /**
  * Classifies a switch's visual device category based on its friendly name and UPnP device type:
  * - Tree lights ("Christmas Tree", "Tree Lights", "Xmas Tree", "Pine Tree") -> CHRISTMAS_TREE
@@ -231,49 +250,16 @@ fun classifyDeviceCategory(
     }
     val lower = name.lowercase()
     return when {
-        "tree" in lower ||
-            "xmas" in lower ||
-            "evergreen" in lower ||
-            "spruce" in lower ||
-            "fir " in lower ||
-            "garland" in lower ||
-            "wreath" in lower ||
-            "tinsel" in lower ||
-            "noel" in lower ||
-            ("christmas" in lower && "candle" !in lower && "lamp" !in lower && "sconce" !in lower && "lantern" !in lower) ->
+        CHRISTMAS_TREE_KEYWORDS.any { it in lower } ||
+            ("christmas" in lower && CHRISTMAS_LIGHT_EXCLUSIONS.none { it in lower }) ->
             DeviceCategory.CHRISTMAS_TREE
 
-        "fan" in lower ||
-            "blower" in lower ||
-            "vent" in lower ||
-            "exhaust" in lower ||
-            "ventilat" in lower ||
-            "circulator" in lower ->
-            DeviceCategory.FAN
+        FAN_KEYWORDS.any { it in lower } -> DeviceCategory.FAN
 
-        deviceType == DeviceType.LIGHTBULB_DIMMER ||
-            "lamp" in lower ||
-            "light" in lower ||
-            "bulb" in lower ||
-            "candle" in lower ||
-            "sconce" in lower ||
-            "chandelier" in lower ||
-            "lantern" in lower ||
-            "pendant" in lower ||
-            "flood" in lower ||
-            "spot" in lower ||
-            "downlight" in lower ||
-            "uplight" in lower ||
-            "strip" in lower ||
-            "neon" in lower ||
-            "torch" in lower ||
-            "dimmer" in lower ||
-            "led" in lower ||
-            "fixture" in lower ->
+        deviceType == DeviceType.LIGHTBULB_DIMMER || LIGHT_KEYWORDS.any { it in lower } ->
             DeviceCategory.LIGHT
 
-        "motion" in lower || "sensor" in lower ->
-            DeviceCategory.MOTION_SENSOR
+        MOTION_KEYWORDS.any { it in lower } -> DeviceCategory.MOTION_SENSOR
 
         else -> DeviceCategory.SWITCH_PLUG
     }
@@ -289,6 +275,84 @@ private val WORD_KID_REGEX = Regex("\\bkid\\b")
 private val WORD_HALL_REGEX = Regex("\\bhall\\b")
 private val WORD_DEN_REGEX = Regex("\\bden\\b")
 private val WORD_WC_REGEX = Regex("\\bwc\\b")
+
+private data class RoomInferenceRule(
+    val roomName: String,
+    val keywords: List<String>,
+    val wordRegexes: List<Regex> = emptyList()
+) {
+    fun matches(normalized: String): Boolean =
+        keywords.any { it in normalized } || wordRegexes.any { it.containsMatchIn(normalized) }
+}
+
+private val ROOM_INFERENCE_RULES = listOf(
+    RoomInferenceRule(
+        roomName = "Kitchen",
+        keywords = listOf(
+            "kitchen", "pantry", "island", "breakfast", "nook",
+            "undercabinet", "under cabinet", "countertop"
+        )
+    ),
+    RoomInferenceRule(
+        roomName = "Dining Room",
+        keywords = listOf("dining", "buffet", "hutch", "china cabinet")
+    ),
+    RoomInferenceRule(
+        roomName = "Ensuite",
+        keywords = listOf(
+            "ensuite", "en suite", "bath", "powder", "vanity", "restroom", "lavatory", "shower"
+        ),
+        wordRegexes = listOf(WORD_WC_REGEX)
+    ),
+    RoomInferenceRule(
+        roomName = "Hallway & Landing",
+        keywords = listOf(
+            "hallway", "landing", "stair", "foyer", "entry",
+            "vestibule", "mudroom", "mud room", "corridor", "breezeway"
+        ),
+        wordRegexes = listOf(WORD_HALL_REGEX)
+    ),
+    RoomInferenceRule(
+        roomName = "Bedroom",
+        keywords = listOf(
+            "bedroom", "bedside", "nightstand", "night stand", "headboard", "dresser", "wardrobe",
+            "crib", "cradle", "loft", "master", "primary", "nursery", "guest", "bunk", "dorm",
+            "girls", "boys", "kids", "children"
+        ),
+        wordRegexes = listOf(WORD_BED_REGEX, WORD_GIRL_REGEX, WORD_BOY_REGEX, WORD_KID_REGEX)
+    ),
+    RoomInferenceRule(
+        roomName = "Outdoor",
+        keywords = listOf(
+            "patio", "porch", "veranda", "lanai", "outdoor", "outside", "exterior", "garden",
+            "dock", "pier", "yard", "deck", "flood", "walkway", "sidewalk", "pathway", "balcony",
+            "terrace", "gazebo", "pergola", "trellis", "pool", "fountain", "landscape"
+        )
+    ),
+    RoomInferenceRule(
+        roomName = "Garage",
+        keywords = listOf("garage", "workshop", "workbench", "driveway", "carport", "shed", "barn")
+    ),
+    RoomInferenceRule(
+        roomName = "Basement",
+        keywords = listOf(
+            "basement", "cellar", "laundry", "utility", "boiler", "furnace", "sump", "crawlspace",
+            "rec room", "game room", "media room", "theater", "theatre"
+        )
+    ),
+    RoomInferenceRule(
+        roomName = "Office",
+        keywords = listOf("office", "study", "desk", "workstation", "studio", "library")
+    ),
+    RoomInferenceRule(
+        roomName = "Living Room",
+        keywords = listOf(
+            "living", "family", "lounge", "great room", "parlor", "parlour", "sitting",
+            "sunroom", "sun room", "solarium", "mantel", "hearth", "fireplace", "couch", "sofa"
+        ),
+        wordRegexes = listOf(WORD_DEN_REGEX)
+    )
+)
 
 /**
  * Normalizes a hardware `<friendlyName>` or user-supplied switch name for room/category inference
@@ -324,142 +388,8 @@ fun normalizeDeviceNameForInference(deviceName: String): String {
  */
 fun inferRoomFromName(deviceName: String): String {
     val normalized = normalizeDeviceNameForInference(deviceName)
-    if (normalized.isEmpty()) return "Unassigned"
-    return when {
-        "kitchen" in normalized ||
-            "pantry" in normalized ||
-            "island" in normalized ||
-            "breakfast" in normalized ||
-            "nook" in normalized ||
-            "undercabinet" in normalized ||
-            "under cabinet" in normalized ||
-            "countertop" in normalized -> "Kitchen"
-
-        "dining" in normalized ||
-            "buffet" in normalized ||
-            "hutch" in normalized ||
-            "china cabinet" in normalized -> "Dining Room"
-
-        "ensuite" in normalized ||
-            "en suite" in normalized ||
-            "bath" in normalized ||
-            "powder" in normalized ||
-            "vanity" in normalized ||
-            "restroom" in normalized ||
-            "lavatory" in normalized ||
-            "shower" in normalized ||
-            WORD_WC_REGEX.containsMatchIn(normalized) -> "Ensuite"
-
-        "hallway" in normalized ||
-            WORD_HALL_REGEX.containsMatchIn(normalized) ||
-            "landing" in normalized ||
-            "stair" in normalized ||
-            "foyer" in normalized ||
-            "entry" in normalized ||
-            "vestibule" in normalized ||
-            "mudroom" in normalized ||
-            "mud room" in normalized ||
-            "corridor" in normalized ||
-            "breezeway" in normalized -> "Hallway & Landing"
-
-        "bedroom" in normalized ||
-            "bedside" in normalized ||
-            "nightstand" in normalized ||
-            "night stand" in normalized ||
-            "headboard" in normalized ||
-            "dresser" in normalized ||
-            "wardrobe" in normalized ||
-            WORD_BED_REGEX.containsMatchIn(normalized) ||
-            "crib" in normalized ||
-            "cradle" in normalized ||
-            "loft" in normalized ||
-            "master" in normalized ||
-            "primary" in normalized ||
-            "nursery" in normalized ||
-            "guest" in normalized ||
-            "bunk" in normalized ||
-            "dorm" in normalized ||
-            "girls" in normalized ||
-            WORD_GIRL_REGEX.containsMatchIn(normalized) ||
-            "boys" in normalized ||
-            WORD_BOY_REGEX.containsMatchIn(normalized) ||
-            "kids" in normalized ||
-            WORD_KID_REGEX.containsMatchIn(normalized) ||
-            "children" in normalized -> "Bedroom"
-
-        "patio" in normalized ||
-            "porch" in normalized ||
-            "veranda" in normalized ||
-            "lanai" in normalized ||
-            "outdoor" in normalized ||
-            "outside" in normalized ||
-            "exterior" in normalized ||
-            "garden" in normalized ||
-            "dock" in normalized ||
-            "pier" in normalized ||
-            "yard" in normalized ||
-            "deck" in normalized ||
-            "flood" in normalized ||
-            "walkway" in normalized ||
-            "sidewalk" in normalized ||
-            "pathway" in normalized ||
-            "balcony" in normalized ||
-            "terrace" in normalized ||
-            "gazebo" in normalized ||
-            "pergola" in normalized ||
-            "trellis" in normalized ||
-            "pool" in normalized ||
-            "fountain" in normalized ||
-            "landscape" in normalized -> "Outdoor"
-
-        "garage" in normalized ||
-            "workshop" in normalized ||
-            "workbench" in normalized ||
-            "driveway" in normalized ||
-            "carport" in normalized ||
-            "shed" in normalized ||
-            "barn" in normalized -> "Garage"
-
-        "basement" in normalized ||
-            "cellar" in normalized ||
-            "laundry" in normalized ||
-            "utility" in normalized ||
-            "boiler" in normalized ||
-            "furnace" in normalized ||
-            "sump" in normalized ||
-            "crawlspace" in normalized ||
-            "rec room" in normalized ||
-            "game room" in normalized ||
-            "media room" in normalized ||
-            "theater" in normalized ||
-            "theatre" in normalized -> "Basement"
-
-        "office" in normalized ||
-            "study" in normalized ||
-            "desk" in normalized ||
-            "workstation" in normalized ||
-            "studio" in normalized ||
-            "library" in normalized -> "Office"
-
-        "living" in normalized ||
-            "family" in normalized ||
-            WORD_DEN_REGEX.containsMatchIn(normalized) ||
-            "lounge" in normalized ||
-            "great room" in normalized ||
-            "parlor" in normalized ||
-            "parlour" in normalized ||
-            "sitting" in normalized ||
-            "sunroom" in normalized ||
-            "sun room" in normalized ||
-            "solarium" in normalized ||
-            "mantel" in normalized ||
-            "hearth" in normalized ||
-            "fireplace" in normalized ||
-            "couch" in normalized ||
-            "sofa" in normalized -> "Living Room"
-
-        else -> "Unassigned"
-    }
+    if (normalized.isEmpty()) return UNASSIGNED_ROOM
+    return ROOM_INFERENCE_RULES.firstOrNull { it.matches(normalized) }?.roomName ?: UNASSIGNED_ROOM
 }
 
 /**

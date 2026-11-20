@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 /**
  * Headless coroutine executor invoked directly by [WeMiSwitchWidgetProvider] when the user
@@ -60,7 +61,7 @@ object WidgetActionExecutor {
                     if (targetDevice != null) {
                         val updated = repository.toggleDevicePower(targetDevice)
                         val learnedRealSerial =
-                            !org.suppressingfire.wemi.network.LanRuntimeUtils.isPlaceholderSerial(updated.serialNumber) &&
+                            !LanRuntimeUtils.isPlaceholderSerial(updated.serialNumber) &&
                                 !updated.serialNumber.equals(config.serialNumber, ignoreCase = true)
                         // Heal persisted config if device ID, name, or real hardware serial changed
                         if (updated.id != config.deviceId || updated.name != config.displayName || learnedRealSerial) {

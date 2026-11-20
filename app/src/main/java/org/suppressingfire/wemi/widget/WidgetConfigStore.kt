@@ -3,6 +3,7 @@ package org.suppressingfire.wemi.widget
 import android.content.Context
 import androidx.core.content.edit
 import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.data.normalizeRoomName
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 /**
@@ -31,7 +32,7 @@ data class WidgetTargetConfig(
     val networkKey: String = "",
     val displayName: String = ""
 ) {
-    fun normalizedRoomName(): String = roomName.trim().ifBlank { "Unassigned" }
+    fun normalizedRoomName(): String = normalizeRoomName(roomName)
 
     companion object {
         fun forDevice(appWidgetId: Int, device: DeviceEntity): WidgetTargetConfig =
@@ -40,13 +41,13 @@ data class WidgetTargetConfig(
                 targetType = WidgetTargetType.DEVICE,
                 deviceId = device.id,
                 serialNumber = device.serialNumber.takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
-                roomName = device.roomName.trim().ifBlank { "Unassigned" },
+                roomName = device.normalizedRoomName,
                 networkKey = device.networkKey,
                 displayName = device.name.trim().ifBlank { "Smart Light" }
             )
 
         fun forRoom(appWidgetId: Int, roomName: String, networkKey: String): WidgetTargetConfig {
-            val normalized = roomName.trim().ifBlank { "Unassigned" }
+            val normalized = normalizeRoomName(roomName)
             return WidgetTargetConfig(
                 appWidgetId = appWidgetId,
                 targetType = WidgetTargetType.ROOM,

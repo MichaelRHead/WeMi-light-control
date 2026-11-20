@@ -192,7 +192,13 @@ internal class ProvisioningCoordinator(
             )
         }
 
-        val finalResult = if ((liveResult == null || (!liveResult.success && liveResult.networkStatusCode != 2)) && isDemoShowroomMode() && apHost == "10.22.22.1") {
+        val useDemoSimulation =
+            (liveResult == null || (!liveResult.success && liveResult.networkStatusCode != 2)) &&
+                isDemoShowroomMode() &&
+                apHost == "10.22.22.1"
+        val finalResult = if (!useDemoSimulation && liveResult != null) {
+            liveResult
+        } else if (useDemoSimulation) {
             val isOpen = encryptionType.equals("NONE", ignoreCase = true) || authMode.equals("OPEN", ignoreCase = true) || plainPassword.isEmpty()
             if (!isOpen && plainPassword.length in 1..7) {
                 val trace = listOf(
@@ -265,7 +271,21 @@ internal class ProvisioningCoordinator(
                 )
             }
         } else {
-            liveResult!!
+            ProvisionResult(
+                success = false,
+                networkStatusCode = 0,
+                statusMessage = "Setup AP ($apHost) unreachable after mode change. Retry provisioning.",
+                encryptedPasswordPayload = "",
+                logEntry = SoapLogEntry(
+                    timestamp = nowFormatted(),
+                    deviceName = "Setup AP ($apHost)",
+                    endpoint = "http://$apHost:$apPort/upnp/control/WiFiSetup1",
+                    soapAction = "WiFiSetup1#ConnectHomeNetwork($ssid)",
+                    statusText = "Offline • Setup AP unreachable",
+                    xmlSnippet = "",
+                    isLiveLanSuccess = false
+                )
+            )
         }
 
         appendLog(finalResult.logEntry)

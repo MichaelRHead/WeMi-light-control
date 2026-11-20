@@ -249,6 +249,8 @@ internal class SetupApProber(
             )
             if (!resp.isSuccessful) return null
             extractXmlTag(resp.body, responseTag)
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             null
         }

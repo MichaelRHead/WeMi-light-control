@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import org.suppressingfire.wemi.data.SwitchRepository
 
 /**
  * Android Home Screen AppWidgetProvider for one-tap Light & Room power control without opening
@@ -17,21 +18,36 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 class WeMiSwitchWidgetProvider : AppWidgetProvider() {
 
+    private fun runAsyncBroadcast(block: suspend () -> Unit) {
+        val customRunner = actionRunnerForTests
+        if (customRunner != null) {
+            customRunner(block)
+            return
+        }
+        val pendingResult = goAsync()
+        widgetScope.launch {
+            try {
+                withTimeoutOrNull(BROADCAST_TIMEOUT_MS) {
+                    block()
+                }
+            } finally {
+                pendingResult?.finish()
+            }
+        }
+    }
+
     override fun onUpdate(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
         if (appWidgetIds.isEmpty()) return
-        val pendingResult = goAsync()
-        widgetScope.launch {
-            try {
-                withTimeoutOrNull(BROADCAST_TIMEOUT_MS) {
-                    WidgetActionExecutor.refreshWidgetIds(context, appWidgetIds)
-                }
-            } finally {
-                pendingResult.finish()
-            }
+        runAsyncBroadcast {
+            WidgetActionExecutor.refreshWidgetIds(
+                context = context,
+                appWidgetIds = appWidgetIds,
+                repositoryOverride = repositoryProviderForTests?.invoke(context)
+            )
         }
     }
 
@@ -44,15 +60,12 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
                     AppWidgetManager.INVALID_APPWIDGET_ID
                 )
                 if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) return
-                val pendingResult = goAsync()
-                widgetScope.launch {
-                    try {
-                        withTimeoutOrNull(BROADCAST_TIMEOUT_MS) {
-                            WidgetActionExecutor.toggleWidgetTarget(context, appWidgetId)
-                        }
-                    } finally {
-                        pendingResult.finish()
-                    }
+                runAsyncBroadcast {
+                    WidgetActionExecutor.toggleWidgetTarget(
+                        context = context,
+                        appWidgetId = appWidgetId,
+                        repositoryOverride = repositoryProviderForTests?.invoke(context)
+                    )
                 }
             }
 
@@ -75,15 +88,12 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
                 )
                 WidgetConfigStore.save(context, config)
 
-                val pendingResult = goAsync()
-                widgetScope.launch {
-                    try {
-                        withTimeoutOrNull(BROADCAST_TIMEOUT_MS) {
-                            WidgetActionExecutor.refreshWidgetIds(context, intArrayOf(appWidgetId))
-                        }
-                    } finally {
-                        pendingResult.finish()
-                    }
+                runAsyncBroadcast {
+                    WidgetActionExecutor.refreshWidgetIds(
+                        context = context,
+                        appWidgetIds = intArrayOf(appWidgetId),
+                        repositoryOverride = repositoryProviderForTests?.invoke(context)
+                    )
                 }
             }
         }
@@ -112,5 +122,11 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
 
         private const val BROADCAST_TIMEOUT_MS = 8_500L
         private val widgetScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        @Volatile
+        internal var actionRunnerForTests: ((suspend () -> Unit) -> Unit)? = null
+
+        @Volatile
+        internal var repositoryProviderForTests: ((Context) -> SwitchRepository)? = null
     }
 }

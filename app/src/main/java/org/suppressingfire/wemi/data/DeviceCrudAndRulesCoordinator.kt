@@ -69,14 +69,14 @@ internal class DeviceCrudAndRulesCoordinator(
         targetOn: Boolean,
         networkKey: String? = null
     ): Int = coroutineScope {
-        val normalizedRoom = roomName.trim().ifBlank { "Unassigned" }
+        val normalizedRoom = normalizeRoomName(roomName)
         val demoMode = isDemoShowroomMode()
         val currentDevices = dao.getAllDevices().first().let {
             if (it.isEmpty() && demoMode) DemoFixtures.defaultClassicDevices() else it
         }
         val roomSwitches = currentDevices.filter {
             (networkKey == null || it.networkKey == networkKey) &&
-                it.roomName.trim().ifBlank { "Unassigned" }.equals(normalizedRoom, ignoreCase = true) &&
+                it.normalizedRoomName.equals(normalizedRoom, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType != DeviceType.MOTION_SENSOR
         }
@@ -92,7 +92,7 @@ internal class DeviceCrudAndRulesCoordinator(
         newBrightness: Int,
         networkKey: String? = null
     ): Int = coroutineScope {
-        val normalizedRoom = roomName.trim().ifBlank { "Unassigned" }
+        val normalizedRoom = normalizeRoomName(roomName)
         val clamped = newBrightness.coerceIn(1, 100)
         val demoMode = isDemoShowroomMode()
         val currentDevices = dao.getAllDevices().first().let {
@@ -100,7 +100,7 @@ internal class DeviceCrudAndRulesCoordinator(
         }
         val roomBulbs = currentDevices.filter {
             (networkKey == null || it.networkKey == networkKey) &&
-                it.roomName.trim().ifBlank { "Unassigned" }.equals(normalizedRoom, ignoreCase = true) &&
+                it.normalizedRoomName.equals(normalizedRoom, ignoreCase = true) &&
                 it.isReachable &&
                 it.parsedType == DeviceType.LIGHTBULB_DIMMER
         }
@@ -327,12 +327,12 @@ internal class DeviceCrudAndRulesCoordinator(
         moveUp: Boolean,
         withinRoomOnly: Boolean = false
     ) {
-        val targetRoom = device.roomName.trim().ifBlank { "Unassigned" }
+        val targetRoom = device.normalizedRoomName
         val homeDevices = dao.getAllDevices().first()
             .filter { it.networkKey == device.networkKey }
             .toMutableList()
         val scopedIndices = homeDevices.indices.filter { idx ->
-            !withinRoomOnly || homeDevices[idx].roomName.trim().ifBlank { "Unassigned" }
+            !withinRoomOnly || homeDevices[idx].normalizedRoomName
                 .equals(targetRoom, ignoreCase = true)
         }
         val posInScope = scopedIndices.indexOfFirst { idx -> homeDevices[idx].id == device.id }

@@ -30,6 +30,7 @@ import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.widget.SwitchWidgetConfigureActivity
+import org.suppressingfire.wemi.widget.WeMiSwitchWidgetProvider
 import org.suppressingfire.wemi.widget.WidgetActionExecutor
 import org.suppressingfire.wemi.widget.WidgetConfigStore
 import org.suppressingfire.wemi.widget.WidgetRemoteViewsBuilder
@@ -49,12 +50,16 @@ class HomeScreenWidgetTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        WeMiSwitchWidgetProvider.actionRunnerForTests = null
+        WeMiSwitchWidgetProvider.repositoryProviderForTests = null
         WidgetConfigStore.clearAll(context)
         SwitchDatabase.closeCurrentInstance()
     }
 
     @After
     fun tearDown() {
+        WeMiSwitchWidgetProvider.actionRunnerForTests = null
+        WeMiSwitchWidgetProvider.repositoryProviderForTests = null
         WidgetConfigStore.clearAll(context)
         SwitchDatabase.closeCurrentInstance()
     }
@@ -348,6 +353,124 @@ class HomeScreenWidgetTest {
                 )
                 assertTrue(WidgetActionExecutor.toggleWidgetTarget(context, 601, repositoryOverride = repo))
                 assertEquals("WLS040HEAL99", WidgetConfigStore.load(context, 601)?.serialNumber)
+            } finally {
+                repo.close()
+            }
+        }
+    }
+
+    @Test
+    fun widgetProviderHandlesPinnedToggleRestoreDeleteAndOfflineRoomWakeup() = runBlocking {
+        // 1) RemoteViews display state & buildRemoteViews edge cases (unconfigured, missing, offline)
+        val unconfigured = WidgetRemoteViewsBuilder.resolveDisplayState(null, emptyList())
+        assertEquals(WidgetVisualMode.UNCONFIGURED, unconfigured.visualMode)
+        assertNotNull(WidgetRemoteViewsBuilder.buildRemoteViews(context, 700, null, emptyList()))
+
+        val removedCfg = WidgetTargetConfig(
+            appWidgetId = 700,
+            targetType = WidgetTargetType.DEVICE,
+            deviceId = 999,
+            displayName = "Old Porch Lamp"
+        )
+        val removedState = WidgetRemoteViewsBuilder.resolveDisplayState(removedCfg, emptyList())
+        assertEquals(WidgetVisualMode.OFFLINE, removedState.visualMode)
+        assertEquals("Tap to reconfigure", removedState.subtitle)
+        assertNotNull(WidgetRemoteViewsBuilder.buildRemoteViews(context, 700, removedCfg, emptyList()))
+
+        // 2) Full WeMiSwitchWidgetProvider broadcast lifecycle with deterministic test seams
+        FakeUpnpServer(
+            initialFriendlyName = "Garage Overhead",
+            modelName = "WLS040",
+            serialNumber = "WLS040BCAST01",
+            udn = "uuid:Lightswitch-3_0-WLS040BCAST01",
+            initialRelayOn = false
+        ).use { server ->
+            val dao = SwitchDatabase.getDatabase(context).switchDao()
+            val repo = SwitchRepository(
+                dao = dao,
+                context = context,
+                initialDemoModeOverride = false
+            )
+            try {
+                // Start marked offline so we also test offline Room wake-up via broadcast
+                val savedId = dao.insertDevice(
+                    DeviceEntity(
+                        name = "Garage Overhead",
+                        roomName = "Garage",
+                        networkKey = DEFAULT_MAIN_HOME_KEY,
+                        deviceType = DeviceType.SWITCH_PLUG.name,
+                        ipAddress = "127.0.0.1",
+                        port = server.port,
+                        isOn = false,
+                        isReachable = false,
+                        serialNumber = "WLS040BCAST01"
+                    )
+                ).toInt()
+
+                val offlineRoomState = WidgetRemoteViewsBuilder.resolveDisplayState(
+                    WidgetTargetConfig.forRoom(702, "Garage", DEFAULT_MAIN_HOME_KEY),
+                    repo.allDevices.first()
+                )
+                assertEquals(WidgetVisualMode.OFFLINE, offlineRoomState.visualMode)
+                assertEquals("Offline • Room", offlineRoomState.subtitle)
+
+                val provider = WeMiSwitchWidgetProvider()
+                WeMiSwitchWidgetProvider.actionRunnerForTests = { block -> runBlocking { block() } }
+                WeMiSwitchWidgetProvider.repositoryProviderForTests = { repo }
+
+                // Pin a Room widget via ACTION_WIDGET_PINNED broadcast
+                provider.onReceive(
+                    context,
+                    Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 702)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.ROOM.name)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, DEFAULT_MAIN_HOME_KEY)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_DISPLAY_NAME, "Garage")
+                    }
+                )
+                assertEquals("Garage", WidgetConfigStore.load(context, 702)?.normalizedRoomName())
+
+                // Tap the offline Room widget via ACTION_TOGGLE_WIDGET -> wakes offline loopback switch ON
+                provider.onReceive(
+                    context,
+                    Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 702)
+                    }
+                )
+                assertTrue("Expected offline Room widget tap to wake server ON", server.relayStateOn.get())
+                assertTrue(dao.getDeviceById(savedId)?.isReachable == true)
+                assertTrue(dao.getDeviceById(savedId)?.isOn == true)
+
+                // Pin a Device widget and toggle it OFF via ACTION_TOGGLE_WIDGET
+                provider.onReceive(
+                    context,
+                    Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 701)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.DEVICE.name)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_DEVICE_ID, savedId)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_SERIAL_NUMBER, "WLS040BCAST01")
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, DEFAULT_MAIN_HOME_KEY)
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_DISPLAY_NAME, "Garage Overhead")
+                    }
+                )
+                provider.onReceive(
+                    context,
+                    Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 701)
+                    }
+                )
+                assertFalse("Expected device widget toggle broadcast to turn server OFF", server.relayStateOn.get())
+
+                // Exercise onRestored (overlapping IDs) and onDeleted
+                provider.onRestored(context, intArrayOf(701, 702), intArrayOf(702, 703))
+                assertNull(WidgetConfigStore.load(context, 701))
+                assertEquals(WidgetTargetType.DEVICE, WidgetConfigStore.load(context, 702)?.targetType)
+                assertEquals(WidgetTargetType.ROOM, WidgetConfigStore.load(context, 703)?.targetType)
+
+                provider.onDeleted(context, intArrayOf(702, 703))
+                assertTrue(WidgetConfigStore.allConfiguredWidgetIds(context).isEmpty())
             } finally {
                 repo.close()
             }

@@ -27,7 +27,8 @@ import java.util.concurrent.ConcurrentHashMap
 class RuleScheduler(
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
     private val onAutoOffExpired: suspend (deviceId: Int) -> Unit,
-    private val onScheduleRuleTriggered: suspend (rule: RuleEntity) -> Unit
+    private val onScheduleRuleTriggered: suspend (rule: RuleEntity) -> Unit,
+    private val calendarProvider: () -> Calendar = { Calendar.getInstance() }
 ) {
     private val countdownJobs = ConcurrentHashMap<Int, Job>()
     private val configuredDurationSec = ConcurrentHashMap<Int, Int>()
@@ -139,35 +140,47 @@ class RuleScheduler(
     }
 
     /**
+     * Evaluates all enabled [RuleType.SCHEDULE] rules against [now], deduplicating per `(rule.id, minute)`
+     * and isolating per-rule dispatch failures. Returns the number of rules triggered.
+     */
+    internal suspend fun evaluateScheduledRulesNow(
+        rules: List<RuleEntity>,
+        now: Calendar = calendarProvider()
+    ): Int {
+        val hour24 = now.get(Calendar.HOUR_OF_DAY)
+        val minute = now.get(Calendar.MINUTE)
+        val dayKey = "${now.get(Calendar.YEAR)}-${now.get(Calendar.DAY_OF_YEAR)}-$hour24:$minute"
+        var triggeredCount = 0
+
+        for (rule in rules) {
+            if (!rule.isEnabled || rule.parsedRuleType != RuleType.SCHEDULE) continue
+            val targetTime = parseScheduleTime24h(rule.triggerSummary) ?: continue
+            if (targetTime.first == hour24 && targetTime.second == minute) {
+                val prevKey = triggeredMinuteKeys[rule.id]
+                if (prevKey != dayKey) {
+                    triggeredMinuteKeys[rule.id] = dayKey
+                    triggeredCount++
+                    try {
+                        onScheduleRuleTriggered(rule)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        // Keep schedule loop running if one rule dispatch throws
+                    }
+                }
+            }
+        }
+        return triggeredCount
+    }
+
+    /**
      * Starts the periodic 20-second schedule evaluator loop for [rulesProvider].
      */
     fun startScheduleLoop(rulesProvider: () -> List<RuleEntity>) {
         if (scheduleLoopJob?.isActive == true) return
         scheduleLoopJob = scope.launch {
             while (isActive) {
-                val cal = Calendar.getInstance()
-                val hour24 = cal.get(Calendar.HOUR_OF_DAY)
-                val minute = cal.get(Calendar.MINUTE)
-                val dayKey = "${cal.get(Calendar.YEAR)}-${cal.get(Calendar.DAY_OF_YEAR)}-$hour24:$minute"
-
-                val rules = rulesProvider()
-                for (rule in rules) {
-                    if (!rule.isEnabled || rule.parsedRuleType != RuleType.SCHEDULE) continue
-                    val targetTime = parseScheduleTime24h(rule.triggerSummary) ?: continue
-                    if (targetTime.first == hour24 && targetTime.second == minute) {
-                        val prevKey = triggeredMinuteKeys[rule.id]
-                        if (prevKey != dayKey) {
-                            triggeredMinuteKeys[rule.id] = dayKey
-                            try {
-                                onScheduleRuleTriggered(rule)
-                            } catch (e: CancellationException) {
-                                throw e
-                            } catch (_: Exception) {
-                                // Keep schedule loop running if one rule dispatch throws
-                            }
-                        }
-                    }
-                }
+                evaluateScheduledRulesNow(rulesProvider(), calendarProvider())
                 delay(20_000L)
             }
         }
@@ -205,12 +218,22 @@ class RuleScheduler(
             val match = regex.find(summary)
             if (match != null) {
                 val rawHour = match.groupValues[1].toIntOrNull() ?: return null
-                val min = match.groupValues[2].toIntOrNull()?.coerceIn(0, 59) ?: return null
+                val min = match.groupValues[2].toIntOrNull() ?: return null
+                if (min !in 0..59) return null
                 val amPm = match.groupValues.getOrNull(3)?.uppercase(Locale.US).orEmpty()
                 val hour24 = when (amPm) {
-                    "PM" -> if (rawHour < 12) rawHour + 12 else rawHour
-                    "AM" -> if (rawHour == 12) 0 else rawHour
-                    else -> rawHour.coerceIn(0, 23)
+                    "PM" -> {
+                        if (rawHour !in 1..12) return null
+                        if (rawHour < 12) rawHour + 12 else 12
+                    }
+                    "AM" -> {
+                        if (rawHour !in 1..12) return null
+                        if (rawHour == 12) 0 else rawHour
+                    }
+                    else -> {
+                        if (rawHour !in 0..23) return null
+                        rawHour
+                    }
                 }
                 return Pair(hour24, min)
             }

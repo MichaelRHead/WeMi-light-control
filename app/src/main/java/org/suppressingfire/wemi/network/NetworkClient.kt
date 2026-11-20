@@ -8,6 +8,7 @@ import java.net.SocketTimeoutException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import javax.net.SocketFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -32,9 +33,10 @@ import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
  */
 class NetworkClient(
     private val appContext: Context? = null,
-    private val extraCandidatePorts: List<Int> = emptyList()
+    private val extraCandidatePorts: List<Int> = emptyList(),
+    socketFactoryOverride: SocketFactory? = null
 ) {
-    private val wifiSocketFactory = NetworkMonitor.createWifiBoundSocketFactory(appContext)
+    private val wifiSocketFactory = socketFactoryOverride ?: NetworkMonitor.createWifiBoundSocketFactory(appContext)
 
     private val httpClient = LanHttpClient(
         socketFactory = wifiSocketFactory,
@@ -63,6 +65,8 @@ class NetworkClient(
 
         val PROBE_PORTS = listOf(49153, 49152, 49154, 49151, 49155, 49156, 49157, 49158, 49159)
 
+        private val SERIAL_TAG_REGEX = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
+        private val UDN_TAG_REGEX = Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
         private val loopbackCandidatePorts = java.util.concurrent.CopyOnWriteArraySet<Int>()
 
         fun registerLoopbackCandidatePort(port: Int) {
@@ -165,12 +169,11 @@ class NetworkClient(
                             xml.contains("basicevent", ignoreCase = true)
                         if (isTarget) {
                             if (verifyIdentity) {
-                                val realXmlSerial = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
+                                val realXmlSerial = SERIAL_TAG_REGEX
                                     .find(xml)?.groupValues?.getOrNull(1)?.trim()
                                     .takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty()
                                 val cleanXmlUdn = LanRuntimeUtils.canonicalHardwareUdn(
-                                    Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
-                                        .find(xml)?.groupValues?.getOrNull(1)?.trim()
+                                    UDN_TAG_REGEX.find(xml)?.groupValues?.getOrNull(1)?.trim()
                                 )
                                 val matches = (realXmlSerial.isNotEmpty() && (
                                     realXmlSerial.equals(cleanExpected, ignoreCase = true) ||
@@ -253,6 +256,13 @@ class NetworkClient(
         return null
     }
 
+    private data class SoapOutcome(
+        val binaryStateOn: Boolean? = null,
+        val brightness: Int? = null,
+        val nightModeEnabled: Boolean? = null,
+        val statusText: String? = null
+    )
+
     private suspend fun executeBasicEventSoapCall(
         device: DeviceEntity,
         action: String,
@@ -264,7 +274,7 @@ class NetworkClient(
         offlineBinaryStateOn: Boolean? = null,
         offlineBrightness: Int? = null,
         offlineNightMode: Boolean? = null,
-        onSuccess: (port: Int, endpoint: String, code: Int, elapsedMs: Int, respXml: String, soapBody: String) -> SoapCallResult
+        onSuccess: (code: Int, respXml: String) -> SoapOutcome
     ): SoapCallResult = withContext(Dispatchers.IO) {
         val startMs = System.currentTimeMillis()
         val soapBody = XmlAndSkuParser.buildSoapEnvelope(
@@ -279,8 +289,23 @@ class NetworkClient(
             val response = httpClient.postXml(endpoint, soapBody, soapAction)
             if (response.isSuccessful) {
                 val elapsedMs = (System.currentTimeMillis() - startMs).toInt().coerceAtLeast(1)
-                return@executeWithPortHealing onSuccess(
-                    port, endpoint, response.code, elapsedMs, response.body, soapBody
+                val outcome = onSuccess(response.code, response.body)
+                return@executeWithPortHealing SoapCallResult(
+                    reachableOnLan = true,
+                    binaryStateOn = outcome.binaryStateOn,
+                    brightness = outcome.brightness,
+                    resolvedPort = port,
+                    latencyMs = elapsedMs,
+                    logEntry = SoapLogEntry(
+                        timestamp = nowTime(),
+                        deviceName = logDeviceName,
+                        endpoint = endpoint,
+                        soapAction = successActionLabel,
+                        statusText = outcome.statusText ?: "HTTP ${response.code} OK (${elapsedMs}ms)",
+                        xmlSnippet = response.body.take(260).ifEmpty { soapBody },
+                        isLiveLanSuccess = true
+                    ),
+                    nightModeEnabled = outcome.nightModeEnabled
                 )
             }
             null
@@ -313,38 +338,26 @@ class NetworkClient(
         targetBrightness: Int? = null
     ): SoapCallResult {
         val stateInt = if (targetOn) 1 else 0
+        val clampedBrightness = targetBrightness?.coerceIn(0, 100)
         val innerXml = buildString {
             append("<BinaryState>$stateInt</BinaryState>")
-            if (targetBrightness != null) {
-                append("\n<brightness>${targetBrightness.coerceIn(0, 100)}</brightness>")
+            if (clampedBrightness != null) {
+                append("\n<brightness>$clampedBrightness</brightness>")
             }
         }
-        val label = "SetBinaryState($stateInt${if (targetBrightness != null) ", lvl=$targetBrightness%" else ""})"
+        val label = "SetBinaryState($stateInt${if (clampedBrightness != null) ", lvl=$clampedBrightness%" else ""})"
         return executeBasicEventSoapCall(
             device = device,
             action = "SetBinaryState",
             innerXml = innerXml,
             successActionLabel = label,
             offlineStatusText = "Offline • Unreachable on LAN"
-        ) { port, endpoint, code, elapsedMs, respXml, soapBody ->
+        ) { _, respXml ->
             val parsed = XmlAndSkuParser.parseBinaryStatePayload(respXml)
             val confirmedOn = if (parsed.isIdempotentError) targetOn else (parsed.binaryOn ?: targetOn)
-            val parsedBrightness = parsed.brightness ?: targetBrightness ?: device.brightness
-            SoapCallResult(
-                reachableOnLan = true,
+            SoapOutcome(
                 binaryStateOn = confirmedOn,
-                brightness = parsedBrightness,
-                resolvedPort = port,
-                latencyMs = elapsedMs,
-                logEntry = SoapLogEntry(
-                    timestamp = nowTime(),
-                    deviceName = device.name,
-                    endpoint = endpoint,
-                    soapAction = label,
-                    statusText = "HTTP $code OK (${elapsedMs}ms)",
-                    xmlSnippet = respXml.take(260).ifEmpty { soapBody },
-                    isLiveLanSuccess = true
-                )
+                brightness = parsed.brightness ?: clampedBrightness ?: device.brightness
             )
         }
     }
@@ -353,24 +366,13 @@ class NetworkClient(
         executeBasicEventSoapCall(
             device = device,
             action = "GetBinaryState"
-        ) { port, endpoint, code, elapsedMs, bodyStr, soapBody ->
+        ) { code, bodyStr ->
             val parsed = XmlAndSkuParser.parseBinaryStatePayload(bodyStr)
-            SoapCallResult(
-                reachableOnLan = true,
+            SoapOutcome(
                 binaryStateOn = parsed.binaryOn ?: false,
                 brightness = parsed.brightness,
-                resolvedPort = port,
-                latencyMs = elapsedMs,
-                logEntry = SoapLogEntry(
-                    timestamp = nowTime(),
-                    deviceName = device.name,
-                    endpoint = endpoint,
-                    soapAction = "GetBinaryState",
-                    statusText = "HTTP $code OK (Live LAN)",
-                    xmlSnippet = bodyStr.take(260).ifEmpty { soapBody },
-                    isLiveLanSuccess = true
-                ),
-                nightModeEnabled = parsed.nightModeEnabled
+                nightModeEnabled = parsed.nightModeEnabled,
+                statusText = "HTTP $code OK (Live LAN)"
             )
         }
 
@@ -383,36 +385,16 @@ class NetworkClient(
     suspend fun changeFriendlyName(
         device: DeviceEntity,
         newFriendlyName: String
-    ): SoapCallResult {
-        val label = "ChangeFriendlyName($newFriendlyName)"
-        return executeBasicEventSoapCall(
-            device = device,
-            action = "ChangeFriendlyName",
-            innerXml = "<FriendlyName>${XmlAndSkuParser.escapeXml(newFriendlyName)}</FriendlyName>",
-            logDeviceName = newFriendlyName,
-            successActionLabel = label,
-            offlineStatusText = "Offline • Name saved locally only",
-            offlineBinaryStateOn = device.isOn,
-            offlineBrightness = device.brightness
-        ) { port, endpoint, code, elapsedMs, respXml, soapBody ->
-            SoapCallResult(
-                reachableOnLan = true,
-                binaryStateOn = device.isOn,
-                brightness = device.brightness,
-                resolvedPort = port,
-                latencyMs = elapsedMs,
-                logEntry = SoapLogEntry(
-                    timestamp = nowTime(),
-                    deviceName = newFriendlyName,
-                    endpoint = endpoint,
-                    soapAction = label,
-                    statusText = "HTTP $code OK (${elapsedMs}ms)",
-                    xmlSnippet = respXml.take(260).ifEmpty { soapBody },
-                    isLiveLanSuccess = true
-                )
-            )
-        }
-    }
+    ): SoapCallResult = executeBasicEventSoapCall(
+        device = device,
+        action = "ChangeFriendlyName",
+        innerXml = "<FriendlyName>${XmlAndSkuParser.escapeXml(newFriendlyName)}</FriendlyName>",
+        logDeviceName = newFriendlyName,
+        successActionLabel = "ChangeFriendlyName($newFriendlyName)",
+        offlineStatusText = "Offline • Name saved locally only",
+        offlineBinaryStateOn = device.isOn,
+        offlineBrightness = device.brightness
+    ) { _, _ -> SoapOutcome(binaryStateOn = device.isOn, brightness = device.brightness) }
 
     suspend fun configureNightMode(
         device: DeviceEntity,
@@ -422,9 +404,10 @@ class NetworkClient(
         nightBrightness: Int = 20
     ): SoapCallResult {
         val modeInt = if (enabled) 1 else 0
+        val clampedNightBrightness = nightBrightness.coerceIn(1, 100)
         val innerXml = """
             <NightMode>$modeInt</NightMode>
-            <NightModeBrightness>${nightBrightness.coerceIn(1, 100)}</NightModeBrightness>
+            <NightModeBrightness>$clampedNightBrightness</NightModeBrightness>
             <StartTime>$startTimeSec</StartTime>
             <EndTime>$endTimeSec</EndTime>
         """.trimIndent()
@@ -432,29 +415,13 @@ class NetworkClient(
             device = device,
             action = "ConfigureNightMode",
             innerXml = innerXml,
-            successActionLabel = "ConfigureNightMode($modeInt, ${nightBrightness}%)",
+            successActionLabel = "ConfigureNightMode($modeInt, ${clampedNightBrightness}%)",
             offlineActionLabel = "ConfigureNightMode($modeInt)",
             offlineBinaryStateOn = device.isOn,
             offlineBrightness = device.brightness,
             offlineNightMode = device.nightModeEnabled
-        ) { port, endpoint, code, elapsedMs, respXml, soapBody ->
-            SoapCallResult(
-                reachableOnLan = true,
-                binaryStateOn = device.isOn,
-                brightness = device.brightness,
-                resolvedPort = port,
-                latencyMs = elapsedMs,
-                logEntry = SoapLogEntry(
-                    timestamp = nowTime(),
-                    deviceName = device.name,
-                    endpoint = endpoint,
-                    soapAction = "ConfigureNightMode($modeInt, ${nightBrightness}%)",
-                    statusText = "HTTP $code OK (${elapsedMs}ms)",
-                    xmlSnippet = respXml.take(260).ifEmpty { soapBody },
-                    isLiveLanSuccess = true
-                ),
-                nightModeEnabled = enabled
-            )
+        ) { _, _ ->
+            SoapOutcome(binaryStateOn = device.isOn, brightness = device.brightness, nightModeEnabled = enabled)
         }
     }
 

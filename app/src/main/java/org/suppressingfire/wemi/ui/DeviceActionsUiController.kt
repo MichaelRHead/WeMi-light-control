@@ -14,6 +14,7 @@ import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.data.inferRoomFromName
+import org.suppressingfire.wemi.data.normalizeRoomName
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.XmlAndSkuParser
 
@@ -65,12 +66,12 @@ internal class DeviceActionsUiController(
     }
 
     fun toggleRoomPower(roomName: String) {
-        val displayRoom = roomName.trim().ifBlank { "Unassigned" }
+        val displayRoom = normalizeRoomName(roomName)
         scope.launch {
             val activeKey = activeNetworkKeyProvider()
             val roomSwitches = currentDevicesProvider().filter {
                 it.networkKey == activeKey &&
-                    it.roomName.trim().ifBlank { "Unassigned" }.equals(displayRoom, ignoreCase = true) &&
+                    it.normalizedRoomName.equals(displayRoom, ignoreCase = true) &&
                     it.isReachable &&
                     it.parsedType != DeviceType.MOTION_SENSOR
             }
@@ -90,7 +91,7 @@ internal class DeviceActionsUiController(
     }
 
     fun updateRoomBrightness(roomName: String, brightness: Int) {
-        val displayRoom = roomName.trim().ifBlank { "Unassigned" }
+        val displayRoom = normalizeRoomName(roomName)
         scope.launch {
             val count = repository.updateRoomBrightness(displayRoom, brightness, activeNetworkKeyProvider())
             onShowTransientStatus("$displayRoom: Set $count dimmable light(s) to $brightness%")
