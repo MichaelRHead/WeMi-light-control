@@ -108,7 +108,9 @@ data class DevicesTabActions(
     val onMoveDevice: (DeviceEntity, Boolean) -> Unit,
     val onPingDeviceLatency: (DeviceEntity) -> Unit,
     val onToggleNightMode: (DeviceEntity) -> Unit,
-    val onResetHomesAndSwitches: (Boolean) -> Unit = {}
+    val onResetHomesAndSwitches: (Boolean) -> Unit = {},
+    val onPinRoomWidget: ((String) -> Unit)? = null,
+    val onPinDeviceWidget: ((DeviceEntity) -> Unit)? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -228,7 +230,8 @@ fun DevicesTabScreen(
                             onToggleCollapse = { actions.onToggleRoomCollapse(roomName) },
                             onRoomBrightnessChange = { brightness ->
                                 actions.onUpdateRoomBrightness(roomName, brightness)
-                            }
+                            },
+                            onPinRoomWidget = actions.onPinRoomWidget?.let { pin -> { pin(roomName) } }
                         )
                     }
 
@@ -285,6 +288,7 @@ private fun BoundDeviceRow(
         onMoveDown = { actions.onMoveDevice(device, false) },
         onPingLatency = { actions.onPingDeviceLatency(device) },
         onToggleNightMode = { actions.onToggleNightMode(device) },
+        onPinDeviceWidget = actions.onPinDeviceWidget?.let { pin -> { pin(device) } },
         autoOffRemainingSeconds = state.activeAutoOffCountdownsSec[device.id],
         modifier = modifier
     )

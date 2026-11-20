@@ -1,6 +1,6 @@
 # WeMi Light Control — Android & Android TV UX Design, Behavioral Model & Critical User Journeys (`UX_DESIGN_AND_EXPERIENCE.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v28.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v29.0`)  
 **Document & Skill Owner**: **Google AI Studio Agent (`AI Studio Build`) — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md)
 
@@ -16,7 +16,7 @@ Related documentation:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — read-only for the Google AI Studio Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent — read-only for the Google AI Studio Agent)*
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v28.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v29.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -174,4 +174,11 @@ Every screen and component in **WeMi Light Control** must obey these five layout
    - **Room Section Headers (`TvRoomSectionHeader`, `tv_room_header_<RoomName>`)**: Group switches by room across all 3 columns (`span = { GridItemSpan(maxLineSpan) }`, with `"Unassigned"` sorted last), are always selected next when moving Up or Down through them from any column (including the leftmost switch widget), allow one-click concurrent (`Semaphore(3)`) Room Master toggling when pressed with `OK`, and step all room dimmers by `-10%` / `+10%` when `Left` / `Right` is pressed on a focused Room Header (`FOCUSED • OK TOGGLE • L/R DIM`).
    - **Unmistakable 10-Foot Cursor Focus & Empty-Home Rescan Focus**: Initial focus (`FocusRequester`) automatically lands on the first switch card (or on `Rescan` `tv_scan_button` when the active Wi-Fi Home has `0` switches), rendering a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated surface (`#133B66`), `1.022f` scale lift, and a **`FOCUSED • OK`** badge.
    - **Google TV Remote-Friendly Focusable Dimmer Slider, System Back & 3-Column Navigation**: Navigating into a dimmer card focuses its **On/Off Toggle** (`tv_device_card_<id>`), where `Left / Right` moves across adjacent switch cards and `OK` toggles power `ON` / `OFF`. Navigating **Down once more** focuses the **Dimmer Slider** (`tv_card_dim_mode_<id>`, highlighted in glowing Gold `#FBBF24`), where pressing `Left / Right` lowers (`-10%`) or raises (`+10%`) the dimmer brightness (surfacing `tv_dimmer_hud_overlay`), pressing `Up` or **system `Back`** (`BackHandler`) returns focus to the On/Off Toggle (`tv_device_card_<id>`), and pressing `Down` moves to the widget in the same column below.
+
+### CUJ 8: Zero-Launch Home Screen Light & Room Toggle Widgets (`widget/`)
+1. **Context**: User wants to flip a favorite light or an entire room ON/OFF directly from the Android home screen without launching WeMi Light Control.
+2. **Experience**:
+   - **One-Tap In-App Pinning or Launcher Picker**: The user taps the **Pin Room Widget** button (`room_pin_widget_button_<Room>`) on any `RoomGroupCard`, taps **`Add Widget`** (`pin_device_widget_<id>`) in a switch's `ExpandedDrawer`, or drags **WeMi Light & Room Toggle** from the Android widget drawer to launch `SwitchWidgetConfigureActivity` (Rooms / Lights tabs with Wi-Fi Home filters).
+   - **Direct Local-LAN Toggle & Live Sync**: Tapping the placed home screen widget runs `WidgetActionExecutor.toggleWidget` headlessly over local-LAN UPnP SOAP (`SetBinaryState`, `Semaphore(3)`-safe room fan-out, 9-port self-healing reconnect) without opening `MainActivity`. The widget immediately updates its Ocean Teal (`ON`), dark charcoal standby (`OFF`), or red dashed (`Offline`) visual state, dimmer brightness (`ON • 75%`), or room counter (`2/3 ON`), and automatically refreshes whenever in-app or physical wall-switch GENA changes occur.
+
 

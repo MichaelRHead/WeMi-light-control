@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v28.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v29.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v28.0`)
+## Quick Release Summary (`v1.0` → `v29.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v29.0`](#version-290-versioncode--29--november-19-2026)** | `29` | Nov 19, 2026 | **Home Screen Light & Room Toggle Widgets** (zero-app-launch local Wi-Fi toggles for any light or whole room, one-tap widget pinning from Room headers & switch drawers, Rooms/Lights configuration picker, and live auto-sync) |
 | **[`v28.0`](#version-280-versioncode--28--november-1519-2026)** | `28` | Nov 15–19, 2026 | Google TV focusable inline & Room-Header dimmer controls, steady single-row TV top bar while dimming, deterministic `Up`/`Down` Room Master Header navigation across all 3 columns (`wemi TV`), immediate `<100ms` GENA push on adoption, hardened UDN/SSDP discovery & `10.22.22.1` setup diagnostics |
 | **[`v25.0`](#version-250-versioncode--25--november-14-2026)** | `25` | Nov 14, 2026 | Top-header **`All Off`** button next to Refresh for 1-tap whole-home power-off, plus R8-shrunk pure Kotlin/DEX release App Bundle with embedded Play Console deobfuscation mapping (`proguard.map`) |
 | **[`v24.0`](#version-240-versioncode--24--november-11-2026)** | `24` | Nov 11, 2026 | Smaller, faster R8-shrunk release App Bundle with embedded Play Console crash deobfuscation mapping (`proguard.map`) and pure Kotlin/DEX packaging |
@@ -45,6 +46,13 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 29.0 (`versionCode = 29`) — November 19, 2026
+- **Home Screen Light & Room Toggle Widgets**: Place resizable widgets for any individual light/switch or entire room right on your Android home screen and turn them ON or OFF directly over your local Wi-Fi network without opening the app.
+- **One-Tap Widget Pinning & Launcher Picker**: Pin a room directly from the **Add to Home Screen** icon on any Room Group header or pin a light from the **`Add Widget`** button in a switch's expanded drawer—or drag the **WeMi Light & Room Toggle** widget from your Android launcher's widget drawer and pick any room or light filtered by Wi-Fi Home.
+- **3-State Visual Feedback & Live Auto-Sync**: Home screen widgets display glowing Ocean Teal (`ON`), dark charcoal standby (`OFF`), or red dashed (`Offline`) states alongside dimmer brightness (`ON • 75%`) and active room counts (`2/3 ON`), updating automatically whenever lights are toggled from a widget, the app, or a physical wall switch, and surviving switch re-scans via hardware serial fallback.
+
+---
 
 ### Version 28.0 (`versionCode = 28`) — November 15–19, 2026
 - **Google TV Focusable Inline Dimmer Slider & Room-Header Dimming (`wemi TV`)**: On Android TV and Google TV remotes without dedicated `Play/Pause` or `Menu` buttons, pressing **Down** from any dimmer card's ON/OFF toggle now focuses the inline **Dimmer Slider** directly underneath it (`◄ -10% • +10% ►`), where **Left / Right** adjusts brightness in `10%` steps, **Up** or **Back** returns to the ON/OFF toggle, and **Down** advances to the next row. Focusing a **Room Master Header** also supports **Left / Right** `-10% / +10%` whole-room dimmer stepping, while the top header bar stays cleanly packed on a single unclipped row.

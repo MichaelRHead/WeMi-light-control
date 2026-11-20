@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.Bathtub
 import androidx.compose.material.icons.filled.Bed
 import androidx.compose.material.icons.filled.Chair
@@ -54,11 +55,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
@@ -184,6 +187,7 @@ fun RoomGroupHeaderCard(
     onToggleRoomPower: () -> Unit,
     onToggleCollapse: () -> Unit,
     onRoomBrightnessChange: (Int) -> Unit,
+    onPinRoomWidget: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val controllableSwitches = roomDevices.filter {
@@ -344,6 +348,23 @@ fun RoomGroupHeaderCard(
                             contentDescription = "Adjust room brightness for $roomName",
                             tint = if (showRoomDimmer) WemoGreenPrimary else WemoTextSecondary,
                             modifier = Modifier.size(19.dp)
+                        )
+                    }
+                }
+
+                // Optional one-tap Home Screen widget pin action for the room
+                if (onPinRoomWidget != null && totalControllable > 0) {
+                    IconButton(
+                        onClick = onPinRoomWidget,
+                        modifier = Modifier
+                            .size(34.dp)
+                            .testTag("room_pin_widget_button_$roomName")
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen,
+                            contentDescription = stringResource(R.string.content_desc_pin_room_widget, roomName),
+                            tint = WemoGreenDark,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }

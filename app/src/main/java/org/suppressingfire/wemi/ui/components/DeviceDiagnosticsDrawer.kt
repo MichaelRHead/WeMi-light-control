@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Refresh
@@ -37,10 +38,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
@@ -61,7 +64,8 @@ internal fun ExpandedDrawer(
     onReconnect: () -> Unit,
     onPingLatency: () -> Unit,
     onEditDevice: () -> Unit,
-    onToggleNightMode: (() -> Unit)? = null
+    onToggleNightMode: (() -> Unit)? = null,
+    onPinDeviceWidget: (() -> Unit)? = null
 ) {
     val type = device.parsedType
     var sliderVal by remember(device.brightness) {
@@ -229,7 +233,10 @@ internal fun ExpandedDrawer(
                 )
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
                 if (!device.isReachable) {
                     AssistChip(
                         onClick = onReconnect,
@@ -257,6 +264,26 @@ internal fun ExpandedDrawer(
                                 modifier = Modifier.size(16.dp)
                             )
                         }
+                    )
+                }
+
+                if (onPinDeviceWidget != null && type != DeviceType.MOTION_SENSOR) {
+                    AssistChip(
+                        onClick = onPinDeviceWidget,
+                        label = { Text(stringResource(R.string.action_add_home_widget)) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen,
+                                contentDescription = "Add ${device.name} widget to Home Screen",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            leadingIconContentColor = WemoGreenDark,
+                            labelColor = WemoGreenDark
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("pin_device_widget_${device.id}")
                     )
                 }
 

@@ -1,32 +1,32 @@
-# Google Play Store Listing — WeMi Switch Control (v28.0 — Phone, Tablet & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v29.0 — Phone, Tablet, Widgets & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `28.0` (`versionCode = 28`)
-- **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, and **Android TV (Leanback)**
+- **Version:** `29.0` (`versionCode = 29`)
+- **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Android Home Screen Widgets**, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
 - **Content Rating:** Everyone
 
-## Short Description (78 / 80 chars max)
-Local Wi-Fi controller for Belkin's discontinued smart switch platform & TV.
+## Short Description (75 / 80 chars max)
+Local Wi-Fi widgets, phone & TV control for Belkin's discontinued switches.
 
 ## Full Description
-WeMi Switch Control brings fast, reliable local-network control back to Belkin's discontinued smart switch platform—including in-wall light switches, 3-way switches, smart dimmers, mini smart plugs, and motion sensors—across your Android phone, tablet, and **Android TV**, styled with an Ocean Teal, Electric Cyan, and Deep Sapphire interface.
+WeMi Switch Control brings fast, reliable local-network control back to Belkin's discontinued smart switch platform—including in-wall light switches, 3-way switches, smart dimmers, mini smart plugs, and motion sensors—across your Android phone, tablet, **Home Screen Widgets**, and **Android TV**, styled with an Ocean Teal, Electric Cyan, and Deep Sapphire interface.
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery, local SOAP HTTP commands, and `<100ms` UPnP GENA push updates—with no cloud account, external server, or subscription required.
 
-### What's New in Version 28.0
-- **Google TV Focusable Dimmer Slider & Room Navigation:** Press `Down` from any Android TV dimmer toggle to focus the inline brightness slider (`Left`/`Right` steps `-10%`/`+10%`, `Back`/`Up` returns to the toggle), step whole-room dimmers from any Room Master Header, and navigate `Up`/`Down` cleanly across all 3 columns.
+### What's New in Version 29.0
+- **Home Screen Light & Room Toggle Widgets:** Place resizable widgets for any individual light/switch or entire room directly on your Android home screen and toggle them ON or OFF over local Wi-Fi without opening the app.
+- **One-Tap Widget Pinning & Live Auto-Sync:** Pin a room widget right from any Room Group header or a light widget from any switch's expanded drawer—or add from the Android widget drawer via the Rooms/Lights picker. Widgets automatically display ON/OFF/Offline state, dimmer brightness percentages, and room active counts, and stay in sync with hardware changes.
+- **Google TV Focusable Dimmer Slider & Room Navigation:** Press `Down` from any Android TV dimmer toggle to focus the inline brightness slider (`Left`/`Right` steps `-10%`/`+10%`), step whole-room dimmers from Room Master Headers, and navigate cleanly across all 3 columns with a steady single-row top bar.
 - **Faster Parallel Local Wi-Fi Control & Instant GENA Push:** Newly discovered, adopted, and reconnected switches subscribe immediately to `<100ms` physical switch updates, while whole-room toggles, **`All Off`**, and health checks run concurrently with embedded RTOS safety limiting.
-- **Compact Single-Row Header with One-Tap `All Off`:** Dedicated `All Off`, `Refresh`, `Edit`, and `+` controls sit neatly beside the `wemi` wordmark on phones and tablets to maximize screen space for rooms and switches.
-- **Self-Healing 9-Port Reconnect & 3-Tier Hardware Identity:** Automatically recovers from firmware port shifts (`49151–49159`) across toggles, dimming, renaming, and Night Mode, while matching switches by hardware serial and UDN so DHCP IP changes never mix up devices.
-- **Smarter Room Grouping:** Automatically parses `CamelCase` and delimited switch names into rooms (Living Room, Bedroom, Ensuite, Kitchen, Hallway & Landing, or `Unassigned`) without overwriting custom room choices.
-- **Zero-Cloud `10.22.22.1` Switch Setup & Local Diagnostics:** Provision factory-reset switches directly over local Wi-Fi with automatic OpenWrt/RTOS encryption and one-tap local diagnostic log export (`wemi-telemetry-latest.txt`, excluded from cloud backup).
-- **Lean, Open-Source Pure Kotlin/DEX Release (`minSdk 24+`):** Built under the MIT License with a first-party local HTTP/UPnP engine, R8 optimization, and optional Wi-Fi hardware manifest support for Ethernet-connected Google TV boxes.
+- **Self-Healing 9-Port Reconnect & 3-Tier Hardware Identity:** Automatically recovers from firmware port shifts (`49151–49159`) while matching switches by hardware serial and UDN so DHCP IP changes never mix up devices.
+- **Zero-Cloud `10.22.22.1` Switch Setup & Lean Pure Kotlin/DEX Release (`minSdk 24+`):** Provision factory-reset switches directly over local Wi-Fi with MIT open-source transparency, R8 optimization, and strictly local diagnostics excluded from cloud backup.
 
 ### Key Features
+- **Home Screen Light & Room Widgets:** One-tap local Wi-Fi toggles for individual lights or whole rooms straight from your Android launcher without opening the app.
 - **Instant One-Tap Cyan Power Rings:** Toggle individual switches or entire room groups ON or OFF over your local LAN with tactile 3-state hardware illustrations (On, Standby, Offline).
 - **Native Android TV (`wemi TV`) 10-Foot Dashboard:** Automatic Leanback launcher UI with a 3-column room-grouped switch grid, glowing cyan `"FOCUSED • OK"` focus rings, TV Quick Scenes (`Movie 20%`, `Holiday ON`, `All OFF`), and inline D-Pad dimming.
 - **Inline Dimmer & Night Mode Controls:** Smoothly dim smart dimmers and bulbs from 1% to 100%, jump to quick presets (21%, 50%, 75%, 100%), or toggle hardware Night Mode.

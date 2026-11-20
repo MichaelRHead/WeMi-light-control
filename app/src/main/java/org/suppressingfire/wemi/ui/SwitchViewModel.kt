@@ -33,6 +33,7 @@ import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.SetupDeviceDescriptor
 import org.suppressingfire.wemi.network.SsdpScanReport
+import org.suppressingfire.wemi.widget.WidgetUpdater
 
 enum class BottomTab {
     DEVICES,
@@ -220,6 +221,7 @@ class SwitchViewModel(application: Application) : AndroidViewModel(application) 
                     devList.forEach { dev ->
                         ruleScheduler.onDeviceStateUpdated(dev, ruleList)
                     }
+                    WidgetUpdater.refreshWidgetsForDevices(getApplication(), devList)
                 }
         }
 

@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +54,7 @@ import org.suppressingfire.wemi.ui.screens.RulesScreen
 import org.suppressingfire.wemi.ui.theme.WeMiTheme
 import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
+import org.suppressingfire.wemi.widget.WidgetUpdater
 
 class MainActivity : ComponentActivity() {
     override val defaultViewModelProviderFactory: ViewModelProvider.Factory
@@ -81,6 +83,7 @@ fun WeMiSwitchApp(
     viewModel: SwitchViewModel = viewModel()
 ) {
     val configuration = LocalConfiguration.current
+    val context = LocalContext.current
     val isTvMode = remember(configuration) {
         (configuration.uiMode and Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_TELEVISION
     }
@@ -225,7 +228,7 @@ fun WeMiSwitchApp(
                     onScanSsdpClick = { viewModel.refreshDevicesFromNetwork() }
                 )
             } else {
-                val devicesTabActions = remember(viewModel) {
+                val devicesTabActions = remember(viewModel, context) {
                     DevicesTabActions(
                         onRefreshDevices = { viewModel.refreshDevicesFromNetwork() },
                         onOpenProvisionApDialog = { viewModel.openProvisionApDialog() },
@@ -250,7 +253,24 @@ fun WeMiSwitchApp(
                         onMoveDevice = { dev, moveUp -> viewModel.moveDevice(dev, moveUp) },
                         onPingDeviceLatency = { viewModel.pingDeviceLatency(it) },
                         onToggleNightMode = { viewModel.toggleDimmerNightMode(it) },
-                        onResetHomesAndSwitches = { rescan -> viewModel.resetLanHomesSwitchesAndRooms(rescan) }
+                        onResetHomesAndSwitches = { rescan -> viewModel.resetLanHomesSwitchesAndRooms(rescan) },
+                        onPinRoomWidget = { roomName ->
+                            val msg = WidgetUpdater.requestPinRoomWidget(
+                                context = context,
+                                roomName = roomName,
+                                networkKey = viewModel.activeNetworkKey.value,
+                                allDevices = viewModel.devices.value
+                            )
+                            viewModel.showTransientStatus(msg)
+                        },
+                        onPinDeviceWidget = { device ->
+                            val msg = WidgetUpdater.requestPinDeviceWidget(
+                                context = context,
+                                device = device,
+                                allDevices = viewModel.devices.value
+                            )
+                            viewModel.showTransientStatus(msg)
+                        }
                     )
                 }
 

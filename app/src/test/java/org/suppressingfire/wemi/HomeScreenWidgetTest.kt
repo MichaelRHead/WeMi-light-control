@@ -1,0 +1,286 @@
+package org.suppressingfire.wemi
+
+import android.app.Activity
+import android.appwidget.AppWidgetManager
+import android.content.Context
+import android.content.Intent
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.test.core.app.ActivityScenario
+import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
+import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.data.DeviceType
+import org.suppressingfire.wemi.data.SwitchDatabase
+import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.widget.SwitchWidgetConfigureActivity
+import org.suppressingfire.wemi.widget.WidgetActionExecutor
+import org.suppressingfire.wemi.widget.WidgetConfigStore
+import org.suppressingfire.wemi.widget.WidgetRemoteViewsBuilder
+import org.suppressingfire.wemi.widget.WidgetTargetConfig
+import org.suppressingfire.wemi.widget.WidgetTargetType
+import org.suppressingfire.wemi.widget.WidgetVisualMode
+
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [36])
+class HomeScreenWidgetTest {
+
+    @get:Rule
+    val composeRule = createEmptyComposeRule()
+
+    private lateinit var context: Context
+
+    @Before
+    fun setUp() {
+        context = ApplicationProvider.getApplicationContext()
+        WidgetConfigStore.clearAll(context)
+        SwitchDatabase.closeCurrentInstance()
+    }
+
+    @After
+    fun tearDown() {
+        WidgetConfigStore.clearAll(context)
+        SwitchDatabase.closeCurrentInstance()
+    }
+
+    @Test
+    fun widgetConfigStorePersistsRemapsAndDeletesLightAndRoomBindings() {
+        val device = DeviceEntity(
+            id = 42,
+            name = "Kitchen Dimmer",
+            roomName = "Kitchen",
+            networkKey = DEFAULT_MAIN_HOME_KEY,
+            deviceType = DeviceType.LIGHTBULB_DIMMER.name,
+            ipAddress = "192.168.1.42",
+            port = 49153,
+            serialNumber = "WDS060KIT42"
+        )
+        val deviceCfg = WidgetTargetConfig.forDevice(appWidgetId = 101, device = device)
+        val roomCfg = WidgetTargetConfig.forRoom(
+            appWidgetId = 102,
+            roomName = "Living Room",
+            networkKey = DEFAULT_MAIN_HOME_KEY
+        )
+
+        WidgetConfigStore.save(context, deviceCfg)
+        WidgetConfigStore.save(context, roomCfg)
+
+        val loadedDev = WidgetConfigStore.load(context, 101)
+        assertNotNull(loadedDev)
+        assertEquals(WidgetTargetType.DEVICE, loadedDev?.targetType)
+        assertEquals(42, loadedDev?.deviceId)
+        assertEquals("WDS060KIT42", loadedDev?.serialNumber)
+
+        val loadedRoom = WidgetConfigStore.load(context, 102)
+        assertNotNull(loadedRoom)
+        assertEquals(WidgetTargetType.ROOM, loadedRoom?.targetType)
+        assertEquals("Living Room", loadedRoom?.normalizedRoomName())
+
+        WidgetConfigStore.remapIds(context, intArrayOf(101), intArrayOf(201))
+        assertNull(WidgetConfigStore.load(context, 101))
+        assertEquals(42, WidgetConfigStore.load(context, 201)?.deviceId)
+
+        WidgetConfigStore.delete(context, 102)
+        assertNull(WidgetConfigStore.load(context, 102))
+        assertEquals(listOf(201), WidgetConfigStore.allConfiguredWidgetIds(context))
+    }
+
+    @Test
+    fun widgetDisplayStateSupportsDimmerRoomCountsAndSerialFallback() {
+        val dimmer = DeviceEntity(
+            id = 99,
+            name = "Dining Chandelier",
+            roomName = "Dining Room",
+            networkKey = DEFAULT_MAIN_HOME_KEY,
+            deviceType = DeviceType.LIGHTBULB_DIMMER.name,
+            ipAddress = "192.168.1.50",
+            port = 49153,
+            isOn = true,
+            isReachable = true,
+            brightness = 65,
+            serialNumber = "WDS060DIN99"
+        )
+        val porchSwitch = DeviceEntity(
+            id = 100,
+            name = "Porch Light",
+            roomName = "Dining Room",
+            networkKey = DEFAULT_MAIN_HOME_KEY,
+            deviceType = DeviceType.SWITCH_PLUG.name,
+            ipAddress = "192.168.1.51",
+            port = 49153,
+            isOn = false,
+            isReachable = true,
+            serialNumber = "WLS040DIN100"
+        )
+
+        // Simulate row ID changing from 7 -> 99 after re-discovery while serialNumber stays constant
+        val staleIdConfig = WidgetTargetConfig(
+            appWidgetId = 301,
+            targetType = WidgetTargetType.DEVICE,
+            deviceId = 7,
+            serialNumber = "WDS060DIN99",
+            roomName = "Dining Room",
+            networkKey = DEFAULT_MAIN_HOME_KEY,
+            displayName = "Dining Chandelier"
+        )
+        val devState = WidgetRemoteViewsBuilder.resolveDisplayState(
+            config = staleIdConfig,
+            devices = listOf(dimmer, porchSwitch)
+        )
+        assertEquals("Dining Chandelier", devState.title)
+        assertEquals("ON • 65%", devState.subtitle)
+        assertEquals(WidgetVisualMode.ON, devState.visualMode)
+
+        val roomConfig = WidgetTargetConfig.forRoom(302, "Dining Room", DEFAULT_MAIN_HOME_KEY)
+        val roomState = WidgetRemoteViewsBuilder.resolveDisplayState(
+            config = roomConfig,
+            devices = listOf(dimmer, porchSwitch)
+        )
+        assertEquals("Dining Room", roomState.title)
+        assertEquals("1/2 ON • Room", roomState.subtitle)
+        assertEquals(WidgetVisualMode.ON, roomState.visualMode)
+    }
+
+    @Test
+    fun headlessWidgetToggleControlsRealLoopbackLightAndRoomOverUpnpSoap() = runBlocking {
+        FakeUpnpServer(
+            initialFriendlyName = "Patio String Lights",
+            modelName = "WLS040",
+            serialNumber = "WLS040WIDGET01",
+            udn = "uuid:Lightswitch-3_0-WLS040WIDGET01",
+            initialRelayOn = false
+        ).use { server1 ->
+            FakeUpnpServer(
+                initialFriendlyName = "Patio Spotlights",
+                modelName = "WLS040",
+                serialNumber = "WLS040WIDGET02",
+                udn = "uuid:Lightswitch-3_0-WLS040WIDGET02",
+                initialRelayOn = false
+            ).use { server2 ->
+                val dao = SwitchDatabase.getDatabase(context).switchDao()
+                val repo = SwitchRepository(
+                    dao = dao,
+                    context = context,
+                    initialDemoModeOverride = false
+                )
+                try {
+                    val saved1 = repo.saveDevice(
+                        DeviceEntity(
+                            name = "Patio String Lights",
+                            roomName = "Patio",
+                            networkKey = DEFAULT_MAIN_HOME_KEY,
+                            deviceType = DeviceType.SWITCH_PLUG.name,
+                            ipAddress = "127.0.0.1",
+                            port = server1.port,
+                            isOn = false,
+                            isReachable = true,
+                            serialNumber = "WLS040WIDGET01"
+                        )
+                    )
+                    val saved2 = repo.saveDevice(
+                        DeviceEntity(
+                            name = "Patio Spotlights",
+                            roomName = "Patio",
+                            networkKey = DEFAULT_MAIN_HOME_KEY,
+                            deviceType = DeviceType.SWITCH_PLUG.name,
+                            ipAddress = "127.0.0.1",
+                            port = server2.port,
+                            isOn = false,
+                            isReachable = true,
+                            serialNumber = "WLS040WIDGET02"
+                        )
+                    )
+
+                    // 1) Toggle individual light widget ON via real loopback SOAP
+                    WidgetConfigStore.save(context, WidgetTargetConfig.forDevice(401, saved1))
+                    assertTrue(WidgetActionExecutor.toggleWidgetTarget(context, 401, repositoryOverride = repo))
+                    assertTrue("Expected server1 to receive SetBinaryState(1)", server1.relayStateOn.get())
+                    assertFalse("Expected server2 to remain OFF", server2.relayStateOn.get())
+                    assertTrue(dao.getDeviceById(saved1.id)?.isOn == true)
+
+                    // 2) Toggle Patio room widget (since 1/2 is ON, room toggle turns ALL Patio lights OFF)
+                    WidgetConfigStore.save(
+                        context,
+                        WidgetTargetConfig.forRoom(402, "Patio", DEFAULT_MAIN_HOME_KEY)
+                    )
+                    assertTrue(WidgetActionExecutor.toggleWidgetTarget(context, 402, repositoryOverride = repo))
+                    assertFalse("Expected room widget to turn server1 OFF", server1.relayStateOn.get())
+                    assertFalse("Expected room widget to keep server2 OFF", server2.relayStateOn.get())
+
+                    // 3) Toggle Patio room widget again (all OFF -> turns ALL Patio lights ON)
+                    assertTrue(WidgetActionExecutor.toggleWidgetTarget(context, 402, repositoryOverride = repo))
+                    assertTrue("Expected room widget to turn server1 ON", server1.relayStateOn.get())
+                    assertTrue("Expected room widget to turn server2 ON", server2.relayStateOn.get())
+
+                    val updatedList = repo.allDevices.first()
+                    val roomState = WidgetRemoteViewsBuilder.resolveDisplayState(
+                        config = WidgetConfigStore.load(context, 402),
+                        devices = updatedList
+                    )
+                    assertEquals("2/2 ON • Room", roomState.subtitle)
+                    assertEquals(WidgetVisualMode.ON, roomState.visualMode)
+                    assertEquals(saved2.id, dao.getDeviceById(saved2.id)?.id)
+                } finally {
+                    repo.close()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun widgetConfigureActivityLetsUserSelectRoomAndReturnsResultOk() {
+        val launchIntent = Intent(context, SwitchWidgetConfigureActivity::class.java).apply {
+            action = AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 555)
+        }
+        ActivityScenario.launchActivityForResult<SwitchWidgetConfigureActivity>(launchIntent).use { scenario ->
+            composeRule.waitUntil(timeoutMillis = 5_000L) {
+                runCatching {
+                    composeRule.onNodeWithTag("widget_config_room_Living Room").assertIsDisplayed()
+                    true
+                }.getOrDefault(false)
+            }
+
+            // Switch to Lights tab and confirm lights list renders
+            composeRule.onNodeWithTag("widget_config_tab_lights").performClick()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("widget_config_lights_list").assertIsDisplayed()
+
+            // Switch back to Rooms tab and pick Living Room
+            composeRule.onNodeWithTag("widget_config_tab_rooms").performClick()
+            composeRule.waitForIdle()
+            composeRule.onNodeWithTag("widget_config_room_Living Room").performClick()
+            composeRule.waitForIdle()
+
+            val result = scenario.result
+            assertEquals(Activity.RESULT_OK, result.resultCode)
+            assertEquals(
+                555,
+                result.resultData?.getIntExtra(
+                    AppWidgetManager.EXTRA_APPWIDGET_ID,
+                    AppWidgetManager.INVALID_APPWIDGET_ID
+                )
+            )
+            val saved = WidgetConfigStore.load(context, 555)
+            assertNotNull(saved)
+            assertEquals(WidgetTargetType.ROOM, saved?.targetType)
+            assertEquals("Living Room", saved?.normalizedRoomName())
+        }
+    }
+}

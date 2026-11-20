@@ -19,13 +19,13 @@ Related documentation:
 
 ## 1. Executive Summary & UX Philosophy
 
-**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v28.0`) reimagines the tactile, unmistakable physical affordances of a dedicated smart-home switch interface (Ocean Teal `#0891B2`, Electric Cyan `#06B6D4`, and Deep Sapphire `#0F4C81` header gradient, crisp white device rows, glowing cyan power rings, and skeuomorphic appliance illustrations) for Belkin's discontinued smart switch platform while pairing them with modern Android 15/16 responsiveness, zero-cloud local LAN privacy, and WCAG-grade accessibility.
+**WeMi Light Control** (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v29.0`) reimagines the tactile, unmistakable physical affordances of a dedicated smart-home switch interface (Ocean Teal `#0891B2`, Electric Cyan `#06B6D4`, and Deep Sapphire `#0F4C81` header gradient, crisp white device rows, glowing cyan power rings, and skeuomorphic appliance illustrations) for Belkin's discontinued smart switch platform while pairing them with modern Android 15/16 responsiveness, Home Screen Light & Room Toggle Widgets, zero-cloud local LAN privacy, and WCAG-grade accessibility.
 
 Smart-home control apps fail when they treat physical wall switches like generic cloud database rows. Our UX design is anchored on four core principles:
 1. **Sub-Frame Tactile Responsiveness (`<16ms`)**: Tapping a light switch in the app must feel as instantaneous as flipping a physical paddle on the wall, backed by optimistic state projection and `1200ms` UPnP GENA echo suppression.
 2. **Honest 3-State Hardware Telemetry**: Never conflate a reachable switch that is turned `OFF` (`Accessible Standby`) with a switch that has lost Wi-Fi or power (`Disconnected`). Every state is communicated simultaneously via color, iconography, border geometry, and text labels.
 3. **Zero-Truncation Spatial Clarity**: Device names are the primary anchor of human recognition (`"Kids Bedroom Bedside Lamp"`, `"Front Porch String Lights"`). Every row guarantees a dedicated, full-width auto-resizing title line (`AutoResizingDeviceNameText` / `AutoShrinkSwitchName`) that never collides with status badges or truncates into ambiguity.
-4. **Native Hardware Form-Factor Ergonomics**: Phone/tablet touchscreens and 10-foot Android TV devices (`Configuration.UI_MODE_TYPE_TELEVISION`) have fundamentally different interaction models. Each device class automatically renders its dedicated native layout—touch-first `Scaffold` on handhelds/tablets and D-Pad-first `TvDashboardScreen` on Android TV—without cross-mode layout toggle buttons.
+4. **Native Hardware Form-Factor Ergonomics**: Phone/tablet touchscreens, Android Home Screen Widgets, and 10-foot Android TV devices (`Configuration.UI_MODE_TYPE_TELEVISION`) have fundamentally different interaction models. Each surface renders its dedicated native layout—touch-first `Scaffold` on handhelds/tablets, zero-launch `RemoteViews` toggle tiles on the Android launcher, and D-Pad-first `TvDashboardScreen` on Android TV—without cross-mode layout toggle buttons.
 
 ---
 
@@ -53,6 +53,7 @@ WeMi Light Control uses a flat, predictable 3-tab bottom `NavigationBar` (`Botto
      - **Uniform Collapsed Card Height**: All collapsed room headers share a locked single-line title (`AutoResizingDeviceNameText(..., singleLineOnly = true)`) and single-line status pills (`"2/3 ON"` or `"0/1 ON"`) so vertical scanning is rhythmically consistent across short and long room names.
      - **Room Master Power Button (`room_power_toggle_<Room>`)**: Toggles every reachable switch and dimmer in that room concurrently (`Semaphore(3)`) via idempotent `setDevicePowerExplicit(dev, targetOn)` without expanding the card.
      - **Room Master Dimmer Bar (`room_dimmer_button_<Room>` / `room_dimmer_slider_<Room>`)**: Surfaces inside rooms that contain at least one `LIGHTBULB_DIMMER`, offering a room-wide master brightness slider and quick presets (`10%`, `25%`, `50%`, `75%`, `100%`) while preserving binary switches in the same room.
+     - **One-Tap Pin Room Widget (`room_pin_widget_button_<Room>`)**: Dedicated `Icons.AutoMirrored.Filled.AddToHomeScreen` button in the room header requests Android launcher pinning (`AppWidgetManager.requestPinAppWidget` on API 26+) with a live preview of that room's toggle tile.
 
 4. **Bottom Navigation Bar (`BottomNavigationBar` in `BottomNavBar.kt`)**:
    - **`Devices` Tab (`BottomTab.DEVICES`)**: Real-time switch & dimmer control, room groups, SSDP discovery, and hardware diagnostics.
@@ -66,7 +67,7 @@ To avoid overwhelming the primary control canvas, secondary controls and diagnos
 - **Tier 1 — Inline Expandable Drawer (`ExpandedDrawer` inside `DeviceDiagnosticsDrawer.kt`)**:
   - Triggered by tapping anywhere on a device row body (outside the right-hand power ring button) or tapping the `ⓘ` details button (`info_button_<id>`).
   - **Dimmer Controls First**: For `LIGHTBULB_DIMMER` devices (`F7C059`, `WDS060`), the continuous `1%–100%` `Slider` (`brightness_slider_<id>`), quick-preset chips (`1%`, `21%`, `25%`, `50%`, `75%`, `100%`), and **Night Mode (`20%` hardware cap)** toggle appear **at the very top of the expanded drawer** before any network telemetry.
-  - **Action Bar & Telemetry Below**: Quick-action buttons (`Ping RTT`, `Configure IP`) and UPnP/SOAP hardware telemetry (`IP:Port`, `MAC`, `Serial Number`, `Firmware`, `UDN`, `Wi-Fi Signal %`) sit cleanly below the primary controls.
+  - **Action Bar & Telemetry Below**: Quick-action chips (`Ping RTT`, `Configure IP`, and **`Add Widget`** `pin_device_widget_<id>` for one-tap launcher pinning) and UPnP/SOAP hardware telemetry (`IP:Port`, `MAC`, `Serial Number`, `Firmware`, `UDN`, `Wi-Fi Signal %`) sit cleanly below the primary controls.
 
 - **Tier 2 — Focused Modal Dialogs (`WeMiModalDialogs.kt`)**:
   - **`SsdpScannerModal` (`SsdpScannerModal.kt` & `SsdpDiscoveryBanner.kt`)**: Live radar progress bar, subnet sweep status, and discovered device cards with `Adopt` / `Synced` badges.
@@ -96,6 +97,15 @@ When running on an Android TV (`Configuration.UI_MODE_TYPE_TELEVISION`), the app
   - **On/Off Toggle Focus (`tv_device_card_<id>`)**: Navigating down into any switch or dimmer card focuses its **On/Off Toggle**. Pressing `D-Pad Left / Right` moves across the 3 columns of switch cards to the left and right, and pressing `OK / Select / Enter` immediately toggles power `ON` / `OFF` (or triggers a 9-port reconnect if offline).
   - **Focusable Dimmer Slider (`tv_card_dim_mode_<id>`)**: Because Google TV remotes do not have a dedicated Play or Menu button, navigating **Down once more** from a dimmer card's On/Off Toggle focuses the **Dimmer Slider** directly below it (highlighted with a glowing Gold `#FBBF24` border and **`◄ -10% • +10% ►`** badge). While the dimmer slider is focused, pressing **`Left` / `Right`** lowers (`-10%`) or raises (`+10%`) the dimmer brightness immediately (and surfaces `tv_dimmer_hud_overlay`), pressing **`Up`** or **system `Back`** (`BackHandler`) returns focus to the dimmer's On/Off Toggle (`tv_device_card_<id>`), and pressing **`Down`** moves to the Room Bar or switch widget in the same column below.
 - **Zero Blocking Popup Modals on TV**: Clicking `Rescan` (`tv_scan_button`) runs a non-blocking background SSDP + state refresh with a bottom toast, and touch-only modal sheets are guarded by `if (!isTvMode)` so popups never trap TV remote focus.
+
+### 2.5 Home Screen Light & Room Widgets (`widget/` Package)
+
+WeMi Light Control ships zero-dependency, zero-permission Android AppWidgets (`WeMiSwitchWidgetProvider`, `SwitchWidgetConfigureActivity`, `WidgetRemoteViewsBuilder`, `WidgetActionExecutor`, `WidgetConfigStore`) so users can toggle individual lights/switches or entire rooms straight from their launcher without opening `MainActivity`:
+
+- **Two Placement Paths**:
+  1. **One-Tap In-App Pinning**: Room headers expose `room_pin_widget_button_<Room>` and switch drawers expose `pin_device_widget_<id>` (`Add Widget`), invoking API 26+ `AppWidgetManager.requestPinAppWidget` with a live `EXTRA_APPWIDGET_PREVIEW` and returning a transient confirmation banner.
+  2. **Launcher Widget Drawer (`SwitchWidgetConfigureActivity`)**: Adding **WeMi Light & Room Toggle** (`wemi_switch_widget_info.xml`, resizable `2×1` default) opens an edge-to-edge Jetpack Compose picker with **Rooms** (`widget_config_tab_rooms`) and **Lights** (`widget_config_tab_lights`) tabs, Wi-Fi Home filter chips, and `>= 48.dp` touch targets.
+- **3-State Tactile Tile & Headless Local-LAN Toggle**: Each widget mirrors WeMi's 3-state visual language—Ocean Teal (`widget_bg_on`), dark charcoal standby (`widget_bg_off`), and red dashed (`widget_bg_offline`)—showing dimmer brightness (`ON • 75%`) or active room counts (`2/3 ON`). Tapping anywhere on the tile executes `WidgetActionExecutor.toggleWidget` via `goAsync()` over local-LAN UPnP SOAP (with 9-port self-healing reconnect) and updates all placed widgets without launching the app.
 
 ---
 

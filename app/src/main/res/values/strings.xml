@@ -19,4 +19,15 @@
     <string name="label_ip_address">Local IP Address</string>
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
+    <string name="widget_label_light_room">Light or Room Toggle</string>
+    <string name="widget_description_light_room">Turn any smart light or entire room ON and OFF straight from your Home Screen.</string>
+    <string name="widget_config_title">Choose Light or Room</string>
+    <string name="widget_config_subtitle">Tap any room or smart switch to pin on your Home Screen</string>
+    <string name="widget_unconfigured_title">WeMi Light Widget</string>
+    <string name="widget_unconfigured_subtitle">Tap to choose light or room</string>
+    <string name="widget_preview_title">Living Room</string>
+    <string name="widget_preview_subtitle">2/3 ON • Room</string>
+    <string name="widget_power_ring_desc">Toggle power</string>
+    <string name="action_add_home_widget">Add Widget</string>
+    <string name="content_desc_pin_room_widget">Add %1$s widget to Home Screen</string>
 </resources>

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="44dp"
+    android:height="44dp"
+    android:viewportWidth="44"
+    android:viewportHeight="44">
+    <!-- Subtle outer slate ring -->
+    <path
+        android:fillColor="#E2E8F0"
+        android:pathData="M22,3a19,19 0,1 0,0 38a19,19 0,1 0,0 -38z" />
+    <!-- Signature charcoal standby disc (#23272F) -->
+    <path
+        android:fillColor="#23272F"
+        android:strokeColor="#64748B"
+        android:strokeWidth="1.5"
+        android:pathData="M22,5.5a16.5,16.5 0,1 0,0 33a16.5,16.5 0,1 0,0 -33z" />
+    <!-- IEC Power Symbol arc -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#CBD5E1"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M16.5,15.5 A8,8 0 1,0 27.5,15.5" />
+    <!-- IEC Power Symbol vertical stem -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#CBD5E1"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:pathData="M22,12 L22,21" />
+</vector>
