@@ -67,11 +67,8 @@ class SwitchRepository(
     private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val defaultDemoMode = initialDemoModeOverride
-        ?: if (isRunningInRobolectric()) {
-            true
-        } else {
-            prefs?.getBoolean(KEY_DEMO_SHOWROOM_MODE, false) ?: false
-        }
+        ?: prefs?.takeIf { it.contains(KEY_DEMO_SHOWROOM_MODE) }?.getBoolean(KEY_DEMO_SHOWROOM_MODE, false)
+        ?: isRunningInRobolectric()
 
     private val _isDemoShowroomMode = MutableStateFlow(defaultDemoMode)
     val isDemoShowroomMode: StateFlow<Boolean> = _isDemoShowroomMode.asStateFlow()
