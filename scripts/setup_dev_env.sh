@@ -422,6 +422,38 @@ EOF
 chmod +x "$TMP_SYNC"
 mv "$TMP_SYNC" "$SYNC_HELPER"
 
+# Ensure forked Gradle Test JVMs (e.g., Robolectric on a cache miss) inherit proxy & trustStore props
+GRADLE_INIT_DIR="$GRADLE_DIR/init.d"
+GRADLE_INIT_SCRIPT="$GRADLE_INIT_DIR/00-proxy-and-certs.gradle"
+mkdir -p "$GRADLE_INIT_DIR"
+TMP_INIT="${GRADLE_INIT_SCRIPT}.tmp.$$"
+cat <<'EOF' > "$TMP_INIT"
+allprojects {
+    tasks.withType(Test).configureEach {
+        [
+            "javax.net.ssl.trustStore",
+            "javax.net.ssl.trustStorePassword",
+            "http.proxyHost",
+            "http.proxyPort",
+            "https.proxyHost",
+            "https.proxyPort",
+            "http.nonProxyHosts",
+            "https.nonProxyHosts"
+        ].each { key ->
+            def val = System.getProperty(key)
+            if (val != null && !val.isEmpty()) {
+                systemProperty(key, val)
+            }
+        }
+    }
+}
+EOF
+if [ -f "$GRADLE_INIT_SCRIPT" ] && cmp -s "$TMP_INIT" "$GRADLE_INIT_SCRIPT"; then
+  rm -f "$TMP_INIT"
+else
+  mv -f "$TMP_INIT" "$GRADLE_INIT_SCRIPT"
+fi
+
 # 5. Persist environment variables & proxy sync hook idempotently in ~/.bashrc
 touch "$HOME/.bashrc"
 sed -i '/case \$- in/,/esac/d' "$HOME/.bashrc" 2>/dev/null || true

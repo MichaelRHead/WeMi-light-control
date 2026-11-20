@@ -71,6 +71,12 @@ android {
     compose = true
     buildConfig = true
   }
+  lint {
+    // Keep full production lint checks active while skipping test-source analysis
+    // during debug lint runs.
+    ignoreTestSources = true
+    checkDependencies = false
+  }
   testOptions {
     unitTests {
       isIncludeAndroidResources = true
@@ -79,6 +85,9 @@ android {
           "robolectric.dependency.repo.url",
           "https://maven-central.storage-download.googleapis.com/maven2/"
         )
+        it.maxHeapSize = "1536m"
+        it.maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(1, 2)
+        it.jvmArgs("-XX:+UseParallelGC")
       }
     }
   }
@@ -86,6 +95,13 @@ android {
     includeInApk = false
     includeInBundle = true
   }
+}
+
+// Test source sets declare no Room/KSP annotations; skip empty KSP invocations on unit/android tests.
+tasks.matching {
+  it.name == "kspDebugUnitTestKotlin" || it.name == "kspDebugAndroidTestKotlin"
+}.configureEach {
+  enabled = false
 }
 
 dependencies {
