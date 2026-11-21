@@ -262,39 +262,28 @@ data class SsdpDiscoveredDevice(
     }
 }
 
-private val CHRISTMAS_TREE_KEYWORDS = listOf(
-    "tree", "xmas", "evergreen", "spruce", "fir ", "garland", "wreath", "tinsel", "noel"
-)
-private val HOLIDAY_LIGHT_KEYWORDS = listOf(
-    "holiday", "christmas", "xmas", "diwali", "dewali", "deepavali",
-    "hanukkah", "chanukah", "menorah", "kwanzaa", "festive", "festival",
-    "halloween", "spooky", "pumpkin", "lunar", "new year", "valentine",
-    "easter", "twinkle", "fairy", "icicle", "string light"
-)
-private val CHRISTMAS_LIGHT_EXCLUSIONS = listOf("candle", "lamp", "sconce", "lantern")
-private val FAN_KEYWORDS = listOf("fan", "blower", "vent", "exhaust", "ventilat", "circulator")
-private val LIGHT_KEYWORDS = listOf(
-    "lamp", "light", "bulb", "candle", "sconce", "chandelier", "lantern", "pendant",
-    "flood", "spot", "downlight", "uplight", "strip", "neon", "torch", "dimmer", "led", "fixture"
-)
-private val MOTION_KEYWORDS = listOf("motion", "sensor")
-
 /**
  * Returns true when a controllable switch or dimmer represents seasonal/holiday lighting
- * (e.g. Christmas Tree, Holiday Lights, Diwali/Dewali Lights, Hanukkah, Fairy/String Lights).
+ * (e.g. Christmas Tree, Holiday Lights, Diwali/Dewali Lights, Hanukkah, Fairy/String Lights),
+ * normalizing CamelCase/delimited names and excluding motion sensors and false-positive substrings
+ * such as `"Street Light"`.
  */
 fun isHolidayLightDevice(device: DeviceEntity): Boolean {
-    if (device.parsedType == DeviceType.MOTION_SENSOR) return false
+    if (device.parsedType == DeviceType.MOTION_SENSOR ||
+        device.visualCategory == DeviceCategory.MOTION_SENSOR
+    ) {
+        return false
+    }
     if (device.visualCategory == DeviceCategory.CHRISTMAS_TREE) return true
-    val lower = device.name.lowercase()
-    return HOLIDAY_LIGHT_KEYWORDS.any { it in lower } || CHRISTMAS_TREE_KEYWORDS.any { it in lower }
+    val normalized = normalizeDeviceNameForInference(device.name)
+    return normalized.isNotEmpty() && RoomAndCategoryRules.matchesHolidayLight(normalized)
 }
 
 /**
- * Classifies a switch's visual device category based on its friendly name and UPnP device type:
- * - Tree lights ("Christmas Tree", "Tree Lights", "Xmas Tree", "Pine Tree") -> CHRISTMAS_TREE
- * - Fans ("Ceiling Fan", "Bedroom Fan", "Exhaust Fan", "Blower") -> FAN
- * - Lamps & Lights ("Lamp", "Light", "Lightbulb", "Candle", "Sconce", "Floodlight", "Lantern", or Dimmer) -> LIGHT
+ * Classifies a switch's visual device category based on its normalized friendly name and UPnP device type:
+ * - Tree lights ("Christmas Tree", "Tree Lights", "Xmas Tree", "Douglas Fir") -> CHRISTMAS_TREE
+ * - Fans ("Ceiling Fan", "Bedroom Fan", "Exhaust Fan", "Bath Vent", "Blower") -> FAN
+ * - Lamps & Lights ("Lamp", "Light", "Lightbulb", "Candle", "Sconce", "Floodlight", "LED", or Dimmer) -> LIGHT
  * - Motion sensors -> MOTION_SENSOR
  * - Everything else -> SWITCH_PLUG
  */
@@ -305,123 +294,16 @@ fun classifyDeviceCategory(
     if (deviceType == DeviceType.MOTION_SENSOR) {
         return DeviceCategory.MOTION_SENSOR
     }
-    val lower = name.lowercase()
+    val normalized = normalizeDeviceNameForInference(name)
     return when {
-        CHRISTMAS_TREE_KEYWORDS.any { it in lower } ||
-            ("christmas" in lower && CHRISTMAS_LIGHT_EXCLUSIONS.none { it in lower }) ->
-            DeviceCategory.CHRISTMAS_TREE
-
-        FAN_KEYWORDS.any { it in lower } -> DeviceCategory.FAN
-
-        deviceType == DeviceType.LIGHTBULB_DIMMER || LIGHT_KEYWORDS.any { it in lower } ->
+        RoomAndCategoryRules.matchesChristmasTree(normalized) -> DeviceCategory.CHRISTMAS_TREE
+        RoomAndCategoryRules.matchesFan(normalized) -> DeviceCategory.FAN
+        deviceType == DeviceType.LIGHTBULB_DIMMER || RoomAndCategoryRules.matchesLight(normalized) ->
             DeviceCategory.LIGHT
-
-        MOTION_KEYWORDS.any { it in lower } -> DeviceCategory.MOTION_SENSOR
-
+        RoomAndCategoryRules.matchesMotion(normalized) -> DeviceCategory.MOTION_SENSOR
         else -> DeviceCategory.SWITCH_PLUG
     }
 }
-
-private val ACRONYM_CAMEL_BOUNDARY_REGEX = Regex("([A-Z]+)([A-Z][a-z])")
-private val CAMEL_CASE_BOUNDARY_REGEX = Regex("([a-z])([A-Z])")
-private val DELIMITER_NORMALIZE_REGEX = Regex("[_\\-/.]+")
-private val MULTI_SPACE_REGEX = Regex("\\s+")
-private val WORD_BED_REGEX = Regex("\\bbed\\b")
-private val WORD_GIRL_REGEX = Regex("\\bgirl\\b")
-private val WORD_BOY_REGEX = Regex("\\bboy\\b")
-private val WORD_KID_REGEX = Regex("\\bkid\\b")
-private val WORD_HALL_REGEX = Regex("\\bhall\\b")
-private val WORD_STAIR_PREFIX_REGEX = Regex("\\bstair")
-private val WORD_PIER_REGEX = Regex("\\bpier\\b")
-private val WORD_SHED_REGEX = Regex("\\bshed\\b")
-private val WORD_DEN_REGEX = Regex("\\bden\\b")
-private val WORD_WC_REGEX = Regex("\\bwc\\b")
-
-private data class RoomInferenceRule(
-    val roomName: String,
-    val keywords: List<String>,
-    val wordRegexes: List<Regex> = emptyList()
-) {
-    fun matches(normalized: String): Boolean =
-        keywords.any { it in normalized } || wordRegexes.any { it.containsMatchIn(normalized) }
-}
-
-private val ROOM_INFERENCE_RULES = listOf(
-    RoomInferenceRule(
-        roomName = "Kitchen",
-        keywords = listOf(
-            "kitchen", "pantry", "island", "breakfast", "nook",
-            "undercabinet", "under cabinet", "countertop"
-        )
-    ),
-    RoomInferenceRule(
-        roomName = "Dining Room",
-        keywords = listOf("dining", "buffet", "hutch", "china cabinet")
-    ),
-    RoomInferenceRule(
-        roomName = "Ensuite",
-        keywords = listOf(
-            "ensuite", "en suite", "bath", "powder", "vanity", "restroom", "lavatory", "shower"
-        ),
-        wordRegexes = listOf(WORD_WC_REGEX)
-    ),
-    RoomInferenceRule(
-        roomName = "Hallway & Landing",
-        keywords = listOf(
-            "hallway", "landing", "foyer", "entry",
-            "vestibule", "mudroom", "mud room", "corridor", "breezeway"
-        ),
-        wordRegexes = listOf(WORD_HALL_REGEX, WORD_STAIR_PREFIX_REGEX)
-    ),
-    RoomInferenceRule(
-        roomName = "Bedroom",
-        keywords = listOf(
-            "bedroom", "bedside", "nightstand", "night stand", "headboard", "dresser", "wardrobe",
-            "crib", "cradle", "loft", "master", "primary", "nursery", "guest", "bunk", "dorm",
-            "girls", "boys", "kids", "children"
-        ),
-        wordRegexes = listOf(WORD_BED_REGEX, WORD_GIRL_REGEX, WORD_BOY_REGEX, WORD_KID_REGEX)
-    ),
-    RoomInferenceRule(
-        roomName = "Outdoor",
-        keywords = listOf(
-            "patio", "porch", "veranda", "lanai", "outdoor", "outside", "exterior", "garden",
-            "dock", "yard", "deck", "flood", "walkway", "sidewalk", "pathway", "balcony",
-            "terrace", "gazebo", "pergola", "trellis", "pool", "fountain", "landscape"
-        ),
-        wordRegexes = listOf(WORD_PIER_REGEX)
-    ),
-    RoomInferenceRule(
-        roomName = "Garage",
-        keywords = listOf(
-            "garage", "workshop", "workbench", "driveway", "carport", "toolshed", "woodshed", "barn"
-        ),
-        wordRegexes = listOf(WORD_SHED_REGEX)
-    ),
-    RoomInferenceRule(
-        roomName = "Basement",
-        keywords = listOf(
-            "basement", "cellar", "laundry", "utility", "boiler", "furnace", "sump", "crawlspace",
-            "rec room", "game room", "media room", "theater", "theatre"
-        )
-    ),
-    RoomInferenceRule(
-        roomName = "Office",
-        keywords = listOf("office", "study", "desk", "workstation", "studio", "library")
-    ),
-    RoomInferenceRule(
-        roomName = "Living Room",
-        keywords = listOf(
-            "living", "family", "lounge", "great room", "parlor", "parlour", "sitting",
-            "sunroom", "sun room", "solarium", "mantel", "hearth", "fireplace", "couch", "sofa"
-        ),
-        wordRegexes = listOf(WORD_DEN_REGEX)
-    ),
-    RoomInferenceRule(
-        roomName = "Hallway & Landing",
-        keywords = listOf("upstairs", "downstairs")
-    )
-)
 
 /**
  * Normalizes a hardware `<friendlyName>` or user-supplied switch name for room/category inference
@@ -431,11 +313,11 @@ private val ROOM_INFERENCE_RULES = listOf(
 fun normalizeDeviceNameForInference(deviceName: String): String {
     if (deviceName.isBlank()) return ""
     return deviceName
-        .replace(ACRONYM_CAMEL_BOUNDARY_REGEX, "$1 $2")
-        .replace(CAMEL_CASE_BOUNDARY_REGEX, "$1 $2")
-        .replace(DELIMITER_NORMALIZE_REGEX, " ")
+        .replace(RoomAndCategoryRules.ACRONYM_CAMEL_BOUNDARY_REGEX, "$1 $2")
+        .replace(RoomAndCategoryRules.CAMEL_CASE_BOUNDARY_REGEX, "$1 $2")
+        .replace(RoomAndCategoryRules.DELIMITER_NORMALIZE_REGEX, " ")
         .lowercase()
-        .replace(MULTI_SPACE_REGEX, " ")
+        .replace(RoomAndCategoryRules.MULTI_SPACE_REGEX, " ")
         .trim()
 }
 
@@ -457,7 +339,8 @@ fun normalizeDeviceNameForInference(deviceName: String): String {
 fun inferRoomFromName(deviceName: String): String {
     val normalized = normalizeDeviceNameForInference(deviceName)
     if (normalized.isEmpty()) return UNASSIGNED_ROOM
-    return ROOM_INFERENCE_RULES.firstOrNull { it.matches(normalized) }?.roomName ?: UNASSIGNED_ROOM
+    return RoomAndCategoryRules.ROOM_INFERENCE_RULES
+        .firstOrNull { it.matches(normalized) }?.roomName ?: UNASSIGNED_ROOM
 }
 
 /**

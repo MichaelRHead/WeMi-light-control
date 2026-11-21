@@ -451,8 +451,13 @@ class NetworkClient(
 
     suspend fun probeAndFetchDeviceDescriptor(
         ipAddress: String,
-        preferredPort: Int = 49153
-    ): SsdpDiscoveredDevice? = descriptorFetcher.probeAndFetchDeviceDescriptor(ipAddress, preferredPort)
+        preferredPort: Int = 49153,
+        expectedSerialOrUdn: String? = null
+    ): SsdpDiscoveredDevice? = descriptorFetcher.probeAndFetchDeviceDescriptor(
+        ipAddress = ipAddress,
+        preferredPort = preferredPort,
+        expectedSerialOrUdn = expectedSerialOrUdn
+    )
 
     suspend fun scanSubnetUnicast(
         subnetPrefix: String,

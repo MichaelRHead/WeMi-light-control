@@ -177,11 +177,18 @@ internal class DeviceCrudAndRulesCoordinator(
             demoMode && device.ipAddress != "127.0.0.1" && device.ipAddress != "localhost"
         val hasPlaceholderSerial = LanRuntimeUtils.isPlaceholderSerial(device.serialNumber)
 
+        val expectedIdentity = if (device.id != 0) {
+            LanRuntimeUtils.expectedHardwareIdentity(device.serialNumber, device.udn).ifEmpty { null }
+        } else {
+            null
+        }
+
         val liveDesc = if (!isSyntheticDemoEndpoint && (device.id == 0 || hasPlaceholderSerial)) {
             lanSemaphore.withPermit {
                 networkClient.probeAndFetchDeviceDescriptor(
                     ipAddress = device.ipAddress,
-                    preferredPort = device.port
+                    preferredPort = device.port,
+                    expectedSerialOrUdn = expectedIdentity
                 )
             }
         } else {
@@ -190,15 +197,29 @@ internal class DeviceCrudAndRulesCoordinator(
 
         val existingMatch = if (device.id == 0 && liveDesc != null) {
             val cleanLiveUdn = LanRuntimeUtils.canonicalHardwareUdn(liveDesc.usn)
+            val liveHasRealSerial = !LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber)
             val existingInHome = dao.getAllDevices().first().filter { it.networkKey == device.networkKey }
             existingInHome.find { existing ->
-                (!LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) &&
+                liveHasRealSerial &&
                     !LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber) &&
-                    existing.serialNumber.equals(liveDesc.serialNumber, ignoreCase = true)) ||
-                    ((LanRuntimeUtils.isPlaceholderSerial(liveDesc.serialNumber) ||
-                        LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber)) &&
-                        cleanLiveUdn.isNotEmpty() &&
-                        cleanLiveUdn.equals(LanRuntimeUtils.canonicalHardwareUdn(existing.udn), ignoreCase = true))
+                    existing.serialNumber.equals(liveDesc.serialNumber, ignoreCase = true)
+            } ?: existingInHome.find { existing ->
+                val serialConflict = liveHasRealSerial &&
+                    !LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber) &&
+                    !existing.serialNumber.equals(liveDesc.serialNumber, ignoreCase = true)
+                !serialConflict &&
+                    cleanLiveUdn.isNotEmpty() &&
+                    cleanLiveUdn.equals(LanRuntimeUtils.canonicalHardwareUdn(existing.udn), ignoreCase = true)
+            } ?: existingInHome.find { existing ->
+                val serialConflict = liveHasRealSerial &&
+                    !LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber) &&
+                    !existing.serialNumber.equals(liveDesc.serialNumber, ignoreCase = true)
+                val existingUdn = LanRuntimeUtils.canonicalHardwareUdn(existing.udn)
+                val udnConflict = cleanLiveUdn.isNotEmpty() && existingUdn.isNotEmpty() &&
+                    !existingUdn.equals(cleanLiveUdn, ignoreCase = true)
+                !serialConflict && !udnConflict &&
+                    existing.ipAddress == device.ipAddress &&
+                    existing.port == liveDesc.port
             }
         } else {
             null
@@ -236,6 +257,12 @@ internal class DeviceCrudAndRulesCoordinator(
                 val cleanLiveSsid = liveDesc.wifiSsid.trim().takeIf {
                     it.isNotEmpty() && !org.suppressingfire.wemi.network.XmlAndSkuParser.isWemoDeviceSetupSsid(it)
                 }
+                val cleanDeviceSsid = device.wifiSsid.trim().takeIf {
+                    it.isNotEmpty() && !org.suppressingfire.wemi.network.XmlAndSkuParser.isWemoDeviceSetupSsid(it)
+                }
+                val cleanBaseSsid = baseEntity.wifiSsid.trim().takeIf {
+                    it.isNotEmpty() && !org.suppressingfire.wemi.network.XmlAndSkuParser.isWemoDeviceSetupSsid(it)
+                }
                 baseEntity.copy(
                     name = resolvedName,
                     roomName = resolvedRoom,
@@ -256,7 +283,7 @@ internal class DeviceCrudAndRulesCoordinator(
                     macAddress = liveDesc.macAddress.ifBlank { baseEntity.macAddress },
                     udn = LanRuntimeUtils.canonicalHardwareUdn(liveDesc.usn)
                         .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(baseEntity.udn) },
-                    wifiSsid = cleanLiveSsid ?: device.wifiSsid.ifBlank { baseEntity.wifiSsid },
+                    wifiSsid = cleanLiveSsid ?: cleanDeviceSsid ?: cleanBaseSsid ?: "Local LAN",
                     signalStrengthPercent = liveDesc.signalStrengthPercent,
                     autoOffMinutes = if (device.id == 0 && device.autoOffMinutes == 0) {
                         baseEntity.autoOffMinutes

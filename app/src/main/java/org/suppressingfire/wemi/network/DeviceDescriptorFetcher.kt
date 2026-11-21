@@ -143,12 +143,13 @@ internal class DeviceDescriptorFetcher(
      */
     suspend fun probeAndFetchDeviceDescriptor(
         ipAddress: String,
-        preferredPort: Int = 49153
+        preferredPort: Int = 49153,
+        expectedSerialOrUdn: String? = null
     ): SsdpDiscoveredDevice? = withContext(Dispatchers.IO) {
         val cleanIp = ipAddress.trim()
         if (cleanIp.isEmpty()) return@withContext null
         val startMs = System.currentTimeMillis()
-        val resolvedPort = probeWemoPort(cleanIp, preferredPort, null) ?: return@withContext null
+        val resolvedPort = probeWemoPort(cleanIp, preferredPort, expectedSerialOrUdn) ?: return@withContext null
         val rtt = (System.currentTimeMillis() - startMs).coerceAtLeast(1L)
 
         for (path in listOf("/setup.xml", "/Lightsetup.xml")) {

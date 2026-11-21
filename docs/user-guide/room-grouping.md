@@ -29,6 +29,7 @@ When **Grouped by Room** is active, each room has an interactive **Room Group He
 | **Active Count Pill (`X/Y ON`)** | Shows how many controllable switches in the room are currently **ON** out of the total reachable switches in that room. |
 | **Room Telemetry Subtitle** | Shows reachable device count, average SOAP round-trip latency across the room (`Avg 12ms`), and average dimmer brightness (`75% dim`). |
 | **Room Master Dimmer Button (`Tune` Sliders Icon)** | Appears automatically if the room contains one or more dimmable switches/bulbs. Tap to open the **Room Master Brightness Drawer**. |
+| **Pin Room Widget Button (`Add to Home Screen` Icon)** | Appears on rooms with controllable switches. Tap to pin a one-tap Home Screen Room Toggle widget for that room (scoped to the active Wi-Fi Home). |
 | **Collapse / Expand Chevron (`^` / `v`)** | Tap the chevron (or anywhere on the header card background) to collapse or expand the individual switch rows inside that room. |
 | **Master Room Power Ring (Right Side)** | Tap to **toggle the entire room ON or OFF at once**:<br>• If **any** switch in the room is currently `ON`, tapping the Master Room Power Ring turns **all** switches in that room `OFF`.<br>• If **all** switches in the room are currently `OFF`, tapping the ring turns **all** switches in that room `ON`. |
 
@@ -39,7 +40,6 @@ When **Grouped by Room** is active, each room has an interactive **Room Group He
 When a room contains dimmable switches (`F7C059` / `WDS060` Smart Dimmers), tapping the **Tune** icon on the Room Group Header Card opens the **Room Master Brightness Drawer**:
 
 - **Master Brightness Slider (`1%–100%`)**: Dragging and releasing the slider sets every dimmable switch in that room to the same brightness level in parallel (protected by RTOS-safe concurrency limiting).
-- **Quick Room Presets**: Tap **`25%`**, **`50%`**, **`75%`**, or **`100%`** to set the entire room's lighting level with a single tap.
 - **Android TV (`wemi TV`) Room Bars**: On Android TV, each room renders a full-width **Room Bar** above its 3-column switch cards (with **`Unassigned`** placed last). Navigating **Up** or **Down** between rooms from any column (including the leftmost switch card) focuses the Room Bar (**`FOCUSED • OK TOGGLE ROOM`** or **`FOCUSED • OK TOGGLE • L/R DIM`**), where pressing **`OK`** toggles every switch in that room ON or OFF at once and pressing **`Left`** / **`Right`** steps all reachable dimmers in that room by **`-10%` / `+10%`**.
 
 ---

@@ -14,8 +14,8 @@ At the top of the **Devices** tab, the **Wi-Fi Home Bar** displays:
   Shows the currently selected Home (e.g., `My Home`) on a full-width reactive top line, with a compact single-line status summary below (`17/17 Active • 192.168.86.0/24` or `16/17 Active • 1 Offline • 192.168.86.0/24`).
 - **1-Tap `Reconnect` Button**:
   Tap **`Reconnect`** on the right side of the card to immediately run a startup state probe (`GetBinaryState`) and a full SSDP / 9-port self-healing reconnection pass for every switch in the current Home.
-- **Remembered Home Chips (`My Home (17)`, `Lake Cabin (2)`, `Add Home`, `Reset`)**:
-  Tap any Home chip in the bottom row to switch your view to that Home's remembered switches and trigger a reconnect pass, tap **`Add Home`** to register a new location, or tap **`Reset`** to clear remembered homes/switches/rooms and rescan your LAN.
+- **Remembered Home Chips (`My Home (17)`, `Lake Cabin (2)`, `Add Home`)**:
+  Tap any Home chip in the bottom row to switch your view to that Home's remembered switches and trigger a reconnect pass, or tap **`Add Home`** to register a new location.
 
 ---
 
@@ -43,5 +43,5 @@ To register an additional home or office network:
 
 ### Resetting Remembered Homes, Switches & Rooms
 If you want to start fresh on your local network:
-1. Tap the **`Reset`** chip in the **Wi-Fi Home Bar** (or tap **`Reset Homes, Discovered Switches & Rooms`** on the **More** tab).
-2. Choose **`Reset & Rescan LAN`** to clear all saved homes, switches, and room assignments and immediately run a fresh SSDP discovery scan on your current `/24` subnet, or choose **`Reset Empty`** to reset to a clean empty **`My Home`** profile.
+1. Open the **More** tab and tap **`Reset Homes, Discovered Switches & Rooms`**.
+2. In the confirmation dialog, choose **`Reset & Rescan LAN`** to clear all saved homes, switches, and room assignments and immediately run a fresh SSDP discovery scan on your current `/24` subnet, or choose **`Reset Empty`** to reset to a clean empty **`My Home`** profile.

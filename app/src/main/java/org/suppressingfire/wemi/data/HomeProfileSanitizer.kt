@@ -20,6 +20,9 @@ internal class HomeProfileSanitizer(
 ) {
     private val adoptMutex = Mutex()
 
+    private fun isLoopbackHost(ipAddress: String): Boolean =
+        ipAddress == "127.0.0.1" || ipAddress.equals("localhost", ignoreCase = true)
+
     fun findMatchingExistingDevice(
         existingDevices: List<DeviceEntity>,
         discovered: SsdpDiscoveredDevice,
@@ -43,6 +46,12 @@ internal class HomeProfileSanitizer(
             it.ipAddress == discovered.ipAddress && it.port == discovered.port &&
                 it.matchesDiscovered(discovered, requireSamePortWhenBlankSerial = true)
         }?.let { return it }
+        if (!isLoopbackHost(discovered.ipAddress)) {
+            homeDevices.find {
+                it.ipAddress == discovered.ipAddress &&
+                    it.matchesDiscovered(discovered, requireSamePortWhenBlankSerial = false)
+            }?.let { return it }
+        }
         return homeDevices.find {
             it.matchesDiscovered(discovered, requireSamePortWhenBlankSerial = true)
         }
@@ -93,6 +102,13 @@ internal class HomeProfileSanitizer(
                 existing.matchesDiscovered(it, requireSamePortWhenBlankSerial) &&
                 !isDiscoveredClaimedByOtherDevice(it, existing, homeDevices, includeEndpointClaim = false)
         }?.let { return it }
+        if (requireSamePortWhenBlankSerial && !isLoopbackHost(existing.ipAddress)) {
+            discoveredDevices.find {
+                it.ipAddress == existing.ipAddress &&
+                    existing.matchesDiscovered(it, requireSamePortWhenBlankSerial = false) &&
+                    !isDiscoveredClaimedByOtherDevice(it, existing, homeDevices, includeEndpointClaim = true)
+            }?.let { return it }
+        }
         return discoveredDevices.find {
             existing.matchesDiscovered(it, requireSamePortWhenBlankSerial) &&
                 !isDiscoveredClaimedByOtherDevice(it, existing, homeDevices, includeEndpointClaim = true)
@@ -217,7 +233,8 @@ internal class HomeProfileSanitizer(
                     LanRuntimeUtils.canonicalHardwareUdn(it.udn).equals(cleanUdn, ignoreCase = true)
                 } -> 1
                 homeSnapshot.any { it.ipAddress == item.ipAddress && it.port == item.port } -> 2
-                else -> 3
+                !isLoopbackHost(item.ipAddress) && homeSnapshot.any { it.ipAddress == item.ipAddress } -> 3
+                else -> 4
             }
         }
         var newlyAdded = 0

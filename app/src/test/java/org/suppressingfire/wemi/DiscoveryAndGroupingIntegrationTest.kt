@@ -1,6 +1,8 @@
 package org.suppressingfire.wemi
 
 import android.content.Context
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bathtub
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import java.net.InetAddress
@@ -315,14 +317,7 @@ class DiscoveryAndGroupingIntegrationTest {
         runBlocking {
             val dao = database.switchDao()
             val homeKey = "wifi_lan_127_0_0"
-            dao.insertHomeNetwork(
-                HomeNetworkEntity(
-                    networkKey = homeKey,
-                    homeName = "My Home",
-                    ssidLabel = "HeadFamily-2.4G",
-                    subnetPrefix = "127.0.0"
-                )
-            )
+            dao.insertHomeNetwork(HomeNetworkEntity(homeKey, "My Home", "HeadFamily-2.4G", "127.0.0"))
 
             FakeUpnpServer(
                 initialFriendlyName = "Kitchen Pantry Switch",
@@ -331,51 +326,18 @@ class DiscoveryAndGroupingIntegrationTest {
                 initialRelayOn = true
             ).use { server ->
                 val existingId = dao.insertDevice(
-                    DeviceEntity(
-                        name = "Kitchen Pantry Switch",
-                        roomName = "  Kitchen  ",
-                        networkKey = homeKey,
-                        ipAddress = "127.0.0.1",
-                        port = 49153,
-                        serialNumber = "",
-                        udn = "uuid:Lightswitch-3_0-WLS0403SN7744",
-                        sortOrder = 0
-                    )
+                    DeviceEntity(name = "Kitchen Pantry Switch", roomName = "  Kitchen  ", networkKey = homeKey, ipAddress = "127.0.0.1", port = 49153, serialNumber = "", udn = "uuid:Lightswitch-3_0-WLS0403SN7744", sortOrder = 0)
                 ).toInt()
                 val unassignedId = dao.insertDevice(
-                    DeviceEntity(
-                        name = "Desk Plug",
-                        roomName = "Unassigned",
-                        networkKey = homeKey,
-                        ipAddress = "192.168.1.77",
-                        port = 49153,
-                        serialNumber = "SER-DESK-1",
-                        sortOrder = 1
-                    )
+                    DeviceEntity(name = "Desk Plug", roomName = "Unassigned", networkKey = homeKey, ipAddress = "192.168.1.77", port = 49153, serialNumber = "SER-DESK-1", sortOrder = 1)
                 ).toInt()
                 val kitchen2Id = dao.insertDevice(
-                    DeviceEntity(
-                        name = "Kitchen Sink Light",
-                        roomName = "Kitchen",
-                        networkKey = homeKey,
-                        ipAddress = "192.168.1.78",
-                        port = 49153,
-                        serialNumber = "SER-SINK-2",
-                        sortOrder = 2
-                    )
+                    DeviceEntity(name = "Kitchen Sink Light", roomName = "Kitchen", networkKey = homeKey, ipAddress = "192.168.1.78", port = 49153, serialNumber = "SER-SINK-2", sortOrder = 2)
                 ).toInt()
 
                 val repo = SwitchRepository(dao = dao, networkClient = NetworkClient(), initialDemoModeOverride = false)
                 val saved = repo.saveDevice(
-                    DeviceEntity(
-                        id = 0,
-                        name = "",
-                        roomName = "Unassigned",
-                        networkKey = homeKey,
-                        ipAddress = "127.0.0.1",
-                        port = server.port,
-                        serialNumber = ""
-                    )
+                    DeviceEntity(id = 0, name = "", roomName = "Unassigned", networkKey = homeKey, ipAddress = "127.0.0.1", port = server.port, serialNumber = "")
                 )
                 assertEquals(existingId, saved.id)
                 assertEquals("WLS0403SN7744", saved.serialNumber)
@@ -444,6 +406,59 @@ class DiscoveryAndGroupingIntegrationTest {
                 assertEquals("SER-REAL-51", dao.getDeviceById(blank51Id)?.serialNumber)
                 assertEquals("192.168.1.51", dao.getDeviceById(blank51Id)?.ipAddress)
                 assertTrue(dao.getAllDevices().first().any { it.serialNumber == "SER-NEW-99" && it.ipAddress == "192.168.1.99" })
+            }
+        }
+
+    @Test
+    fun `verify word-bounded classification, non-loopback port-hop dedup, and UDN-guarded saveDevice edits`() =
+        runBlocking {
+            // 1. Word-bounded category, CamelCase/motion-safe holiday matching & bath-before-bed room icon
+            mapOf(
+                "Front Street Light" to org.suppressingfire.wemi.data.DeviceCategory.LIGHT,
+                "Douglas Fir" to org.suppressingfire.wemi.data.DeviceCategory.CHRISTMAS_TREE,
+                "First Floor Light" to org.suppressingfire.wemi.data.DeviceCategory.LIGHT,
+                "Tiffany Lamp" to org.suppressingfire.wemi.data.DeviceCategory.LIGHT,
+                "Infant Room Light" to org.suppressingfire.wemi.data.DeviceCategory.LIGHT,
+                "Event Hall Light" to org.suppressingfire.wemi.data.DeviceCategory.LIGHT,
+                "CeilingFan" to org.suppressingfire.wemi.data.DeviceCategory.FAN,
+                "BathVent" to org.suppressingfire.wemi.data.DeviceCategory.FAN,
+                "Installed Outlet" to org.suppressingfire.wemi.data.DeviceCategory.SWITCH_PLUG,
+                "KitchenLED" to org.suppressingfire.wemi.data.DeviceCategory.LIGHT
+            ).forEach { (name, expected) -> assertEquals(name, expected, org.suppressingfire.wemi.data.classifyDeviceCategory(name)) }
+            listOf("NewYearLights", "PatioStringLights", "ChristmasTree").forEach {
+                assertTrue(it, org.suppressingfire.wemi.data.isHolidayLightDevice(DeviceEntity(name = it)))
+            }
+            listOf("Front Street Light", "Holiday Motion").forEach {
+                assertFalse(it, org.suppressingfire.wemi.data.isHolidayLightDevice(DeviceEntity(name = it)))
+            }
+            assertEquals(Icons.Default.Bathtub, org.suppressingfire.wemi.ui.components.iconForRoom("Kids Bath"))
+
+            // 2. Non-loopback blank-serial port hop upgrades in place without duplicating
+            val dao = database.switchDao()
+            val homeKey = "wifi_lan_192_168_1"
+            dao.insertHomeNetwork(HomeNetworkEntity(homeKey, "My Home", "HomeNet-2.4G", "192.168.1"))
+            val manualId = dao.insertDevice(DeviceEntity(name = "My Porch", roomName = "Outdoor", networkKey = homeKey, ipAddress = "192.168.1.50", port = 49153, serialNumber = "", udn = "")).toInt()
+            val repo = SwitchRepository(dao = dao, networkClient = NetworkClient(), initialDemoModeOverride = false)
+            val hopped = repo.adoptDiscoveredDevice(
+                SsdpDiscoveredDevice(name = "Porch Light", ipAddress = "192.168.1.50", port = 49152, deviceType = DeviceType.SWITCH_PLUG, modelName = "WLS040", serialNumber = "SER-HOP-50", firmwareVersion = "WeMo_WW_2.00", usn = "uuid:Lightswitch-2_0-SER-HOP-50", searchTarget = "urn:Belkin:service:basicevent:1", locationUrl = "http://192.168.1.50:49152/setup.xml", responseTimeMs = 7L),
+                homeKey, "HomeNet-2.4G"
+            )
+            assertEquals(manualId, hopped.id)
+            assertEquals(49152, hopped.port)
+            assertEquals("SER-HOP-50", hopped.serialNumber)
+
+            // 3. UDN-identified edit probe refuses foreign switch on DHCP swap; blank manual re-add deduplicates endpoint & shields soft-AP SSID
+            FakeUpnpServer(initialFriendlyName = "Foreign Switch", serialNumber = "SER-FOREIGN-9", udn = "uuid:Socket-1_0-SER-FOREIGN-9", wifiSsid = "WeMo.Mini.999").use { srv ->
+                val udnEditId = dao.insertDevice(DeviceEntity(name = "Original UDN Switch", roomName = "Office", networkKey = homeKey, ipAddress = "127.0.0.1", port = srv.port, serialNumber = "", udn = "uuid:Socket-1_0-SER-OWN-1")).toInt()
+                val edited = repo.saveDevice(dao.getDeviceById(udnEditId)!!.copy(name = "Edited Office Switch"))
+                assertEquals("uuid:Socket-1_0-SER-OWN-1", edited.udn)
+                assertEquals("", edited.serialNumber)
+
+                val blankLocalId = dao.insertDevice(DeviceEntity(name = "Blank Local", roomName = "Garage", networkKey = homeKey, ipAddress = "127.0.0.1", port = srv.port, serialNumber = "", udn = "", wifiSsid = "WeMo.Switch.111")).toInt()
+                val deduped = repo.saveDevice(DeviceEntity(id = 0, name = "", roomName = "Unassigned", networkKey = homeKey, ipAddress = "127.0.0.1", port = srv.port, serialNumber = "", wifiSsid = "WeMo.Switch.111"))
+                assertEquals(blankLocalId, deduped.id)
+                assertEquals("SER-FOREIGN-9", deduped.serialNumber)
+                assertEquals("Local LAN", deduped.wifiSsid)
             }
         }
 }
