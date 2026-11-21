@@ -72,7 +72,7 @@ trap 'rm -f "${PID_FILE}"' EXIT
 extract_field() {
   local content="$1"
   local key="$2"
-  printf '%s\n' "${content}" | awk -F': *' -v k="${key}" '$1 == k { print $2; exit }' | tr -d '\r'
+  awk -F': *' -v k="${key}" '!found && $1 == k { gsub(/\r$/, "", $2); print $2; found=1 }' <<< "${content}"
 }
 
 role_signoff_key() {
