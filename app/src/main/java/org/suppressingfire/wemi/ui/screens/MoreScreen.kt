@@ -44,7 +44,6 @@ import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 fun MoreScreen(
     devices: List<DeviceEntity>,
     soapLogs: List<SoapLogEntry>,
-    useWeMiWordmark: Boolean,
     isDemoShowroomMode: Boolean = false,
     allDevices: List<DeviceEntity> = devices,
     homeNetworks: List<HomeNetworkEntity> = emptyList(),
@@ -54,10 +53,9 @@ fun MoreScreen(
     onTurnAllOff: () -> Unit,
     onScanNetwork: () -> Unit,
     onResetClassicDevices: () -> Unit,
-    onResetLanHomesAndSwitches: () -> Unit = {},
+    onResetLanHomesAndSwitches: (Boolean) -> Unit = {},
     onToggleDemoShowroomMode: (Boolean) -> Unit = {},
     onOpenProvisionApWizard: () -> Unit = {},
-    onToggleBrandWordmark: () -> Unit,
     onClearLogs: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -80,18 +78,12 @@ fun MoreScreen(
         item(key = "more_local_upnp_engine") {
             LocalUpnpEngineCard(
                 isDemoShowroomMode = isDemoShowroomMode,
-                useWeMiWordmark = useWeMiWordmark,
                 onToggleDemoShowroomMode = onToggleDemoShowroomMode,
-                onToggleBrandWordmark = onToggleBrandWordmark,
                 onScanNetwork = onScanNetwork,
                 onResetClassicDevices = onResetClassicDevices,
                 onResetLanHomesAndSwitches = onResetLanHomesAndSwitches,
                 onOpenProvisionApWizard = onOpenProvisionApWizard
             )
-        }
-
-        item(key = "more_play_store_assets") {
-            PlayStoreAssetsCard()
         }
 
         item(key = "more_soap_packet_log") {

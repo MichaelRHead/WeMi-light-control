@@ -65,7 +65,19 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
 
 ---
 
-## 3. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt`, `TvNavigationAndScenesE2ETest.kt`, `HomeScreenWidgetTest.kt`, `HomeScreenWidgetUiE2ETest.kt`, `AppFlowsAndManagementE2ETest.kt` & `TelemetryDiagnosticsTest.kt` — `102/102` Tests Across `20` Suites)
+## 3. Mandatory Stage 1 Release Audit: Obsolete UI & UX Hygiene Checklist
+
+Before initiating any release review (`Stage 1: ai_studio_ux_cuj` in [`RELEASE_PROCESS.md`](../../../RELEASE_PROCESS.md)), audit all Compose screens, dialogs, drawers, widgets, and Android TV views and clean up any regressions across these six checks:
+1. **No Dead or No-Op Controls**: Every switch, button, and chip must trigger real, persisted, user-meaningful behavior (no legacy toggles whose branches render identical UI).
+2. **No Internal Dev / Asset Showcase Cards**: Keep promotional, build-check, or Store-asset preview cards out of end-user screens and delete unused bundled drawable assets.
+3. **Strict Demo vs. Real LAN Separation**: Gate demo/preset actions (such as `Reset Preset` or simulated sensor triggers) behind `isDemoShowroomMode`, and ensure Real LAN labels accurately reflect live hardware actions (`"Refresh Motion"` vs. `"Simulate Motion"`).
+4. **No Redundant Chrome or Unprotected Destructive Actions**: Hide empty-state or discovery banners once populated (`SsdpDiscoveryBanner`), avoid exposing one-tap destructive `Reset` chips on everyday control bars, and guard destructive resets behind a confirmation dialog on the `More` tab.
+5. **Progressive Disclosure & Clean User-Facing Copy**: Collapse technical diagnostic panels (`ProvisionDebugPanel`) while idle with an explicit `Details`/`Hide` toggle (auto-expanding on traces or errors) and strip developer jargon like `(SCREENSHOT)`.
+6. **Context-Relevant Conditional Controls**: Only surface specialized scene/feature controls when matching hardware exists on the active home (e.g., show Android TV `Holiday ON` only when `devices.any { isHolidayLightDevice(it) }` and target only matching holiday switches).
+
+---
+
+## 4. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt`, `TvNavigationAndScenesE2ETest.kt`, `HomeScreenWidgetTest.kt`, `HomeScreenWidgetUiE2ETest.kt`, `AppFlowsAndManagementE2ETest.kt` & `TelemetryDiagnosticsTest.kt` — `102/102` Tests Across `20` Suites)
 
 Whenever UI components, widgets, ViewModel flows, or repository methods are touched, verify all 8 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
 

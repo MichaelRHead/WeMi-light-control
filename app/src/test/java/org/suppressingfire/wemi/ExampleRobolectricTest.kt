@@ -112,11 +112,11 @@ class ExampleRobolectricTest {
     fun `verify Wi-Fi Home network memory, auto-reconnect, Room grouping, and SSDP scanner`() {
         composeTestRule.waitForIdle()
 
-        // Verify Wi-Fi Home selector bar, pull-to-refresh container, and SSDP discovery banner at top
+        // Verify Wi-Fi Home selector bar and pull-to-refresh container; SSDP banner stays hidden when devices exist
         composeTestRule.onNodeWithTag("wifi_home_selector_bar").assertIsDisplayed()
         composeTestRule.onNodeWithTag("reconnect_home_wifi_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("devices_pull_to_refresh").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertDoesNotExist()
 
         // Switch to the remembered Lake Cabin Wi-Fi network ("PineLake-Cabin-WiFi") and verify remembered switches load & reconnect
         composeTestRule.onNodeWithTag("home_chip_wifi_cabin_192_168_50").performClick()
@@ -275,7 +275,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `verify EmptyDevicesState onboarding card on empty Wi-Fi Home and Restore Classic Setup action`() {
+    fun `verify EmptyDevicesState onboarding card and SSDP banner on empty Wi-Fi Home`() {
         composeTestRule.waitForIdle()
 
         // Create a new empty Wi-Fi Home ("Beach House") via AddWifiHomeNetworkDialog
@@ -287,7 +287,10 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("save_wifi_home_button").performClick()
         composeTestRule.waitForIdle()
 
-        // Verify the EmptyDevicesState onboarding card and its 4 actions on the new empty Wi-Fi Home
+        // SSDP discovery banner appears automatically on an empty home
+        composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
+
+        // Verify the EmptyDevicesState onboarding card and its 3 real-LAN setup actions (no classic restore button)
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasTestTag("empty_devices_state_card"))
         composeTestRule.onNodeWithTag("empty_devices_state_card").assertIsDisplayed()
@@ -297,11 +300,18 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("empty_state_scan_ssdp_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("empty_state_provision_ap_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("empty_state_add_manual_button").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("empty_state_restore_classic_button").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("empty_state_restore_classic_button").assertDoesNotExist()
 
-        // Restore classic showcase switches and verify they repopulate the Devices list on Main Home
-        composeTestRule.onNodeWithTag("empty_state_restore_classic_button").performClick()
+        // In Demo Showroom Mode, Reset Preset on the More tab restores classic showcase switches
+        composeTestRule.onNodeWithTag("nav_tab_more").performClick()
         composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("restore_screenshot_preset_button")
+            .performScrollTo()
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertDoesNotExist()
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasText("Christmas Tree Living"))
         composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()

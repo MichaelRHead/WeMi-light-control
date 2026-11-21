@@ -56,14 +56,16 @@ class ProvisioningAndGenaCujE2ETest {
             enableSsdpResponder = false,
             registerAsCandidatePort = false
         ).use { server ->
-            // 1. Reset to clean Real LAN Mode ('My Home (0)')
-            composeTestRule.onNodeWithTag("devices_list")
-                .performScrollToNode(hasTestTag("wifi_home_selector_bar"))
-            composeTestRule.onNodeWithTag("reset_lan_data_chip")
+            // 1. Reset to clean Real LAN Mode ('My Home (0)') via More tab confirmation dialog
+            composeTestRule.onNodeWithTag("nav_tab_more").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("more_reset_lan_homes_switches_button")
                 .performScrollTo()
                 .performClick()
             composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag("confirm_reset_empty_button").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
 
             awaitLoopbackIo {
                 runCatching {
@@ -179,7 +181,16 @@ class ProvisioningAndGenaCujE2ETest {
             assertTrue(exportedText.contains("[HOME] key="))
             assertFalse(exportedText.contains("[NET] mode=REAL-LAN ip= "))
 
-            // Restore Classic Showroom preset
+            // Verify Reset Preset is gated behind Demo Showroom Mode, then re-enable Demo Mode and restore preset
+            composeTestRule.onNodeWithTag("restore_screenshot_preset_button").assertDoesNotExist()
+            composeTestRule.onNodeWithTag("more_screen_list")
+                .performScrollToNode(hasTestTag("demo_showroom_mode_switch"))
+            composeTestRule.onNodeWithTag("demo_showroom_mode_switch")
+                .performClick()
+            awaitLoopbackIo {
+                composeTestRule.onAllNodes(hasTestTag("restore_screenshot_preset_button"))
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
             composeTestRule.onNodeWithTag("more_screen_list")
                 .performScrollToNode(hasTestTag("restore_screenshot_preset_button"))
             composeTestRule.onNodeWithTag("restore_screenshot_preset_button")
@@ -229,13 +240,17 @@ class ProvisioningAndGenaCujE2ETest {
                     }.getOrDefault(false)
             }
 
-            // 3. Enter Wi-Fi password, custom switch name ('Stairway 3-Way Switch'), and enable Keep Dialog Open on Success
+            // 3. Enter Wi-Fi password, custom switch name ('Stairway 3-Way Switch'), expand Setup Diagnostics, and enable Keep Dialog Open on Success
             composeTestRule.onNodeWithTag("provision_password_input")
                 .performScrollTo()
                 .performTextReplacement("HomeRouterSecret99")
             composeTestRule.onNodeWithTag("provision_device_name_input")
                 .performScrollTo()
                 .performTextReplacement("Stairway 3-Way Switch")
+            composeTestRule.onNodeWithTag("toggle_provision_debug_button")
+                .performScrollTo()
+                .performClick()
+            composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag("keep_provision_dialog_open_chip")
                 .performScrollTo()
                 .performClick()

@@ -68,14 +68,16 @@ class HardwareCujEndToEndTest {
                 initialBrightness = 35,
                 enableSsdpResponder = false
             ).use { dimmerServer ->
-                // 1. Reset all Demo Showroom homes/switches/rooms into a clean Real LAN 'My Home (0)'
-                composeTestRule.onNodeWithTag("devices_list")
-                    .performScrollToNode(hasTestTag("wifi_home_selector_bar"))
-                composeTestRule.onNodeWithTag("reset_lan_data_chip")
+                // 1. Reset all Demo Showroom homes/switches/rooms via More tab into a clean Real LAN 'My Home (0)'
+                composeTestRule.onNodeWithTag("nav_tab_more").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("more_reset_lan_homes_switches_button")
                     .performScrollTo()
                     .performClick()
                 composeTestRule.waitForIdle()
                 composeTestRule.onNodeWithTag("confirm_reset_empty_button").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
 
                 awaitLoopbackIo {
                     runCatching {
@@ -122,11 +124,10 @@ class HardwareCujEndToEndTest {
                     .performScrollTo()
                     .assertIsDisplayed()
 
-                // 3. Second hardware device (Kitchen Under-Cabinet Dimmer) comes online -> open SSDP Scanner -> click 'Adopt'
+                // 3. Second hardware device (Kitchen Under-Cabinet Dimmer) comes online -> SSDP banner stays hidden while devices exist -> open SSDP Scanner via top-bar Refresh -> click 'Adopt'
                 dimmerServer.setSsdpDiscoverable(true)
-                composeTestRule.onNodeWithTag("devices_list")
-                    .performScrollToNode(hasTestTag("ssdp_discovery_banner"))
-                composeTestRule.onNodeWithTag("open_ssdp_scanner_button").performClick()
+                composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertDoesNotExist()
+                composeTestRule.onNodeWithTag("refresh_devices_button").performClick()
                 composeTestRule.waitForIdle()
 
                 awaitLoopbackIo {
@@ -284,9 +285,17 @@ class HardwareCujEndToEndTest {
                     }.getOrDefault(false)
                 }
 
-                // Restore Classic Showroom preset at end of CUJ
+                // Verify Reset Preset is hidden in Real LAN Mode, then re-enable Demo Showroom Mode and restore preset
                 composeTestRule.onNodeWithTag("nav_tab_more").performClick()
                 composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("restore_screenshot_preset_button").assertDoesNotExist()
+                composeTestRule.onNodeWithTag("demo_showroom_mode_switch")
+                    .performScrollTo()
+                    .performClick()
+                awaitLoopbackIo {
+                    composeTestRule.onAllNodes(hasTestTag("restore_screenshot_preset_button"))
+                        .fetchSemanticsNodes().isNotEmpty()
+                }
                 composeTestRule.onNodeWithTag("restore_screenshot_preset_button")
                     .performScrollTo()
                     .performClick()

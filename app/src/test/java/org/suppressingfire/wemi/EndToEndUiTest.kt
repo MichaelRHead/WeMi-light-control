@@ -203,11 +203,14 @@ class EndToEndUiTest {
             .performClick()
         composeTestRule.waitForIdle()
 
-        // Dialog remains open and status box + screenshot debug panel display validation error & diagnostics
+        // Dialog remains open and status box + auto-expanded debug panel display validation error & diagnostics
         composeTestRule.onNodeWithTag("provision_ap_status_box")
             .performScrollTo()
             .assertIsDisplayed()
         composeTestRule.onNodeWithTag("provision_debug_panel")
+            .performScrollTo()
+            .assertIsDisplayed()
+        composeTestRule.onNodeWithTag("toggle_provision_debug_button")
             .performScrollTo()
             .assertIsDisplayed()
         composeTestRule.onNodeWithTag("copy_provision_debug_button")
@@ -296,10 +299,15 @@ class EndToEndUiTest {
             longNameBounds.bottom <= connBounds.top + 4f
         )
 
-        // 3. Scroll back to top Wi-Fi Home Bar, click Reset chip, and verify confirmation dialog
+        // 3. Verify redundant Reset chip is removed from WifiHomeBar; navigate to More tab for destructive reset
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasTestTag("wifi_home_selector_bar"))
-        composeTestRule.onNodeWithTag("reset_lan_data_chip")
+        composeTestRule.onNodeWithTag("reset_lan_data_chip").assertDoesNotExist()
+
+        composeTestRule.onNodeWithTag("nav_tab_more").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithText("Google Play Store Assets Ready").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("more_reset_lan_homes_switches_button")
             .performScrollTo()
             .performClick()
         composeTestRule.waitForIdle()
@@ -308,8 +316,15 @@ class EndToEndUiTest {
         composeTestRule.onNodeWithTag("confirm_reset_and_rescan_button").assertIsDisplayed()
         composeTestRule.onNodeWithTag("confirm_reset_empty_button").assertIsDisplayed()
 
-        // 4. Confirm 'Reset Empty' and verify switches & extra homes are cleared into a clean 'My Home (0)' with EmptyDevicesState
+        // 4. Confirm 'Reset Empty' -> Real LAN Mode hides Reset Preset; Devices tab shows 'My Home (0)' + EmptyDevicesState
         composeTestRule.onNodeWithTag("confirm_reset_empty_button").performClick()
+        awaitLoopbackIo {
+            composeTestRule.onAllNodes(hasTestTag("restore_screenshot_preset_button"))
+                .fetchSemanticsNodes().isEmpty()
+        }
+        composeTestRule.onNodeWithTag("restore_screenshot_preset_button").assertDoesNotExist()
+
+        composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
         awaitLoopbackIo {
             runCatching {
                 composeTestRule.onNodeWithTag("devices_list")
@@ -318,6 +333,7 @@ class EndToEndUiTest {
             }.getOrDefault(false)
         }
         composeTestRule.onNodeWithTag("empty_devices_state_card").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
 
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasTestTag("wifi_home_selector_bar"))
@@ -325,14 +341,19 @@ class EndToEndUiTest {
             .performScrollTo()
             .assertIsDisplayed()
 
-        // 5. Navigate to More tab, verify 'Reset Homes, Discovered Switches & Rooms' button is present, and restore preset
+        // 5. Re-enable Demo Showroom Mode on More tab -> Reset Preset reappears and restores preset
         composeTestRule.onNodeWithTag("nav_tab_more").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("more_reset_lan_homes_switches_button")
+        composeTestRule.onNodeWithTag("demo_showroom_mode_switch")
             .performScrollTo()
-            .assertIsDisplayed()
+            .performClick()
+        awaitLoopbackIo {
+            composeTestRule.onAllNodes(hasTestTag("restore_screenshot_preset_button"))
+                .fetchSemanticsNodes().isNotEmpty()
+        }
         composeTestRule.onNodeWithTag("restore_screenshot_preset_button")
             .performScrollTo()
+            .assertIsDisplayed()
             .performClick()
         composeTestRule.waitForIdle()
     }

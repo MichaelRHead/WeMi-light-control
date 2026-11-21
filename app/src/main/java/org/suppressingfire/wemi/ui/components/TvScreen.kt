@@ -228,6 +228,9 @@ fun TvDashboardScreen(
     val controllableDevices = devices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
     val activeSwitchCount = controllableDevices.count { it.isOn && it.isReachable }
     val totalSwitchCount = controllableDevices.size
+    val hasHolidayDevices = remember(devices) {
+        devices.any { org.suppressingfire.wemi.data.isHolidayLightDevice(it) }
+    }
 
     Column(
         modifier = Modifier
@@ -246,6 +249,7 @@ fun TvDashboardScreen(
             focusedDevice = focusedDevice,
             dimmingDeviceId = dimmingDeviceId,
             isRefreshing = isRefreshing,
+            showHolidayScene = hasHolidayDevices,
             topActionFocusRequesters = topActionFocusRequesters,
             onSelectTopActionFocus = { idx -> activeFocusTarget = TvFocusTarget.TopAction(idx) },
             onNavigateDownFromTopBar = {
@@ -253,7 +257,8 @@ fun TvDashboardScreen(
                 if (firstRoom != null) navigateTo(TvFocusTarget.RoomHeader(firstRoom)) else true
             },
             onNavigateTopActionHorizontal = { targetIdx ->
-                navigateTo(TvFocusTarget.TopAction(targetIdx.coerceIn(0, 3)))
+                val resolvedIdx = if (!hasHolidayDevices && targetIdx == 1) 2 else targetIdx.coerceIn(0, 3)
+                navigateTo(TvFocusTarget.TopAction(resolvedIdx))
             },
             onPrimaryActionOnFocused = { triggerPrimaryAction(it) },
             onToggleDimmingFocused = { targetDimId ->

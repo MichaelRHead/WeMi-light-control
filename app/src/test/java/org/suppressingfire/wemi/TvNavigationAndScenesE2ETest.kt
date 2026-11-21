@@ -52,6 +52,7 @@ class TvNavigationAndScenesE2ETest {
         }
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("tv_scan_button").assertIsDisplayed().assertIsFocused()
+        composeTestRule.onNodeWithTag("tv_scene_holiday").assertDoesNotExist()
 
         // 2. Spin up 4 loopback devices in "Living Room" (Row 0: Alpha Dimmer, Bravo Switch, Charlie Switch; Row 1: Delta Christmas Tree)
         FakeUpnpServer(
@@ -90,7 +91,7 @@ class TvNavigationAndScenesE2ETest {
                     initialRelayOn = false,
                     enableSsdpResponder = true,
                     registerAsCandidatePort = true
-                ).use { _ ->
+                ).use { charlieServer ->
                     FakeUpnpServer(
                         initialFriendlyName = "Living Room Delta Christmas Tree",
                         deviceTypeUrn = "urn:Belkin:device:controllee:1",
@@ -194,8 +195,14 @@ class TvNavigationAndScenesE2ETest {
                         composeTestRule.onNodeWithTag("tv_scene_holiday").assertIsFocused()
                         composeTestRule.onNodeWithTag("tv_scene_holiday")
                             .performKeyInput { pressKey(Key.DirectionCenter) }
-                        awaitLoopbackIo { deltaServer.relayStateOn.get() }
+                        awaitLoopbackIo {
+                            deltaServer.relayStateOn.get() && vm.togglingDeviceIds.value.isEmpty()
+                        }
                         assertTrue(deltaServer.relayStateOn.get())
+                        assertFalse(
+                            "Holiday ON must target only holiday-named lights, leaving Living Room Charlie Switch OFF",
+                            charlieServer.relayStateOn.get()
+                        )
 
                         composeTestRule.onNodeWithTag("tv_scene_holiday")
                             .performKeyInput { pressKey(Key.DirectionRight) }

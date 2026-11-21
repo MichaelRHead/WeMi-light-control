@@ -69,6 +69,7 @@ internal fun TvTopHeaderBar(
     focusedDevice: DeviceEntity?,
     dimmingDeviceId: Int?,
     isRefreshing: Boolean,
+    showHolidayScene: Boolean = false,
     topActionFocusRequesters: List<FocusRequester>,
     onSelectTopActionFocus: (Int) -> Unit,
     onNavigateDownFromTopBar: () -> Boolean,
@@ -128,6 +129,7 @@ internal fun TvTopHeaderBar(
                 ) {
                     TvTopRightActionChips(
                         isRefreshing = isRefreshing,
+                        showHolidayScene = showHolidayScene,
                         topActionFocusRequesters = topActionFocusRequesters,
                         onSelectTopActionFocus = onSelectTopActionFocus,
                         onNavigateDownFromTopBar = onNavigateDownFromTopBar,
@@ -162,6 +164,7 @@ internal fun TvTopHeaderBar(
                 }
                 TvTopRightActionChips(
                     isRefreshing = isRefreshing,
+                    showHolidayScene = showHolidayScene,
                     topActionFocusRequesters = topActionFocusRequesters,
                     onSelectTopActionFocus = onSelectTopActionFocus,
                     onNavigateDownFromTopBar = onNavigateDownFromTopBar,
@@ -319,6 +322,7 @@ private fun TvDimmerModeChip(
 @Composable
 private fun TvTopRightActionChips(
     isRefreshing: Boolean,
+    showHolidayScene: Boolean,
     topActionFocusRequesters: List<FocusRequester>,
     onSelectTopActionFocus: (Int) -> Unit,
     onNavigateDownFromTopBar: () -> Boolean,
@@ -332,28 +336,30 @@ private fun TvTopRightActionChips(
         focusRequester = topActionFocusRequesters.getOrNull(0),
         onFocusGained = { onSelectTopActionFocus(0) },
         onNavigateLeft = { true },
-        onNavigateRight = { onNavigateTopActionHorizontal(1) },
+        onNavigateRight = { onNavigateTopActionHorizontal(if (showHolidayScene) 1 else 2) },
         onNavigateDown = onNavigateDownFromTopBar,
         onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.MOVIE_MODE.wireKey) },
         testTag = "tv_scene_movie"
     )
-    TvSceneChip(
-        title = "Holiday ON",
-        icon = Icons.Default.Park,
-        focusRequester = topActionFocusRequesters.getOrNull(1),
-        onFocusGained = { onSelectTopActionFocus(1) },
-        onNavigateLeft = { onNavigateTopActionHorizontal(0) },
-        onNavigateRight = { onNavigateTopActionHorizontal(2) },
-        onNavigateDown = onNavigateDownFromTopBar,
-        onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey) },
-        testTag = "tv_scene_holiday"
-    )
+    if (showHolidayScene) {
+        TvSceneChip(
+            title = "Holiday ON",
+            icon = Icons.Default.Park,
+            focusRequester = topActionFocusRequesters.getOrNull(1),
+            onFocusGained = { onSelectTopActionFocus(1) },
+            onNavigateLeft = { onNavigateTopActionHorizontal(0) },
+            onNavigateRight = { onNavigateTopActionHorizontal(2) },
+            onNavigateDown = onNavigateDownFromTopBar,
+            onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey) },
+            testTag = "tv_scene_holiday"
+        )
+    }
     TvSceneChip(
         title = "All OFF",
         icon = Icons.Default.Bedtime,
         focusRequester = topActionFocusRequesters.getOrNull(2),
         onFocusGained = { onSelectTopActionFocus(2) },
-        onNavigateLeft = { onNavigateTopActionHorizontal(1) },
+        onNavigateLeft = { onNavigateTopActionHorizontal(if (showHolidayScene) 1 else 0) },
         onNavigateRight = { onNavigateTopActionHorizontal(3) },
         onNavigateDown = onNavigateDownFromTopBar,
         onClick = { onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.BEDTIME_OFF.wireKey) },

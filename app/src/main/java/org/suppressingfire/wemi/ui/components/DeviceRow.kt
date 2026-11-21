@@ -120,6 +120,7 @@ fun DeviceRow(
     onPingLatency: () -> Unit = onReconnect,
     onToggleNightMode: (() -> Unit)? = null,
     onPinDeviceWidget: (() -> Unit)? = null,
+    isDemoShowroomMode: Boolean = false,
     autoOffRemainingSeconds: Int? = null,
     modifier: Modifier = Modifier
 ) {
@@ -409,7 +410,8 @@ fun DeviceRow(
                         onPingLatency = onPingLatency,
                         onEditDevice = onEditDevice,
                         onToggleNightMode = onToggleNightMode,
-                        onPinDeviceWidget = onPinDeviceWidget
+                        onPinDeviceWidget = onPinDeviceWidget,
+                        isDemoShowroomMode = isDemoShowroomMode
                     )
                 }
             }

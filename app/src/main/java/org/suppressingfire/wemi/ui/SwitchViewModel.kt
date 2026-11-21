@@ -135,9 +135,6 @@ class SwitchViewModel internal constructor(
     val statusBannerMessage: StateFlow<String?> = _statusBannerMessage.asStateFlow()
     private var statusBannerJob: Job? = null
 
-    private val _useWeMiWordmark = MutableStateFlow(true)
-    val useWeMiWordmark: StateFlow<Boolean> = _useWeMiWordmark.asStateFlow()
-
     private val homeAndRulesController = HomeAndRulesUiController(
         scope = viewModelScope,
         repository = repository,
@@ -444,10 +441,6 @@ class SwitchViewModel internal constructor(
 
     fun resetToClassicScreenshotDevices() =
         homeAndRulesController.resetToClassicScreenshotDevices { _selectedRoomFilter.value = null }
-
-    fun toggleBrandWordmark() {
-        _useWeMiWordmark.value = !_useWeMiWordmark.value
-    }
 
     fun clearSoapLogs() {
         repository.clearLogs()

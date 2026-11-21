@@ -65,7 +65,8 @@ internal fun ExpandedDrawer(
     onPingLatency: () -> Unit,
     onEditDevice: () -> Unit,
     onToggleNightMode: (() -> Unit)? = null,
-    onPinDeviceWidget: (() -> Unit)? = null
+    onPinDeviceWidget: (() -> Unit)? = null,
+    isDemoShowroomMode: Boolean = false
 ) {
     val type = device.parsedType
     var sliderVal by remember(device.brightness) {
@@ -256,7 +257,7 @@ internal fun ExpandedDrawer(
                 } else if (type == DeviceType.MOTION_SENSOR) {
                     AssistChip(
                         onClick = onTriggerMotion,
-                        label = { Text("Trigger Motion") },
+                        label = { Text(if (isDemoShowroomMode) "Simulate Motion" else "Refresh Motion") },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Sensors,

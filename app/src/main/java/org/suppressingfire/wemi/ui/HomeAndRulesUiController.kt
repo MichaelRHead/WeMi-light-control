@@ -224,7 +224,7 @@ internal class HomeAndRulesUiController(
                 TvScene.HOLIDAY_ON -> {
                     val holidaySwitches = currentHomeDevices.filter {
                         it.isReachable &&
-                            it.parsedType == DeviceType.SWITCH_PLUG &&
+                            org.suppressingfire.wemi.data.isHolidayLightDevice(it) &&
                             !it.isOn
                     }
                     coroutineScope {
@@ -232,7 +232,13 @@ internal class HomeAndRulesUiController(
                             async { repository.setDevicePowerExplicit(sw, true) }
                         }.awaitAll()
                     }
-                    onShowTransientStatus("Holiday Scene: All smart plugs turned ON")
+                    onShowTransientStatus(
+                        if (holidaySwitches.isNotEmpty()) {
+                            "Holiday Scene: Turned ON ${holidaySwitches.size} holiday light switch(es)"
+                        } else {
+                            "Holiday Scene: Holiday lights are already ON"
+                        }
+                    )
                 }
                 TvScene.BEDTIME_OFF -> {
                     onTurnAllSwitches(false)

@@ -78,6 +78,7 @@ data class DevicesTabUiState(
     val expandedDeviceIds: Set<Int>,
     val togglingDeviceIds: Set<Int>,
     val isEditMode: Boolean,
+    val isDemoShowroomMode: Boolean = false,
     val activeAutoOffCountdownsSec: Map<Int, Int>
 )
 
@@ -94,7 +95,6 @@ data class DevicesTabActions(
     val onToggleGroupedByRoom: () -> Unit,
     val onSelectRoomFilter: (String?) -> Unit,
     val onOpenAddDeviceDialog: () -> Unit,
-    val onRestoreClassicDevices: () -> Unit,
     val onToggleRoomPower: (String) -> Unit,
     val onToggleRoomCollapse: (String) -> Unit,
     val onUpdateRoomBrightness: (String, Int) -> Unit,
@@ -108,7 +108,6 @@ data class DevicesTabActions(
     val onMoveDevice: (DeviceEntity, Boolean) -> Unit,
     val onPingDeviceLatency: (DeviceEntity) -> Unit,
     val onToggleNightMode: (DeviceEntity) -> Unit,
-    val onResetHomesAndSwitches: (Boolean) -> Unit = {},
     val onPinRoomWidget: ((String) -> Unit)? = null,
     val onPinDeviceWidget: ((DeviceEntity) -> Unit)? = null
 )
@@ -184,18 +183,19 @@ fun DevicesTabScreen(
                     isReconnectingHome = state.isReconnectingHome,
                     onSelectHomeNetwork = actions.onSelectHomeNetwork,
                     onReconnectCurrentHome = actions.onReconnectCurrentHome,
-                    onOpenAddHomeDialog = actions.onOpenAddHomeDialog,
-                    onResetHomesAndSwitches = actions.onResetHomesAndSwitches
+                    onOpenAddHomeDialog = actions.onOpenAddHomeDialog
                 )
             }
 
-            item(key = "ssdp_discovery_banner_header") {
-                SsdpDiscoveryBanner(
-                    isScanning = state.isRefreshing,
-                    latestReport = state.latestSsdpReport,
-                    savedDeviceCount = state.homeDevices.count { it.isReachable },
-                    onOpenScannerClick = actions.onOpenScannerAndScan
-                )
+            if (state.homeDevices.isEmpty() || state.isRefreshing) {
+                item(key = "ssdp_discovery_banner_header") {
+                    SsdpDiscoveryBanner(
+                        isScanning = state.isRefreshing,
+                        latestReport = state.latestSsdpReport,
+                        savedDeviceCount = state.homeDevices.count { it.isReachable },
+                        onOpenScannerClick = actions.onOpenScannerAndScan
+                    )
+                }
             }
 
             item(key = "room_grouping_filter_bar") {
@@ -213,8 +213,7 @@ fun DevicesTabScreen(
                     EmptyDevicesState(
                         onAddClick = actions.onOpenAddDeviceDialog,
                         onScanSsdpClick = actions.onOpenScannerAndScan,
-                        onOpenProvisionApClick = actions.onOpenProvisionApDialog,
-                        onRestoreClassicClick = actions.onRestoreClassicDevices
+                        onOpenProvisionApClick = actions.onOpenProvisionApDialog
                     )
                 }
             } else if (state.isGroupedByRoom) {
@@ -289,6 +288,7 @@ private fun BoundDeviceRow(
         onPingLatency = { actions.onPingDeviceLatency(device) },
         onToggleNightMode = { actions.onToggleNightMode(device) },
         onPinDeviceWidget = actions.onPinDeviceWidget?.let { pin -> { pin(device) } },
+        isDemoShowroomMode = state.isDemoShowroomMode,
         autoOffRemainingSeconds = state.activeAutoOffCountdownsSec[device.id],
         modifier = modifier
     )
@@ -298,8 +298,7 @@ private fun BoundDeviceRow(
 internal fun EmptyDevicesState(
     onAddClick: () -> Unit,
     onScanSsdpClick: () -> Unit,
-    onOpenProvisionApClick: () -> Unit,
-    onRestoreClassicClick: () -> Unit
+    onOpenProvisionApClick: () -> Unit
 ) {
     Surface(
         color = WemoRowSurface,
@@ -365,7 +364,7 @@ internal fun EmptyDevicesState(
             )
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, provision a factory-reset switch (10.22.22.1), add a switch by IP, or restore the default preset.",
+                text = "Scan this Wi-Fi network via SSDP (239.255.255.250:1900) to remember discovered switches here, provision a factory-reset switch (10.22.22.1), or add a switch by IP.",
                 fontFamily = FontFamily.SansSerif,
                 fontSize = 13.sp,
                 color = WemoTextSecondary,
@@ -392,26 +391,13 @@ internal fun EmptyDevicesState(
                 Text("Setup Factory-Reset Switch AP (10.22.22.1)")
             }
             Spacer(modifier = Modifier.height(6.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            OutlinedButton(
+                onClick = onAddClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("empty_state_add_manual_button")
             ) {
-                OutlinedButton(
-                    onClick = onAddClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("empty_state_add_manual_button")
-                ) {
-                    Text("Add Switch Manually", color = WemoGreenDark)
-                }
-                OutlinedButton(
-                    onClick = onRestoreClassicClick,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("empty_state_restore_classic_button")
-                ) {
-                    Text("Restore Classic Setup", color = WemoTextSecondary)
-                }
+                Text("Add Switch Manually", color = WemoGreenDark)
             }
         }
     }

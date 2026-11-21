@@ -224,6 +224,41 @@ class SkuAndCryptoTest {
         assertEquals(DeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Espresso Machine Plug"))
         assertEquals(DeviceCategory.SWITCH_PLUG, classifyDeviceCategory("Office Wall Switch"))
 
+        // 3b. Verify isHolidayLightDevice matches festive/holiday switches (Christmas, Diwali/Dewali, Hanukkah, Halloween, etc.) and excludes regular switches & motion sensors
+        listOf(
+            "Christmas Tree Living",
+            "Holiday Lights Porch",
+            "Diwali Lights Patio",
+            "Dewali String Lights",
+            "Deepavali Garland",
+            "Hanukkah Menorah",
+            "Halloween Pumpkin Plug",
+            "Backyard Fairy Lights",
+            "Roofline Icicle Lights",
+            "Xmas Wreath"
+        ).forEach { holidayName ->
+            assertTrue(
+                "Expected '$holidayName' to match isHolidayLightDevice",
+                org.suppressingfire.wemi.data.isHolidayLightDevice(
+                    org.suppressingfire.wemi.data.DeviceEntity(name = holidayName)
+                )
+            )
+        }
+        listOf(
+            "Kitchen Island Switch" to DeviceType.SWITCH_PLUG,
+            "Living Room Floor Lamp" to DeviceType.LIGHTBULB_DIMMER,
+            "Bedroom Ceiling Fan" to DeviceType.SWITCH_PLUG,
+            "Porch Plug" to DeviceType.SWITCH_PLUG,
+            "Holiday Motion Sensor" to DeviceType.MOTION_SENSOR
+        ).forEach { (regularName, type) ->
+            assertFalse(
+                "Expected '$regularName' ($type) NOT to match isHolidayLightDevice",
+                org.suppressingfire.wemi.data.isHolidayLightDevice(
+                    org.suppressingfire.wemi.data.DeviceEntity(name = regularName, deviceType = type.name)
+                )
+            )
+        }
+
         // 4. Verify isWemoDeviceSetupSsid and parseMetaInfoSoapResponse filter all Belkin soft-AP SSIDs while keeping real router SSIDs
         val softApSsids = listOf(
             "WeMo.Switch.998",

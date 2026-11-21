@@ -1,6 +1,5 @@
 package org.suppressingfire.wemi.ui.screens
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,9 +12,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Router
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -34,17 +33,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.HomeNetworkEntity
 import org.suppressingfire.wemi.data.SoapLogEntry
@@ -124,14 +119,13 @@ internal fun MasterSwitchControlCard(
 @Composable
 internal fun LocalUpnpEngineCard(
     isDemoShowroomMode: Boolean,
-    useWeMiWordmark: Boolean,
     onToggleDemoShowroomMode: (Boolean) -> Unit,
-    onToggleBrandWordmark: () -> Unit,
     onScanNetwork: () -> Unit,
     onResetClassicDevices: () -> Unit,
-    onResetLanHomesAndSwitches: () -> Unit,
+    onResetLanHomesAndSwitches: (Boolean) -> Unit,
     onOpenProvisionApWizard: () -> Unit
 ) {
+    var showResetConfirmDialog by remember { mutableStateOf(false) }
     Card(
         colors = CardDefaults.cardColors(containerColor = WemoRowSurface),
         shape = RoundedCornerShape(12.dp),
@@ -198,35 +192,6 @@ internal fun LocalUpnpEngineCard(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Header Logo Wordmark",
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 15.sp,
-                        color = WemoTextPrimary
-                    )
-                    Text(
-                        text = "Showing 'wemi' wordmark in top bar",
-                        fontFamily = FontFamily.SansSerif,
-                        fontSize = 13.sp,
-                        color = WemoTextSecondary
-                    )
-                }
-                Switch(
-                    checked = useWeMiWordmark,
-                    onCheckedChange = { onToggleBrandWordmark() },
-                    colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 OutlinedButton(
@@ -235,27 +200,29 @@ internal fun LocalUpnpEngineCard(
                 ) {
                     Text("Scan LAN (SSDP)", color = WemoGreenDark)
                 }
-                OutlinedButton(
-                    onClick = onResetClassicDevices,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("restore_screenshot_preset_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Restore,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = WemoTextPrimary
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Reset Preset", color = WemoTextPrimary)
+                if (isDemoShowroomMode) {
+                    OutlinedButton(
+                        onClick = onResetClassicDevices,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("restore_screenshot_preset_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Restore,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = WemoTextPrimary
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Reset Preset", color = WemoTextPrimary)
+                    }
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
 
             OutlinedButton(
-                onClick = onResetLanHomesAndSwitches,
+                onClick = { showResetConfirmDialog = true },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("more_reset_lan_homes_switches_button")
@@ -282,69 +249,54 @@ internal fun LocalUpnpEngineCard(
             }
         }
     }
-}
 
-@Composable
-internal fun PlayStoreAssetsCard() {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = WemoRowSurface),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = WemoGreenPrimary
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+    if (showResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirmDialog = false },
+            title = {
                 Text(
-                    text = "Google Play Store Assets Ready",
+                    text = "Reset Homes, Switches & Rooms?",
                     fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 18.sp,
-                    color = WemoTextPrimary
+                    fontWeight = FontWeight.Bold
                 )
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-            Image(
-                painter = painterResource(id = R.drawable.img_wemi_teal_feature_1794086803999),
-                contentDescription = "Google Play Feature Graphic Banner",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(136.dp)
-                    .clip(RoundedCornerShape(10.dp))
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(id = R.drawable.img_wemi_teal_icon_1794086800772),
-                    contentDescription = "Google Play 512x512 High-Res Icon",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(54.dp)
-                        .clip(RoundedCornerShape(12.dp))
+            },
+            text = {
+                Text(
+                    text = "This clears all remembered Wi-Fi Homes, discovered switches, and room assignments, then resets your primary LAN profile back to a clean 'My Home'.",
+                    color = WemoTextSecondary,
+                    fontFamily = FontFamily.SansSerif,
+                    fontSize = 13.sp
                 )
-                Spacer(modifier = Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "WeMi Switch Control",
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 16.sp,
-                        color = WemoTextPrimary
-                    )
-                    Text(
-                        text = "512×512 Icon, 1024×500 Feature Graphic, Store Listing & Privacy Policy bundled in /play_store_assets/",
-                        fontFamily = FontFamily.SansSerif,
-                        fontSize = 12.sp,
-                        color = WemoTextSecondary
-                    )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showResetConfirmDialog = false
+                        onResetLanHomesAndSwitches(true)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                    modifier = Modifier.testTag("confirm_reset_and_rescan_button")
+                ) {
+                    Text("Reset & Rescan LAN")
+                }
+            },
+            dismissButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            showResetConfirmDialog = false
+                            onResetLanHomesAndSwitches(false)
+                        },
+                        modifier = Modifier.testTag("confirm_reset_empty_button")
+                    ) {
+                        Text("Reset Empty", color = WemoGreenDark)
+                    }
+                    TextButton(onClick = { showResetConfirmDialog = false }) {
+                        Text("Cancel")
+                    }
                 }
             }
-        }
+        )
     }
 }
 

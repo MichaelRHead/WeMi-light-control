@@ -12,10 +12,10 @@
 ## 1. Ways to Discover Switches
 
 You can trigger a local network discovery scan at any time:
-1. **SSDP Local Network Discovery Banner**: Tap the **`SSDP Scan`** button in the discovery card near the top of the **Devices** tab.
-2. **Top Header Radar / Refresh Button**: Tap the **Refresh** icon in the top-right header bar.
-3. **Pull-to-Refresh**: Swipe down on the **Devices** list to refresh existing switches and scan for new ones in the background.
-4. **Add Device Dialog**: Tap **`+`** in the top header and tap **`Scan Local Wi-Fi (SSDP UPnP)`**.
+1. **Top Header Radar / Refresh Button**: Tap the **Refresh** icon in the top-right header bar.
+2. **Pull-to-Refresh**: Swipe down on the **Devices** list to refresh existing switches and scan for new ones in the background.
+3. **Add Device Dialog**: Tap **`+`** in the top header and tap **`Scan Local Wi-Fi (SSDP UPnP)`**.
+4. **SSDP Local Network Discovery Banner**: Appears automatically on an empty Wi-Fi Home or while a scan is active (and hides automatically once your switches are populated).
 
 ---
 

@@ -23,12 +23,11 @@ Inside the **Offline Local UPnP / SOAP Engine** card on the **More** tab:
   - If a physical switch is unplugged or unreachable on Wi-Fi, toggling it performs a 2-stage self-healing reconnect attempt and accurately marks the device **`Offline`** if it cannot be reached.
 - **Demo Showroom Mode (`Demo Showroom Mode = ON`)**:
   - Populates **14 showcase switches, dimmers, fans, Christmas tree lights, and motion sensors** across 3 sample Wi-Fi Homes (`Main Home`, `Lake Cabin`, `Studio Office`) so you can explore room grouping, dimming, rules, and the interface without physical hardware on your LAN.
-  - Tapping **`Reset Preset`** restores the 14 classic showcase switches at any time.
+  - While Demo Showroom Mode is enabled, tapping **`Reset Preset`** restores the 14 classic showcase switches at any time (this button is hidden in Real LAN Mode).
 
 Other quick settings in this card:
-- **Header Logo Wordmark Switch**: Controls the top header **`wemi`** wordmark display (`Showing 'wemi' wordmark in top bar`).
 - **`Scan LAN (SSDP)`**: Opens the SSDP network discovery sheet.
-- **`Reset Homes, Discovered Switches & Rooms`**: Clears all remembered Wi-Fi Homes, discovered switches, and room assignments in Real LAN Mode, resets your primary LAN profile back to a clean **`My Home`**, and triggers a fresh SSDP discovery scan.
+- **`Reset Homes, Discovered Switches & Rooms`**: Opens a confirmation dialog offering **`Reset & Rescan LAN`** or **`Reset Empty`** to clear all remembered Wi-Fi Homes, discovered switches, and room assignments into a clean **`My Home`**.
 - **`Provision New Switch AP (10.22.22.1)`**: Opens the zero-cloud Wi-Fi setup wizard.
 
 ---
@@ -71,7 +70,7 @@ At the bottom of the **More** tab, the **Open Source License** card (`open_sourc
    - **Focusable Dimmer Slider**: Navigating **`Down` once more** from a dimmer card's On/Off Toggle focuses the **Dimmer Slider** inside the card (highlighted with a glowing Gold `#FBBF24` border and **`◄ -10% • +10% ►`** badge) — no Play or Menu button required. While the Dimmer Slider is focused, press **`Left`** / **`Right`** to lower (`-10%`) or raise (`+10%`) the dimmer brightness, press **`Up`** or **`Back`** to return to the On/Off Toggle, or press **`Down`** to move to the widget below.
 4. **1-Click TV Lighting Scenes & Non-Blocking LAN Rescan**:
    - **`Movie 20%`**: Dims Living Room lights to a soft `20%` glow and turns off bright overhead switches concurrently.
-   - **`Holiday ON`**: Turns all holiday/tree switches **ON** concurrently without toggling ones that are already ON.
+   - **`Holiday ON`** *(shown automatically when your active home includes holiday/festive switches such as Christmas tree, holiday lights, Diwali/Dewali, Hanukkah, Halloween, or fairy/string lights)*: Turns matching holiday switches **ON** concurrently without toggling regular switches or ones that are already ON.
    - **`All OFF`**: Turns every active switch in the home **OFF** concurrently.
    - **`Rescan`**: Runs a background SSDP + state refresh with a bottom status toast—never popping up modal dialogs over the TV screen.
 

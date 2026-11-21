@@ -34,7 +34,7 @@ import org.suppressingfire.wemi.ui.SwitchViewModel
  * Full-stack Jetpack Compose + Robolectric E2E validation for UI layout & Android TV D-Pad CUJs:
  * 1. Compact single-row mobile/tablet `TopHeader` horizontal alignment, `>= 48.dp` Play Console
  *    Accessibility touch targets, `Role.Button` + `ContentDescription` semantics, `"All Off"` button,
- *    and wordmark toggle.
+ *    and static non-interactive `wemi` brand wordmark.
  * 2. Native Android TV (`UI_MODE_TYPE_TELEVISION`) 3-column room-grouped grid, deterministic
  *    alphabetical adoption ordering (`Living Room Dimmer` Col 0, `Living Room Switch` Col 1),
  *    `"Unassigned"`-last room ordering, Up/Down Room Bar navigation across columns, focusable Dimmer
@@ -51,7 +51,7 @@ class TvAndHeaderLayoutE2ETest {
         composeTestRule.awaitLoopbackIo(timeoutMs, condition)
 
     @Test
-    fun `verify v23_0 compact single-row TopHeader layout, 48dp accessibility touch targets, and brand wordmark toggle`() {
+    fun `verify v23_0 compact single-row TopHeader layout, 48dp accessibility touch targets, and static brand wordmark`() {
         composeTestRule.waitForIdle()
 
         val wordmarkNode = composeTestRule.onNodeWithTag("brand_wordmark_text").assertIsDisplayed()
@@ -64,8 +64,23 @@ class TvAndHeaderLayoutE2ETest {
         composeTestRule.onNodeWithText("LAN SWITCHES").assertDoesNotExist()
         composeTestRule.onNodeWithText("All Off").assertIsDisplayed()
 
-        val headerControls = listOf(
-            "brand_wordmark_text" to wordmarkNode.fetchSemanticsNode(),
+        val wordmarkSem = wordmarkNode.fetchSemanticsNode()
+        assertEquals(
+            "Expected static brand_wordmark_text not to expose Role.Button",
+            null,
+            wordmarkSem.config.getOrNull(SemanticsProperties.Role)
+        )
+        assertEquals(
+            "Expected static brand_wordmark_text not to expose OnClick action",
+            null,
+            wordmarkSem.config.getOrNull(SemanticsActions.OnClick)
+        )
+        assertTrue(
+            "Expected brand_wordmark_text to expose a non-blank accessibility ContentDescription",
+            wordmarkSem.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().any { it.isNotBlank() }
+        )
+
+        val headerActionControls = listOf(
             "all_off_devices_button" to allOffNode.fetchSemanticsNode(),
             "refresh_devices_button" to refreshNode.fetchSemanticsNode(),
             "edit_devices_button" to editNode.fetchSemanticsNode(),
@@ -73,7 +88,7 @@ class TvAndHeaderLayoutE2ETest {
         )
         val minTouchHeightPx = with(composeTestRule.density) { 48.dp.toPx() } - 0.5f
 
-        headerControls.forEach { (tag, semNode) ->
+        headerActionControls.forEach { (tag, semNode) ->
             assertTrue(
                 "Expected $tag height >= 48.dp ($minTouchHeightPx px), got ${semNode.boundsInRoot.height}",
                 semNode.boundsInRoot.height >= minTouchHeightPx
@@ -90,13 +105,13 @@ class TvAndHeaderLayoutE2ETest {
             )
         }
 
-        val wordmarkBounds = headerControls[0].second.boundsInRoot
-        val allOffBounds = headerControls[1].second.boundsInRoot
-        val refreshBounds = headerControls[2].second.boundsInRoot
-        val editBounds = headerControls[3].second.boundsInRoot
-        val addBounds = headerControls[4].second.boundsInRoot
+        val wordmarkBounds = wordmarkSem.boundsInRoot
+        val allOffBounds = headerActionControls[0].second.boundsInRoot
+        val refreshBounds = headerActionControls[1].second.boundsInRoot
+        val editBounds = headerActionControls[2].second.boundsInRoot
+        val addBounds = headerActionControls[3].second.boundsInRoot
 
-        // All 5 controls must share the same single horizontal header row (vertical centers within 10px)
+        // All 5 elements must share the same single horizontal header row (vertical centers within 10px)
         assertTrue(
             "Expected All Off button aligned vertically with wordmark ($wordmarkBounds vs $allOffBounds)",
             abs(allOffBounds.center.y - wordmarkBounds.center.y) <= 10f
@@ -123,13 +138,13 @@ class TvAndHeaderLayoutE2ETest {
                 editBounds.center.x < addBounds.center.x
         )
 
-        // Clicking wordmark toggles brand display and clicking again restores "wemi"
+        // Static "wemi" wordmark is displayed, and the removed legacy wordmark toggle is absent on the More tab
         composeTestRule.onNodeWithText("wemi").assertIsDisplayed()
-        wordmarkNode.performClick()
+        composeTestRule.onNodeWithTag("nav_tab_more").performClick()
         composeTestRule.waitForIdle()
-        wordmarkNode.performClick()
+        composeTestRule.onNodeWithText("Header Logo Wordmark").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("wemi").assertIsDisplayed()
 
         // Clicking "All Off" next to the Refresh button turns OFF all reachable controllable switches on the active home
         val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
@@ -327,19 +342,19 @@ class TvAndHeaderLayoutE2ETest {
                         "Expected TV top bar height to remain stable while dimming ($topBarToggleBounds vs $topBarDimmingBounds)",
                         abs(topBarDimmingBounds.height - topBarToggleBounds.height) <= 4f
                     )
+                    // Without any holiday-named switches, Holiday ON is hidden and the remaining 5 TV top-bar chips pack cleanly on one row
+                    composeTestRule.onNodeWithTag("tv_scene_holiday").assertDoesNotExist()
                     val statusBounds = composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
                         .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
                     val dimmerToggleBounds = composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle")
                         .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
                     val movieBounds = composeTestRule.onNodeWithTag("tv_scene_movie")
                         .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-                    val holidayBounds = composeTestRule.onNodeWithTag("tv_scene_holiday")
-                        .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
                     val bedtimeBounds = composeTestRule.onNodeWithTag("tv_scene_bedtime")
                         .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
                     val scanBounds = composeTestRule.onNodeWithTag("tv_scan_button")
                         .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-                    val topChips = listOf(statusBounds, dimmerToggleBounds, movieBounds, holidayBounds, bedtimeBounds, scanBounds)
+                    val topChips = listOf(statusBounds, dimmerToggleBounds, movieBounds, bedtimeBounds, scanBounds)
                     topChips.forEach { chip ->
                         assertTrue(
                             "Expected TV top bar chip to stay single-row horizontal ($chip vs $movieBounds)",
@@ -350,8 +365,7 @@ class TvAndHeaderLayoutE2ETest {
                         "Expected strict non-overlapping left-to-right TV top bar order without clipping Rescan ($topChips in $topBarDimmingBounds)",
                         statusBounds.right <= dimmerToggleBounds.left + 1f &&
                             dimmerToggleBounds.right <= movieBounds.left + 1f &&
-                            movieBounds.right <= holidayBounds.left + 1f &&
-                            holidayBounds.right <= bedtimeBounds.left + 1f &&
+                            movieBounds.right <= bedtimeBounds.left + 1f &&
                             bedtimeBounds.right <= scanBounds.left + 1f &&
                             scanBounds.right <= topBarDimmingBounds.right + 1f
                     )
@@ -394,6 +408,20 @@ class TvAndHeaderLayoutE2ETest {
                     }
                     assertFalse(switchServer.relayStateOn.get())
                     assertFalse(dimmerServer.relayStateOn.get())
+
+                    // 6. Verify D-Pad navigation in TV top bar skips cleanly between Movie 20% and All OFF when Holiday ON is hidden
+                    composeTestRule.onNodeWithTag("tv_room_header_Living Room")
+                        .performKeyInput { pressKey(Key.DirectionUp) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_scene_movie").assertIsFocused()
+                    composeTestRule.onNodeWithTag("tv_scene_movie")
+                        .performKeyInput { pressKey(Key.DirectionRight) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_scene_bedtime").assertIsFocused()
+                    composeTestRule.onNodeWithTag("tv_scene_bedtime")
+                        .performKeyInput { pressKey(Key.DirectionLeft) }
+                    composeTestRule.waitForIdle()
+                    composeTestRule.onNodeWithTag("tv_scene_movie").assertIsFocused()
                 }
             }
         }

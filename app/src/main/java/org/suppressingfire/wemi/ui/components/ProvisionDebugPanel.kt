@@ -34,12 +34,12 @@ import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.TelemetryFileExporter
 
 /**
- * Screenshot-ready on-screen diagnostic and trace panel rendered inside [ProvisionApDialog].
+ * Expandable on-screen diagnostic and trace panel rendered inside [ProvisionApDialog].
  *
- * Displays live `/setup.xml` / `GetMetaInfo` MAC & serial source, `GetApList` channel/auth match,
- * AES-128-CBC encryption method & length suffix, and step-by-step `ConnectHomeNetwork` /
- * `GetNetworkStatus` / `CloseSetup` trace lines, with one-tap `Copy` and `Save/Share` export to
- * `wemi-telemetry-latest.txt`.
+ * Stays compact while idle and auto-expands when AP scanning, provisioning traces, or errors
+ * occur, displaying `/setup.xml` / `GetMetaInfo` MAC & serial source, `GetApList` channel/auth
+ * match, AES-128-CBC encryption details, and step-by-step trace lines with one-tap `Copy` and
+ * `Save/Share` export to `wemi-telemetry-latest.txt`.
  */
 @Suppress("DEPRECATION")
 @Composable
@@ -47,12 +47,16 @@ internal fun ProvisionDebugPanel(
     debugSnapshot: SetupDebugSnapshot,
     selectedSsid: String,
     keepOpenOnSuccess: Boolean,
+    hasWarningOrError: Boolean = false,
     onToggleKeepOpen: () -> Unit
 ) {
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
     var copiedFeedback by remember(debugSnapshot, selectedSsid) { mutableStateOf(false) }
     var sharedFeedback by remember(debugSnapshot, selectedSsid) { mutableStateOf(false) }
+    val hasActiveDiagnostics = hasWarningOrError || debugSnapshot.traceLines.isNotEmpty()
+    var userExpandedOverride by remember { mutableStateOf<Boolean?>(null) }
+    val isExpanded = userExpandedOverride ?: hasActiveDiagnostics
     val displayLines = remember(debugSnapshot, selectedSsid) {
         debugSnapshot.toDisplayLines(selectedSsid)
     }
@@ -75,7 +79,7 @@ internal fun ProvisionDebugPanel(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "SETUP DEBUG DETAILS (SCREENSHOT)",
+                    text = "SETUP DIAGNOSTICS",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp,
@@ -83,6 +87,20 @@ internal fun ProvisionDebugPanel(
                     modifier = Modifier.weight(1f)
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    OutlinedButton(
+                        onClick = { userExpandedOverride = !isExpanded },
+                        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp),
+                        border = BorderStroke(1.dp, Color(0xFF475569)),
+                        modifier = Modifier
+                            .height(24.dp)
+                            .testTag("toggle_provision_debug_button")
+                    ) {
+                        Text(
+                            text = if (isExpanded) "Hide" else "Details",
+                            fontSize = 10.sp,
+                            color = Color(0xFFE2E8F0)
+                        )
+                    }
                     OutlinedButton(
                         onClick = {
                             val reportText = debugSnapshot.toClipboardText(selectedSsid)
@@ -129,56 +147,58 @@ internal fun ProvisionDebugPanel(
                 }
             }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("provision_debug_text"),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                displayLines.forEach { line ->
-                    val lineColor = when {
-                        line.contains("WARN", ignoreCase = true) ||
-                            line.contains("ERROR", ignoreCase = true) ||
-                            line.contains("MISSING", ignoreCase = true) ||
-                            line.contains("No setup descriptor", ignoreCase = true) ||
-                            line.contains("Status=2", ignoreCase = true) ||
-                            line.contains("HOLD", ignoreCase = true) -> Color(0xFFFCA5A5)
-                        line.contains("Status=1", ignoreCase = true) ||
-                            line.contains("HTTP_200", ignoreCase = true) ||
-                            line.contains("CLOSE] CloseSetup -> success", ignoreCase = true) -> Color(0xFF86EFAC)
-                        else -> Color(0xFFE2E8F0)
+            if (isExpanded) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("provision_debug_text"),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    displayLines.forEach { line ->
+                        val lineColor = when {
+                            line.contains("WARN", ignoreCase = true) ||
+                                line.contains("ERROR", ignoreCase = true) ||
+                                line.contains("MISSING", ignoreCase = true) ||
+                                line.contains("No setup descriptor", ignoreCase = true) ||
+                                line.contains("Status=2", ignoreCase = true) ||
+                                line.contains("HOLD", ignoreCase = true) -> Color(0xFFFCA5A5)
+                            line.contains("Status=1", ignoreCase = true) ||
+                                line.contains("HTTP_200", ignoreCase = true) ||
+                                line.contains("CLOSE] CloseSetup -> success", ignoreCase = true) -> Color(0xFF86EFAC)
+                            else -> Color(0xFFE2E8F0)
+                        }
+                        Text(
+                            text = line,
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            lineHeight = 13.sp,
+                            color = lineColor
+                        )
                     }
-                    Text(
-                        text = line,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        lineHeight = 13.sp,
-                        color = lineColor
-                    )
                 }
-            }
 
-            FilterChip(
-                selected = keepOpenOnSuccess,
-                onClick = onToggleKeepOpen,
-                label = {
-                    Text(
-                        text = if (keepOpenOnSuccess) {
-                            "Keep Dialog Open on Success: ON (for screenshot)"
-                        } else {
-                            "Keep Dialog Open on Success: OFF (stays open on any error)"
-                        },
-                        fontSize = 10.5.sp
-                    )
-                },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = Color(0xFF1E293B),
-                    labelColor = Color(0xFFCBD5E1),
-                    selectedContainerColor = Color(0xFF14532D),
-                    selectedLabelColor = Color(0xFFBBF7D0)
-                ),
-                modifier = Modifier.testTag("keep_provision_dialog_open_chip")
-            )
+                FilterChip(
+                    selected = keepOpenOnSuccess,
+                    onClick = onToggleKeepOpen,
+                    label = {
+                        Text(
+                            text = if (keepOpenOnSuccess) {
+                                "Keep Dialog Open on Success: ON"
+                            } else {
+                                "Keep Dialog Open on Success: OFF (stays open on errors)"
+                            },
+                            fontSize = 10.5.sp
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Color(0xFF1E293B),
+                        labelColor = Color(0xFFCBD5E1),
+                        selectedContainerColor = Color(0xFF14532D),
+                        selectedLabelColor = Color(0xFFBBF7D0)
+                    ),
+                    modifier = Modifier.testTag("keep_provision_dialog_open_chip")
+                )
+            }
         }
     }
 }

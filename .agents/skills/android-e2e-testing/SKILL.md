@@ -64,7 +64,7 @@ Never let a single test file exceed `500` lines. Organize tests by architectural
 ## 3. Compose Semantic `testTag` Conventions
 
 Every interactive or status-bearing Compose element must expose a deterministic `Modifier.testTag(...)` so E2E tests never rely on fragile layout hierarchy indexing:
-- Top Header single-row controls (`>= 48.dp` touch height + `Role.Button`): `"brand_wordmark_text"`, `"all_off_devices_button"`, `"refresh_devices_button"`, `"edit_devices_button"`, `"add_device_button"`
+- Top Header single-row layout: static `"brand_wordmark_text"` plus 4 interactive controls (`>= 48.dp` touch height + `Role.Button`): `"all_off_devices_button"`, `"refresh_devices_button"`, `"edit_devices_button"`, `"add_device_button"`
 - Status Feedback Banner: `"status_feedback_banner"` (scope text assertions via `hasTestTag("status_feedback_banner") and hasAnyDescendant(hasText(..., substring = true))` so device row labels never trigger ambiguous-node matches)
 - Device Row container & name: `"device_row_${device.id}"`, `"device_name_${device.id}"`
 - Power Ring button: `"power_button_${device.id}"`
@@ -78,8 +78,8 @@ Every interactive or status-bearing Compose element must expose a deterministic 
 - Room Group header, collapse, pin, filter & toggle: `"room_header_$roomName"`, `"room_collapse_button_$roomName"`, `"room_pin_widget_button_$roomName"`, `"room_power_toggle_$roomName"`, `"room_filter_bar"`, `"room_filter_$roomName"`, `"room_filter_All"`, `"toggle_group_by_room_chip"`
 - Android TV 10-foot Dashboard (`wemi TV`): `"tv_dashboard_screen"`, `"tv_device_grid"`, `"tv_room_header_$roomName"`, `"tv_room_dim_minus_$roomName"`, `"tv_room_dim_plus_$roomName"`, `"tv_device_card_${device.id}"`, `"tv_card_dim_mode_${device.id}"`, `"tv_dimmer_mode_toggle"`, `"tv_remote_dpad_ok"`, `"tv_scene_movie"`, `"tv_scene_holiday"`, `"tv_scene_bedtime"`, `"tv_scan_button"`
 - Home Screen Widget Configurator (`SwitchWidgetConfigureActivity`): `"widget_config_home_${networkKey}"`, `"widget_config_tab_rooms"`, `"widget_config_tab_lights"`, `"widget_config_rooms_list"`, `"widget_config_lights_list"`, `"widget_config_room_$roomName"`, `"widget_config_device_${device.id}"`, `"widget_config_cancel_button"`
-- Empty-Home Onboarding Card (`EmptyDevicesState`): `"empty_devices_state_card"`, `"empty_state_scan_ssdp_button"`, `"empty_state_provision_ap_button"`, `"empty_state_add_manual_button"`, `"empty_state_restore_classic_button"`
-- Navigation, Rules, More & Modals: `"nav_tab_devices"`, `"nav_tab_rules"`, `"nav_tab_more"`, `"save_device_button"`, `"sync_hardware_name_switch"`, `"scan_wifi_ssdp_button"`, `"trigger_ssdp_scan_button"`, `"sync_all_ssdp_button"`, `"open_provision_ap_wizard_button"`, `"provision_ap_status_box"`, `"provision_status_box"`, `"confirm_provision_ap_button"`, `"add_rule_button"`, `"rule_brightness_slider"`, `"save_rule_button"`, `"delete_rule_${rule.id}"`, `"all_switches_on_button"`, `"all_switches_off_button"`, `"clear_soap_logs_button"`, `"demo_showroom_mode_switch"`
+- Empty-Home Onboarding Card (`EmptyDevicesState`): `"empty_devices_state_card"`, `"empty_state_scan_ssdp_button"`, `"empty_state_provision_ap_button"`, `"empty_state_add_manual_button"`
+- Navigation, Rules, More & Modals: `"nav_tab_devices"`, `"nav_tab_rules"`, `"nav_tab_more"`, `"save_device_button"`, `"sync_hardware_name_switch"`, `"scan_wifi_ssdp_button"`, `"trigger_ssdp_scan_button"`, `"sync_all_ssdp_button"`, `"open_provision_ap_wizard_button"`, `"provision_ap_status_box"`, `"provision_status_box"`, `"toggle_provision_debug_button"`, `"confirm_provision_ap_button"`, `"add_rule_button"`, `"rule_brightness_slider"`, `"save_rule_button"`, `"delete_rule_${rule.id}"`, `"all_switches_on_button"`, `"all_switches_off_button"`, `"more_reset_lan_homes_switches_button"`, `"clear_soap_logs_button"`, `"demo_showroom_mode_switch"`
 
 ---
 

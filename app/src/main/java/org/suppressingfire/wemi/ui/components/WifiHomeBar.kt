@@ -31,7 +31,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -80,7 +79,6 @@ fun WifiHomeBar(
     onSelectHomeNetwork: (String) -> Unit,
     onReconnectCurrentHome: () -> Unit,
     onOpenAddHomeDialog: () -> Unit,
-    onResetHomesAndSwitches: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val activeHome = homeNetworks.find { it.networkKey == activeNetworkKey }
@@ -90,7 +88,6 @@ fun WifiHomeBar(
     }
     val onlineCount = homeDevices.count { it.isReachable }
     val offlineCount = homeDevices.size - onlineCount
-    var showResetConfirmDialog by remember { mutableStateOf(false) }
 
     Surface(
         color = WemoRowSurface,
@@ -263,81 +260,8 @@ fun WifiHomeBar(
                         .height(28.dp)
                         .testTag("add_wifi_home_button")
                 )
-
-                FilterChip(
-                    selected = false,
-                    onClick = { showResetConfirmDialog = true },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Sync,
-                            contentDescription = "Reset Homes, Switches, and Rooms",
-                            modifier = Modifier.size(14.dp)
-                        )
-                    },
-                    label = {
-                        Text(
-                            text = "Reset",
-                            fontFamily = FontFamily.SansSerif,
-                            fontSize = 11.5.sp,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    },
-                    modifier = Modifier
-                        .height(28.dp)
-                        .testTag("reset_lan_data_chip")
-                )
             }
         }
-    }
-
-    if (showResetConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetConfirmDialog = false },
-            title = {
-                Text(
-                    text = "Reset Homes, Switches & Rooms?",
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = "This clears all remembered Wi-Fi Homes, discovered switches, and room assignments, then resets your primary LAN profile back to a clean 'My Home'.",
-                    color = WemoTextSecondary,
-                    fontFamily = FontFamily.SansSerif,
-                    fontSize = 13.sp
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showResetConfirmDialog = false
-                        onResetHomesAndSwitches(true)
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
-                    modifier = Modifier.testTag("confirm_reset_and_rescan_button")
-                ) {
-                    Text("Reset & Rescan LAN")
-                }
-            },
-            dismissButton = {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedButton(
-                        onClick = {
-                            showResetConfirmDialog = false
-                            onResetHomesAndSwitches(false)
-                        },
-                        modifier = Modifier.testTag("confirm_reset_empty_button")
-                    ) {
-                        Text("Reset Empty", color = WemoGreenDark)
-                    }
-                    TextButton(onClick = { showResetConfirmDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            }
-        )
     }
 }
 

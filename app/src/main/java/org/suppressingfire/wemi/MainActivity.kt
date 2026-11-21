@@ -110,7 +110,6 @@ fun WeMiSwitchApp(
     val expandedDeviceIds by viewModel.expandedDeviceIds.collectAsStateWithLifecycle()
     val togglingDeviceIds by viewModel.togglingDeviceIds.collectAsStateWithLifecycle()
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
-    val useWeMiWordmark by viewModel.useWeMiWordmark.collectAsStateWithLifecycle()
     val isDemoShowroomMode by viewModel.isDemoShowroomMode.collectAsStateWithLifecycle()
     val setupDebugSnapshot by viewModel.setupDebugSnapshot.collectAsStateWithLifecycle()
 
@@ -165,7 +164,6 @@ fun WeMiSwitchApp(
                 TopHeader(
                     isRefreshing = isRefreshing,
                     isEditMode = isEditMode,
-                    useWeMiWordmark = useWeMiWordmark,
                     onRefreshClick = { viewModel.openSsdpScannerAndScan() },
                     onEditClick = {
                         if (selectedTab != BottomTab.DEVICES) {
@@ -180,7 +178,6 @@ fun WeMiSwitchApp(
                             viewModel.openAddDeviceDialog()
                         }
                     },
-                    onWordmarkClick = { viewModel.toggleBrandWordmark() },
                     activeOnCount = activeOnCount,
                     onAllOffClick = { viewModel.turnAllSwitches(false) }
                 )
@@ -233,7 +230,6 @@ fun WeMiSwitchApp(
                         onToggleGroupedByRoom = { viewModel.toggleGroupByRoom() },
                         onSelectRoomFilter = { viewModel.selectRoomFilter(it) },
                         onOpenAddDeviceDialog = { viewModel.openAddDeviceDialog() },
-                        onRestoreClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
                         onToggleRoomPower = { viewModel.toggleRoomPower(it) },
                         onToggleRoomCollapse = { viewModel.toggleRoomCollapse(it) },
                         onUpdateRoomBrightness = { room, level -> viewModel.updateRoomBrightness(room, level) },
@@ -247,7 +243,6 @@ fun WeMiSwitchApp(
                         onMoveDevice = { dev, moveUp -> viewModel.moveDevice(dev, moveUp) },
                         onPingDeviceLatency = { viewModel.pingDeviceLatency(it) },
                         onToggleNightMode = { viewModel.toggleDimmerNightMode(it) },
-                        onResetHomesAndSwitches = { rescan -> viewModel.resetLanHomesSwitchesAndRooms(rescan) },
                         onPinRoomWidget = { roomName ->
                             val msg = WidgetUpdater.requestPinRoomWidget(
                                 context = context,
@@ -295,6 +290,7 @@ fun WeMiSwitchApp(
                                     expandedDeviceIds = expandedDeviceIds,
                                     togglingDeviceIds = togglingDeviceIds,
                                     isEditMode = isEditMode,
+                                    isDemoShowroomMode = isDemoShowroomMode,
                                     activeAutoOffCountdownsSec = activeAutoOffCountdownsSec
                                 ),
                                 actions = devicesTabActions
@@ -315,7 +311,6 @@ fun WeMiSwitchApp(
                             MoreScreen(
                                 devices = homeDevices,
                                 soapLogs = soapLogs,
-                                useWeMiWordmark = useWeMiWordmark,
                                 isDemoShowroomMode = isDemoShowroomMode,
                                 allDevices = devices,
                                 homeNetworks = homeNetworks,
@@ -325,12 +320,11 @@ fun WeMiSwitchApp(
                                 onTurnAllOff = { viewModel.turnAllSwitches(false) },
                                 onScanNetwork = { viewModel.openSsdpScannerAndScan() },
                                 onResetClassicDevices = { viewModel.resetToClassicScreenshotDevices() },
-                                onResetLanHomesAndSwitches = {
-                                    viewModel.resetLanHomesSwitchesAndRooms(rediscoverAfterReset = true)
+                                onResetLanHomesAndSwitches = { rescan ->
+                                    viewModel.resetLanHomesSwitchesAndRooms(rediscoverAfterReset = rescan)
                                 },
                                 onToggleDemoShowroomMode = { viewModel.toggleDemoShowroomMode(it) },
                                 onOpenProvisionApWizard = { viewModel.openProvisionApDialog() },
-                                onToggleBrandWordmark = { viewModel.toggleBrandWordmark() },
                                 onClearLogs = { viewModel.clearSoapLogs() }
                             )
                         }

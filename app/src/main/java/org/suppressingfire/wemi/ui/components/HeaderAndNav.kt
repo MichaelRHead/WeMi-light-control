@@ -58,11 +58,9 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenTop
 fun TopHeader(
     isRefreshing: Boolean,
     isEditMode: Boolean,
-    useWeMiWordmark: Boolean,
     onRefreshClick: () -> Unit,
     onEditClick: () -> Unit,
     onAddClick: () -> Unit,
-    onWordmarkClick: () -> Unit,
     activeOnCount: Int = 0,
     onAllOffClick: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -71,11 +69,7 @@ fun TopHeader(
     val isStandardPhoneWidth = screenWidthDp >= 360
     val isWideHeaderWidth = screenWidthDp >= 380
 
-    val brandText = if (useWeMiWordmark) {
-        stringResource(R.string.header_brand_wemi)
-    } else {
-        stringResource(R.string.header_brand_wemo)
-    }
+    val brandText = stringResource(R.string.header_brand_wemi)
     val allOffLabel = stringResource(R.string.action_all_off)
     val refreshLabel = stringResource(R.string.action_refresh)
     val editLabel = if (isEditMode) {
@@ -136,9 +130,9 @@ fun TopHeader(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .clickable(role = Role.Button, onClick = onWordmarkClick)
-                    .semantics { contentDescription = "$brandText brand header" }
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = "$brandText brand header"
+                    }
                     .padding(horizontal = 4.dp, vertical = 2.dp)
                     .testTag("brand_wordmark_text")
             ) {

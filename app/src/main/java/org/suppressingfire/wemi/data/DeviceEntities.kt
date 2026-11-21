@@ -265,6 +265,12 @@ data class SsdpDiscoveredDevice(
 private val CHRISTMAS_TREE_KEYWORDS = listOf(
     "tree", "xmas", "evergreen", "spruce", "fir ", "garland", "wreath", "tinsel", "noel"
 )
+private val HOLIDAY_LIGHT_KEYWORDS = listOf(
+    "holiday", "christmas", "xmas", "diwali", "dewali", "deepavali",
+    "hanukkah", "chanukah", "menorah", "kwanzaa", "festive", "festival",
+    "halloween", "spooky", "pumpkin", "lunar", "new year", "valentine",
+    "easter", "twinkle", "fairy", "icicle", "string light"
+)
 private val CHRISTMAS_LIGHT_EXCLUSIONS = listOf("candle", "lamp", "sconce", "lantern")
 private val FAN_KEYWORDS = listOf("fan", "blower", "vent", "exhaust", "ventilat", "circulator")
 private val LIGHT_KEYWORDS = listOf(
@@ -272,6 +278,17 @@ private val LIGHT_KEYWORDS = listOf(
     "flood", "spot", "downlight", "uplight", "strip", "neon", "torch", "dimmer", "led", "fixture"
 )
 private val MOTION_KEYWORDS = listOf("motion", "sensor")
+
+/**
+ * Returns true when a controllable switch or dimmer represents seasonal/holiday lighting
+ * (e.g. Christmas Tree, Holiday Lights, Diwali/Dewali Lights, Hanukkah, Fairy/String Lights).
+ */
+fun isHolidayLightDevice(device: DeviceEntity): Boolean {
+    if (device.parsedType == DeviceType.MOTION_SENSOR) return false
+    if (device.visualCategory == DeviceCategory.CHRISTMAS_TREE) return true
+    val lower = device.name.lowercase()
+    return HOLIDAY_LIGHT_KEYWORDS.any { it in lower } || CHRISTMAS_TREE_KEYWORDS.any { it in lower }
+}
 
 /**
  * Classifies a switch's visual device category based on its friendly name and UPnP device type:

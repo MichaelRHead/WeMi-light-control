@@ -145,11 +145,22 @@ fun ProvisionApDialog(
                     statusMessage = statusMessage
                 )
 
-                // Live On-Screen Setup Diagnostic & Trace Panel (Screenshot-Ready)
+                val hasSetupWarningOrError = statusMessage?.let { msg ->
+                    msg.contains("No response", ignoreCase = true) ||
+                        msg.contains("rejected", ignoreCase = true) ||
+                        msg.contains("unreachable", ignoreCase = true) ||
+                        msg.contains("did not join", ignoreCase = true) ||
+                        msg.contains("too short", ignoreCase = true) ||
+                        msg.contains("enter", ignoreCase = true) ||
+                        msg.contains("error", ignoreCase = true) ||
+                        msg.contains("failed", ignoreCase = true)
+                } == true
+
                 ProvisionDebugPanel(
                     debugSnapshot = debugSnapshot,
                     selectedSsid = ssid,
                     keepOpenOnSuccess = keepDialogOpenOnSuccess,
+                    hasWarningOrError = hasSetupWarningOrError,
                     onToggleKeepOpen = { keepDialogOpenOnSuccess = !keepDialogOpenOnSuccess }
                 )
 

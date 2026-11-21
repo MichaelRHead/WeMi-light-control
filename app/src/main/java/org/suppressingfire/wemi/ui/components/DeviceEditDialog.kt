@@ -87,8 +87,8 @@ fun AddOrEditDeviceDialog(
     var ipAddress by remember(formKey) { mutableStateOf(initialDevice?.ipAddress ?: "192.168.1.115") }
     var portText by remember(formKey) { mutableStateOf((initialDevice?.port ?: 49153).toString()) }
     var brightness by remember(formKey) { mutableFloatStateOf((initialDevice?.brightness ?: 100).toFloat()) }
-    var isReachable by remember(formKey) { mutableStateOf(initialDevice?.isReachable ?: true) }
-    var isOn by remember(formKey) { mutableStateOf(initialDevice?.isOn ?: true) }
+    val isReachable = initialDevice?.isReachable ?: true
+    val isOn = initialDevice?.isOn ?: true
     val preservedAutoOffMinutes = initialDevice?.autoOffMinutes ?: 0
     var syncNameToHardware by remember(formKey) { mutableStateOf(true) }
     val detectedCategory = classifyDeviceCategory(
@@ -314,30 +314,6 @@ fun AddOrEditDeviceDialog(
                             thumbColor = WemoGreenPrimary,
                             activeTrackColor = WemoGreenPrimary
                         )
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Detected on Local Wi-Fi",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = if (isReachable) "Online & Controllable" else "Shows 'Not Detected'",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = isReachable,
-                        onCheckedChange = { isReachable = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary)
                     )
                 }
 
