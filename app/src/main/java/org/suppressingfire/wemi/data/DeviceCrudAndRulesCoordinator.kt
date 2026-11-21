@@ -122,10 +122,33 @@ internal class DeviceCrudAndRulesCoordinator(
         )
         dao.updateDevice(updated)
 
+        val devices = dao.getAllDevices().first()
         val rules = dao.getAllRules().first()
         rules.filter { it.isEnabled && it.parsedRuleType == RuleType.MOTION_TRIGGER }.forEach { rule ->
-            val target = dao.getDeviceById(rule.targetDeviceId)
-            if (target != null) {
+            executeRuleAction(
+                rule = rule,
+                devices = devices,
+                requiredNetworkKey = device.networkKey.takeIf { it.isNotBlank() }
+            )
+        }
+    }
+
+    private suspend fun executeRuleAction(
+        rule: RuleEntity,
+        devices: List<DeviceEntity>,
+        requiredNetworkKey: String? = null
+    ) {
+        val scopedDevices = if (requiredNetworkKey != null) {
+            devices.filter { it.networkKey.isBlank() || it.networkKey == requiredNetworkKey }
+        } else {
+            devices
+        }
+        val target = scopedDevices.find { it.id == rule.targetDeviceId }
+            ?: scopedDevices.find { it.name.equals(rule.targetDeviceName, ignoreCase = true) }
+        if (target != null) {
+            if (target.parsedType == DeviceType.LIGHTBULB_DIMMER && rule.targetStateOn) {
+                updateDeviceBrightness(target, rule.targetBrightness)
+            } else {
                 setDevicePowerExplicit(target, rule.targetStateOn)
             }
         }
@@ -358,16 +381,7 @@ internal class DeviceCrudAndRulesCoordinator(
     }
 
     suspend fun runRuleNow(rule: RuleEntity) {
-        val devices = dao.getAllDevices().first()
-        val target = devices.find { it.id == rule.targetDeviceId }
-            ?: devices.find { it.name.equals(rule.targetDeviceName, ignoreCase = true) }
-        if (target != null) {
-            if (target.parsedType == DeviceType.LIGHTBULB_DIMMER && rule.targetStateOn) {
-                updateDeviceBrightness(target, rule.targetBrightness)
-            } else {
-                setDevicePowerExplicit(target, rule.targetStateOn)
-            }
-        }
+        executeRuleAction(rule = rule, devices = dao.getAllDevices().first())
     }
 
     suspend fun addRule(rule: RuleEntity) {

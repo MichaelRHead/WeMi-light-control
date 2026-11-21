@@ -263,7 +263,8 @@ internal fun ExpandedDrawer(
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
-                        }
+                        },
+                        modifier = Modifier.testTag("trigger_motion_${device.id}")
                     )
                 }
 

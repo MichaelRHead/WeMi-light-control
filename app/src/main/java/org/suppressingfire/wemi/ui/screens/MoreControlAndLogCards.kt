@@ -410,7 +410,10 @@ internal fun SoapPacketLogCard(
                         )
                     }
                     if (soapLogs.isNotEmpty()) {
-                        TextButton(onClick = onClearLogs) {
+                        TextButton(
+                            onClick = onClearLogs,
+                            modifier = Modifier.testTag("clear_soap_logs_button")
+                        ) {
                             Text("Clear", color = WemoErrorRed, fontSize = 12.sp)
                         }
                     }

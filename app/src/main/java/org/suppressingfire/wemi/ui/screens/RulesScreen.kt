@@ -187,7 +187,8 @@ fun RulesScreen(
                         )
 
                         IconButton(
-                            onClick = { onDeleteRule(rule) }
+                            onClick = { onDeleteRule(rule) },
+                            modifier = Modifier.testTag("delete_rule_${rule.id}")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,

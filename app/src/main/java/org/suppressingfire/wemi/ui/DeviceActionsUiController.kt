@@ -1,6 +1,8 @@
 package org.suppressingfire.wemi.ui
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -246,6 +248,11 @@ internal class DeviceActionsUiController(
         }
     }
 
+    private val scanLock = Any()
+
+    @Volatile
+    private var ssdpScanJob: Job? = null
+
     fun openSsdpScannerAndScan(searchTarget: String = _selectedSearchTarget.value) {
         _selectedSearchTarget.value = searchTarget
         _showSsdpScannerSheet.value = true
@@ -258,33 +265,54 @@ internal class DeviceActionsUiController(
 
     fun selectSearchTargetAndScan(searchTarget: String) {
         _selectedSearchTarget.value = searchTarget
-        runSsdpScan(searchTarget = searchTarget, autoAdoptNew = false)
+        runSsdpScan(searchTarget = searchTarget, autoAdoptNew = false, cancelExisting = true)
     }
 
     fun refreshDevicesFromNetwork() {
         runSsdpScan(searchTarget = _selectedSearchTarget.value, autoAdoptNew = true)
     }
 
-    private fun runSsdpScan(searchTarget: String, autoAdoptNew: Boolean) {
-        if (!_isRefreshing.compareAndSet(false, true)) return
-        scope.launch {
-            try {
-                val activeKey = activeNetworkKeyProvider()
-                val activeSsid = currentWifiSsidProvider()
-                val report = repository.executeSsdpScan(
-                    searchTarget = searchTarget,
-                    autoAdoptNew = autoAdoptNew,
-                    activeNetworkKey = activeKey,
-                    activeWifiSsid = activeSsid
-                )
-                refreshGenaIfRealLan(activeKey)
-                onShowTransientStatus(
-                    "SSDP Scan on $activeSsid (${report.scanDurationMs}ms): Found ${report.discoveredDevices.size} UPnP smart switch devices"
-                )
-            } finally {
-                _isRefreshing.value = false
+    private fun runSsdpScan(
+        searchTarget: String,
+        autoAdoptNew: Boolean,
+        cancelExisting: Boolean = false
+    ) {
+        val superseded: Job?
+        val job: Job
+        synchronized(scanLock) {
+            if (!cancelExisting && (ssdpScanJob?.isActive == true || _isRefreshing.value)) {
+                return
             }
+            superseded = ssdpScanJob
+            _isRefreshing.value = true
+            job = scope.launch(start = CoroutineStart.LAZY) {
+                val self = coroutineContext[Job]
+                try {
+                    val activeKey = activeNetworkKeyProvider()
+                    val activeSsid = currentWifiSsidProvider()
+                    val report = repository.executeSsdpScan(
+                        searchTarget = searchTarget,
+                        autoAdoptNew = autoAdoptNew,
+                        activeNetworkKey = activeKey,
+                        activeWifiSsid = activeSsid
+                    )
+                    refreshGenaIfRealLan(activeKey)
+                    onShowTransientStatus(
+                        "SSDP Scan on $activeSsid (${report.scanDurationMs}ms): Found ${report.discoveredDevices.size} UPnP smart switch devices"
+                    )
+                } finally {
+                    synchronized(scanLock) {
+                        if (ssdpScanJob === self) {
+                            ssdpScanJob = null
+                            _isRefreshing.value = false
+                        }
+                    }
+                }
+            }
+            ssdpScanJob = job
         }
+        superseded?.cancel()
+        job.start()
     }
 
     fun adoptSsdpDevice(discovered: SsdpDiscoveredDevice) {

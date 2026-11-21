@@ -172,7 +172,8 @@ fun AddRuleDialog(
                         colors = SliderDefaults.colors(
                             thumbColor = WemoGreenPrimary,
                             activeTrackColor = WemoGreenPrimary
-                        )
+                        ),
+                        modifier = Modifier.testTag("rule_brightness_slider")
                     )
                 }
             }

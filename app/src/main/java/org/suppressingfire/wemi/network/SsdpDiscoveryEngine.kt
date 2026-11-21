@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -168,6 +169,7 @@ internal class SsdpDiscoveryEngine(
                 val deadline = System.currentTimeMillis() + if (fastMode) 220L else 1250L
 
                 while (System.currentTimeMillis() < deadline) {
+                    ensureActive()
                     if (!retransmitted && System.currentTimeMillis() - scanStartMs >= (if (fastMode) 90L else 550L)) {
                         sendBurst()
                         retransmitted = true
