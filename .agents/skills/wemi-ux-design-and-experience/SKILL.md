@@ -70,7 +70,7 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
 Whenever UI components, widgets, ViewModel flows, or repository methods are touched, verify all 8 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
 
 ```bash
-./gradlew testDebugUnitTest --rerun-tasks
+sh gradlew testDebugUnitTest --rerun-tasks
 ```
 
 
