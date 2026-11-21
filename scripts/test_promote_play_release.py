@@ -569,6 +569,96 @@ class PromotePlayReleaseTests(unittest.TestCase):
             self.assertIn("promoted=false\n", output_text)
             self.assertIn("PROMOTED_TO_CLOSED_TESTING", output_text)
 
+    def test_release_status_reads_lifecycle_without_opening_edit(self) -> None:
+        session = FakeSession(
+            [
+                (
+                    "GET",
+                    "/tracks/alpha/releases",
+                    FakeResponse(
+                        200,
+                        {
+                            "releases": [
+                                {
+                                    "releaseName": "0.0.0.32",
+                                    "track": "alpha",
+                                    "activeArtifacts": [{"versionCode": 32}],
+                                    "releaseLifecycleState": "RELEASE_LIFECYCLE_STATE_IN_REVIEW",
+                                },
+                                {
+                                    "releaseName": "0.0.0.31",
+                                    "track": "alpha",
+                                    "activeArtifacts": [{"versionCode": 31}],
+                                    "releaseLifecycleState": "RELEASE_LIFECYCLE_STATE_PUBLISHED",
+                                },
+                            ]
+                        },
+                    ),
+                )
+            ]
+        )
+        client = mod.PlayPublisherClient("com.aistudio.wemiswitch.kxpqzr", session=session)
+        result = mod.run_release_status(client, track="alpha", version_code="32")
+        self.assertEqual(result["version_code"], "32")
+        self.assertEqual(result["release_name"], "0.0.0.32")
+        self.assertEqual(result["lifecycle_state"], "RELEASE_LIFECYCLE_STATE_IN_REVIEW")
+        self.assertFalse(result["is_terminal"])
+        self.assertEqual(len(session.calls), 1)
+        self.assertEqual(session.calls[0]["method"], "GET")
+
+    def test_release_status_polls_until_published(self) -> None:
+        session = FakeSession(
+            [
+                (
+                    "GET",
+                    "/tracks/alpha/releases",
+                    FakeResponse(
+                        200,
+                        {
+                            "releases": [
+                                {
+                                    "releaseName": "0.0.0.32",
+                                    "track": "alpha",
+                                    "activeArtifacts": [{"versionCode": 32}],
+                                    "releaseLifecycleState": "RELEASE_LIFECYCLE_STATE_IN_REVIEW",
+                                }
+                            ]
+                        },
+                    ),
+                ),
+                (
+                    "GET",
+                    "/tracks/alpha/releases",
+                    FakeResponse(
+                        200,
+                        {
+                            "releases": [
+                                {
+                                    "releaseName": "0.0.0.32",
+                                    "track": "alpha",
+                                    "activeArtifacts": [{"versionCode": 32}],
+                                    "releaseLifecycleState": "RELEASE_LIFECYCLE_STATE_PUBLISHED",
+                                }
+                            ]
+                        },
+                    ),
+                ),
+            ]
+        )
+        sleeps: list[float] = []
+        client = mod.PlayPublisherClient("com.aistudio.wemiswitch.kxpqzr", session=session)
+        result = mod.run_release_status(
+            client,
+            track="alpha",
+            version_code="32",
+            poll_attempts=3,
+            poll_interval_sec=10.0,
+            sleep_fn=sleeps.append,
+        )
+        self.assertEqual(result["lifecycle_state"], "RELEASE_LIFECYCLE_STATE_PUBLISHED")
+        self.assertTrue(result["is_terminal"])
+        self.assertEqual(sleeps, [10.0])
+
 
 if __name__ == "__main__":
     unittest.main()

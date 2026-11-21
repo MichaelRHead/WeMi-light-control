@@ -32,6 +32,11 @@ MAX_RELEASE_NOTES_CHARS = 500
 VALID_RELEASE_STATUSES = ("completed", "draft", "inProgress")
 VALID_NOTES_SOURCES = ("source_track", "file", "none")
 REQUIRED_APPROVAL_STATUS = "APPROVED_FOR_PLAY_STORE"
+TERMINAL_LIFECYCLE_STATES = (
+    "RELEASE_LIFECYCLE_STATE_PUBLISHED",
+    "RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED",
+    "RELEASE_LIFECYCLE_STATE_NOT_APPROVED",
+)
 
 
 class PlayApiError(RuntimeError):
@@ -194,6 +199,11 @@ class PlayPublisherClient:
         data = self._request("GET", f"/edits/{quote(edit_id, safe='')}/tracks")
         tracks = data.get("tracks") or []
         return sorted(tracks, key=lambda item: str(item.get("track", "")))
+
+    def list_track_releases(self, track: str) -> list[dict[str, Any]]:
+        """List non-obsolete release lifecycle summaries for a track without opening an edit."""
+        data = self._request("GET", f"/tracks/{quote(track, safe='')}/releases")
+        return list(data.get("releases") or [])
 
     def get_track(self, edit_id: str, track: str) -> dict[str, Any]:
         return self._request(
@@ -550,6 +560,103 @@ def run_list_tracks(client: PlayPublisherClient) -> list[dict[str, Any]]:
     return tracks
 
 
+def extract_release_summary_version_codes(summary: dict[str, Any]) -> list[str]:
+    codes: list[str] = []
+    for artifact in summary.get("activeArtifacts") or []:
+        vc = artifact.get("versionCode")
+        if vc is not None and str(vc).strip():
+            codes.append(str(vc).strip())
+    return codes
+
+
+def select_release_summary(
+    releases: list[dict[str, Any]],
+    *,
+    requested_version_code: str | None = None,
+) -> dict[str, Any] | None:
+    if not releases:
+        return None
+    wanted = (requested_version_code or "").strip()
+    if wanted:
+        for rel in releases:
+            if wanted in extract_release_summary_version_codes(rel):
+                return rel
+        return None
+
+    def sort_key(rel: dict[str, Any]) -> tuple[int, str]:
+        nums = [int(vc) for vc in extract_release_summary_version_codes(rel) if vc.isdigit()]
+        return (max(nums) if nums else -1, str(rel.get("releaseName") or ""))
+
+    return max(releases, key=sort_key)
+
+
+def format_release_status_markdown(
+    package_name: str,
+    track: str,
+    releases: list[dict[str, Any]],
+) -> str:
+    lines = [
+        f"### Google Play Release Lifecycle (`{package_name}`, track `{track}`)",
+        "",
+        "| Track | Version Codes | Release Name | Lifecycle State |",
+        "| :--- | :--- | :--- | :--- |",
+    ]
+    if not releases:
+        lines.append(f"| `{track}` | — | — | *(no active releases)* |")
+        return "\n".join(lines) + "\n"
+
+    for rel in releases:
+        rel_track = str(rel.get("track") or track)
+        codes = ", ".join(extract_release_summary_version_codes(rel)) or "—"
+        name = str(rel.get("releaseName") or "").replace("|", "\\|") or "—"
+        state = str(rel.get("releaseLifecycleState") or "RELEASE_LIFECYCLE_STATE_UNSPECIFIED")
+        lines.append(f"| `{rel_track}` | `{codes}` | {name} | `{state}` |")
+    return "\n".join(lines) + "\n"
+
+
+def run_release_status(
+    client: PlayPublisherClient,
+    *,
+    track: str,
+    version_code: str | None = None,
+    poll_attempts: int = 1,
+    poll_interval_sec: float = 30.0,
+    sleep_fn: Callable[[float], None] = time.sleep,
+) -> dict[str, Any]:
+    """Read live Play release lifecycle states (in review / published / etc.) without an edit."""
+    attempts = max(1, int(poll_attempts))
+    releases: list[dict[str, Any]] = []
+    matched: dict[str, Any] | None = None
+    lifecycle_state = ""
+
+    for attempt in range(1, attempts + 1):
+        releases = client.list_track_releases(track)
+        matched = select_release_summary(releases, requested_version_code=version_code)
+        lifecycle_state = str((matched or {}).get("releaseLifecycleState") or "")
+        if lifecycle_state in TERMINAL_LIFECYCLE_STATES:
+            break
+        if attempt < attempts:
+            print(
+                f"Attempt {attempt}/{attempts}: track '{track}' versionCode={version_code or 'latest'} "
+                f"state={lifecycle_state or 'UNKNOWN'}; retrying in {poll_interval_sec:g}s..."
+            )
+            sleep_fn(poll_interval_sec)
+
+    md = format_release_status_markdown(client.package_name, track, releases)
+    print(md)
+    write_step_summary(md)
+
+    matched_codes = extract_release_summary_version_codes(matched) if matched else []
+    return {
+        "track": track,
+        "version_code": matched_codes[0] if matched_codes else (version_code or ""),
+        "release_name": str((matched or {}).get("releaseName") or ""),
+        "lifecycle_state": lifecycle_state,
+        "is_terminal": lifecycle_state in TERMINAL_LIFECYCLE_STATES,
+        "releases": releases,
+    }
+
+
 def run_promote(
     client: PlayPublisherClient,
     *,
@@ -810,6 +917,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("list-tracks", help="List all tracks and active releases (read-only).")
 
+    status_parser = subparsers.add_parser(
+        "release-status",
+        help="Read release lifecycle states (in review / published) for a Play track (read-only).",
+    )
+    status_parser.add_argument("--track", default="alpha")
+    status_parser.add_argument("--version-code", default="")
+    status_parser.add_argument("--poll-attempts", type=int, default=1)
+    status_parser.add_argument("--poll-interval-sec", type=float, default=30.0)
+
     promote_parser = subparsers.add_parser(
         "promote",
         help="Promote an existing release from one Play track to another.",
@@ -911,6 +1027,31 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "list-tracks":
             run_list_tracks(client)
             write_github_output(output_path, {"promoted": "false"})
+            return 0
+
+        if args.command == "release-status":
+            raw_vc = (args.version_code or "").strip()
+            version_code = raw_vc if raw_vc else None
+            if version_code is not None and not version_code.isdigit():
+                raise ValueError(f"--version-code must be numeric, got '{version_code}'.")
+            status_result = run_release_status(
+                client,
+                track=args.track.strip() or "alpha",
+                version_code=version_code,
+                poll_attempts=args.poll_attempts,
+                poll_interval_sec=args.poll_interval_sec,
+            )
+            write_github_output(
+                output_path,
+                {
+                    "promoted": "false",
+                    "track": status_result["track"],
+                    "version_code": status_result["version_code"],
+                    "release_name": status_result["release_name"],
+                    "lifecycle_state": status_result["lifecycle_state"],
+                    "is_terminal": "true" if status_result["is_terminal"] else "false",
+                },
+            )
             return 0
 
         if args.command == "auto-promote":

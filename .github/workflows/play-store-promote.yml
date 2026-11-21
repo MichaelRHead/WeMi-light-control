@@ -9,12 +9,13 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Operation: list-tracks, diff-assets (read-only), sync-assets, auto-promote (Stage 7), or promote"
+        description: "Operation: list-tracks, release-status, diff-assets (read-only), sync-assets, auto-promote (Stage 7), or promote"
         required: true
         type: choice
         default: list-tracks
         options:
           - list-tracks
+          - release-status
           - diff-assets
           - sync-assets
           - auto-promote
@@ -175,6 +176,17 @@ jobs:
               --credentials "$KEY_FILE" \
               --github-output "$GITHUB_OUTPUT" \
               list-tracks
+          elif [ "$MODE" = "release-status" ]; then
+            args=(
+              --credentials "$KEY_FILE"
+              --github-output "$GITHUB_OUTPUT"
+              release-status
+              --track "$TO_TRACK"
+            )
+            if [ -n "$INPUT_VERSION_CODE" ]; then
+              args+=(--version-code "$INPUT_VERSION_CODE")
+            fi
+            python3 scripts/promote_play_release.py "${args[@]}"
           elif [ "$MODE" = "diff-assets" ] || [ "$MODE" = "sync-assets" ]; then
             echo "promoted=false" >> "$GITHUB_OUTPUT"
             args=(

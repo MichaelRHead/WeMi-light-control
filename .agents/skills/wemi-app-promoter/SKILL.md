@@ -68,6 +68,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p "test_*.py"
 # Inspect all Play Console release tracks
 gh workflow run play-store-promote.yml --ref main -f mode=list-tracks
 
+# Check live Play review/publishing lifecycle state (IN_REVIEW vs PUBLISHED) without opening an edit
+gh workflow run play-store-promote.yml --ref main -f mode=release-status -f to_track=alpha
+
 # Compare play_store_assets/ (text + 14 PNGs across 7 slots) against Google Play without writing
 gh workflow run play-store-promote.yml --ref main -f mode=diff-assets
 ```
