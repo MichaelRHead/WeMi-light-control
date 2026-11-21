@@ -1,6 +1,9 @@
 package org.suppressingfire.wemi.widget
 
 import android.content.Context
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -9,9 +12,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.network.LanRuntimeUtils
+import org.suppressingfire.wemi.network.SharedSoapLogStore
 
 /**
  * Headless coroutine executor invoked directly by [WeMiSwitchWidgetProvider] when the user
@@ -20,6 +25,28 @@ import org.suppressingfire.wemi.network.LanRuntimeUtils
  */
 object WidgetActionExecutor {
     private val widgetMutexes = ConcurrentHashMap<Int, Mutex>()
+
+    private fun logWidgetEvent(
+        context: Context,
+        appWidgetId: Int,
+        label: String,
+        action: String,
+        statusText: String,
+        success: Boolean
+    ) {
+        SharedSoapLogStore.append(
+            context = context,
+            entry = SoapLogEntry(
+                timestamp = SimpleDateFormat("h:mm:ss a", Locale.US).format(Date()),
+                deviceName = label,
+                endpoint = "widget://$appWidgetId",
+                soapAction = action,
+                statusText = statusText,
+                xmlSnippet = "",
+                isLiveLanSuccess = success
+            )
+        )
+    }
 
     private suspend fun loadAllDevices(repository: SwitchRepository): List<DeviceEntity> {
         if (repository.isDemoShowroomMode.value) {
@@ -41,7 +68,18 @@ object WidgetActionExecutor {
         repositoryOverride: SwitchRepository? = null
     ): Boolean = widgetMutexes.computeIfAbsent(appWidgetId) { Mutex() }.withLock {
         val appCtx = context.applicationContext
-        val config = WidgetConfigStore.load(appCtx, appWidgetId) ?: return@withLock false
+        val config = WidgetConfigStore.load(appCtx, appWidgetId)
+        if (config == null) {
+            logWidgetEvent(
+                context = appCtx,
+                appWidgetId = appWidgetId,
+                label = "Widget #$appWidgetId",
+                action = "Widget#Toggle",
+                statusText = "Ignored • Widget not configured",
+                success = false
+            )
+            return@withLock false
+        }
 
         val ownsRepo = repositoryOverride == null
         val repository = repositoryOverride ?: SwitchRepository(
@@ -75,8 +113,29 @@ object WidgetActionExecutor {
                                 WidgetTargetConfig.forDevice(appWidgetId, updated)
                             )
                         }
+                        val stateLabel = when {
+                            !updated.isReachable -> "OFFLINE"
+                            updated.isOn -> "ON"
+                            else -> "OFF"
+                        }
+                        logWidgetEvent(
+                            context = appCtx,
+                            appWidgetId = appWidgetId,
+                            label = "Widget #$appWidgetId (${updated.name})",
+                            action = "Widget#Toggle(DEVICE)",
+                            statusText = "Resolved #${updated.id} (${updated.ipAddress}:${updated.port}) -> $stateLabel",
+                            success = updated.isReachable
+                        )
                         true
                     } else {
+                        logWidgetEvent(
+                            context = appCtx,
+                            appWidgetId = appWidgetId,
+                            label = "Widget #$appWidgetId (${config.displayName.ifBlank { "Device" }})",
+                            action = "Widget#Toggle(DEVICE)",
+                            statusText = "Orphaned • No matching switch (devId=${config.deviceId}, sn=${config.serialNumber.ifBlank { "none" }})",
+                            success = false
+                        )
                         false
                     }
                 }
@@ -84,6 +143,14 @@ object WidgetActionExecutor {
                 WidgetTargetType.ROOM -> {
                     val roomSwitches = WidgetRemoteViewsBuilder.resolveRoomDevices(config, currentDevices)
                     if (roomSwitches.isEmpty()) {
+                        logWidgetEvent(
+                            context = appCtx,
+                            appWidgetId = appWidgetId,
+                            label = "Widget #$appWidgetId (${config.normalizedRoomName()})",
+                            action = "Widget#Toggle(ROOM)",
+                            statusText = "Orphaned • No controllable switches in \"${config.normalizedRoomName()}\" (home=${config.networkKey.ifBlank { "none" }})",
+                            success = false
+                        )
                         false
                     } else {
                         val resolvedHomeKey = roomSwitches.first().networkKey
@@ -106,6 +173,14 @@ object WidgetActionExecutor {
                         if (resolvedHomeKey.isNotBlank() && resolvedHomeKey != config.networkKey) {
                             WidgetConfigStore.save(appCtx, config.copy(networkKey = resolvedHomeKey))
                         }
+                        logWidgetEvent(
+                            context = appCtx,
+                            appWidgetId = appWidgetId,
+                            label = "Widget #$appWidgetId (${config.normalizedRoomName()})",
+                            action = "Widget#Toggle(ROOM)",
+                            statusText = "Updated ${roomSwitches.size} switch(es) in \"${config.normalizedRoomName()}\" (home=$resolvedHomeKey)",
+                            success = true
+                        )
                         true
                     }
                 }

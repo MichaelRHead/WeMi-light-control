@@ -208,6 +208,7 @@ class NetworkClient(
      */
     private suspend fun executeWithPortHealing(
         device: DeviceEntity,
+        onError: ((String) -> Unit)? = null,
         executeOnPort: suspend (Int) -> SoapCallResult?
     ): SoapCallResult? {
         try {
@@ -215,8 +216,8 @@ class NetworkClient(
             if (directResult != null) return directResult
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            // Fall through to 9-port self-healing probe
+        } catch (e: Exception) {
+            onError?.invoke(":${device.port}=${e.javaClass.simpleName}")
         }
 
         val expectedIdentity = LanRuntimeUtils.expectedHardwareIdentity(device.serialNumber, device.udn)
@@ -231,9 +232,11 @@ class NetworkClient(
                 if (retryResult != null) return retryResult
             } catch (e: CancellationException) {
                 throw e
-            } catch (_: Exception) {
-                // Fall through to offline result
+            } catch (e: Exception) {
+                onError?.invoke(":$discoveredPort=${e.javaClass.simpleName}")
             }
+        } else if (discoveredPort == null && expectedIdentity.isNotEmpty()) {
+            onError?.invoke("9-port probe: no match")
         } else if (discoveredPort == null && expectedIdentity.isEmpty()) {
             for (port in orderedCandidatePorts(device.port).drop(1)) {
                 try {
@@ -283,8 +286,9 @@ class NetworkClient(
             innerXml = innerXml
         )
         val soapAction = XmlAndSkuParser.soapActionHeader(XmlAndSkuParser.URN_BASIC_EVENT, action)
+        val failureCauses = mutableListOf<String>()
 
-        val healedResult = executeWithPortHealing(device) { port ->
+        val healedResult = executeWithPortHealing(device, onError = { failureCauses.add(it) }) { port ->
             val endpoint = "http://${device.ipAddress}:$port/upnp/control/basicevent1"
             val response = httpClient.postXml(endpoint, soapBody, soapAction)
             if (response.isSuccessful) {
@@ -308,11 +312,18 @@ class NetworkClient(
                     nightModeEnabled = outcome.nightModeEnabled
                 )
             }
+            failureCauses.add(":$port=HTTP_${response.code}")
             null
         }
         if (healedResult != null) return@withContext healedResult
 
         val fallbackEndpoint = "http://${device.ipAddress}:${device.port}/upnp/control/basicevent1"
+        val causeSummary = failureCauses.distinct().take(2).joinToString(", ")
+        val resolvedOfflineStatus = if (causeSummary.isNotEmpty()) {
+            "$offlineStatusText ($causeSummary)"
+        } else {
+            offlineStatusText
+        }
         SoapCallResult(
             reachableOnLan = false,
             binaryStateOn = offlineBinaryStateOn,
@@ -324,7 +335,7 @@ class NetworkClient(
                 deviceName = logDeviceName,
                 endpoint = fallbackEndpoint,
                 soapAction = offlineActionLabel,
-                statusText = offlineStatusText,
+                statusText = resolvedOfflineStatus,
                 xmlSnippet = soapBody,
                 isLiveLanSuccess = false
             ),

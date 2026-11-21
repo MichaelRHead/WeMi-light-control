@@ -393,7 +393,8 @@ internal fun SoapPacketLogCard(
                                 ),
                                 homes = homeNetworks,
                                 devices = devices,
-                                soapLogs = soapLogs
+                                soapLogs = soapLogs,
+                                widgets = org.suppressingfire.wemi.widget.WidgetConfigStore.loadAll(context)
                             )
                             TelemetryFileExporter.copyAndShareTelemetryReport(
                                 context = context,

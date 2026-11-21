@@ -6,12 +6,12 @@
 
 Because switches from Belkin's discontinued smart switch platform operate entirely on your private home Wi-Fi (`192.168.x.x`) or on a factory-reset switch's isolated setup hotspot (`10.22.22.1`), **WeMi Light Control** includes built-in **on-screen diagnostic panels** and a **one-tap telemetry file exporter (`wemi-telemetry-latest.txt`)**.
 
-Whenever you need help troubleshooting `10.22.22.1` Wi-Fi setup, switch discovery, or UPnP/SOAP commands, you can share diagnostic details in **two ways**:
+Whenever you need help troubleshooting `10.22.22.1` Wi-Fi setup, switch discovery, Home Screen widgets, or UPnP/SOAP commands, you can share diagnostic details in **two ways**:
 1. **Take a screenshot** of the on-screen debug panels and attach the image.
 2. **Export or copy the recorded telemetry file (`wemi-telemetry-latest.txt`)** with a single tap on **`Save/Share`** or **`Copy`**.
 
 > [!NOTE]
-> **Privacy & Local-Only Storage Protection**: Neither the on-screen debug panel nor the exported `wemi-telemetry-latest.txt` file ever displays or records your plaintext or encrypted Wi-Fi password (only the encryption method `Method 1/2/3`, length-suffix flag `addLengths`, and plaintext/encrypted lengths `plainLen` / `encLen` are logged, and any `<password>` XML tags in SOAP log summaries are automatically redacted before export). In addition, `wemi-telemetry-latest.txt` is explicitly excluded from Android cloud Auto-Backup and device-to-device transfer so diagnostic LAN metadata stays strictly local until you choose to share it.
+> **Privacy & Local-Only Storage Protection**: Neither the on-screen debug panel nor the exported `wemi-telemetry-latest.txt` file ever displays or records your plaintext or encrypted Wi-Fi password (only the encryption method `Method 1/2/3`, length-suffix flag `addLengths`, and plaintext/encrypted lengths `plainLen` / `encLen` are logged, and any `<password>` XML tags — including namespaced, entity-escaped, or truncated tags — in SOAP log summaries are automatically redacted before export). In addition, `wemi-telemetry-latest.txt` is explicitly excluded from Android cloud Auto-Backup and device-to-device transfer so diagnostic LAN metadata stays strictly local until you choose to share it.
 
 ---
 
@@ -29,8 +29,8 @@ You can take a standard Android screenshot (**Power + Volume Down**) of any of t
 ### A2. Live UPnP / SOAP Packet Log (`More` Tab)
 1. Tap the **`More`** tab in the bottom navigation bar.
 2. Scroll down to the **`UPnP / SOAP Packet Log`** card at the bottom of the screen.
-3. Each entry displays the timestamp (`HH:mm:ss.SSS`), direction (`TX→RX`, `GENA`, `SCAN`, `SETUP`), switch name, SOAP action (e.g., `SetBinaryState`, `GetBinaryState`, `GetMetaInfo`, `WiFiSetup1#ConnectHomeNetwork`), target `http://<ip>:<port>/upnp/control/...` URL, and HTTP status / round-trip latency in milliseconds.
-4. Take a screenshot of the packet log card to share recent network traffic.
+3. Each entry displays the timestamp (`h:mm:ss a`), switch or widget name, SOAP/widget action (e.g., `SetBinaryState`, `GetBinaryState`, `GetMetaInfo`, `WiFiSetup1#ConnectHomeNetwork`, `GENA PropChange`, or headless Home Screen `Widget#Toggle`), target `http://<ip>:<port>/upnp/control/...` URL, and HTTP status / exact offline failure reason / round-trip latency in milliseconds.
+4. Take a screenshot of the packet log card to share recent network traffic (including background Home Screen widget taps).
 
 ### A3. Per-Switch Hardware & Latency Drawer (`Devices` Tab)
 1. On the **`Devices`** tab, tap the info icon (`ⓘ`) or body of any switch row to expand its inline diagnostics drawer.
@@ -41,7 +41,7 @@ You can take a standard Android screenshot (**Power + Volume Down**) of any of t
 
 ## 2. Method B: Exporting or Copying a Telemetry File (`wemi-telemetry-latest.txt`)
 
-When a setup or discovery trace is longer than a single screen, you can export a complete text report (`wemi-telemetry-latest.txt`) in one tap:
+When a setup, discovery, or Home Screen widget trace is longer than a single screen, you can export a complete text report (`wemi-telemetry-latest.txt`) in one tap:
 
 ### B1. Exporting from the `10.22.22.1` Setup Dialog (`Save/Share` or `Copy`)
 Inside the **`SETUP DEBUG DETAILS (SCREENSHOT)`** header bar in the **Provision New Switch AP (`10.22.22.1`)** dialog:
@@ -50,17 +50,18 @@ Inside the **`SETUP DEBUG DETAILS (SCREENSHOT)`** header bar in the **Provision 
   2. Copies the entire report to your Android clipboard.
   3. Opens Android's **Share Sheet (`Save or Share WeMi Telemetry`)** so you can save `wemi-telemetry-latest.txt` to **Files / Google Drive**, email it, or send it directly to chat.
 - **Tap `Copy`**:
-  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v28.0 [28] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
+  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v31.0 [31] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
   2. Paste the copied text directly into your chat message or issue report.
 
 ### B2. Exporting from the `More` Tab (`Save/Share Log`)
 In the header of the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
 - **Tap `Save/Share Log`**:
-  1. Generates a comprehensive 4-section report (`wemi-telemetry-latest.txt`, stamped with `App Version: v28.0 (versionCode=28, com.aistudio.wemiswitch.kxpqzr)`) containing:
+  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v31.0 (versionCode=31, com.aistudio.wemiswitch.kxpqzr)`) containing:
      - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt (keeping `[NET]` subnet/Wi-Fi-binding flags consistent with the captured session).
      - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet, and gateway IP).
-     - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its room, IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), dimmer brightness/Night Mode (`dim=<n>%`, `night=1`), latency (`ms`), hardware SKU, firmware, serial number, MAC, and canonical UPnP `UDN`.
-     - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries (including Top-Header **`All Off`**, Room Master toggles, and Android TV D-Pad switch/dimmer commands) with timestamps, endpoints, HTTP statuses, and password-redacted single-line `xml:` payload summaries.
+     - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its normalized room, Wi-Fi Home (`home=<networkKey>`), IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), dimmer brightness/Night Mode (`dim=<n>%`, `night=1`), latency (`ms`), hardware SKU, firmware, serial number, MAC, and canonical UPnP `UDN`.
+     - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries — including Top-Header **`All Off`**, Room Master toggles, Android TV D-Pad switch/dimmer commands, and **headless Home Screen widget taps/timeouts** — with timestamps, endpoints, HTTP statuses, exact offline failure causes, and password-redacted single-line `xml:` payload summaries.
+     - **`--- [5. HOME SCREEN WIDGETS] ---`**: Every configured Home Screen light or room widget with its `appWidgetId`, bound serial/room/Wi-Fi Home, and whether it resolves to active switches or is `ORPHANED` (needs reconfiguring).
   2. Copies the full report to your clipboard and opens the Android **Share Sheet**.
 
 ### B3. Pulling `wemi-telemetry-latest.txt` via USB (`adb`)
@@ -72,7 +73,7 @@ adb exec-out run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-late
 
 ---
 
-## 3. Quick Reference: What the Setup Debug Lines Mean
+## 3. Quick Reference: What the Telemetry Lines Mean
 
 | Line Prefix | Example | What It Tells You |
 | :--- | :--- | :--- |
@@ -87,3 +88,5 @@ adb exec-out run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-late
 | **`[STEP 5 SEND #1]`** | `ConnectHomeNetwork -> HTTP_200 (18ms) PairingStatus=1` | Confirms the switch accepted the `ConnectHomeNetwork` SOAP command. |
 | **`[POLL #n]`** | `GetNetworkStatus -> Status=1 (14ms)` | Status codes from the switch while joining your router: **`1` = Connected**, **`3` = Connected (Handshake Complete)**, **`0` = Still Connecting / Handshake Failed**, **`2` = Bad Password / Auth Rejected** (reports the exact `Method` and `lengths` tried on `>=8`-char passwords so you know which encryption chip to toggle on retry). |
 | **`[STEP 6 CLOSE/HOLD]`** | `CloseSetup -> success` or `Skipping CloseSetup so 10.22.22.1 AP stays open for retry` | Shows whether the setup AP was closed after a successful connection (`1` or `3`) or intentionally kept open (`kept_open_for_retry`) so you can retry immediately. |
+| **`[WIDGET #id]`** | `type=DEVICE name="Patio" devId=7 sn=... home=... -> resolved=#7 "Patio" (ON)` | Confirms each placed Home Screen widget's bound target and whether it resolves to a live switch/room or is `ORPHANED` (tap the widget to reconfigure). |
+

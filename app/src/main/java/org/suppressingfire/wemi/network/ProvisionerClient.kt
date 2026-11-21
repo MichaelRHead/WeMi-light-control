@@ -239,7 +239,7 @@ class ProvisionerClient(
         val isLoopbackHost = apHost == "127.0.0.1" || apHost.equals("localhost", ignoreCase = true)
         val effectivePollDelayMs = if (isLoopbackHost && statusPollDelayMs == 1000L) 35L else statusPollDelayMs
 
-        repeat(2) { attempt ->
+        for (attempt in 0 until 2) {
             val sendStart = System.currentTimeMillis()
             try {
                 val resp = httpClient.postXml(
@@ -263,7 +263,7 @@ class ProvisionerClient(
                 logStep(
                     "[STEP 5 SEND #${attempt + 1}] ERROR: ${e.javaClass.simpleName}: ${e.message?.take(60)} (${elapsed}ms)"
                 )
-                if (descriptor == null && attempt == 0) return@repeat
+                if (descriptor == null && attempt == 0) break
             }
             if (attempt == 0 && httpSuccess) delay(if (isLoopbackHost) 15L else 100L)
         }

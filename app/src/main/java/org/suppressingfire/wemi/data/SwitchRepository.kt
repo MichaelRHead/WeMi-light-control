@@ -30,6 +30,7 @@ import org.suppressingfire.wemi.network.ProvisionResult
 import org.suppressingfire.wemi.network.ProvisionerClient
 import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDeviceDescriptor
+import org.suppressingfire.wemi.network.SharedSoapLogStore
 import org.suppressingfire.wemi.network.SoapCallResult
 import org.suppressingfire.wemi.network.SsdpScanReport
 import org.suppressingfire.wemi.network.XmlAndSkuParser
@@ -84,7 +85,7 @@ class SwitchRepository(
     private val deviceMutexes = ConcurrentHashMap<String, Mutex>()
     private val lastSetStateTimestampMs = ConcurrentHashMap<Int, Long>()
 
-    private val _soapLogs = MutableStateFlow<List<SoapLogEntry>>(emptyList())
+    private val _soapLogs: MutableStateFlow<List<SoapLogEntry>> = SharedSoapLogStore.flowFor(context)
     val soapLogs: StateFlow<List<SoapLogEntry>> = _soapLogs.asStateFlow()
 
     private val _latestSsdpReport = MutableStateFlow<SsdpScanReport?>(null)

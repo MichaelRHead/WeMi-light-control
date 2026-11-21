@@ -144,6 +144,9 @@ object WidgetConfigStore {
             .filter { it > 0 }
     }
 
+    fun loadAll(context: Context): List<WidgetTargetConfig> =
+        allConfiguredWidgetIds(context).sorted().mapNotNull { load(context, it) }
+
     fun clearAll(context: Context) {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit { clear() }

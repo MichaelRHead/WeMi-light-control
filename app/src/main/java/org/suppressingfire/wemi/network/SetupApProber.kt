@@ -231,6 +231,8 @@ internal class SetupApProber(
             }
             val rawTag = extractXmlTag(resp.body, "MetaInfo").orEmpty()
             rawTag to XmlAndSkuParser.parseMetaInfoSoapResponse(resp.body)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             "ERR_${e.javaClass.simpleName}" to null
         }

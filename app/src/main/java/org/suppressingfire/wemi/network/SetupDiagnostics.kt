@@ -4,14 +4,51 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import org.suppressingfire.wemi.BuildConfig
-import org.suppressingfire.wemi.data.SoapLogEntry
-import org.suppressingfire.wemi.data.DeviceEntity
-import org.suppressingfire.wemi.data.HomeNetworkEntity
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.WeakHashMap
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
+import org.suppressingfire.wemi.BuildConfig
+import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.data.DeviceType
+import org.suppressingfire.wemi.data.HomeNetworkEntity
+import org.suppressingfire.wemi.data.SoapLogEntry
+import org.suppressingfire.wemi.widget.WidgetRemoteViewsBuilder
+import org.suppressingfire.wemi.widget.WidgetTargetConfig
+import org.suppressingfire.wemi.widget.WidgetTargetType
+
+/**
+ * Process-scoped, per-`Application` bounded ring buffer for live UPnP/SOAP/GENA and Home Screen
+ * widget telemetry logs. Keeps headless `WeMiSwitchWidgetProvider` / `WidgetActionExecutor`
+ * traffic visible in `More` -> `UPnP / SOAP Packet Log` and `wemi-telemetry-latest.txt` while
+ * preserving strict per-`Application` isolation across Robolectric test runs.
+ */
+object SharedSoapLogStore {
+    private const val MAX_ENTRIES = 50
+    private val flowsByAppContext = WeakHashMap<Context, MutableStateFlow<List<SoapLogEntry>>>()
+
+    fun flowFor(context: Context?): MutableStateFlow<List<SoapLogEntry>> {
+        val appCtx = context?.applicationContext ?: return MutableStateFlow(emptyList())
+        return synchronized(flowsByAppContext) {
+            flowsByAppContext.getOrPut(appCtx) { MutableStateFlow(emptyList()) }
+        }
+    }
+
+    fun append(context: Context?, entry: SoapLogEntry) {
+        val appCtx = context?.applicationContext ?: return
+        flowFor(appCtx).update { (listOf(entry) + it).take(MAX_ENTRIES) }
+    }
+
+    fun clear(context: Context?) {
+        val appCtx = context?.applicationContext ?: return
+        synchronized(flowsByAppContext) {
+            flowsByAppContext[appCtx]?.value = emptyList()
+        }
+    }
+}
 
 /**
  * Structured diagnostic snapshot and human/screenshot-readable formatter for zero-cloud
@@ -88,25 +125,50 @@ data class SetupDebugSnapshot(
 }
 
 /**
- * Builds, persists (`files/wemi-telemetry-latest.txt`), and shares full device & network
+ * Builds, persists (`files/wemi-telemetry-latest.txt`), and shares full device, widget & network
  * telemetry reports so users can either take an on-screen screenshot or export a file to share.
  */
 object TelemetryFileExporter {
     const val DEFAULT_TELEMETRY_FILENAME = "wemi-telemetry-latest.txt"
 
     private val PASSWORD_TAG_REGEX = Regex(
-        "(<password>)([\\s\\S]*?)(</password>)",
+        "(<(?:[a-z0-9_.-]+:)?password\\b[^>]*>)([\\s\\S]*?)(</(?:[a-z0-9_.-]+:)?password>)",
+        RegexOption.IGNORE_CASE
+    )
+    private val ESCAPED_PASSWORD_TAG_REGEX = Regex(
+        "(&lt;(?:[a-z0-9_.-]+:)?password\\b[^&]*?&gt;)([\\s\\S]*?)(&lt;/(?:[a-z0-9_.-]+:)?password&gt;)",
+        RegexOption.IGNORE_CASE
+    )
+    private val UNCLOSED_PASSWORD_TAG_REGEX = Regex(
+        "(<(?:[a-z0-9_.-]+:)?password\\b[^>]*>)([^<]*)$",
+        RegexOption.IGNORE_CASE
+    )
+    private val UNCLOSED_ESCAPED_PASSWORD_TAG_REGEX = Regex(
+        "(&lt;(?:[a-z0-9_.-]+:)?password\\b[^&]*?&gt;)((?:(?!&lt;/)[\\s\\S])*)$",
         RegexOption.IGNORE_CASE
     )
 
+    private fun redactTagMatch(openTag: String, rawInner: String, closeTag: String = ""): String {
+        val inner = rawInner.trim()
+        return if (inner.startsWith("[REDACTED", ignoreCase = true)) {
+            "$openTag$rawInner$closeTag"
+        } else {
+            "$openTag[REDACTED encLen=${inner.length}]$closeTag"
+        }
+    }
+
     fun sanitizeXmlSnippet(raw: String, maxChars: Int = 220): String {
-        val redacted = PASSWORD_TAG_REGEX.replace(raw) { match ->
-            val inner = match.groupValues[2].trim()
-            if (inner.startsWith("[REDACTED", ignoreCase = true)) {
-                match.value
-            } else {
-                "${match.groupValues[1]}[REDACTED encLen=${inner.length}]${match.groupValues[3]}"
-            }
+        val step1 = PASSWORD_TAG_REGEX.replace(raw) { m ->
+            redactTagMatch(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+        }
+        val step2 = ESCAPED_PASSWORD_TAG_REGEX.replace(step1) { m ->
+            redactTagMatch(m.groupValues[1], m.groupValues[2], m.groupValues[3])
+        }
+        val step3 = UNCLOSED_PASSWORD_TAG_REGEX.replace(step2) { m ->
+            redactTagMatch(m.groupValues[1], m.groupValues[2])
+        }
+        val redacted = UNCLOSED_ESCAPED_PASSWORD_TAG_REGEX.replace(step3) { m ->
+            redactTagMatch(m.groupValues[1], m.groupValues[2])
         }
         val compact = redacted.replace(Regex("\\s+"), " ").trim()
         return if (compact.length > maxChars) "${compact.take(maxChars - 1)}…" else compact
@@ -149,7 +211,8 @@ object TelemetryFileExporter {
         selectedSsid: String = setupSnapshot.targetSsid,
         homes: List<HomeNetworkEntity> = emptyList(),
         devices: List<DeviceEntity> = emptyList(),
-        soapLogs: List<SoapLogEntry> = emptyList()
+        soapLogs: List<SoapLogEntry> = emptyList(),
+        widgets: List<WidgetTargetConfig> = emptyList()
     ): String {
         val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         return buildString {
@@ -181,14 +244,14 @@ object TelemetryFileExporter {
                         d.isOn -> "ON"
                         else -> "OFF_STANDBY"
                     }
-                    val dimmerPart = if (d.parsedType == org.suppressingfire.wemi.data.DeviceType.LIGHTBULB_DIMMER) {
+                    val dimmerPart = if (d.parsedType == DeviceType.LIGHTBULB_DIMMER) {
                         " dim=${d.brightness}%${if (d.nightModeEnabled) " night=1" else ""}"
                     } else {
                         ""
                     }
                     val udnPart = if (d.udn.isNotBlank()) " udn=${d.udn}" else ""
                     appendLine(
-                        "[DEV #${d.id}] name=\"${d.name}\" room=\"${d.roomName}\" addr=${d.ipAddress}:${d.port} state=$stateStr$dimmerPart rtt=${d.latencyMs}ms sku=\"${d.hardwareModel}\" fw=\"${d.firmwareVersion}\" sn=${d.serialNumber} mac=${d.macAddress}$udnPart ssid=\"${d.wifiSsid}\""
+                        "[DEV #${d.id}] name=\"${d.name}\" room=\"${d.normalizedRoomName}\" home=${d.networkKey} addr=${d.ipAddress}:${d.port} state=$stateStr$dimmerPart rtt=${d.latencyMs}ms sku=\"${d.hardwareModel}\" fw=\"${d.firmwareVersion}\" sn=${d.serialNumber} mac=${d.macAddress}$udnPart ssid=\"${d.wifiSsid}\""
                     )
                 }
             }
@@ -205,6 +268,45 @@ object TelemetryFileExporter {
                     val snippet = sanitizeXmlSnippet(entry.xmlSnippet)
                     if (snippet.isNotEmpty()) {
                         appendLine("  xml: $snippet")
+                    }
+                }
+            }
+            appendLine()
+            appendLine("--- [5. HOME SCREEN WIDGETS (${widgets.size})] ---")
+            if (widgets.isEmpty()) {
+                appendLine("(none)")
+            } else {
+                widgets.forEach { w ->
+                    when (w.targetType) {
+                        WidgetTargetType.DEVICE -> {
+                            val resolved = WidgetRemoteViewsBuilder.resolveTargetDevice(w, devices)
+                            val status = if (resolved != null) {
+                                val stateStr = when {
+                                    !resolved.isReachable -> "OFFLINE"
+                                    resolved.isOn -> "ON"
+                                    else -> "OFF_STANDBY"
+                                }
+                                "resolved=#${resolved.id} \"${resolved.name}\" ($stateStr)"
+                            } else {
+                                "ORPHANED (no matching switch)"
+                            }
+                            appendLine(
+                                "[WIDGET #${w.appWidgetId}] type=DEVICE name=\"${w.displayName}\" devId=${w.deviceId} sn=${w.serialNumber.ifBlank { "none" }} room=\"${w.normalizedRoomName()}\" home=${w.networkKey.ifBlank { "none" }} -> $status"
+                            )
+                        }
+                        WidgetTargetType.ROOM -> {
+                            val roomDevs = WidgetRemoteViewsBuilder.resolveRoomDevices(w, devices)
+                            val status = if (roomDevs.isNotEmpty()) {
+                                val reachable = roomDevs.count { it.isReachable }
+                                val onCount = roomDevs.count { it.isReachable && it.isOn }
+                                "resolved=$onCount/${roomDevs.size} ON ($reachable/${roomDevs.size} reachable)"
+                            } else {
+                                "ORPHANED (0 matching switches)"
+                            }
+                            appendLine(
+                                "[WIDGET #${w.appWidgetId}] type=ROOM room=\"${w.normalizedRoomName()}\" home=${w.networkKey.ifBlank { "none" }} -> $status"
+                            )
+                        }
                     }
                 }
             }
@@ -251,4 +353,5 @@ object TelemetryFileExporter {
         return savedFile
     }
 }
+
 

@@ -1,8 +1,7 @@
 ---
 name: wemi-device-telemetry-debug
-description: Capture, parse, and diagnose on-device Belkin WeMo setup, discovery, and UPnP/SOAP telemetry from the user's physical Android phone or Android TV via screenshots (Setup Debug Details panel, SOAP Packet Log, Inline Diagnostics Drawer) or recorded telemetry files (wemi-telemetry-latest.txt / Copy / Save-Share). EXCLUSIVELY OWNED by the Antigravity Debugging & Support Agent (other agents MUST read and follow this skill when modifying provisioning/telemetry flows, but MUST NOT edit this skill, DEBUGGING_AND_SUPPORT.md, or docs/user-guide/telemetry-and-troubleshooting.md).
+description: Diagnose on-device Belkin WeMo 10.22.22.1 setup, UPnP/SOAP, and Home Screen widget issues via screenshots or wemi-telemetry-latest.txt. EXCLUSIVELY OWNED by the Antigravity Debugging & Support Agent (read-only for peer agents).
 ---
-
 # WeMi Device Telemetry & Screenshot Debugging Skill (`wemi-device-telemetry-debug`)
 
 > [!CAUTION]
@@ -13,7 +12,7 @@ description: Capture, parse, and diagnose on-device Belkin WeMo setup, discovery
 
 For the full debugging & support architecture and invariants, read [`../../DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md) and the end-user guide in [`../../docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md).
 
-Use this skill whenever a user reports an issue with physical switches from Belkin's discontinued smart switch platform (`F7C030`, `WLS040`/`WLS0403`, `F7C059`/`WDS060`, `F7C063`/`WSP080`) on their Android phone, tablet, or Android TV — especially during **`10.22.22.1` zero-cloud Wi-Fi setup**, **LAN SSDP discovery**, or **UPnP/SOAP control**.
+Use this skill whenever a user reports an issue with physical switches from Belkin's discontinued smart switch platform (`F7C030`, `WLS040`/`WLS0403`, `F7C059`/`WDS060`, `F7C063`/`WSP080`) on their Android phone, tablet, Home Screen widget, or Android TV — especially during **`10.22.22.1` zero-cloud Wi-Fi setup**, **LAN SSDP discovery**, **UPnP/SOAP control**, or **Home Screen widget toggling**.
 
 Because physical switches sit on the user's private local Wi-Fi (`192.168.x.x/24`) or isolated soft-AP (`10.22.22.1/24`), the fastest way to close the diagnostic loop is to inspect **structured on-screen screenshots** or **exported telemetry files (`wemi-telemetry-latest.txt`)** captured directly on the user's device.
 
@@ -29,7 +28,7 @@ Ask the user to take a screenshot of one of the three built-in high-contrast dia
    - Automatically stays open whenever setup fails (`NetworkStatus=0`, `NetworkStatus=2`, or unreachable).
    - If the user wants to screenshot a *successful* run as well, ask them to toggle the **`Keep Dialog Open on Success`** chip (`keep_provision_dialog_open_chip`) ON before tapping **`Provision Switch`**.
 2. **On the `More` Tab (`UPnP / SOAP Packet Log`)**:
-   - Shows the most recent SOAP actions (`GetBinaryState`, `SetBinaryState`, `GetMetaInfo`, `WiFiSetup1#GetApList`, `WiFiSetup1#ConnectHomeNetwork`, `SSDP+UnicastScan`, `GENA#NOTIFY`), target endpoints, HTTP status codes, and round-trip latency in milliseconds.
+   - Shows the most recent SOAP actions (`GetBinaryState`, `SetBinaryState`, `GetMetaInfo`, `WiFiSetup1#GetApList`, `WiFiSetup1#ConnectHomeNetwork`, `SSDP+UnicastScan`, `GENA#NOTIFY`, and headless **`Widget#Toggle`** / broadcast-timeout entries bridged via `SharedSoapLogStore`), target endpoints, HTTP status codes / offline failure causes, and round-trip latency in milliseconds.
 3. **On Any Switch Row (`Inline Device Diagnostics Drawer` — [`DeviceDiagnosticsDrawer.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/components/DeviceDiagnosticsDrawer.kt))**:
    - Tap the info (`ⓘ`) button on any device row to expand the hardware SKU, firmware string, MAC, Serial Number, UDN, IP:port, and **`Ping RTT`** button (`ping_device_<id>`).
 
@@ -43,11 +42,12 @@ When a trace is longer than one screen or the user prefers sharing a text file:
    - Tap **`Save/Share`** (`share_provision_debug_button`) to write `/data/data/com.aistudio.wemiswitch.kxpqzr/files/wemi-telemetry-latest.txt`, copy the full report to the clipboard, and open Android's share sheet (to save to Google Drive / Files or paste directly into chat).
    - Or tap **`Copy`** (`copy_provision_debug_button`) to copy the version-stamped `=== WeMi Setup AP Diagnostic Report (v<VERSION_NAME> [<VERSION_CODE>] • <timestamp>) ===` block to the clipboard and save `wemi-telemetry-latest.txt`.
 2. **Inside the `More` Tab (`UPnP / SOAP Packet Log` header — [`MoreScreen.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreScreen.kt) & [`MoreControlAndLogCards.kt`](../../app/src/main/java/org/suppressingfire/wemi/ui/screens/MoreControlAndLogCards.kt))**:
-   - Tap **`Save/Share Log`** (`export_telemetry_file_button`) to generate a complete 4-section report stamped with `App Version: v<VERSION_NAME> (versionCode=<VERSION_CODE>, com.aistudio.wemiswitch.kxpqzr)` (`TelemetryFileExporter.buildFullTelemetryReport` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt)):
+   - Tap **`Save/Share Log`** (`export_telemetry_file_button`) to generate a complete **5-section** report stamped with `App Version: v<VERSION_NAME> (versionCode=<VERSION_CODE>, com.aistudio.wemiswitch.kxpqzr)` (`TelemetryFileExporter.buildFullTelemetryReport` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt)):
      - `--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---` (session-consistent `[NET]` flags via `resolveExportSetupSnapshot`, `[PROBE]`, `[XML]`, `[FLAGS]`, `[ID]`, `[SCAN]`, `[TARGET AP]`, `[STEP 1..6]`)
      - `--- [2. REMEMBERED WI-FI HOMES] ---`
-     - `--- [3. REGISTERED SWITCHES & DEVICES] ---` (includes dimmer `dim=<n>%` / `night=1` and `udn=<UDN>` metadata)
-     - `--- [4. UPNP / SOAP PACKET LOG] ---` (includes single-line `xml:` payload summaries scrubbed via `TelemetryFileExporter.sanitizeXmlSnippet`)
+     - `--- [3. REGISTERED SWITCHES & DEVICES] ---` (includes normalized `room=`, `home=<networkKey>`, dimmer `dim=<n>%` / `night=1`, and `udn=<UDN>` metadata)
+     - `--- [4. UPNP / SOAP PACKET LOG] ---` (includes live app + headless widget traffic, exact offline failure causes, and single-line `xml:` payload summaries scrubbed via `TelemetryFileExporter.sanitizeXmlSnippet`)
+     - `--- [5. HOME SCREEN WIDGETS] ---` (configured `WidgetConfigStore.loadAll(context)` bindings and live vs. `ORPHANED` target resolution)
 3. **Via `adb` (If User Has USB/Wireless Debugging Connected)**:
    ```bash
    adb shell run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-latest.txt > wemi-telemetry-latest.txt
@@ -55,7 +55,7 @@ When a trace is longer than one screen or the user prefers sharing a text file:
 
 ---
 
-## 2. Line-by-Line Diagnostic Decoder (`SetupDebugSnapshot`)
+## 2. Line-by-Line Diagnostic Decoder (`SetupDebugSnapshot` & 5-Section Report)
 
 Every `SETUP DEBUG DETAILS (SCREENSHOT)` panel and exported telemetry file uses deterministic line prefixes generated by [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt):
 
@@ -133,13 +133,30 @@ Format:
     2. Router `AuthMode`/`EncryptionType` mismatch (check `[TARGET AP]` vs the **2.4G Ch / Auth Mode / Encrypt** fields).
     3. Router MAC filtering or WPA3-PMF rejection.
 
+### 2.6 `[DEV #id]`, Offline SOAP Causes & `[WIDGET #id]` — LAN & Home Screen Widget Diagnostics
+Format:
+```text
+[DEV #7] name="Patio Lights" room="Patio" home=wifi_home_192_168_1 addr=192.168.1.45:49153 state=OFFLINE rtt=0ms ...
+[10:15:02 AM] [ERR] Patio Lights | SetBinaryState(1) | http://192.168.1.45:49153/upnp/control/basicevent1 -> Offline • Unreachable on LAN (:49153=ConnectException, 9-port probe: no match)
+[10:15:02 AM] [ERR] Widget #401 (Patio Lights) | Widget#Toggle(DEVICE) | widget://401 -> Resolved #7 (192.168.1.45:49153) -> OFFLINE
+[WIDGET #401] type=DEVICE name="Patio Lights" devId=7 sn=WLS040PATIO01 room="Patio" home=wifi_home_192_168_1 -> resolved=#7 "Patio Lights" (OFFLINE)
+```
+- **Offline SOAP Failure Causes (`NetworkClient.kt`)**:
+  - `:port=ConnectException` + `9-port probe: no match`: switch port closed/shifted or DHCP IP reassigned to a different switch (run **SSDP Scan** or **Reconnect Home**).
+  - `:port=SocketTimeoutException` / `NoRouteToHostException`: phone is off the home Wi-Fi subnet, cellular data routed the packet, or the switch is powered off/unplugged.
+  - `:port=HTTP_500`: switch returned a UPnP SOAP fault (inspect `xml:` snippet on the following line).
+- **Home Screen Widget Failures (`WeMiSwitchWidgetProvider.kt` / `WidgetActionExecutor.kt`)**:
+  - **`ORPHANED`** in Section 5 or `Widget#Toggle(...) -> Orphaned`: the bound switch was deleted, renamed/reset without a matching serial, or moved to another `home=<networkKey>` — tap the widget (or reconfigure it) to re-bind.
+  - **`Timeout • Exceeded 8500ms broadcast budget`**: local LAN SOAP + 9-port probe exceeded Android's broadcast window (typically phone on cellular or switch offline); check `[NET]` and Section 4 error causes.
+
 ---
 
 ## 3. Expanding Telemetry & Stage 3 Release Sign-Off
 
-Whenever a screenshot or exported telemetry file reveals a new firmware flag, SOAP tag, or hardware SKU quirk:
-1. Add the parsed field to `SetupDeviceDescriptor` in [`NetworkModels.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) (populated by `probeSetupDevice` in [`SetupApProber.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupApProber.kt) / [`ProvisionerClient.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt)) and surface it in `SetupDebugSnapshot.toDisplayLines` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt).
-2. Add deterministic loopback regression coverage in [`GenaProvisioningAndRulesTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt), [`LifecycleAndConcurrencyTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/LifecycleAndConcurrencyTest.kt), [`ExampleUnitTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ExampleUnitTest.kt), and/or [`ProvisioningAndGenaCujE2ETest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ProvisioningAndGenaCujE2ETest.kt) using [`FakeUpnpServer.kt`](../../app/src/test/java/org/suppressingfire/wemi/FakeUpnpServer.kt).
-3. Run `./gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`73/73` tests across `15` suites, `0` lint errors, `100%` of `.kt` files `< 500` lines) before pushing.
-4. **Stage 3 Release Sign-Off & Quota-Safe Clean Stop**: During active `IN_REVIEW` rounds in [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md), complete Stage 3 (`telemetry_and_debugging`) per [`RELEASE_PROCESS.md`](../../RELEASE_PROCESS.md) and sign off via `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<summary>"`. **Never** arm or re-arm `scripts/await_release_turn.sh` after recording `SIGNED_OFF` or between releases when `RELEASE_STATUS` is `APPROVED_FOR_PLAY_STORE` / `CURRENT_TURN: NONE` (always honor `[QUOTA GUARD] DO NOT RE-ARM`).
+Whenever a screenshot or exported telemetry file reveals a new firmware flag, SOAP tag, widget edge case, or hardware SKU quirk:
+1. Add the parsed field to `SetupDeviceDescriptor` in [`NetworkModels.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/NetworkModels.kt) (populated by `probeSetupDevice` in [`SetupApProber.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupApProber.kt) / [`ProvisionerClient.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/ProvisionerClient.kt)) and surface it in `SetupDebugSnapshot.toDisplayLines` or `TelemetryFileExporter` in [`SetupDiagnostics.kt`](../../app/src/main/java/org/suppressingfire/wemi/network/SetupDiagnostics.kt).
+2. Add deterministic loopback regression coverage in [`TelemetryDiagnosticsTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/TelemetryDiagnosticsTest.kt), [`GenaProvisioningAndRulesTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/GenaProvisioningAndRulesTest.kt), [`LifecycleAndConcurrencyTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/LifecycleAndConcurrencyTest.kt), [`ExampleUnitTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ExampleUnitTest.kt), and/or [`ProvisioningAndGenaCujE2ETest.kt`](../../app/src/test/java/org/suppressingfire/wemi/ProvisioningAndGenaCujE2ETest.kt) using [`FakeUpnpServer.kt`](../../app/src/test/java/org/suppressingfire/wemi/FakeUpnpServer.kt).
+3. Run `sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`95/95` tests across `20` suites, `0` lint errors, `100%` of `.kt` files `< 500` lines, `100644` non-executable script modes) before pushing.
+4. **Stage 3 Release Sign-Off & Quota-Safe Clean Stop**: During active `IN_REVIEW` rounds in [`RELEASE_SIGN_OFF.md`](../../RELEASE_SIGN_OFF.md), complete Stage 3 (`telemetry_and_debugging`) per [`RELEASE_PROCESS.md`](../../RELEASE_PROCESS.md) and sign off via `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<summary>"`. **Never** arm or re-arm `scripts/await_release_turn.sh` after recording `SIGNED_OFF` or between releases when `RELEASE_STATUS` is `APPROVED_FOR_PLAY_STORE` / `PROMOTED_TO_CLOSED_TESTING` / `CURRENT_TURN: NONE` (always honor `[QUOTA GUARD] DO NOT RE-ARM`).
+
 

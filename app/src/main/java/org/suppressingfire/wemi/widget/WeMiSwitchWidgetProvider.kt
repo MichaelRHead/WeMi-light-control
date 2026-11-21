@@ -4,13 +4,18 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.network.LanRuntimeUtils
+import org.suppressingfire.wemi.network.SharedSoapLogStore
 
 /**
  * Android Home Screen AppWidgetProvider for one-tap Light & Room power control without opening
@@ -19,17 +24,37 @@ import org.suppressingfire.wemi.network.LanRuntimeUtils
  */
 class WeMiSwitchWidgetProvider : AppWidgetProvider() {
 
-    private fun runAsyncBroadcast(block: suspend () -> Unit) {
+    private fun runAsyncBroadcast(
+        context: Context,
+        actionLabel: String,
+        block: suspend () -> Unit
+    ) {
         val customRunner = actionRunnerForTests
         if (customRunner != null) {
             customRunner(block)
             return
         }
+        val appCtx = context.applicationContext
         val pendingResult = goAsync()
         widgetScope.launch {
             try {
-                withTimeoutOrNull(BROADCAST_TIMEOUT_MS) {
+                val completed = withTimeoutOrNull(broadcastTimeoutMs) {
                     block()
+                    true
+                }
+                if (completed == null) {
+                    SharedSoapLogStore.append(
+                        context = appCtx,
+                        entry = SoapLogEntry(
+                            timestamp = SimpleDateFormat("h:mm:ss a", Locale.US).format(Date()),
+                            deviceName = "Home Screen Widget",
+                            endpoint = "widget://$actionLabel",
+                            soapAction = "Widget#$actionLabel",
+                            statusText = "Timeout • Exceeded ${broadcastTimeoutMs}ms broadcast budget",
+                            xmlSnippet = "",
+                            isLiveLanSuccess = false
+                        )
+                    )
                 }
             } finally {
                 pendingResult?.finish()
@@ -43,7 +68,7 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray
     ) {
         if (appWidgetIds.isEmpty()) return
-        runAsyncBroadcast {
+        runAsyncBroadcast(context, "Refresh(${appWidgetIds.joinToString(",")})") {
             WidgetActionExecutor.refreshWidgetIds(
                 context = context,
                 appWidgetIds = appWidgetIds,
@@ -61,7 +86,7 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
                     AppWidgetManager.INVALID_APPWIDGET_ID
                 )
                 if (appWidgetId <= 0) return
-                runAsyncBroadcast {
+                runAsyncBroadcast(context, "Toggle($appWidgetId)") {
                     WidgetActionExecutor.toggleWidgetTarget(
                         context = context,
                         appWidgetId = appWidgetId,
@@ -90,7 +115,7 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
                 )
                 WidgetConfigStore.save(context, config)
 
-                runAsyncBroadcast {
+                runAsyncBroadcast(context, "Pinned($appWidgetId)") {
                     WidgetActionExecutor.refreshWidgetIds(
                         context = context,
                         appWidgetIds = intArrayOf(appWidgetId),
@@ -124,6 +149,9 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
 
         private const val BROADCAST_TIMEOUT_MS = 8_500L
         private val widgetScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        @Volatile
+        internal var broadcastTimeoutMs: Long = BROADCAST_TIMEOUT_MS
 
         @Volatile
         internal var actionRunnerForTests: ((suspend () -> Unit) -> Unit)? = null
