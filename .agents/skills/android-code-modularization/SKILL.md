@@ -98,5 +98,5 @@ When modularizing an existing Android codebase:
 3. **Audit Synchronous vs. Asynchronous UI State Transitions**:
    - Verify that extracting or reorganizing ViewModel / Repository methods never moves synchronous UI state updates (`_show*Dialog`, `_editing*`) behind suspending network I/O.
 4. **Mandatory Non-Cached Build & Test Gate (`--rerun-tasks`)**:
-   - Run `./gradlew testDebugUnitTest --rerun-tasks assembleDebug` after every modularization stage and after syncing remote commits, and inspect `app/build/test-results/testDebugUnitTest/TEST-*.xml` to verify 100% test pass rate, zero compiler warnings, and sub-second loopback E2E test durations before committing.
+   - Run `sh gradlew testDebugUnitTest --rerun-tasks assembleDebug` after every modularization stage and after syncing remote commits, and inspect `app/build/test-results/testDebugUnitTest/TEST-*.xml` to verify 100% test pass rate, zero compiler warnings, and sub-second loopback E2E test durations before committing.
 

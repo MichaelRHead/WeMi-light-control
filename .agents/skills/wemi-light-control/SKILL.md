@@ -16,11 +16,11 @@ For detailed UPnP/SSDP/SOAP/GENA wire formats, device model identifiers, and XML
 - **Toolchain**: AGP `9.1.0`, Kotlin `2.3.20`, KSP `2.3.6`, Compose BOM `2026.03.00`, Room `2.8.4` (`version = 5`), Robolectric `4.16.1`, `compileSdk = 36`, `minSdk = 24`.
 - **Unit, Protocol, Governance & E2E Compose UI Tests (`58/58` across 13 suites + Lint)**:
   ```bash
-  ./gradlew testDebugUnitTest --rerun-tasks lintDebug
+  sh gradlew testDebugUnitTest --rerun-tasks lintDebug
   ```
 - **Debug APK Build**:
   ```bash
-  ./gradlew assembleDebug
+  sh gradlew assembleDebug
   ```
 - **Package / Namespace**: `org.suppressingfire.wemi` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "28.0"`, `versionCode = 28`).
 

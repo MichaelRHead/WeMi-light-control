@@ -699,12 +699,11 @@ if [ "$INSTALL_SDK" -eq 1 ]; then
   fi
 fi
 
-# 7. Ensure gradlew is executable; pre-warm wrapper only when saving shared caches
+# 7. Pre-warm Gradle wrapper only when saving shared caches (invoke via sh to keep 100644 mode)
 GRADLE_VER="$(sed -n 's/.*gradle-\([0-9.]*\)-bin\.zip.*/\1/p' "$REPO_ROOT/gradle/wrapper/gradle-wrapper.properties" 2>/dev/null | head -n 1 || true)"
 if [ -f "$REPO_ROOT/gradlew" ]; then
-  [ -x "$REPO_ROOT/gradlew" ] || chmod +x "$REPO_ROOT/gradlew"
   if [ "$SAVE_CACHES" -eq 1 ] && { [ -z "$GRADLE_VER" ] || [ ! -d "$GRADLE_DIR/wrapper/dists/gradle-${GRADLE_VER}-bin" ]; }; then
-    (cd "$REPO_ROOT" && ./gradlew --version --no-daemon >/dev/null)
+    (cd "$REPO_ROOT" && sh ./gradlew --version --no-daemon >/dev/null)
   fi
 fi
 
@@ -727,7 +726,7 @@ if [ "$SAVE_CACHES" -eq 1 ] && [ -n "$CACHE_DIR" ]; then
 
   if [ -d "$GRADLE_DIR/caches/modules-2/files-2.1" ]; then
     echo "[env-setup] Saving warm Gradle dependency cache (${DEPS_KEY}) to $GRADLE_CACHE..."
-    [ -f "$REPO_ROOT/gradlew" ] && (cd "$REPO_ROOT" && ./gradlew --stop >/dev/null 2>&1 || true)
+    [ -f "$REPO_ROOT/gradlew" ] && (cd "$REPO_ROOT" && sh ./gradlew --stop >/dev/null 2>&1 || true)
     GRADLE_TAR_PATHS=()
     [ -d "$GRADLE_DIR/wrapper/dists" ] && GRADLE_TAR_PATHS+=("wrapper/dists")
     [ -d "$GRADLE_DIR/caches/modules-2" ] && GRADLE_TAR_PATHS+=("caches/modules-2")

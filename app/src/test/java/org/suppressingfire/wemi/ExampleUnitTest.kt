@@ -286,39 +286,35 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun `verify executable script modes and DeviceDescriptorFetcher placeholder serial guard`() {
+    fun `verify non-executable script modes and DeviceDescriptorFetcher placeholder serial guard`() {
         val repoRoot = listOf(java.io.File("."), java.io.File(".."))
             .map { it.canonicalFile }
             .firstOrNull { java.io.File(it, "gradlew").isFile }
         assertNotNull("Expected repository root containing gradlew", repoRoot)
 
-        val requiredExecutables = listOf(
-            "gradlew",
-            "scripts/advance_release_turn.sh",
-            "scripts/await_release_turn.sh",
-            "scripts/setup_dev_env.sh",
-            "scripts/promote_play_release.py",
-            "scripts/sync_play_assets.py",
+        val requiredScripts = listOf(
+            "gradlew", "scripts/advance_release_turn.sh", "scripts/await_release_turn.sh",
+            "scripts/setup_dev_env.sh", "scripts/promote_play_release.py", "scripts/sync_play_assets.py",
+            "scripts/test_promote_play_release.py", "scripts/test_sync_play_assets.py",
             ".agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh",
             ".agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh"
         )
-        for (relPath in requiredExecutables) {
-            val f = java.io.File(repoRoot!!, relPath)
+        val hasGit = java.io.File(repoRoot!!, ".git").exists()
+        val checkNonExec = hasGit && !System.getProperty("os.name").orEmpty().lowercase().contains("win")
+        for (relPath in requiredScripts) {
+            val f = java.io.File(repoRoot, relPath)
             assertTrue("Expected script to exist: $relPath", f.isFile)
-            assertTrue("Expected +x executable permission on $relPath", f.canExecute())
+            if (checkNonExec) {
+                assertFalse("Expected 100644 non-executable mode (use sh/bash/python3): $relPath", f.canExecute())
+            }
         }
-        if (java.io.File(repoRoot!!, ".git").exists()) {
-            val proc = ProcessBuilder(listOf("git", "ls-files", "-s") + requiredExecutables)
-                .directory(repoRoot)
-                .redirectErrorStream(true)
-                .start()
+        if (hasGit) {
+            val proc = ProcessBuilder(listOf("git", "ls-files", "-s") + requiredScripts)
+                .directory(repoRoot).redirectErrorStream(true).start()
             val indexOut = proc.inputStream.bufferedReader().readText()
             if (proc.waitFor() == 0 && indexOut.isNotBlank()) {
-                for (line in indexOut.lines().filter { it.isNotBlank() }) {
-                    assertTrue(
-                        "Expected git index mode 100755 (AI Studio sync must not strip +x): $line",
-                        line.startsWith("100755 ")
-                    )
+                indexOut.lines().filter { it.isNotBlank() }.forEach { line ->
+                    assertTrue("Expected git mode 100644 (use sh/bash/python3): $line", line.startsWith("100644 "))
                 }
             }
         }

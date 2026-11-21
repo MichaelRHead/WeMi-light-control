@@ -95,7 +95,7 @@ Before committing or pushing your integrated changes:
 ### Step 5: Mandatory Pre-Push Verification, Agent Commit Attribution & Atomic Push
 1. If any Kotlin source, resource, or test files were modified, run the mandatory build & test gate:
    ```bash
-   ./gradlew testDebugUnitTest --rerun-tasks assembleDebug
+   sh gradlew testDebugUnitTest --rerun-tasks assembleDebug
    ```
 2. Stage, commit **with a concise, human-readable plain-English message and mandatory trailer attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (plain-English `<= 72`-char Conventional Commits subject with no `[...Agent]` tag; short reflowable plain-text body explaining what changed and why without symbol dumps, semicolon chains, nested parentheses, or raw `**bold**`/`` `backticks` ``; brief `Verified:` trailer `<= 120` chars; and mandatory `Agent: <Canonical Agent Name> (<role_id>)` trailer), and push atomically:
    ```bash

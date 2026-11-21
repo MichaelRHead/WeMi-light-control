@@ -2,10 +2,9 @@
 # ==============================================================================
 # WeMi Light Control — Release State Machine Transition (advance_release_turn.sh)
 # ==============================================================================
-# Atomically updates RELEASE_SIGN_OFF.md, preserves +x on gradlew and scripts,
-# commits, rebases against origin/main, and pushes to GitHub to advance the
-# 6-agent / 7-stage release process (Stages 1-6 review ring + Stage 7 automated
-# Closed testing promotion).
+# Atomically updates RELEASE_SIGN_OFF.md, commits, rebases against origin/main,
+# and pushes to GitHub to advance the 6-agent / 7-stage release process
+# (Stages 1-6 review ring + Stage 7 automated Closed testing promotion).
 #
 # Usage:
 #   bash scripts/advance_release_turn.sh initiate "<summary>" [--verified "<checks>"] [--no-push]
@@ -80,14 +79,6 @@ if [[ -d ".git" ]]; then
 else
   NO_PUSH="true"
 fi
-
-# Ensure executable bits on gradlew, release scripts, setup script, promotion/asset scripts, and commit attribution scripts
-chmod +x gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
-  scripts/setup_dev_env.sh \
-  scripts/promote_play_release.py scripts/test_promote_play_release.py \
-  scripts/sync_play_assets.py scripts/test_sync_play_assets.py \
-  .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
-  .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || true
 
 PST_NOW="$(TZ=America/Los_Angeles date "+%Y-%m-%d %H:%M %Z")"
 GRADLE_VER_NAME="$(sed -n 's/.*versionName *= *"\([^"]*\)".*/v\1-rc/p' app/build.gradle.kts | tr -d '\r' | head -n 1 || true)"
@@ -468,13 +459,7 @@ COMMIT_SUBJECT="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])
 COMMIT_BODY="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["body"])' "${TMP_COMMIT_INFO}")"
 COMMIT_VERIFIED="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["verified"])' "${TMP_COMMIT_INFO}")"
 
-git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh \
-  scripts/setup_dev_env.sh \
-  scripts/promote_play_release.py scripts/test_promote_play_release.py \
-  scripts/sync_play_assets.py scripts/test_sync_play_assets.py \
-  .agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh \
-  .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh 2>/dev/null || \
-  git add RELEASE_SIGN_OFF.md gradlew scripts/await_release_turn.sh scripts/advance_release_turn.sh scripts/setup_dev_env.sh
+git add RELEASE_SIGN_OFF.md
 
 if [[ -n "${COMMIT_VERIFIED}" ]]; then
   bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \

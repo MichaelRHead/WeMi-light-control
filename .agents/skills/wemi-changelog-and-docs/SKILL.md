@@ -66,7 +66,7 @@ Whenever you implement a feature, fix a bug, or adjust existing behavior:
 ### Step 4: Run Pre-Push Build & Test Gate and Commit with Agent Attribution
 Never push code or documentation to `origin/main` unless the full Gradle build and unit/Robolectric test suite succeed, and always write human-readable plain-English commits (`<= 72`-char tag-free subject, brief reflowable plain-text bullets explaining what changed and why without symbol dumps or semicolon chains, brief `Verified:` trailer `<= 120` chars, and `Agent:` trailer) per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md):
 ```bash
-./gradlew assembleDebug testDebugUnitTest --rerun-tasks
+sh gradlew assembleDebug testDebugUnitTest --rerun-tasks
 bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
   <your_role_id> \
   "<type>(<scope>): <plain-English summary <= 72 chars>" \
