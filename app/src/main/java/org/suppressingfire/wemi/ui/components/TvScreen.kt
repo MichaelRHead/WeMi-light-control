@@ -83,7 +83,7 @@ fun TvDashboardScreen(
     onApplyTvScene: (String) -> Unit,
     onScanSsdpClick: () -> Unit
 ) {
-    // Group switches by room (with "Unassigned" placed last) while preserving user sortOrder within each room
+    // Group switches by canonical room (with "Unassigned" placed last) while preserving user sortOrder within each room
     val groupedByRoom: List<Pair<String, List<DeviceEntity>>> = remember(devices, selectedRoomFilter) {
         val base = if (selectedRoomFilter == null) {
             devices
@@ -92,16 +92,7 @@ fun TvDashboardScreen(
                 it.normalizedRoomName.equals(selectedRoomFilter, ignoreCase = true)
             }
         }
-        base.groupBy { it.normalizedRoomName }
-            .entries
-            .sortedWith(
-                compareBy<Map.Entry<String, List<DeviceEntity>>> {
-                    if (it.key.equals("Unassigned", ignoreCase = true)) 1 else 0
-                }.thenBy { entry ->
-                    entry.value.minOfOrNull { it.sortOrder } ?: Int.MAX_VALUE
-                }
-            )
-            .map { it.key to it.value }
+        org.suppressingfire.wemi.data.groupDevicesByCanonicalRoom(base).toList()
     }
 
     val orderedDevices: List<DeviceEntity> = remember(groupedByRoom) {

@@ -69,6 +69,7 @@ internal class SsdpDiscoveryEngine(
             async(Dispatchers.IO) {
                 sweepSemaphore.withPermit {
                     for (port in fastPorts) {
+                        ensureActive()
                         val start = System.currentTimeMillis()
                         try {
                             wifiSocketFactory.createSocket().use { s ->

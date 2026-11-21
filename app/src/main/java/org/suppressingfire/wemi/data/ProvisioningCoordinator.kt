@@ -295,8 +295,9 @@ internal class ProvisioningCoordinator(
             val resolvedName = customDeviceName?.trim()?.takeIf { it.isNotEmpty() }
                 ?: desc?.friendlyName?.takeIf { it.isNotBlank() && !it.equals("WeMo Switch", ignoreCase = true) }
                 ?: "WeMi Smart Switch"
-            val resolvedRoom = roomName?.trim()?.takeIf { it.isNotEmpty() }
-                ?: inferRoomFromName(resolvedName)
+            val resolvedRoom = normalizeRoomName(
+                roomName?.trim()?.takeIf { it.isNotEmpty() } ?: inferRoomFromName(resolvedName)
+            )
             val resolvedType = deviceType ?: desc?.deviceType ?: DeviceType.SWITCH_PLUG
             val existingDevices = dao.getAllDevices().first()
 
@@ -321,9 +322,26 @@ internal class ProvisioningCoordinator(
             }
             val firmware = desc?.firmwareVersion?.takeIf { it.isNotBlank() } ?: "WeMo_WW_2.00.11563.PVT"
 
+            val hasRealSerial = !LanRuntimeUtils.isPlaceholderSerial(serial)
             val existing = existingDevices.find {
-                (!LanRuntimeUtils.isPlaceholderSerial(serial) && it.serialNumber.equals(serial, ignoreCase = true)) ||
-                    (it.networkKey == targetNetworkKey && it.name.equals(resolvedName, ignoreCase = true))
+                hasRealSerial && !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
+                    it.serialNumber.equals(serial, ignoreCase = true)
+            } ?: udn.takeIf { it.isNotEmpty() }?.let { cleanUdn ->
+                existingDevices.find {
+                    it.networkKey == targetNetworkKey &&
+                        LanRuntimeUtils.canonicalHardwareUdn(it.udn).equals(cleanUdn, ignoreCase = true) &&
+                        !(hasRealSerial && !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
+                            !it.serialNumber.equals(serial, ignoreCase = true))
+                }
+            } ?: existingDevices.find {
+                val serialConflict = hasRealSerial && !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
+                    !it.serialNumber.equals(serial, ignoreCase = true)
+                val existingUdn = LanRuntimeUtils.canonicalHardwareUdn(it.udn)
+                val udnConflict = udn.isNotEmpty() && existingUdn.isNotEmpty() &&
+                    !existingUdn.equals(udn, ignoreCase = true)
+                !serialConflict && !udnConflict &&
+                    it.networkKey == targetNetworkKey &&
+                    it.name.equals(resolvedName, ignoreCase = true)
             }
 
             val nextOctet = (120 + (existingDevices.size % 120)).coerceIn(101, 250)

@@ -38,16 +38,23 @@ object WidgetRemoteViewsBuilder {
     private const val COLOR_TEXT_STANDBY = 0xFF64748B.toInt()
     private const val COLOR_TEXT_OFFLINE = 0xFFDC2626.toInt()
 
-    private fun hasConflictingRealSerial(candidate: DeviceEntity, configSerial: String): Boolean =
-        !LanRuntimeUtils.isPlaceholderSerial(configSerial) &&
+    private fun hasConflictingHardwareIdentity(candidate: DeviceEntity, config: WidgetTargetConfig): Boolean {
+        val serialConflict = !LanRuntimeUtils.isPlaceholderSerial(config.serialNumber) &&
             !LanRuntimeUtils.isPlaceholderSerial(candidate.serialNumber) &&
-            !candidate.serialNumber.equals(configSerial, ignoreCase = true)
+            !candidate.serialNumber.equals(config.serialNumber, ignoreCase = true)
+        if (serialConflict) return true
+        val configUdn = LanRuntimeUtils.canonicalHardwareUdn(config.udn)
+        val candidateUdn = LanRuntimeUtils.canonicalHardwareUdn(candidate.udn)
+        return configUdn.isNotEmpty() && candidateUdn.isNotEmpty() &&
+            !candidateUdn.equals(configUdn, ignoreCase = true)
+    }
 
     /**
      * Resolves a configured [WidgetTargetConfig] targeting a single device against the latest
-     * Room device list. Prioritizes real hardware [DeviceEntity.serialNumber] so recycled SQLite
-     * row IDs after a LAN reset never hijack a different switch, then falls back to `deviceId`
-     * or `(displayName, networkKey)` while rejecting any candidate with a conflicting real serial.
+     * Room device list. Prioritizes Tier-1 real [DeviceEntity.serialNumber] and Tier-2 canonical
+     * [DeviceEntity.udn] so recycled SQLite row IDs after a LAN reset never hijack a different
+     * switch, then falls back to `deviceId` or `(displayName, networkKey)` while rejecting any
+     * candidate with a conflicting real serial or canonical UDN.
      */
     fun resolveTargetDevice(
         config: WidgetTargetConfig,
@@ -63,9 +70,18 @@ object WidgetRemoteViewsBuilder {
             if (bySerial != null) return bySerial
         }
 
+        val configUdn = LanRuntimeUtils.canonicalHardwareUdn(config.udn)
+        if (configUdn.isNotEmpty()) {
+            val byUdn = devices.firstOrNull {
+                LanRuntimeUtils.canonicalHardwareUdn(it.udn).equals(configUdn, ignoreCase = true) &&
+                    !hasConflictingHardwareIdentity(it, config)
+            }
+            if (byUdn != null) return byUdn
+        }
+
         if (config.deviceId > 0) {
             val byId = devices.firstOrNull {
-                it.id == config.deviceId && !hasConflictingRealSerial(it, config.serialNumber)
+                it.id == config.deviceId && !hasConflictingHardwareIdentity(it, config)
             }
             if (byId != null) return byId
         }
@@ -74,12 +90,12 @@ object WidgetRemoteViewsBuilder {
             val byNameInHome = devices.firstOrNull {
                 it.name.equals(config.displayName, ignoreCase = true) &&
                     (config.networkKey.isBlank() || it.networkKey == config.networkKey) &&
-                    !hasConflictingRealSerial(it, config.serialNumber)
+                    !hasConflictingHardwareIdentity(it, config)
             }
             if (byNameInHome != null) return byNameInHome
             return devices.firstOrNull {
                 it.name.equals(config.displayName, ignoreCase = true) &&
-                    !hasConflictingRealSerial(it, config.serialNumber)
+                    !hasConflictingHardwareIdentity(it, config)
             }
         }
         return null
@@ -383,6 +399,7 @@ object WidgetUpdater {
             putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, config.targetType.name)
             putExtra(WeMiSwitchWidgetProvider.EXTRA_DEVICE_ID, config.deviceId)
             putExtra(WeMiSwitchWidgetProvider.EXTRA_SERIAL_NUMBER, config.serialNumber)
+            putExtra(WeMiSwitchWidgetProvider.EXTRA_UDN, config.udn)
             putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, config.roomName)
             putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, config.networkKey)
             putExtra(WeMiSwitchWidgetProvider.EXTRA_DISPLAY_NAME, config.displayName)

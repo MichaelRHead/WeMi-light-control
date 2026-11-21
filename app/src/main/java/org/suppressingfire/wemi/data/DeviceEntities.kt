@@ -2,6 +2,7 @@ package org.suppressingfire.wemi.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.util.Locale
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 const val DEFAULT_MAIN_HOME_KEY = "wifi_home_192_168_1"
@@ -9,9 +10,41 @@ const val DEFAULT_CABIN_HOME_KEY = "wifi_cabin_192_168_50"
 const val DEFAULT_OFFICE_HOME_KEY = "wifi_office_10_0_10"
 const val UNASSIGNED_ROOM = "Unassigned"
 
-/** Canonicalizes a room name so blank or whitespace-only values consistently map to [UNASSIGNED_ROOM]. */
-fun normalizeRoomName(rawRoom: String?): String =
-    rawRoom?.trim().orEmpty().ifBlank { UNASSIGNED_ROOM }
+/** Canonicalizes a room name so blank, whitespace-only, or case-variant unassigned values map to [UNASSIGNED_ROOM]. */
+fun normalizeRoomName(rawRoom: String?): String {
+    val trimmed = rawRoom?.trim().orEmpty()
+    return when {
+        trimmed.isEmpty() || trimmed.equals(UNASSIGNED_ROOM, ignoreCase = true) -> UNASSIGNED_ROOM
+        else -> trimmed
+    }
+}
+
+/**
+ * Groups [devices] by case-insensitive canonical room name (merging variants like `"Kitchen"` and
+ * `"kitchen"` into a single display header), preserves user `sortOrder` across rooms, and sorts
+ * [UNASSIGNED_ROOM] after all named rooms.
+ */
+fun groupDevicesByCanonicalRoom(devices: List<DeviceEntity>): Map<String, List<DeviceEntity>> {
+    if (devices.isEmpty()) return emptyMap()
+    val groupedByKey = devices.groupBy { it.normalizedRoomName.lowercase(Locale.US) }
+    val resolvedEntries = groupedByKey.values.map { roomDevices ->
+        val rawLabels = roomDevices.map { it.normalizedRoomName }
+        val canonicalLabel = when {
+            rawLabels.first().equals(UNASSIGNED_ROOM, ignoreCase = true) -> UNASSIGNED_ROOM
+            else -> rawLabels.firstOrNull { label -> label != label.lowercase(Locale.US) } ?: rawLabels.first()
+        }
+        canonicalLabel to roomDevices
+    }
+    return resolvedEntries
+        .sortedWith(
+            compareBy<Pair<String, List<DeviceEntity>>> { (room, _) ->
+                if (room.equals(UNASSIGNED_ROOM, ignoreCase = true)) 1 else 0
+            }.thenBy { (_, roomDevices) ->
+                roomDevices.minOfOrNull { it.sortOrder } ?: Int.MAX_VALUE
+            }
+        )
+        .toMap(LinkedHashMap())
+}
 
 enum class DeviceType {
     SWITCH_PLUG,
@@ -217,8 +250,15 @@ data class SsdpDiscoveredDevice(
     fun matchesEndpointOrSerial(other: SsdpDiscoveredDevice): Boolean {
         val bothRealSerials = !LanRuntimeUtils.isPlaceholderSerial(serialNumber) &&
             !LanRuntimeUtils.isPlaceholderSerial(other.serialNumber)
-        return (bothRealSerials && serialNumber.equals(other.serialNumber, ignoreCase = true)) ||
-            (ipAddress == other.ipAddress && port == other.port)
+        if (bothRealSerials) {
+            return serialNumber.equals(other.serialNumber, ignoreCase = true)
+        }
+        val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(usn)
+        val otherUdn = LanRuntimeUtils.canonicalHardwareUdn(other.usn)
+        if (cleanUdn.isNotEmpty() && otherUdn.isNotEmpty()) {
+            return cleanUdn.equals(otherUdn, ignoreCase = true)
+        }
+        return ipAddress == other.ipAddress && port == other.port
     }
 }
 
@@ -265,6 +305,7 @@ fun classifyDeviceCategory(
     }
 }
 
+private val ACRONYM_CAMEL_BOUNDARY_REGEX = Regex("([A-Z]+)([A-Z][a-z])")
 private val CAMEL_CASE_BOUNDARY_REGEX = Regex("([a-z])([A-Z])")
 private val DELIMITER_NORMALIZE_REGEX = Regex("[_\\-/.]+")
 private val MULTI_SPACE_REGEX = Regex("\\s+")
@@ -273,6 +314,9 @@ private val WORD_GIRL_REGEX = Regex("\\bgirl\\b")
 private val WORD_BOY_REGEX = Regex("\\bboy\\b")
 private val WORD_KID_REGEX = Regex("\\bkid\\b")
 private val WORD_HALL_REGEX = Regex("\\bhall\\b")
+private val WORD_STAIR_PREFIX_REGEX = Regex("\\bstair")
+private val WORD_PIER_REGEX = Regex("\\bpier\\b")
+private val WORD_SHED_REGEX = Regex("\\bshed\\b")
 private val WORD_DEN_REGEX = Regex("\\bden\\b")
 private val WORD_WC_REGEX = Regex("\\bwc\\b")
 
@@ -307,10 +351,10 @@ private val ROOM_INFERENCE_RULES = listOf(
     RoomInferenceRule(
         roomName = "Hallway & Landing",
         keywords = listOf(
-            "hallway", "landing", "stair", "foyer", "entry",
+            "hallway", "landing", "foyer", "entry",
             "vestibule", "mudroom", "mud room", "corridor", "breezeway"
         ),
-        wordRegexes = listOf(WORD_HALL_REGEX)
+        wordRegexes = listOf(WORD_HALL_REGEX, WORD_STAIR_PREFIX_REGEX)
     ),
     RoomInferenceRule(
         roomName = "Bedroom",
@@ -325,13 +369,17 @@ private val ROOM_INFERENCE_RULES = listOf(
         roomName = "Outdoor",
         keywords = listOf(
             "patio", "porch", "veranda", "lanai", "outdoor", "outside", "exterior", "garden",
-            "dock", "pier", "yard", "deck", "flood", "walkway", "sidewalk", "pathway", "balcony",
+            "dock", "yard", "deck", "flood", "walkway", "sidewalk", "pathway", "balcony",
             "terrace", "gazebo", "pergola", "trellis", "pool", "fountain", "landscape"
-        )
+        ),
+        wordRegexes = listOf(WORD_PIER_REGEX)
     ),
     RoomInferenceRule(
         roomName = "Garage",
-        keywords = listOf("garage", "workshop", "workbench", "driveway", "carport", "shed", "barn")
+        keywords = listOf(
+            "garage", "workshop", "workbench", "driveway", "carport", "toolshed", "woodshed", "barn"
+        ),
+        wordRegexes = listOf(WORD_SHED_REGEX)
     ),
     RoomInferenceRule(
         roomName = "Basement",
@@ -351,17 +399,22 @@ private val ROOM_INFERENCE_RULES = listOf(
             "sunroom", "sun room", "solarium", "mantel", "hearth", "fireplace", "couch", "sofa"
         ),
         wordRegexes = listOf(WORD_DEN_REGEX)
+    ),
+    RoomInferenceRule(
+        roomName = "Hallway & Landing",
+        keywords = listOf("upstairs", "downstairs")
     )
 )
 
 /**
  * Normalizes a hardware `<friendlyName>` or user-supplied switch name for room/category inference
- * by splitting CamelCase boundaries (`"StairwayLight"` -> `"stairway light"`,
- * `"MasterBathVanity"` -> `"master bath vanity"`) and converting `_`, `-`, `/`, `.` to spaces.
+ * by splitting CamelCase & acronym boundaries (`"StairwayLight"` -> `"stairway light"`,
+ * `"WCLight"` -> `"wc light"`) and converting `_`, `-`, `/`, `.` to spaces.
  */
 fun normalizeDeviceNameForInference(deviceName: String): String {
     if (deviceName.isBlank()) return ""
     return deviceName
+        .replace(ACRONYM_CAMEL_BOUNDARY_REGEX, "$1 $2")
         .replace(CAMEL_CASE_BOUNDARY_REGEX, "$1 $2")
         .replace(DELIMITER_NORMALIZE_REGEX, " ")
         .lowercase()
@@ -375,16 +428,14 @@ fun normalizeDeviceNameForInference(deviceName: String): String {
  * Precedence Order:
  * 1. Specific functional rooms (`"Kitchen"`, `"Dining Room"`, `"Ensuite"`) are evaluated **before**
  *    broad modifiers (`"master"`, `"primary"`, `"guest"`, `"kids"`) so compound names like
- *    `"Master Bath Vanity"`, `"Guest Bathroom Light"`, or `"Kids Bath Fan"` resolve to `"Ensuite"`
- *    rather than `"Bedroom"`.
- * 2. Circulation & entry spaces (`"Hallway & Landing"`) match `"stair"` (`"stair"`, `"stairs"`,
- *    `"stairway"`, `"staircase"`, `"upstairs"`, `"downstairs"`), `"landing"`, `"foyer"`, `"entry"`,
- *    `"mudroom"`, `"corridor"`, and word-bounded `"hall"`.
- * 3. Sleeping spaces (`"Bedroom"`) match `"bedroom"`, `"bedside"`, `"nightstand"`, word-bounded `"bed"`,
- *    `"girls"`/`"girl"`, `"boys"`/`"boy"`, `"kids"`/`"kid"`, `"master"`, `"primary"`, `"guest"`, `"nursery"`, etc.
- * 4. Exterior, utility, workspace, and living spaces (`"Outdoor"`, `"Garage"`, `"Basement"`, `"Office"`,
- *    `"Living Room"` with word-bounded `"den"`).
- * 5. Unrecognized names default to `"Unassigned"` (never `"Living Room"`).
+ *    `"Master Bath Vanity"`, `"Guest Bathroom Light"`, or `"Kids Bath Fan"` resolve to `"Ensuite"`.
+ * 2. Circulation & entry spaces (`"Hallway & Landing"`) match word-prefixed `"stair*"` (`"stair"`,
+ *    `"stairs"`, `"stairway"`, `"staircase"`), `"landing"`, `"foyer"`, `"entry"`, `"mudroom"`,
+ *    `"corridor"`, and word-bounded `"hall"` — while floor modifiers (`"upstairs"`, `"downstairs"`)
+ *    fall back to `"Hallway & Landing"` only when no specific room (e.g., `"Upstairs Bedroom"`) matches.
+ * 3. Sleeping, exterior, utility, workspace, and living spaces (`"Bedroom"`, `"Outdoor"` with `\bpier\b`,
+ *    `"Garage"` with `\bshed\b`, `"Basement"`, `"Office"`, `"Living Room"` with `\bden\b`).
+ * 4. Unrecognized names default to `"Unassigned"` (never `"Living Room"`).
  */
 fun inferRoomFromName(deviceName: String): String {
     val normalized = normalizeDeviceNameForInference(deviceName)
@@ -404,21 +455,23 @@ fun resolveDeviceRoomAssignment(
     discoveredRoomName: String = "",
     isDemoMode: Boolean = false
 ): String {
-    val inferredRoom = discoveredRoomName.takeIf {
-        it.isNotBlank() && !it.equals("Unassigned", ignoreCase = true)
+    val cleanDiscovered = discoveredRoomName.trim()
+    val inferredRoom = cleanDiscovered.takeIf {
+        it.isNotEmpty() && !it.equals(UNASSIGNED_ROOM, ignoreCase = true)
     } ?: inferRoomFromName(deviceName)
 
-    if (existingRoomName.isBlank()) return inferredRoom
-    if (isDemoMode) return existingRoomName
+    val cleanExisting = existingRoomName.trim()
+    if (cleanExisting.isEmpty()) return inferredRoom
+    if (isDemoMode) return normalizeRoomName(cleanExisting)
 
-    val isUnassignedPlaceholder = existingRoomName.equals("Unassigned", ignoreCase = true)
-    val isLegacyLivingRoomFallback = existingRoomName.equals("Living Room", ignoreCase = true) &&
+    val isUnassignedPlaceholder = cleanExisting.equals(UNASSIGNED_ROOM, ignoreCase = true)
+    val isLegacyLivingRoomFallback = cleanExisting.equals("Living Room", ignoreCase = true) &&
         inferredRoom != "Living Room"
 
     return if (isUnassignedPlaceholder || isLegacyLivingRoomFallback) {
         inferredRoom
     } else {
-        existingRoomName
+        cleanExisting
     }
 }
 

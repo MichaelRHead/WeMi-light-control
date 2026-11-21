@@ -206,9 +206,11 @@ internal class DeviceCrudAndRulesCoordinator(
                 val resolvedName = device.name.trim().ifBlank {
                     liveDesc.name.ifBlank { baseEntity.name.ifBlank { "WeMi Light Switch" } }
                 }
-                val resolvedRoom = if (device.name.isBlank() &&
-                    (device.roomName.isBlank() || device.roomName == "Living Room" || device.roomName == "Unassigned")
-                ) {
+                val trimmedInputRoom = device.roomName.trim()
+                val isAutoInferRoomInput = trimmedInputRoom.isEmpty() ||
+                    trimmedInputRoom.equals("Living Room", ignoreCase = true) ||
+                    trimmedInputRoom.equals(UNASSIGNED_ROOM, ignoreCase = true)
+                val resolvedRoom = if (device.name.isBlank() && isAutoInferRoomInput) {
                     if (existingMatch != null) {
                         resolveDeviceRoomAssignment(
                             existingRoomName = existingMatch.roomName,
@@ -217,10 +219,10 @@ internal class DeviceCrudAndRulesCoordinator(
                             isDemoMode = demoMode
                         )
                     } else {
-                        liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) }
+                        normalizeRoomName(liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) })
                     }
                 } else {
-                    device.roomName.trim().ifBlank { liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) } }
+                    normalizeRoomName(trimmedInputRoom.ifBlank { liveDesc.roomName.ifBlank { inferRoomFromName(resolvedName) } })
                 }
                 val resolvedType = if (device.name.isBlank()) {
                     liveDesc.deviceType.name
@@ -261,10 +263,10 @@ internal class DeviceCrudAndRulesCoordinator(
             } else {
                 val fallbackName = device.name.trim().ifBlank { liveRow?.name?.ifBlank { null } ?: "WeMi Light Switch" }
                 val fallbackRoom = device.roomName.trim().let { rawRoom ->
-                    if (rawRoom.isBlank() || (device.name.isBlank() && rawRoom == "Living Room")) {
+                    if (rawRoom.isEmpty() || (device.name.isBlank() && rawRoom.equals("Living Room", ignoreCase = true))) {
                         inferRoomFromName(fallbackName)
                     } else {
-                        rawRoom
+                        normalizeRoomName(rawRoom)
                     }
                 }
                 val baseEntity = liveRow ?: device

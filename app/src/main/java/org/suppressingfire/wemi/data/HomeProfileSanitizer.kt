@@ -16,14 +16,88 @@ import org.suppressingfire.wemi.network.XmlAndSkuParser
 internal class HomeProfileSanitizer(
     private val dao: SwitchDao,
     private val isDemoShowroomMode: () -> Boolean,
-    private val nowFormatted: () -> String,
-    private val findMatchingExistingDevice: (
+    private val nowFormatted: () -> String
+) {
+    private val adoptMutex = Mutex()
+
+    fun findMatchingExistingDevice(
         existingDevices: List<DeviceEntity>,
         discovered: SsdpDiscoveredDevice,
         activeNetworkKey: String
-    ) -> DeviceEntity?
-) {
-    private val adoptMutex = Mutex()
+    ): DeviceEntity? {
+        if (!LanRuntimeUtils.isPlaceholderSerial(discovered.serialNumber)) {
+            existingDevices.find {
+                !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
+                    it.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
+            }?.let { return it }
+        }
+        val homeDevices = existingDevices.filter { it.networkKey == activeNetworkKey }
+        val cleanDiscoveredUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered.usn)
+        if (cleanDiscoveredUdn.isNotEmpty()) {
+            homeDevices.find {
+                LanRuntimeUtils.canonicalHardwareUdn(it.udn).equals(cleanDiscoveredUdn, ignoreCase = true) &&
+                    it.matchesDiscovered(discovered, requireSamePortWhenBlankSerial = true)
+            }?.let { return it }
+        }
+        homeDevices.find {
+            it.ipAddress == discovered.ipAddress && it.port == discovered.port &&
+                it.matchesDiscovered(discovered, requireSamePortWhenBlankSerial = true)
+        }?.let { return it }
+        return homeDevices.find {
+            it.matchesDiscovered(discovered, requireSamePortWhenBlankSerial = true)
+        }
+    }
+
+    private fun isDiscoveredClaimedByOtherDevice(
+        discovered: SsdpDiscoveredDevice,
+        existing: DeviceEntity,
+        homeDevices: List<DeviceEntity>,
+        includeEndpointClaim: Boolean
+    ): Boolean {
+        val discSerialReal = !LanRuntimeUtils.isPlaceholderSerial(discovered.serialNumber)
+        val discUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered.usn)
+        return homeDevices.any { other ->
+            (other.id != existing.id && (existing.id != 0 || other !== existing)) && (
+                (discSerialReal && !LanRuntimeUtils.isPlaceholderSerial(other.serialNumber) &&
+                    other.serialNumber.equals(discovered.serialNumber, ignoreCase = true)) ||
+                    (discUdn.isNotEmpty() &&
+                        LanRuntimeUtils.canonicalHardwareUdn(other.udn).equals(discUdn, ignoreCase = true)) ||
+                    (includeEndpointClaim &&
+                        other.ipAddress == discovered.ipAddress && other.port == discovered.port)
+                )
+        }
+    }
+
+    fun findMatchingDiscoveredDevice(
+        existing: DeviceEntity,
+        discoveredDevices: List<SsdpDiscoveredDevice>,
+        homeDevices: List<DeviceEntity> = emptyList(),
+        requireSamePortWhenBlankSerial: Boolean = true
+    ): SsdpDiscoveredDevice? {
+        if (!LanRuntimeUtils.isPlaceholderSerial(existing.serialNumber)) {
+            discoveredDevices.find {
+                !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
+                    it.serialNumber.equals(existing.serialNumber, ignoreCase = true)
+            }?.let { return it }
+        }
+        val cleanExistingUdn = LanRuntimeUtils.canonicalHardwareUdn(existing.udn)
+        if (cleanExistingUdn.isNotEmpty()) {
+            discoveredDevices.find {
+                LanRuntimeUtils.canonicalHardwareUdn(it.usn).equals(cleanExistingUdn, ignoreCase = true) &&
+                    existing.matchesDiscovered(it, requireSamePortWhenBlankSerial)
+            }?.let { return it }
+        }
+        discoveredDevices.find {
+            it.ipAddress == existing.ipAddress &&
+                (!requireSamePortWhenBlankSerial || it.port == existing.port) &&
+                existing.matchesDiscovered(it, requireSamePortWhenBlankSerial) &&
+                !isDiscoveredClaimedByOtherDevice(it, existing, homeDevices, includeEndpointClaim = false)
+        }?.let { return it }
+        return discoveredDevices.find {
+            existing.matchesDiscovered(it, requireSamePortWhenBlankSerial) &&
+                !isDiscoveredClaimedByOtherDevice(it, existing, homeDevices, includeEndpointClaim = true)
+        }
+    }
 
     suspend fun adoptDiscoveredDevice(
         discovered: SsdpDiscoveredDevice,
@@ -70,7 +144,7 @@ internal class HomeProfileSanitizer(
                 ) + 1
             val newEntity = DeviceEntity(
                 name = discovered.name,
-                roomName = discovered.roomName.ifBlank { inferRoomFromName(discovered.name) },
+                roomName = normalizeRoomName(discovered.roomName.ifBlank { inferRoomFromName(discovered.name) }),
                 networkKey = activeNetworkKey,
                 wifiSsid = resolvedSsid,
                 deviceType = discovered.deviceType.name,
@@ -128,8 +202,26 @@ internal class HomeProfileSanitizer(
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
         activeWifiSsid: String = "WeMi-Home-5G"
     ): Int {
+        if (discoveredList.isEmpty()) return 0
+        val existingSnapshot = dao.getAllDevices().first()
+        val homeSnapshot = existingSnapshot.filter { it.networkKey == activeNetworkKey }
+        val orderedList = discoveredList.sortedBy { item ->
+            val hasRealSerial = !LanRuntimeUtils.isPlaceholderSerial(item.serialNumber)
+            val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(item.usn)
+            when {
+                hasRealSerial && existingSnapshot.any {
+                    !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
+                        it.serialNumber.equals(item.serialNumber, ignoreCase = true)
+                } -> 0
+                cleanUdn.isNotEmpty() && homeSnapshot.any {
+                    LanRuntimeUtils.canonicalHardwareUdn(it.udn).equals(cleanUdn, ignoreCase = true)
+                } -> 1
+                homeSnapshot.any { it.ipAddress == item.ipAddress && it.port == item.port } -> 2
+                else -> 3
+            }
+        }
         var newlyAdded = 0
-        for (item in discoveredList) {
+        for (item in orderedList) {
             if (adoptDiscoveredDeviceWithStatus(item, activeNetworkKey, activeWifiSsid).second) {
                 newlyAdded++
             }

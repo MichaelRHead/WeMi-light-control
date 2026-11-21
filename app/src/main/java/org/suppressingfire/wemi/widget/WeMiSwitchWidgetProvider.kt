@@ -104,6 +104,7 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
                 if (appWidgetId <= 0 || targetType == null) return
 
                 val rawSerial = intent.getStringExtra(EXTRA_SERIAL_NUMBER).orEmpty()
+                val rawUdn = intent.getStringExtra(EXTRA_UDN).orEmpty()
                 val config = WidgetTargetConfig(
                     appWidgetId = appWidgetId,
                     targetType = targetType,
@@ -111,7 +112,8 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
                     serialNumber = rawSerial.takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
                     roomName = intent.getStringExtra(EXTRA_ROOM_NAME).orEmpty(),
                     networkKey = intent.getStringExtra(EXTRA_NETWORK_KEY).orEmpty(),
-                    displayName = intent.getStringExtra(EXTRA_DISPLAY_NAME).orEmpty()
+                    displayName = intent.getStringExtra(EXTRA_DISPLAY_NAME).orEmpty(),
+                    udn = LanRuntimeUtils.canonicalHardwareUdn(rawUdn)
                 )
                 WidgetConfigStore.save(context, config)
 
@@ -143,6 +145,7 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
         const val EXTRA_TARGET_TYPE = "extra_widget_target_type"
         const val EXTRA_DEVICE_ID = "extra_widget_device_id"
         const val EXTRA_SERIAL_NUMBER = "extra_widget_serial_number"
+        const val EXTRA_UDN = "extra_widget_udn"
         const val EXTRA_ROOM_NAME = "extra_widget_room_name"
         const val EXTRA_NETWORK_KEY = "extra_widget_network_key"
         const val EXTRA_DISPLAY_NAME = "extra_widget_display_name"

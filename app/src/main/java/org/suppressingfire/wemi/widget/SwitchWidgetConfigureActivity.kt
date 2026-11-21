@@ -202,10 +202,7 @@ internal fun WidgetConfigureScreen(
     }
 
     val roomsWithDevices = remember(scopedDevices) {
-        val grouped = scopedDevices.groupBy { it.normalizedRoomName }
-        val assigned = grouped.filterKeys { !it.equals("Unassigned", ignoreCase = true) }
-        val unassigned = grouped.filterKeys { it.equals("Unassigned", ignoreCase = true) }
-        (assigned + unassigned).toList()
+        org.suppressingfire.wemi.data.groupDevicesByCanonicalRoom(scopedDevices).toList()
     }
 
     Scaffold(

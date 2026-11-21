@@ -31,6 +31,21 @@ object XmlAndSkuParser {
     }
 
     /**
+     * Unescapes standard XML entities (`&lt;`, `&gt;`, `&quot;`, `&apos;`, `&#39;`, `&amp;`)
+     * returned inside `/setup.xml`, `GetMetaInfo`, GENA `NOTIFY`, and `GetApList` payloads.
+     */
+    fun unescapeXml(input: String): String {
+        if (!input.contains('&')) return input
+        return input
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&#39;", "'")
+            .replace("&amp;", "&")
+    }
+
+    /**
      * Builds a standard UTF-8 UPnP SOAP 1.1 envelope for [serviceUrn] and [action],
      * optionally embedding [innerXml] parameter tags inside `<u:$action>`.
      */
@@ -70,15 +85,7 @@ object XmlAndSkuParser {
         rawXml: String,
         unescapeEntities: Boolean = false
     ): ParsedBinaryState {
-        val xml = if (unescapeEntities) {
-            rawXml
-                .replace("&lt;", "<")
-                .replace("&gt;", ">")
-                .replace("&quot;", "\"")
-                .replace("&amp;", "&")
-        } else {
-            rawXml
-        }
+        val xml = if (unescapeEntities) unescapeXml(rawXml) else rawXml
         val rawState = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
             .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
         val parts = if (rawState.isEmpty()) emptyList() else rawState.split("|")
@@ -183,13 +190,15 @@ object XmlAndSkuParser {
         isLiveUdp: Boolean
     ): SsdpDiscoveredDevice {
         val friendlyName = Regex("<friendlyName>([^<]+)</friendlyName>", RegexOption.IGNORE_CASE)
-            .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "WeMi Smart Switch"
+            .find(xml)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim()
+            ?.takeIf { it.isNotEmpty() } ?: "WeMi Smart Switch"
         val serial = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL
         val modelName = Regex("<modelName>([^<]+)</modelName>", RegexOption.IGNORE_CASE)
-            .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "LightSwitch"
+            .find(xml)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim()
+            ?.takeIf { it.isNotEmpty() } ?: "LightSwitch"
         val modelDescription = Regex("<modelDescription>([^<]+)</modelDescription>", RegexOption.IGNORE_CASE)
-            .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
+            .find(xml)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim().orEmpty()
         val firmware = Regex("<firmwareVersion>([^<]+)</firmwareVersion>", RegexOption.IGNORE_CASE)
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "WeMo_WW_2.00.11532.PVT"
         val macAddress = Regex("<macAddress>([^<]+)</macAddress>", RegexOption.IGNORE_CASE)
@@ -282,7 +291,7 @@ object XmlAndSkuParser {
      */
     fun parseMetaInfoSoapResponse(body: String): SwitchMetaInfo? {
         val rawMeta = Regex("<MetaInfo>([^<]+)</MetaInfo>", RegexOption.IGNORE_CASE)
-            .find(body)?.groupValues?.getOrNull(1)?.trim() ?: return null
+            .find(body)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim() ?: return null
         val parts = rawMeta.split("|")
         if (parts.size < 2) return null
         val rawSsid = parts.getOrNull(4)?.trim().orEmpty()
@@ -315,10 +324,7 @@ object XmlAndSkuParser {
      * `SSID|Channel|RSSI|AuthMode/EncrypType`.
      */
     fun parseApListXml(xml: String): List<ScannedAp> {
-        val unescaped = xml
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&amp;", "&")
+        val unescaped = unescapeXml(xml)
         val rawList = Regex("<(?:ApList|NetworkList)>([\\s\\S]*?)</(?:ApList|NetworkList)>", RegexOption.IGNORE_CASE)
             .find(unescaped)?.groupValues?.getOrNull(1)?.trim() ?: return emptyList()
 

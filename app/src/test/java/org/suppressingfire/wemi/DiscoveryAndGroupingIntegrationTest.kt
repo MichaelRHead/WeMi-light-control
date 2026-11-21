@@ -182,6 +182,15 @@ class DiscoveryAndGroupingIntegrationTest {
                             candidatePortsOverride = listOf(deadPort, serverB.port)
                         )
                     )
+                    assertEquals(
+                        serverA.port,
+                        client.probeWemoPort(
+                            ipAddress = "127.0.0.1",
+                            preferredPort = deadPort,
+                            expectedSerialOrUdn = "uuid:Socket-1_0-221644K010AAA1",
+                            candidatePortsOverride = listOf(deadPort, serverB.port, serverA.port)
+                        )
+                    )
 
                     val matchingUdnDevice = DeviceEntity(
                         name = "Porch Plug",
@@ -211,53 +220,30 @@ class DiscoveryAndGroupingIntegrationTest {
         runBlocking {
             val dao = database.switchDao()
             val homeKey = "wifi_lan_192_168_1"
-            dao.insertHomeNetwork(
-                HomeNetworkEntity(
-                    networkKey = homeKey,
-                    homeName = "My Home",
-                    ssidLabel = "HomeNet-2.4G",
-                    subnetPrefix = "192.168.1"
-                )
-            )
+            dao.insertHomeNetwork(HomeNetworkEntity(homeKey, "My Home", "HomeNet-2.4G", "192.168.1"))
 
             // Two factory-named switches with blank serials distinguished only by canonical UDN
             val devAId = dao.insertDevice(
                 DeviceEntity(
-                    name = "WeMo Light Switch",
-                    roomName = "Unassigned",
-                    networkKey = homeKey,
-                    ipAddress = "192.168.1.40",
-                    port = 49153,
-                    serialNumber = "",
-                    udn = "uuid:Socket-1_0-221644K010AAA1",
-                    sortOrder = 0
+                    name = "WeMo Light Switch", roomName = "Unassigned", networkKey = homeKey,
+                    ipAddress = "192.168.1.40", port = 49153, serialNumber = "",
+                    udn = "uuid:Socket-1_0-221644K010AAA1", sortOrder = 0
                 )
             ).toInt()
             val devBId = dao.insertDevice(
                 DeviceEntity(
-                    name = "WeMo Light Switch",
-                    roomName = "Unassigned",
-                    networkKey = homeKey,
-                    ipAddress = "192.168.1.41",
-                    port = 49154,
-                    serialNumber = "",
-                    udn = "uuid:Socket-1_0-221644K010BBB2",
-                    sortOrder = 1
+                    name = "WeMo Light Switch", roomName = "Unassigned", networkKey = homeKey,
+                    ipAddress = "192.168.1.41", port = 49154, serialNumber = "",
+                    udn = "uuid:Socket-1_0-221644K010BBB2", sortOrder = 1
                 )
             ).toInt()
 
             val repo = SwitchRepository(dao = dao, networkClient = NetworkClient(), initialDemoModeOverride = false)
             val discoveredB = SsdpDiscoveredDevice(
-                name = "WeMo Light Switch",
-                ipAddress = "192.168.1.88",
-                port = 49155,
-                deviceType = DeviceType.SWITCH_PLUG,
-                modelName = "Socket-1_0",
-                serialNumber = "",
-                firmwareVersion = "WeMo_WW_2.00.12000",
-                usn = "uuid:Socket-1_0-221644K010BBB2::urn:Belkin:service:basicevent:1",
-                searchTarget = "urn:Belkin:service:basicevent:1",
-                locationUrl = "http://192.168.1.88:49155/setup.xml",
+                name = "WeMo Light Switch", ipAddress = "192.168.1.88", port = 49155,
+                deviceType = DeviceType.SWITCH_PLUG, modelName = "Socket-1_0", serialNumber = "",
+                firmwareVersion = "WeMo_WW_2.00.12000", usn = "uuid:Socket-1_0-221644K010BBB2::urn:Belkin:service:basicevent:1",
+                searchTarget = "urn:Belkin:service:basicevent:1", locationUrl = "http://192.168.1.88:49155/setup.xml",
                 responseTimeMs = 9L
             )
             val updatedB = repo.adoptDiscoveredDevice(discoveredB, homeKey, "HomeNet-2.4G")
@@ -269,38 +255,20 @@ class DiscoveryAndGroupingIntegrationTest {
             // Two blank-serial, blank-UDN factory-named switches distinguished only by exact IP:Port (Tier 3a > Tier 3b)
             val plain1Id = dao.insertDevice(
                 DeviceEntity(
-                    name = "WeMo Mini",
-                    roomName = "Unassigned",
-                    networkKey = homeKey,
-                    ipAddress = "192.168.1.50",
-                    port = 49153,
-                    isOn = false,
-                    serialNumber = "",
-                    udn = "",
-                    sortOrder = 2
+                    name = "WeMo Mini", roomName = "Unassigned", networkKey = homeKey,
+                    ipAddress = "192.168.1.50", port = 49153, isOn = false, serialNumber = "", udn = "", sortOrder = 2
                 )
             ).toInt()
             val plain2Id = dao.insertDevice(
                 DeviceEntity(
-                    name = "WeMo Mini",
-                    roomName = "Unassigned",
-                    networkKey = homeKey,
-                    ipAddress = "192.168.1.51",
-                    port = 49153,
-                    isOn = false,
-                    serialNumber = "",
-                    udn = "",
-                    sortOrder = 3
+                    name = "WeMo Mini", roomName = "Unassigned", networkKey = homeKey,
+                    ipAddress = "192.168.1.51", port = 49153, isOn = false, serialNumber = "", udn = "", sortOrder = 3
                 )
             ).toInt()
 
             val discoveredPlain2 = discoveredB.copy(
-                name = "WeMo Mini",
-                ipAddress = "192.168.1.51",
-                port = 49153,
-                usn = "",
-                locationUrl = "http://192.168.1.51:49153/setup.xml",
-                isOn = true
+                name = "WeMo Mini", ipAddress = "192.168.1.51", port = 49153,
+                usn = "", locationUrl = "http://192.168.1.51:49153/setup.xml", isOn = true
             )
             val matchedPlain2 = repo.adoptDiscoveredDevice(discoveredPlain2, homeKey, "HomeNet-2.4G")
             assertEquals(plain2Id, matchedPlain2.id)
@@ -314,29 +282,17 @@ class DiscoveryAndGroupingIntegrationTest {
         runBlocking {
             val dao = database.switchDao()
             val homeKey = "wifi_lan_127_0_0"
-            dao.insertHomeNetwork(
-                HomeNetworkEntity(
-                    networkKey = homeKey,
-                    homeName = "My Home",
-                    ssidLabel = "LAN 127.0.0.0/24",
-                    subnetPrefix = "127.0.0"
-                )
-            )
+            dao.insertHomeNetwork(HomeNetworkEntity(homeKey, "My Home", "LAN 127.0.0.0/24", "127.0.0"))
 
             FakeUpnpServer(
-                initialFriendlyName = "Kitchen Island Dimmer",
-                serialNumber = "221840K0105511",
-                udn = "uuid:Dimmer-1_0-221840K0105511",
-                wifiSsid = "HeadFamily-2.4G",
-                enableSsdpResponder = true
+                initialFriendlyName = "Kitchen Island Dimmer", serialNumber = "221840K0105511",
+                udn = "uuid:Dimmer-1_0-221840K0105511", wifiSsid = "HeadFamily-2.4G", enableSsdpResponder = true
             ).use { server ->
                 val repo = SwitchRepository(dao = dao, networkClient = NetworkClient(), initialDemoModeOverride = false)
                 val summary = repo.reconnectAndRediscoverHome(homeKey)
                 assertEquals(1, summary.reconnectedCount)
                 assertEquals("HeadFamily-2.4G", summary.ssidLabel)
-
-                val persistedHome = dao.getAllHomeNetworks().first().first { it.networkKey == homeKey }
-                assertEquals("HeadFamily-2.4G", persistedHome.ssidLabel)
+                assertEquals("HeadFamily-2.4G", dao.getAllHomeNetworks().first().first { it.networkKey == homeKey }.ssidLabel)
 
                 val persistedSwitch = dao.getAllDevices().first().first()
                 assertEquals("HeadFamily-2.4G", persistedSwitch.wifiSsid)
@@ -344,22 +300,13 @@ class DiscoveryAndGroupingIntegrationTest {
 
                 // Re-adopting when GetMetaInfo returns a Belkin soft-AP SSID must keep the known router SSID
                 val softApDiscovery = SsdpDiscoveredDevice(
-                    name = "Kitchen Island Dimmer",
-                    roomName = "Kitchen",
-                    ipAddress = "127.0.0.1",
-                    port = server.port,
-                    deviceType = DeviceType.LIGHTBULB_DIMMER,
-                    modelName = "Dimmer-1_0",
-                    serialNumber = "221840K0105511",
-                    firmwareVersion = "WeMo_WW_2.00.12000",
-                    usn = "uuid:Dimmer-1_0-221840K0105511::urn:Belkin:service:basicevent:1",
-                    searchTarget = "urn:Belkin:service:basicevent:1",
-                    locationUrl = "http://127.0.0.1:${server.port}/setup.xml",
-                    responseTimeMs = 6L,
-                    wifiSsid = "WeMo.Dimmer.551"
+                    name = "Kitchen Island Dimmer", roomName = "Kitchen", ipAddress = "127.0.0.1", port = server.port,
+                    deviceType = DeviceType.LIGHTBULB_DIMMER, modelName = "Dimmer-1_0", serialNumber = "221840K0105511",
+                    firmwareVersion = "WeMo_WW_2.00.12000", usn = "uuid:Dimmer-1_0-221840K0105511::urn:Belkin:service:basicevent:1",
+                    searchTarget = "urn:Belkin:service:basicevent:1", locationUrl = "http://127.0.0.1:${server.port}/setup.xml",
+                    responseTimeMs = 6L, wifiSsid = "WeMo.Dimmer.551"
                 )
-                val updated = repo.adoptDiscoveredDevice(softApDiscovery, homeKey, "LAN 127.0.0.0/24")
-                assertEquals("HeadFamily-2.4G", updated.wifiSsid)
+                assertEquals("HeadFamily-2.4G", repo.adoptDiscoveredDevice(softApDiscovery, homeKey, "LAN 127.0.0.0/24").wifiSsid)
             }
         }
 
@@ -439,6 +386,64 @@ class DiscoveryAndGroupingIntegrationTest {
                 repo.moveDeviceOrder(dao.getDeviceById(existingId)!!, moveUp = false, withinRoomOnly = true)
                 val reordered = dao.getAllDevices().first().sortedBy { it.sortOrder }.map { it.id }
                 assertEquals(listOf(kitchen2Id, unassignedId, existingId), reordered)
+            }
+        }
+
+    @Test
+    fun `verify executeSsdpScan anti-hijack guard and exact-endpoint-first batch adoption ordering`() =
+        runBlocking {
+            val dao = database.switchDao()
+            val homeKey = "wifi_lan_127_0_0"
+            dao.insertHomeNetwork(HomeNetworkEntity(homeKey, "My Home", "HomeNet-2.4G", "127.0.0"))
+            val deadPort = ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { it.localPort }
+
+            FakeUpnpServer(
+                initialFriendlyName = "WeMo Light Switch", serialNumber = "SER-ONLINE-A",
+                udn = "uuid:Socket-1_0-SER-ONLINE-A", initialRelayOn = true, enableSsdpResponder = true
+            ).use { serverA ->
+                val onlineAId = dao.insertDevice(
+                    DeviceEntity(
+                        name = "WeMo Light Switch", roomName = "Unassigned", networkKey = homeKey,
+                        ipAddress = "127.0.0.1", port = serverA.port, isOn = false,
+                        serialNumber = "SER-ONLINE-A", udn = "uuid:Socket-1_0-SER-ONLINE-A", sortOrder = 0
+                    )
+                ).toInt()
+                val offlineBId = dao.insertDevice(
+                    DeviceEntity(
+                        name = "WeMo Light Switch", roomName = "Unassigned", networkKey = homeKey,
+                        ipAddress = "127.0.0.1", port = deadPort, isOn = false,
+                        serialNumber = "", udn = "", sortOrder = 1
+                    )
+                ).toInt()
+
+                val repo = SwitchRepository(dao = dao, networkClient = NetworkClient(), initialDemoModeOverride = false)
+                repo.executeSsdpScan(autoAdoptNew = false, activeNetworkKey = homeKey)
+                assertEquals(true, dao.getDeviceById(onlineAId)?.isOn)
+                assertEquals("", dao.getDeviceById(offlineBId)?.serialNumber)
+                assertEquals(deadPort, dao.getDeviceById(offlineBId)?.port)
+
+                // Batch adoption with a brand-new factory-named switch listed before existing .51 must not swap rows
+                val blank51Id = dao.insertDevice(
+                    DeviceEntity(
+                        name = "WeMo Mini", roomName = "Unassigned", networkKey = homeKey,
+                        ipAddress = "192.168.1.51", port = 49153, serialNumber = "", udn = "", sortOrder = 2
+                    )
+                ).toInt()
+                val baseDisc = SsdpDiscoveredDevice(
+                    name = "WeMo Mini", ipAddress = "192.168.1.99", port = 49153,
+                    deviceType = DeviceType.SWITCH_PLUG, modelName = "Socket", serialNumber = "SER-NEW-99",
+                    firmwareVersion = "WeMo_WW_2.00", usn = "uuid:Socket-1_0-SER-NEW-99",
+                    searchTarget = "urn:Belkin:service:basicevent:1", locationUrl = "http://192.168.1.99:49153/setup.xml",
+                    responseTimeMs = 8L
+                )
+                val disc51 = baseDisc.copy(
+                    ipAddress = "192.168.1.51", serialNumber = "SER-REAL-51",
+                    usn = "uuid:Socket-1_0-SER-REAL-51", locationUrl = "http://192.168.1.51:49153/setup.xml"
+                )
+                assertEquals(1, repo.adoptDiscoveredDevices(listOf(baseDisc, disc51), homeKey, "HomeNet-2.4G"))
+                assertEquals("SER-REAL-51", dao.getDeviceById(blank51Id)?.serialNumber)
+                assertEquals("192.168.1.51", dao.getDeviceById(blank51Id)?.ipAddress)
+                assertTrue(dao.getAllDevices().first().any { it.serialNumber == "SER-NEW-99" && it.ipAddress == "192.168.1.99" })
             }
         }
 }

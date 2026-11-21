@@ -30,7 +30,8 @@ data class WidgetTargetConfig(
     val serialNumber: String = "",
     val roomName: String = "",
     val networkKey: String = "",
-    val displayName: String = ""
+    val displayName: String = "",
+    val udn: String = ""
 ) {
     fun normalizedRoomName(): String = normalizeRoomName(roomName)
 
@@ -43,7 +44,8 @@ data class WidgetTargetConfig(
                 serialNumber = device.serialNumber.takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
                 roomName = device.normalizedRoomName,
                 networkKey = device.networkKey,
-                displayName = device.name.trim().ifBlank { "Smart Light" }
+                displayName = device.name.trim().ifBlank { "Smart Light" },
+                udn = LanRuntimeUtils.canonicalHardwareUdn(device.udn)
             )
 
         fun forRoom(appWidgetId: Int, roomName: String, networkKey: String): WidgetTargetConfig {
@@ -79,6 +81,7 @@ object WidgetConfigStore {
             putString("${p}type", config.targetType.name)
             putInt("${p}device_id", config.deviceId)
             putString("${p}serial", config.serialNumber)
+            putString("${p}udn", LanRuntimeUtils.canonicalHardwareUdn(config.udn))
             putString("${p}room_name", config.roomName)
             putString("${p}network_key", config.networkKey)
             putString("${p}display_name", config.displayName)
@@ -97,7 +100,8 @@ object WidgetConfigStore {
             serialNumber = prefs.getString("${p}serial", "").orEmpty(),
             roomName = prefs.getString("${p}room_name", "").orEmpty(),
             networkKey = prefs.getString("${p}network_key", "").orEmpty(),
-            displayName = prefs.getString("${p}display_name", "").orEmpty()
+            displayName = prefs.getString("${p}display_name", "").orEmpty(),
+            udn = LanRuntimeUtils.canonicalHardwareUdn(prefs.getString("${p}udn", ""))
         )
     }
 
@@ -111,6 +115,7 @@ object WidgetConfigStore {
             remove("${p}type")
             remove("${p}device_id")
             remove("${p}serial")
+            remove("${p}udn")
             remove("${p}room_name")
             remove("${p}network_key")
             remove("${p}display_name")

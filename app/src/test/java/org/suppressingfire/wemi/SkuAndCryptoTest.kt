@@ -325,5 +325,130 @@ class SkuAndCryptoTest {
             )
         )
     }
+
+    @Test
+    fun `verify XML entity unescaping, refined room inference, canonical room grouping, and UDN deduplication`() {
+        val client = NetworkClient()
+        val entityXml = """
+            <?xml version="1.0"?>
+            <root xmlns="urn:Belkin:device-1-0">
+              <device>
+                <deviceType>urn:Belkin:device:lightswitch:1</deviceType>
+                <friendlyName>Mike&apos;s Bed &amp; Bath Lamp</friendlyName>
+                <modelName>LightSwitch</modelName>
+                <serialNumber>221517K01099AA</serialNumber>
+                <UDN>uuid:Lightswitch-1_0-221517K01099AA</UDN>
+              </device>
+            </root>
+        """.trimIndent()
+        val parsedDesc = client.parseSetupXmlDescriptor(
+            xml = entityXml,
+            locationUrl = "http://192.168.1.70:49153/setup.xml",
+            usnHeader = "",
+            stHeader = "urn:Belkin:service:basicevent:1",
+            responseTimeMs = 9L,
+            isLiveUdp = true
+        )
+        assertEquals("Mike's Bed & Bath Lamp", parsedDesc.name)
+        assertEquals("Ensuite", parsedDesc.roomName)
+
+        val metaWithEntities = """
+            <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
+              <s:Body>
+                <u:GetMetaInfoResponse xmlns:u="urn:Belkin:service:metainfo:1">
+                  <MetaInfo>EC1A59AA1122|221517K01099AA|F7C030|WeMo_WW_2.00|AT&amp;T Mike&#39;s Wi-Fi|LightSwitch</MetaInfo>
+                </u:GetMetaInfoResponse>
+              </s:Body>
+            </s:Envelope>
+        """.trimIndent()
+        val parsedMeta = org.suppressingfire.wemi.network.XmlAndSkuParser.parseMetaInfoSoapResponse(metaWithEntities)
+        assertEquals("AT&T Mike's Wi-Fi", parsedMeta?.accessPointSsid)
+
+        // Floor modifiers ("upstairs"/"downstairs") must not hijack specific rooms like Bedroom/Office/Living Room
+        assertEquals("Bedroom", org.suppressingfire.wemi.data.inferRoomFromName("Upstairs Bedroom"))
+        assertEquals("Office", org.suppressingfire.wemi.data.inferRoomFromName("Upstairs Office"))
+        assertEquals("Living Room", org.suppressingfire.wemi.data.inferRoomFromName("Downstairs Living Room"))
+        assertEquals("Ensuite", org.suppressingfire.wemi.data.inferRoomFromName("Downstairs Bath"))
+        assertEquals("Hallway & Landing", org.suppressingfire.wemi.data.inferRoomFromName("Upstairs Light"))
+        assertEquals("Hallway & Landing", org.suppressingfire.wemi.data.inferRoomFromName("Downstairs Switch"))
+
+        // Word-bounded "shed" and "pier" prevent false matches on "Finished Basement", "Polished", and "Pierre"
+        assertEquals("Basement", org.suppressingfire.wemi.data.inferRoomFromName("Finished Basement"))
+        assertEquals("Basement", org.suppressingfire.wemi.data.inferRoomFromName("Unfinished Basement"))
+        assertEquals("Unassigned", org.suppressingfire.wemi.data.inferRoomFromName("Polished Brass Lamp"))
+        assertEquals("Garage", org.suppressingfire.wemi.data.inferRoomFromName("Tool Shed Light"))
+        assertEquals("Garage", org.suppressingfire.wemi.data.inferRoomFromName("Woodshed Switch"))
+        assertEquals("Unassigned", org.suppressingfire.wemi.data.inferRoomFromName("Pierre's Accent Lamp"))
+        assertEquals("Outdoor", org.suppressingfire.wemi.data.inferRoomFromName("Boat Pier Light"))
+
+        // Acronym CamelCase boundaries split cleanly
+        assertEquals("Ensuite", org.suppressingfire.wemi.data.inferRoomFromName("WCLight"))
+        assertEquals("Living Room", org.suppressingfire.wemi.data.inferRoomFromName("TVDenLamp"))
+
+        // Canonical room normalization and case-insensitive room grouping with Unassigned sorted last
+        assertEquals("Unassigned", org.suppressingfire.wemi.data.normalizeRoomName("  unassigned  "))
+        assertEquals(
+            "Bedroom",
+            org.suppressingfire.wemi.data.resolveDeviceRoomAssignment("  Living Room  ", "Upstairs Bedroom")
+        )
+        assertEquals(
+            "Kitchen",
+            org.suppressingfire.wemi.data.resolveDeviceRoomAssignment("  Kitchen  ", "Island Plug")
+        )
+        val grouped = org.suppressingfire.wemi.data.groupDevicesByCanonicalRoom(
+            listOf(
+                org.suppressingfire.wemi.data.DeviceEntity(id = 1, name = "Plug A", roomName = "unassigned", sortOrder = 0),
+                org.suppressingfire.wemi.data.DeviceEntity(id = 2, name = "Sink Light", roomName = "kitchen", sortOrder = 1),
+                org.suppressingfire.wemi.data.DeviceEntity(id = 3, name = "Island Light", roomName = "Kitchen", sortOrder = 2),
+                org.suppressingfire.wemi.data.DeviceEntity(id = 4, name = "Plug B", roomName = "  ", sortOrder = 3)
+            )
+        )
+        assertEquals(listOf("Kitchen", "Unassigned"), grouped.keys.toList())
+        assertEquals(listOf(2, 3), grouped["Kitchen"]?.map { it.id })
+        assertEquals(listOf(1, 4), grouped["Unassigned"]?.map { it.id })
+
+        // SsdpDiscoveredDevice Tier-2 canonical UDN deduplication across ports
+        val udnNodeA = parsedDesc.copy(serialNumber = "", port = 49153, usn = "uuid:Lightswitch-1_0-UDN123")
+        val udnNodeAPortHop = udnNodeA.copy(port = 49154, usn = "uuid:Lightswitch-1_0-UDN123::urn:Belkin:service:basicevent:1")
+        val udnNodeB = udnNodeA.copy(usn = "uuid:Lightswitch-1_0-UDN999")
+        assertTrue(udnNodeA.matchesEndpointOrSerial(udnNodeAPortHop))
+        assertFalse(udnNodeA.matchesEndpointOrSerial(udnNodeB))
+    }
+
+    @Test
+    fun `verify Home Screen widget Tier-2 canonical UDN resolution and persistence when serial is blank`() {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
+        org.suppressingfire.wemi.widget.WidgetConfigStore.clearAll(context)
+        try {
+            val udnSwitchA = org.suppressingfire.wemi.data.DeviceEntity(
+                id = 11, name = "WeMo Light Switch", roomName = "Unassigned",
+                ipAddress = "192.168.1.40", serialNumber = "", udn = "uuid:Socket-1_0-UDNA001"
+            )
+            val udnSwitchB = org.suppressingfire.wemi.data.DeviceEntity(
+                id = 12, name = "WeMo Light Switch", roomName = "Unassigned",
+                ipAddress = "192.168.1.41", serialNumber = "", udn = "uuid:Socket-1_0-UDNB002"
+            )
+            val savedCfg = org.suppressingfire.wemi.widget.WidgetTargetConfig.forDevice(811, udnSwitchB)
+            org.suppressingfire.wemi.widget.WidgetConfigStore.save(context, savedCfg)
+            val loaded = org.suppressingfire.wemi.widget.WidgetConfigStore.load(context, 811)!!
+            assertEquals("uuid:Socket-1_0-UDNB002", loaded.udn)
+
+            // Recycled ID (11) & renamed switch must still resolve by canonical UDN to switch B and reject switch A
+            val afterResetB = udnSwitchB.copy(id = 99, name = "Renamed Porch Switch")
+            val recycledA = udnSwitchA.copy(id = 12)
+            assertEquals(
+                99,
+                org.suppressingfire.wemi.widget.WidgetRemoteViewsBuilder
+                    .resolveTargetDevice(loaded, listOf(recycledA, afterResetB))?.id
+            )
+            assertEquals(
+                null,
+                org.suppressingfire.wemi.widget.WidgetRemoteViewsBuilder
+                    .resolveTargetDevice(loaded, listOf(recycledA))
+            )
+        } finally {
+            org.suppressingfire.wemi.widget.WidgetConfigStore.clearAll(context)
+        }
+    }
 }
 

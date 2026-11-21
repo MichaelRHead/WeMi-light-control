@@ -40,8 +40,7 @@ internal class DiscoveryCoordinator(
     private val homeSanitizer = HomeProfileSanitizer(
         dao = dao,
         isDemoShowroomMode = isDemoShowroomMode,
-        nowFormatted = nowFormatted,
-        findMatchingExistingDevice = ::findMatchingExistingDevice
+        nowFormatted = nowFormatted
     )
 
     /**
@@ -61,34 +60,24 @@ internal class DiscoveryCoordinator(
         existingDevices: List<DeviceEntity>,
         discovered: SsdpDiscoveredDevice,
         activeNetworkKey: String
-    ): DeviceEntity? {
-        if (!LanRuntimeUtils.isPlaceholderSerial(discovered.serialNumber)) {
-            existingDevices.find {
-                !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
-                    it.serialNumber.equals(discovered.serialNumber, ignoreCase = true)
-            }?.let { return it }
-        }
-        val homeDevices = existingDevices.filter { it.networkKey == activeNetworkKey }
-        val cleanDiscoveredUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered.usn)
-        if (cleanDiscoveredUdn.isNotEmpty()) {
-            homeDevices.find {
-                LanRuntimeUtils.canonicalHardwareUdn(it.udn).equals(cleanDiscoveredUdn, ignoreCase = true) &&
-                    matchesDiscoveredDevice(it, discovered, requireSamePortWhenBlankSerial = true)
-            }?.let { return it }
-        }
-        homeDevices.find {
-            it.ipAddress == discovered.ipAddress && it.port == discovered.port &&
-                matchesDiscoveredDevice(it, discovered, requireSamePortWhenBlankSerial = true)
-        }?.let { return it }
-        return homeDevices.find {
-            matchesDiscoveredDevice(it, discovered, requireSamePortWhenBlankSerial = true)
-        }
-    }
+    ): DeviceEntity? = homeSanitizer.findMatchingExistingDevice(existingDevices, discovered, activeNetworkKey)
+
+    internal fun findMatchingDiscoveredDevice(
+        existing: DeviceEntity,
+        discoveredDevices: List<SsdpDiscoveredDevice>,
+        homeDevices: List<DeviceEntity> = emptyList(),
+        requireSamePortWhenBlankSerial: Boolean = true
+    ): SsdpDiscoveredDevice? = homeSanitizer.findMatchingDiscoveredDevice(
+        existing = existing,
+        discoveredDevices = discoveredDevices,
+        homeDevices = homeDevices,
+        requireSamePortWhenBlankSerial = requireSamePortWhenBlankSerial
+    )
 
     /**
      * Two-stage self-healing reconnect for a device whose primary SOAP call failed:
      * - Stage 1: Re-probe all 9 UPnP ports on the device's current IP address (verifying serialNumber/UDN).
-     * - Stage 2: If Stage 1 returns null (device moved to a new DHCP IP), run a fast SSDP scan and match by serialNumber.
+     * - Stage 2: If Stage 1 returns null (device moved to a new DHCP IP), run a fast SSDP scan and match by serialNumber/UDN.
      */
     suspend fun attemptTwoStageReconnect(device: DeviceEntity): DeviceEntity? {
         val newPort = networkClient.probeWemoPort(
@@ -107,13 +96,13 @@ internal class DiscoveryCoordinator(
             allowUnicastSubnetFallback = false
         )
         onSsdpReport(scanReport)
-        val match = scanReport.discoveredDevices.find { discovered ->
-            matchesDiscoveredDevice(
-                existing = device,
-                discovered = discovered,
-                requireSamePortWhenBlankSerial = false
-            )
-        }
+        val peerDevices = dao.getAllDevices().first().filter { it.networkKey == device.networkKey }
+        val match = findMatchingDiscoveredDevice(
+            existing = device,
+            discoveredDevices = scanReport.discoveredDevices,
+            homeDevices = peerDevices,
+            requireSamePortWhenBlankSerial = false
+        )
         return if (match != null) {
             device.copy(
                 ipAddress = match.ipAddress,
@@ -303,13 +292,12 @@ internal class DiscoveryCoordinator(
                 async {
                     mutexFor(device).withLock {
                         val latest = if (device.id != 0) dao.getDeviceById(device.id) ?: return@withLock null else device
-                        val ssdpMatch = report.discoveredDevices.find { discovered ->
-                            matchesDiscoveredDevice(
-                                existing = latest,
-                                discovered = discovered,
-                                requireSamePortWhenBlankSerial = false
-                            )
-                        }
+                        val ssdpMatch = findMatchingDiscoveredDevice(
+                            existing = latest,
+                            discoveredDevices = report.discoveredDevices,
+                            homeDevices = rememberedForHome,
+                            requireSamePortWhenBlankSerial = false
+                        )
                         val candidateDevice = if (ssdpMatch != null) {
                             latest.copy(ipAddress = ssdpMatch.ipAddress, port = ssdpMatch.port)
                         } else {
@@ -400,9 +388,12 @@ internal class DiscoveryCoordinator(
         currentDevicesForHome.forEach { existing ->
             mutexFor(existing).withLock {
                 val latest = if (existing.id != 0) dao.getDeviceById(existing.id) ?: return@withLock else existing
-                val match = report.discoveredDevices.find { discovered ->
-                    matchesDiscoveredDevice(latest, discovered, requireSamePortWhenBlankSerial = true)
-                } ?: return@withLock
+                val match = findMatchingDiscoveredDevice(
+                    existing = latest,
+                    discoveredDevices = report.discoveredDevices,
+                    homeDevices = currentDevicesForHome,
+                    requireSamePortWhenBlankSerial = true
+                ) ?: return@withLock
 
                 val recentSetMs = lastSetStateTimestampMs[latest.id] ?: 0L
                 val allowStateOverwrite = (System.currentTimeMillis() - recentSetMs) > 1500L

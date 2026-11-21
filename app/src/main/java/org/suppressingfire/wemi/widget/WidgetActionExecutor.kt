@@ -106,8 +106,15 @@ object WidgetActionExecutor {
                         val learnedRealSerial =
                             !LanRuntimeUtils.isPlaceholderSerial(updated.serialNumber) &&
                                 !updated.serialNumber.equals(config.serialNumber, ignoreCase = true)
-                        // Heal persisted config if device ID, name, or real hardware serial changed
-                        if (updated.id != config.deviceId || updated.name != config.displayName || learnedRealSerial) {
+                        val updatedCanonicalUdn = LanRuntimeUtils.canonicalHardwareUdn(updated.udn)
+                        val learnedCanonicalUdn = updatedCanonicalUdn.isNotEmpty() &&
+                            !updatedCanonicalUdn.equals(LanRuntimeUtils.canonicalHardwareUdn(config.udn), ignoreCase = true)
+                        // Heal persisted config if device ID, name, real serial, or canonical UDN changed
+                        if (updated.id != config.deviceId ||
+                            updated.name != config.displayName ||
+                            learnedRealSerial ||
+                            learnedCanonicalUdn
+                        ) {
                             WidgetConfigStore.save(
                                 appCtx,
                                 WidgetTargetConfig.forDevice(appWidgetId, updated)
@@ -187,15 +194,18 @@ object WidgetActionExecutor {
             }
 
             val updatedDevices = repository.allDevices.first()
+            val activeIds = WidgetUpdater.getActiveWidgetIds(appCtx)
             WidgetUpdater.refreshWidgetsForDevices(appCtx, updatedDevices)
-            // Also update the tapped ID explicitly in case the launcher/test hasn't registered it in AppWidgetManager
-            WidgetUpdater.updateSingleWidget(
-                context = appCtx,
-                appWidgetId = appWidgetId,
-                config = WidgetConfigStore.load(appCtx, appWidgetId) ?: config,
-                devices = updatedDevices,
-                isUpdating = false
-            )
+            // Also update the tapped ID explicitly only if the launcher/test hasn't registered it in AppWidgetManager
+            if (appWidgetId !in activeIds) {
+                WidgetUpdater.updateSingleWidget(
+                    context = appCtx,
+                    appWidgetId = appWidgetId,
+                    config = WidgetConfigStore.load(appCtx, appWidgetId) ?: config,
+                    devices = updatedDevices,
+                    isUpdating = false
+                )
+            }
             executed
         } finally {
             if (ownsRepo) {
@@ -205,7 +215,9 @@ object WidgetActionExecutor {
     }
 
     /**
-     * Refreshes the supplied [appWidgetIds] against the latest persisted Room device state.
+     * Refreshes the supplied [appWidgetIds] against the latest persisted Room device state,
+     * serializing each widget ID against in-flight [toggleWidgetTarget] runs so stale toggle
+     * snapshots cannot overwrite a subsequent `ACTION_APPWIDGET_UPDATE` refresh.
      */
     suspend fun refreshWidgetIds(
         context: Context,
@@ -220,16 +232,18 @@ object WidgetActionExecutor {
             context = appCtx
         )
         try {
-            val devices = loadAllDevices(repository)
             appWidgetIds.forEach { widgetId ->
-                val config = WidgetConfigStore.load(appCtx, widgetId)
-                WidgetUpdater.updateSingleWidget(
-                    context = appCtx,
-                    appWidgetId = widgetId,
-                    config = config,
-                    devices = devices,
-                    isUpdating = false
-                )
+                widgetMutexes.computeIfAbsent(widgetId) { Mutex() }.withLock {
+                    val devices = loadAllDevices(repository)
+                    val config = WidgetConfigStore.load(appCtx, widgetId)
+                    WidgetUpdater.updateSingleWidget(
+                        context = appCtx,
+                        appWidgetId = widgetId,
+                        config = config,
+                        devices = devices,
+                        isUpdating = false
+                    )
+                }
             }
         } finally {
             if (ownsRepo) {

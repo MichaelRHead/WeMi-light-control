@@ -183,6 +183,9 @@ class NetworkClient(
                                         (!isExpectedUdn && cleanXmlUdn.contains(cleanExpected, ignoreCase = true))
                                     ))
                                 if (!matches && (realXmlSerial.isNotEmpty() || cleanXmlUdn.isNotEmpty())) {
+                                    if (ipAddress == "127.0.0.1" || ipAddress.equals("localhost", ignoreCase = true)) {
+                                        break
+                                    }
                                     return@withContext null
                                 }
                             }

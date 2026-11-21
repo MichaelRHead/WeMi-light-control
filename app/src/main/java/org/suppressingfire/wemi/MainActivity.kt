@@ -119,10 +119,7 @@ fun WeMiSwitchApp(
     }
 
     val availableRooms = remember(homeDevices) {
-        homeDevices
-            .map { it.normalizedRoomName }
-            .distinct()
-            .sortedBy { it.equals("Unassigned", ignoreCase = true) }
+        org.suppressingfire.wemi.data.groupDevicesByCanonicalRoom(homeDevices).keys.toList()
     }
 
     val filteredDevices = remember(homeDevices, selectedRoomFilter) {
@@ -136,10 +133,7 @@ fun WeMiSwitchApp(
     }
 
     val groupedDevicesByRoom = remember(filteredDevices) {
-        val rawGroups = filteredDevices.groupBy { it.normalizedRoomName }
-        val assigned = rawGroups.filterKeys { !it.equals("Unassigned", ignoreCase = true) }
-        val unassigned = rawGroups.filterKeys { it.equals("Unassigned", ignoreCase = true) }
-        assigned + unassigned
+        org.suppressingfire.wemi.data.groupDevicesByCanonicalRoom(filteredDevices)
     }
 
     BackHandler(
