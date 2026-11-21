@@ -19,12 +19,13 @@ Whenever you need help troubleshooting `10.22.22.1` Wi-Fi setup, switch discover
 
 You can take a standard Android screenshot (**Power + Volume Down**) of any of the three diagnostic views below and share the image directly:
 
-### A1. During `10.22.22.1` Switch Setup (`SETUP DEBUG DETAILS (SCREENSHOT)`)
+### A1. During `10.22.22.1` Switch Setup (`SETUP DIAGNOSTICS`)
 1. Open the **Provision New Switch AP (`10.22.22.1`)** dialog (by tapping the green **Switch Setup AP Detected (`10.22.22.1`)** banner at the top of the **Devices** tab, or via **`More` → `Provision New Switch AP (10.22.22.1)`**).
-2. Scroll to the **`SETUP DEBUG DETAILS (SCREENSHOT)`** terminal card inside the dialog:
+2. Look for the **`SETUP DIAGNOSTICS`** dark terminal card inside the dialog:
+   - **Compact While Idle, Auto-Expands on Errors or Traces**: While waiting for input, the card stays compact — tap **`Details`** to inspect the live `[NET]` / `[PROBE]` lines or **`Hide`** to collapse them. Whenever provisioning starts or fails (`NetworkStatus = 0` or `2`, or unreachable), the card automatically expands so the full trace is immediately visible.
    - **Automatic Hold on Failure**: If the switch fails to join your home Wi-Fi (`NetworkStatus = 0` or `2`) or cannot be reached on `10.22.22.1`, the app **automatically keeps the switch's `10.22.22.1` setup AP open** (`[STEP 6 HOLD] ... Skipping CloseSetup so 10.22.22.1 AP stays open for retry`) and keeps the dialog on screen so you can screenshot the full trace immediately.
-   - **Keeping the Dialog Open on Success**: If you also want to capture a screenshot after a *successful* provisioning run (`NetworkStatus = 1` or `3`), tap the **`Keep Dialog Open on Success`** chip inside the debug panel before tapping **`Provision Switch`**.
-3. Take a screenshot showing the **`SETUP DEBUG DETAILS (SCREENSHOT)`** terminal box (and the status banner above it) and attach it to your message.
+   - **Keeping the Dialog Open on Success**: If you also want to capture a screenshot after a *successful* provisioning run (`NetworkStatus = 1` or `3`), tap **`Details`** inside `SETUP DIAGNOSTICS` and toggle the **`Keep Dialog Open on Success`** chip ON before tapping **`Provision Switch`**.
+3. Take a screenshot showing the **`SETUP DIAGNOSTICS`** terminal box (and the status banner above it) and attach it to your message.
 
 ### A2. Live UPnP / SOAP Packet Log (`More` Tab)
 1. Tap the **`More`** tab in the bottom navigation bar.
@@ -44,7 +45,7 @@ You can take a standard Android screenshot (**Power + Volume Down**) of any of t
 When a setup, discovery, or Home Screen widget trace is longer than a single screen, you can export a complete text report (`wemi-telemetry-latest.txt`) in one tap:
 
 ### B1. Exporting from the `10.22.22.1` Setup Dialog (`Save/Share` or `Copy`)
-Inside the **`SETUP DEBUG DETAILS (SCREENSHOT)`** header bar in the **Provision New Switch AP (`10.22.22.1`)** dialog:
+Inside the **`SETUP DIAGNOSTICS`** header bar in the **Provision New Switch AP (`10.22.22.1`)** dialog (available whether the panel is collapsed or expanded):
 - **Tap `Save/Share`**:
   1. Writes the diagnostic report to `files/wemi-telemetry-latest.txt` in the app's private storage.
   2. Copies the entire report to your Android clipboard.
@@ -61,7 +62,7 @@ In the header of the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
      - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet, and gateway IP).
      - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its normalized room, Wi-Fi Home (`home=<networkKey>`), IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), dimmer brightness/Night Mode (`dim=<n>%`, `night=1`), latency (`ms`), hardware SKU, firmware, serial number, MAC, and canonical UPnP `UDN`.
      - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries — including Top-Header **`All Off`**, Room Master toggles, Android TV D-Pad switch/dimmer commands, and **headless Home Screen widget taps/timeouts** — with timestamps, endpoints, HTTP statuses, exact offline failure causes, and password-redacted single-line `xml:` payload summaries.
-     - **`--- [5. HOME SCREEN WIDGETS] ---`**: Every configured Home Screen light or room widget with its `appWidgetId`, bound serial/room/Wi-Fi Home, and whether it resolves to active switches or is `ORPHANED` (needs reconfiguring).
+     - **`--- [5. HOME SCREEN WIDGETS] ---`**: Every configured Home Screen light or room widget with its `appWidgetId`, bound serial/UDN/room/Wi-Fi Home, and whether it resolves to active switches or is `ORPHANED` (needs reconfiguring).
   2. Copies the full report to your clipboard and opens the Android **Share Sheet**.
 
 ### B3. Pulling `wemi-telemetry-latest.txt` via USB (`adb`)
@@ -88,5 +89,5 @@ adb exec-out run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-late
 | **`[STEP 5 SEND #1]`** | `ConnectHomeNetwork -> HTTP_200 (18ms) PairingStatus=1` | Confirms the switch accepted the `ConnectHomeNetwork` SOAP command. |
 | **`[POLL #n]`** | `GetNetworkStatus -> Status=1 (14ms)` | Status codes from the switch while joining your router: **`1` = Connected**, **`3` = Connected (Handshake Complete)**, **`0` = Still Connecting / Handshake Failed**, **`2` = Bad Password / Auth Rejected** (reports the exact `Method` and `lengths` tried on `>=8`-char passwords so you know which encryption chip to toggle on retry). |
 | **`[STEP 6 CLOSE/HOLD]`** | `CloseSetup -> success` or `Skipping CloseSetup so 10.22.22.1 AP stays open for retry` | Shows whether the setup AP was closed after a successful connection (`1` or `3`) or intentionally kept open (`kept_open_for_retry`) so you can retry immediately. |
-| **`[WIDGET #id]`** | `type=DEVICE name="Patio" devId=7 sn=... home=... -> resolved=#7 "Patio" (ON)` | Confirms each placed Home Screen widget's bound target and whether it resolves to a live switch/room or is `ORPHANED` (tap the widget to reconfigure). |
+| **`[WIDGET #id]`** | `type=DEVICE name="Patio" devId=7 sn=... udn=... home=... -> resolved=#7 "Patio" (ON)` | Confirms each placed Home Screen widget's bound target (serial, optional canonical `udn`, room, and Wi-Fi Home) and whether it resolves to a live switch/room or is `ORPHANED` (tap the widget to reconfigure). |
 

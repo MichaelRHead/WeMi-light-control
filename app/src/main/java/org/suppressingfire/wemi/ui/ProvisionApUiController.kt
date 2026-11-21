@@ -61,6 +61,10 @@ internal class ProvisionApUiController(
 
     fun openProvisionApDialog() {
         _setupApStatusMessage.value = null
+        if (!_isScanningSetupAp.value && !_isProvisioningAp.value) {
+            _detectedSetupDevice.value = null
+            _scannedSetupAps.value = emptyList()
+        }
         _showProvisionApDialog.value = true
         val netSnap = networkMonitor.refreshSnapshot()
         val preferredHost = if (netSnap.isWemoSetupApSubnet) {
@@ -96,7 +100,7 @@ internal class ProvisionApUiController(
                         isWifiSocketBound = netSnap.isWifiSocketBound,
                         isDemoMode = repository.isDemoShowroomMode.value,
                         targetApHost = cleanHost,
-                        probeSummary = "Probing $cleanHost (ports 49152..49159)...",
+                        probeSummary = "Probing $cleanHost (ports 49151..49159)...",
                         apScanSummary = "Waiting for probe..."
                     )
 
@@ -243,6 +247,7 @@ internal class ProvisionApUiController(
                         timestamp = nowTimeText(),
                         detectedDevice = res.setupDevice ?: _detectedSetupDevice.value,
                         probeSummary = res.setupDevice?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
+                            ?: repository.latestSetupProbeSummary().takeUnless { it.isBlank() || it == "Not probed yet" }
                             ?: current.probeSummary,
                         traceLines = res.debugTraceLines.ifEmpty { current.traceLines }
                     )

@@ -3,6 +3,13 @@ package org.suppressingfire.wemi
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import java.net.InetAddress
 import java.net.ServerSocket
@@ -13,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -28,6 +36,8 @@ import org.suppressingfire.wemi.network.ProvisionerClient
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.SharedSoapLogStore
 import org.suppressingfire.wemi.network.TelemetryFileExporter
+import org.suppressingfire.wemi.ui.components.ProvisionDebugPanel
+import org.suppressingfire.wemi.ui.components.isProvisionStatusWarningOrError
 import org.suppressingfire.wemi.widget.WeMiSwitchWidgetProvider
 import org.suppressingfire.wemi.widget.WidgetActionExecutor
 import org.suppressingfire.wemi.widget.WidgetConfigStore
@@ -36,6 +46,9 @@ import org.suppressingfire.wemi.widget.WidgetTargetConfig
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
 class TelemetryDiagnosticsTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
 
     private lateinit var context: Context
 
@@ -124,7 +137,8 @@ class TelemetryDiagnosticsTest {
                         serialNumber = "WLS040MISSING",
                         roomName = "Garage",
                         networkKey = DEFAULT_MAIN_HOME_KEY,
-                        displayName = "Deleted Garage Light"
+                        displayName = "Deleted Garage Light",
+                        udn = "uuid:Lightswitch-3_0-WLS040MISSING"
                     )
                 )
                 assertFalse(WidgetActionExecutor.toggleWidgetTarget(context, 502))
@@ -136,7 +150,13 @@ class TelemetryDiagnosticsTest {
 
                 val allLogs = appRepo.soapLogs.value
                 assertTrue(allLogs.any { it.endpoint == "widget://599" && it.statusText.contains("Widget not configured") })
-                assertTrue(allLogs.any { it.endpoint == "widget://502" && it.statusText.contains("Orphaned") })
+                assertTrue(
+                    allLogs.any {
+                        it.endpoint == "widget://502" &&
+                            it.statusText.contains("Orphaned") &&
+                            it.statusText.contains("udn=uuid:Lightswitch-3_0-WLS040MISSING")
+                    }
+                )
                 assertTrue(allLogs.any { it.endpoint == "widget://503" && it.statusText.contains("Orphaned") })
             } finally {
                 appRepo.close()
@@ -235,7 +255,8 @@ class TelemetryDiagnosticsTest {
             port = 49153,
             isOn = false,
             isReachable = true,
-            serialNumber = "WSP080MYS12"
+            serialNumber = "WSP080MYS12",
+            udn = "uuid:Socket-1_0-WSP080MYS12"
         )
         val patioOffline = DeviceEntity(
             id = 13,
@@ -252,9 +273,10 @@ class TelemetryDiagnosticsTest {
         WidgetConfigStore.save(context, WidgetTargetConfig.forDevice(603, switchOn.copy(id = 999, serialNumber = "WLS040GONE")))
         WidgetConfigStore.save(context, WidgetTargetConfig.forDevice(601, switchOn))
         WidgetConfigStore.save(context, WidgetTargetConfig.forRoom(602, "Patio", DEFAULT_MAIN_HOME_KEY))
+        WidgetConfigStore.save(context, WidgetTargetConfig.forDevice(604, unassignedSwitch))
 
         val loadedWidgets = WidgetConfigStore.loadAll(context)
-        assertEquals(listOf(601, 602, 603), loadedWidgets.map { it.appWidgetId })
+        assertEquals(listOf(601, 602, 603, 604), loadedWidgets.map { it.appWidgetId })
 
         val report = TelemetryFileExporter.buildFullTelemetryReport(
             setupSnapshot = SetupDebugSnapshot(timestamp = "9:15:00 AM", phoneLocalIp = "192.168.86.10"),
@@ -264,10 +286,11 @@ class TelemetryDiagnosticsTest {
         )
 
         assertTrue(report.contains("[DEV #12] name=\"Mystery Plug\" room=\"Unassigned\" home=$DEFAULT_MAIN_HOME_KEY"))
-        assertTrue(report.contains("--- [5. HOME SCREEN WIDGETS (3)] ---"))
+        assertTrue(report.contains("--- [5. HOME SCREEN WIDGETS (4)] ---"))
         assertTrue(report.contains("[WIDGET #601] type=DEVICE name=\"Patio String Lights\" devId=11 sn=WLS040PAT11 room=\"Patio\" home=$DEFAULT_MAIN_HOME_KEY -> resolved=#11 \"Patio String Lights\" (ON)"))
         assertTrue(report.contains("[WIDGET #602] type=ROOM room=\"Patio\" home=$DEFAULT_MAIN_HOME_KEY -> resolved=1/2 ON (1/2 reachable)"))
         assertTrue(report.contains("[WIDGET #603] type=DEVICE name=\"Patio String Lights\" devId=999 sn=WLS040GONE room=\"Patio\" home=$DEFAULT_MAIN_HOME_KEY -> ORPHANED (no matching switch)"))
+        assertTrue(report.contains("[WIDGET #604] type=DEVICE name=\"Mystery Plug\" devId=12 sn=WSP080MYS12 udn=uuid:Socket-1_0-WSP080MYS12 room=\"Unassigned\" home=$DEFAULT_MAIN_HOME_KEY -> resolved=#12 \"Mystery Plug\" (OFF_STANDBY)"))
     }
 
     @Test
@@ -387,5 +410,71 @@ class TelemetryDiagnosticsTest {
             "Unreachable Setup AP (descriptor == null) must break after attempt #1",
             provResult.debugTraceLines.any { it.contains("[STEP 5 SEND #2]") }
         )
+    }
+
+    @Test
+    fun provisionDebugPanelClassifierAndAutoExpandRecoveryAfterManualHide() {
+        // 1. Healthy/in-progress messages must never false-positive (e.g., "Entertainment Center" containing "enter")
+        assertFalse(isProvisionStatusWarningOrError(null))
+        assertFalse(
+            isProvisionStatusWarningOrError(
+                "Detected Entertainment Center (WLS040 • Port 49152 • Auto Method 2) • Found 3 nearby 2.4 GHz Wi-Fi network(s)"
+            )
+        )
+        assertFalse(isProvisionStatusWarningOrError("Provisioning switch on 10.22.22.1 to 'CenterNet'..."))
+        assertFalse(
+            isProvisionStatusWarningOrError(
+                "Provisioned 'Error Lamp' to 'CenterNet' (Status=1, Method 2) • Added to switches"
+            )
+        )
+
+        // 2. Real setup failures and validation prompts must classify as warning/error
+        assertTrue(isProvisionStatusWarningOrError("No response from Setup AP at 10.22.22.1 (:49152=TCP_TIMEOUT)"))
+        assertTrue(isProvisionStatusWarningOrError("Password rejected by switch (Status=2): Wi-Fi password must be at least 8 characters"))
+        assertTrue(isProvisionStatusWarningOrError("Switch did not join 'MyHome' (NetworkStatus=0 after polling)"))
+        assertTrue(isProvisionStatusWarningOrError("Setup AP (10.22.22.1:49152) unreachable — connect phone Wi-Fi first"))
+        assertTrue(isProvisionStatusWarningOrError("Please enter a valid 2.4 GHz Wi-Fi SSID"))
+
+        // 3. ProvisionDebugPanel stays compact while idle, toggles via Details/Hide, and auto-re-expands on new errors/traces
+        var snapshot by mutableStateOf(SetupDebugSnapshot(timestamp = "9:00:00 AM", phoneLocalIp = "10.22.22.2"))
+        var status by mutableStateOf<String?>(
+            "Detected Entertainment Center (WLS040 • Port 49152) • Found 2 nearby 2.4 GHz Wi-Fi network(s)"
+        )
+        composeTestRule.setContent {
+            ProvisionDebugPanel(
+                debugSnapshot = snapshot,
+                selectedSsid = "CenterNet",
+                keepOpenOnSuccess = false,
+                hasWarningOrError = isProvisionStatusWarningOrError(status),
+                statusMessage = status,
+                onToggleKeepOpen = {}
+            )
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("provision_debug_text").assertDoesNotExist()
+
+        // User expands Details and then clicks Hide while idle
+        composeTestRule.onNodeWithTag("toggle_provision_debug_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("provision_debug_text").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("toggle_provision_debug_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("provision_debug_text").assertDoesNotExist()
+
+        // New provisioning failure must auto-re-expand despite prior Hide
+        composeTestRule.runOnIdle {
+            status = "Password or auth rejected by switch (Status=2, Method=2, lengths=false)."
+            snapshot = snapshot.copy(
+                timestamp = "9:00:15 AM",
+                traceLines = listOf("[POLL #1] GetNetworkStatus -> Status=2 (14ms)", "[STEP 6 HOLD] Skipping CloseSetup")
+            )
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("provision_debug_text").assertIsDisplayed()
+
+        // User can manually Hide the displayed failure without the UI fighting them
+        composeTestRule.onNodeWithTag("toggle_provision_debug_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("provision_debug_text").assertDoesNotExist()
     }
 }

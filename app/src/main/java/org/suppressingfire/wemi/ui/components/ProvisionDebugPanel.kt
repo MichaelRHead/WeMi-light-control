@@ -15,6 +15,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,7 @@ internal fun ProvisionDebugPanel(
     selectedSsid: String,
     keepOpenOnSuccess: Boolean,
     hasWarningOrError: Boolean = false,
+    statusMessage: String? = null,
     onToggleKeepOpen: () -> Unit
 ) {
     val context = LocalContext.current
@@ -56,6 +58,16 @@ internal fun ProvisionDebugPanel(
     var sharedFeedback by remember(debugSnapshot, selectedSsid) { mutableStateOf(false) }
     val hasActiveDiagnostics = hasWarningOrError || debugSnapshot.traceLines.isNotEmpty()
     var userExpandedOverride by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(hasWarningOrError, statusMessage) {
+        if (hasWarningOrError) {
+            userExpandedOverride = null
+        }
+    }
+    LaunchedEffect(debugSnapshot.traceLines.isNotEmpty()) {
+        if (debugSnapshot.traceLines.isNotEmpty()) {
+            userExpandedOverride = null
+        }
+    }
     val isExpanded = userExpandedOverride ?: hasActiveDiagnostics
     val displayLines = remember(debugSnapshot, selectedSsid) {
         debugSnapshot.toDisplayLines(selectedSsid)
@@ -98,7 +110,9 @@ internal fun ProvisionDebugPanel(
                         Text(
                             text = if (isExpanded) "Hide" else "Details",
                             fontSize = 10.sp,
-                            color = Color(0xFFE2E8F0)
+                            color = Color(0xFFE2E8F0),
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                     OutlinedButton(
@@ -119,7 +133,9 @@ internal fun ProvisionDebugPanel(
                         Text(
                             text = if (copiedFeedback) "Copied" else "Copy",
                             fontSize = 10.sp,
-                            color = Color(0xFFE2E8F0)
+                            color = Color(0xFFE2E8F0),
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                     OutlinedButton(
@@ -141,7 +157,9 @@ internal fun ProvisionDebugPanel(
                         Text(
                             text = if (sharedFeedback) "Saved" else "Save/Share",
                             fontSize = 10.sp,
-                            color = Color(0xFFE2E8F0)
+                            color = Color(0xFFE2E8F0),
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                 }
@@ -160,6 +178,10 @@ internal fun ProvisionDebugPanel(
                                 line.contains("ERROR", ignoreCase = true) ||
                                 line.contains("MISSING", ignoreCase = true) ||
                                 line.contains("No setup descriptor", ignoreCase = true) ||
+                                line.contains("TCP_TIMEOUT", ignoreCase = true) ||
+                                line.contains("NO_ROUTE", ignoreCase = true) ||
+                                line.contains("REFUSED", ignoreCase = true) ||
+                                line.contains("unreachable", ignoreCase = true) ||
                                 line.contains("Status=2", ignoreCase = true) ||
                                 line.contains("HOLD", ignoreCase = true) -> Color(0xFFFCA5A5)
                             line.contains("Status=1", ignoreCase = true) ||

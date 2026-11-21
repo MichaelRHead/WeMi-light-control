@@ -82,17 +82,17 @@ Inside the **Provision New Switch AP (`10.22.22.1`)** dialog:
 
 ---
 
-## 4. On-Screen Setup Debug Details (`Setup Debug Details (Screenshot)`) & Telemetry Export
+## 4. On-Screen Setup Diagnostics (`SETUP DIAGNOSTICS`) & Telemetry Export
 
-At the bottom of the **Provision New Switch AP (`10.22.22.1`)** dialog, a high-contrast dark terminal card (**`Setup Debug Details (Screenshot)`**) prints real-time hardware and protocol diagnostics directly on screen so you can take a single screenshot, tap **`Copy`** (`copy_provision_debug_button`), or tap **`Save/Share`** (`share_provision_debug_button`) to save `wemi-telemetry-latest.txt` and open Android's share sheet:
+Inside the **Provision New Switch AP (`10.22.22.1`)** dialog, a high-contrast dark terminal card (**`SETUP DIAGNOSTICS`**) stays compact while idle (tap **`Details`** / **`Hide`** to toggle) and automatically expands on live provisioning traces or setup errors so you can take a single screenshot, tap **`Copy`** (`copy_provision_debug_button`), or tap **`Save/Share`** (`share_provision_debug_button`) to save `wemi-telemetry-latest.txt` and open Android's share sheet:
 
-- **`[NET]`**: Your phone's active Wi-Fi interface (`wlan0`), IP address (`10.22.22.x`), `setupAp=true/false`, and whether sockets are bound directly to the unvalidated Wi-Fi network (`wifiBound=true/false`).
-- **`[PROBE]` & `[PROBE TRACE]`**: The exact port (`49151..49159`) and XML path (`/setup.xml` or `/Lightsetup.xml`) that responded on `10.22.22.1`, plus per-port status codes.
-- **`[XML]` & `[FLAGS]`**: Hardware `<modelName>`, `<friendlyName>`, `<firmwareVersion>`, and raw encryption flags (`rtos`, `iot`, `binaryOption`, `new_algo`, `autoMethod`).
+- **`[NET]`**: Your phone's active Wi-Fi interface (`wlan0`), IP address (`10.22.22.x`), `setupSubnet=true/false`, and whether sockets are bound directly to the unvalidated Wi-Fi network (`wifiBound=true/false`).
+- **`[PROBE]`**: The exact port (`49151..49159`) and XML path (`/setup.xml` or `/Lightsetup.xml`) that responded on `10.22.22.1`, plus per-port status codes.
+- **`[XML]` & `[FLAGS]`**: Hardware `<modelName>`, `<friendlyName>`, `<firmwareVersion>`, and raw encryption flags (`rtos`, `iot`, `binaryOption`, `new_algo`, `autoMethod`, `autoLen`).
 - **`[ID]`**: Hardware MAC address, Serial Number, which UPnP service provided them (`GetMetaInfo`, `setup.xml`, or `GetMacAddr/GetSerialNo`), and the raw pipe-delimited `GetMetaInfo` string.
 - **`[SCAN]` & `[TARGET AP]`**: The switch's `WiFiSetup1#GetApList` site survey count and the matched 2.4 GHz channel, auth mode (`WPA2PSK`), and cipher (`AES`) for your selected SSID.
-- **Live `[STEP 1..5]` Provisioning Trace**: Each step of `ChangeFriendlyName`, AES-128-CBC encryption (`Method 1/2/3`, `lenSuffix`, ciphertext hex length — **never** your plaintext password), `ConnectHomeNetwork` (`PairingStatus`), `GetNetworkStatus` polls (`1..18`), and `CloseSetup` (`kept_open_for_retry` on failure).
-- **`Keep Dialog Open on Success` Chip**: Toggle this chip ON before tapping **`Provision Switch`** if you want the dialog to remain open after a successful setup so you can screenshot or export the final trace.
+- **Live `[STEP 1..6]` Provisioning Trace**: Each step of `ChangeFriendlyName`, AES-128-CBC encryption (`Method 1/2/3`, `addLengths`, ciphertext length — **never** your plaintext password), `ConnectHomeNetwork` (`PairingStatus`), `GetNetworkStatus` polls (`1..18`), and `CloseSetup` (`kept_open_for_retry` on failure).
+- **`Keep Dialog Open on Success` Chip**: Tap **`Details`** inside `SETUP DIAGNOSTICS` and toggle this chip ON before tapping **`Provision Switch`** if you want the dialog to remain open after a successful setup so you can screenshot or export the final trace.
 
 For a complete line-by-line guide to capturing screenshots, exporting `wemi-telemetry-latest.txt`, and interpreting setup status codes, see **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)**.
 

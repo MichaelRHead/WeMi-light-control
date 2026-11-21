@@ -142,12 +142,13 @@ object WidgetActionExecutor {
                         )
                         true
                     } else {
+                        val udnNote = if (config.udn.isNotBlank()) ", udn=${config.udn}" else ""
                         logWidgetEvent(
                             context = appCtx,
                             appWidgetId = appWidgetId,
                             label = "Widget #$appWidgetId (${config.displayName.ifBlank { "Device" }})",
                             action = "Widget#Toggle(DEVICE)",
-                            statusText = "Orphaned • No matching switch (devId=${config.deviceId}, sn=${config.serialNumber.ifBlank { "none" }})",
+                            statusText = "Orphaned • No matching switch (devId=${config.deviceId}, sn=${config.serialNumber.ifBlank { "none" }}$udnNote)",
                             success = false
                         )
                         false

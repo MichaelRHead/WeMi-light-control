@@ -290,8 +290,9 @@ object TelemetryFileExporter {
                             } else {
                                 "ORPHANED (no matching switch)"
                             }
+                            val udnPart = if (w.udn.isNotBlank()) " udn=${w.udn}" else ""
                             appendLine(
-                                "[WIDGET #${w.appWidgetId}] type=DEVICE name=\"${w.displayName}\" devId=${w.deviceId} sn=${w.serialNumber.ifBlank { "none" }} room=\"${w.normalizedRoomName()}\" home=${w.networkKey.ifBlank { "none" }} -> $status"
+                                "[WIDGET #${w.appWidgetId}] type=DEVICE name=\"${w.displayName}\" devId=${w.deviceId} sn=${w.serialNumber.ifBlank { "none" }}$udnPart room=\"${w.normalizedRoomName()}\" home=${w.networkKey.ifBlank { "none" }} -> $status"
                             )
                         }
                         WidgetTargetType.ROOM -> {

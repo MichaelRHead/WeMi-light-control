@@ -145,22 +145,14 @@ fun ProvisionApDialog(
                     statusMessage = statusMessage
                 )
 
-                val hasSetupWarningOrError = statusMessage?.let { msg ->
-                    msg.contains("No response", ignoreCase = true) ||
-                        msg.contains("rejected", ignoreCase = true) ||
-                        msg.contains("unreachable", ignoreCase = true) ||
-                        msg.contains("did not join", ignoreCase = true) ||
-                        msg.contains("too short", ignoreCase = true) ||
-                        msg.contains("enter", ignoreCase = true) ||
-                        msg.contains("error", ignoreCase = true) ||
-                        msg.contains("failed", ignoreCase = true)
-                } == true
+                val hasSetupWarningOrError = isProvisionStatusWarningOrError(statusMessage)
 
                 ProvisionDebugPanel(
                     debugSnapshot = debugSnapshot,
                     selectedSsid = ssid,
                     keepOpenOnSuccess = keepDialogOpenOnSuccess,
                     hasWarningOrError = hasSetupWarningOrError,
+                    statusMessage = statusMessage,
                     onToggleKeepOpen = { keepDialogOpenOnSuccess = !keepDialogOpenOnSuccess }
                 )
 
@@ -275,16 +267,33 @@ fun ProvisionApDialog(
     )
 }
 
+internal fun isProvisionStatusWarningOrError(statusMessage: String?): Boolean {
+    val msg = statusMessage?.trim().orEmpty()
+    if (msg.isEmpty()) return false
+    if (msg.startsWith("Detected ", ignoreCase = true) ||
+        msg.startsWith("Smart Switch Setup AP ", ignoreCase = true) ||
+        msg.startsWith("Provisioning ", ignoreCase = true) ||
+        msg.startsWith("Provisioned ", ignoreCase = true)
+    ) {
+        return false
+    }
+    return msg.contains("No response", ignoreCase = true) ||
+        msg.contains("rejected", ignoreCase = true) ||
+        msg.contains("unreachable", ignoreCase = true) ||
+        msg.contains("did not join", ignoreCase = true) ||
+        msg.contains("too short", ignoreCase = true) ||
+        msg.contains("Please enter", ignoreCase = true) ||
+        msg.contains("error", ignoreCase = true) ||
+        msg.contains("failed", ignoreCase = true)
+}
+
 @Composable
 private fun ProvisionSetupStatusBanner(
     apHost: String,
     detectedDevice: SetupDeviceDescriptor?,
     statusMessage: String?
 ) {
-    val isWarningOrError = statusMessage?.contains("No response", ignoreCase = true) == true ||
-        statusMessage?.contains("rejected", ignoreCase = true) == true ||
-        statusMessage?.contains("unreachable", ignoreCase = true) == true ||
-        statusMessage?.contains("did not join", ignoreCase = true) == true
+    val isWarningOrError = isProvisionStatusWarningOrError(statusMessage)
 
     Surface(
         color = if (isWarningOrError) Color(0xFFFEF2F2) else WemoGreenSoft.copy(alpha = 0.65f),
