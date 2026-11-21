@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v31.0 — Phone, Tablet, Widgets & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v32.0 — Phone, Tablet, Widgets & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `31.0` (`versionCode = 31`)
+- **Version:** `32.0` (`versionCode = 32`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Android Home Screen Widgets**, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,13 +17,12 @@ WeMi Switch Control brings fast, reliable local-network control back to Belkin's
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery, local SOAP HTTP commands, and `<100ms` UPnP GENA push updates—with no cloud account, external server, or subscription required.
 
-### What's New in Version 31.0
-- **Home Screen Light & Room Toggle Widgets:** Place resizable widgets for any individual light/switch or entire room directly on your Android home screen and toggle them ON or OFF over local Wi-Fi without opening the app—complete with rapid double-tap serialization, multi-home room isolation, and serial-number self-healing.
-- **One-Tap Widget Pinning & Live Auto-Sync:** Pin a room widget right from any Room Group header or a light widget from any switch's expanded drawer—or add from the Android widget drawer via the Rooms/Lights picker. Widgets automatically display ON/OFF/Offline state, dimmer brightness percentages, and room active counts, and stay in sync with hardware changes.
-- **Smarter Local Rules & SSDP Discovery:** Motion-trigger rules now honor dimmer brightness levels and Wi-Fi Home isolation, and switching SSDP search targets cancels active scans immediately to start the new sweep cleanly.
+### What's New in Version 32.0
+- **Hardened Discovery & Unified Room Grouping:** Symmetric 4-pass hardware identity matching, Tier-2 UDN deduplication across LAN discovery and Home Screen Widgets, XML entity decoding for switch names, and case-insensitive room grouping shared across phone, TV, and widgets.
+- **More Reliable Rules & Live Push Sync:** Isolated UPnP GENA push socket handling keeps physical switch updates responsive, cross-home same-named switch rules stay isolated, and Auto-Off timers now default to turning lights OFF.
+- **Home Screen Light & Room Widgets + Local Diagnostics:** Place resizable one-tap light or room widgets with multi-home isolation and rapid-tap protection, plus headless widget SOAP logging and widget summaries in strictly local diagnostics with hardened password redaction.
 - **Google TV Focusable Dimmer Slider & Room Navigation:** Press `Down` from any Android TV dimmer toggle to focus the inline brightness slider (`Left`/`Right` steps `-10%`/`+10%`), step whole-room dimmers from Room Master Headers, and navigate cleanly across all 3 columns with a steady single-row top bar.
-- **Faster Parallel Local Wi-Fi Control & Self-Healing Reconnect:** Newly discovered, adopted, and reconnected switches subscribe immediately to `<100ms` physical switch updates, recover automatically from 9-port firmware shifts (`49151–49159`), and match switches by hardware serial and UDN so DHCP IP changes never mix up devices.
-- **Zero-Cloud `10.22.22.1` Switch Setup & Lean Pure Kotlin/DEX Release (`minSdk 24+`):** Provision factory-reset switches directly over local Wi-Fi with MIT open-source transparency, R8 optimization, and strictly local diagnostics excluded from cloud backup.
+- **Zero-Cloud `10.22.22.1` Switch Setup & Lean Pure Kotlin/DEX Release (`minSdk 24+`):** Provision factory-reset switches directly over local Wi-Fi with MIT open-source transparency, R8 optimization, and local diagnostics excluded from cloud backup.
 
 ### Key Features
 - **Home Screen Light & Room Widgets:** One-tap local Wi-Fi toggles for individual lights or whole rooms straight from your Android launcher without opening the app.

@@ -1,4 +1,4 @@
-WeMi Switch Control v31.0:
-• Home Screen Light & Room Widgets: Toggle any light or room ON/OFF straight from your home screen over local Wi-Fi with one-tap pinning, multi-home isolation, and rapid-tap protection.
-• Smarter Rules & Discovery: Motion-trigger rules now honor dimmer brightness & home isolation, and switching SSDP scan targets updates immediately.
-• Android TV Dimmer Navigation & R8-optimized pure Kotlin/DEX bundle (minSdk 24+).
+WeMi Switch Control v32.0:
+• Smarter Discovery & Rooms: Stronger 4-pass hardware identity matching, widget UDN self-healing, decoded switch names, and unified room grouping across phones, TV, and widgets.
+• Reliable Rules & Live Sync: Isolated GENA push handling, cross-home rule fixes, and Auto-Off defaulting to OFF.
+• Widget Diagnostics: Home screen widget SOAP logs and widget inventory now appear in local diagnostics with stricter password redaction.

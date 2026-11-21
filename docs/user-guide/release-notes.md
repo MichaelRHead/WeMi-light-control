@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v31.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v32.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v31.0`)
+## Quick Release Summary (`v1.0` → `v32.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v32.0`](#version-320-versioncode--32--november-21-2026)** | `32` | Nov 21, 2026 | **Discovery, Rules, GENA Push & Widget Diagnostics Hardening**: 4-pass hardware identity & widget UDN self-healing, decoded XML switch names, unified case-insensitive room grouping across phone/TV/widgets, isolated GENA push handlers, cross-home rule isolation & Auto-Off OFF default, and headless widget SOAP telemetry |
 | **[`v31.0`](#version-310-versioncode--31--november-1920-2026)** | `31` | Nov 19–20, 2026 | **Home Screen Light & Room Toggle Widgets** (zero-app-launch local Wi-Fi toggles, one-tap pinning, multi-home isolation & rapid-tap protection), plus motion-trigger dimmer brightness & Wi-Fi Home isolation fix and instant SSDP search-target switching |
 | **[`v28.0`](#version-280-versioncode--28--november-1519-2026)** | `28` | Nov 15–19, 2026 | Google TV focusable inline & Room-Header dimmer controls, steady single-row TV top bar while dimming, deterministic `Up`/`Down` Room Master Header navigation across all 3 columns (`wemi TV`), immediate `<100ms` GENA push on adoption, hardened UDN/SSDP discovery & `10.22.22.1` setup diagnostics |
 | **[`v25.0`](#version-250-versioncode--25--november-14-2026)** | `25` | Nov 14, 2026 | Top-header **`All Off`** button next to Refresh for 1-tap whole-home power-off, plus R8-shrunk pure Kotlin/DEX release App Bundle with embedded Play Console deobfuscation mapping (`proguard.map`) |
@@ -46,6 +47,14 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 32.0 (`versionCode = 32`) — November 21, 2026
+- **Stronger Hardware Identity, Name Decoding & Unified Room Grouping**: Symmetric 4-pass identity matching and Tier-2 UDN deduplication prevent duplicate switches after discovery, adoption, or `10.22.22.1` setup and carry over to Home Screen Widgets. Switch names containing `&amp;` or apostrophes decode cleanly, and phone, Android TV, and Home Screen Widgets share unified case-insensitive room grouping (`Upstairs Bedroom` → `Bedroom`, `Finished Basement` → `Basement`, `WCLight` → `Ensuite`).
+- **Isolated GENA Live Push & Multi-Home Rule Fixes**: Per-client GENA callback socket isolation keeps instant physical switch updates running smoothly even if a switch drops mid-connection, while local rules stay strictly isolated per Wi-Fi Home so identically named switches in different homes never collide and new `Auto-Off` timers default to turning lights OFF.
+- **Headless Home Screen Widget Telemetry & Clearer Diagnostics**: Home screen widget toggles, timeouts, and configuration summaries now flow directly into **More** → **UPnP / SOAP Packet Log** and the 5-section local `wemi-telemetry-latest.txt` export, alongside exact offline failure reasons and hardened `<password>` redaction.
+- **Privacy, Governance & Code-Quality Polish**: Strengthened zero-cloud privacy disclosures for local widget preferences, resolved remaining lint warnings, and expanded automated verification to **`102/102` tests across `20` suites**.
+
+---
 
 ### Version 31.0 (`versionCode = 31`) — November 19–20, 2026
 - **Home Screen Light & Room Toggle Widgets**: Place resizable widgets for any individual light/switch or entire room right on your Android home screen and turn them ON or OFF directly over your local Wi-Fi network without opening the app—hardened with rapid double-tap serialization, multi-home room isolation, and serial-number self-healing.

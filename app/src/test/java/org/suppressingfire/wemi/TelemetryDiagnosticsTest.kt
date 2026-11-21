@@ -306,12 +306,32 @@ class TelemetryDiagnosticsTest {
                     runCatching {
                         faultServer.accept().use { sock ->
                             sock.soTimeout = 1000
+                            val input = sock.getInputStream()
+                            val reqBuf = StringBuilder()
+                            val chunk = ByteArray(2048)
+                            var bodyStart = -1
+                            var contentLength = 0
+                            while (reqBuf.length < 8192) {
+                                val n = input.read(chunk)
+                                if (n <= 0) break
+                                reqBuf.append(String(chunk, 0, n, Charsets.ISO_8859_1))
+                                if (bodyStart < 0) {
+                                    val idx = reqBuf.indexOf("\r\n\r\n")
+                                    if (idx >= 0) {
+                                        bodyStart = idx + 4
+                                        contentLength = Regex("(?i)Content-Length:\\s*(\\d+)")
+                                            .find(reqBuf.substring(0, idx))?.groupValues?.get(1)?.toIntOrNull() ?: 0
+                                    }
+                                }
+                                if (bodyStart >= 0 && reqBuf.length >= bodyStart + contentLength) break
+                            }
                             val body = "<s:Fault><faultstring>UPnPError 501</faultstring></s:Fault>"
                             val bytes = body.toByteArray(Charsets.UTF_8)
                             val resp = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: ${bytes.size}\r\nConnection: close\r\n\r\n"
                             sock.getOutputStream().write(resp.toByteArray(Charsets.US_ASCII))
                             sock.getOutputStream().write(bytes)
                             sock.getOutputStream().flush()
+                            runCatching { sock.shutdownOutput() }
                         }
                     }
                 }
