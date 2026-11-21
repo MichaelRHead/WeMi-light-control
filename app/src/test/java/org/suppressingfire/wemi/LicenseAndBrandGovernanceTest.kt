@@ -113,6 +113,16 @@ class LicenseAndBrandGovernanceTest {
             "gradle/libs.versions.toml contains unapproved Gradle plugin IDs: $unapprovedPluginIds",
             unapprovedPluginIds.isEmpty()
         )
+        val approvedSettingsPluginIds = setOf("org.gradle.toolchains.foojay-resolver-convention")
+        val settingsPluginIds = Regex("""\bid\s*\(\s*"([^"]+)"\s*\)""")
+            .findAll(File(repoRoot, "settings.gradle.kts").readText())
+            .map { it.groupValues[1] }
+            .toList()
+        val unapprovedSettingsPlugins = settingsPluginIds.filterNot { it in approvedSettingsPluginIds }
+        assertTrue(
+            "settings.gradle.kts contains unapproved Gradle plugin IDs: $unapprovedSettingsPlugins",
+            unapprovedSettingsPlugins.isEmpty()
+        )
 
         val appBuildGradle = File(repoRoot, "app/build.gradle.kts")
         assertTrue("app/build.gradle.kts must exist", appBuildGradle.exists())
@@ -255,16 +265,12 @@ class LicenseAndBrandGovernanceTest {
         }
         val resXmlHits = listOf("app/src/main/res/layout", "app/src/main/res/xml", "app/src/main/res/values")
             .flatMap { dirRel -> File(repoRoot, dirRel).listFiles().orEmpty().filter { it.isFile && it.extension == "xml" } }
-            .filter { trademarkRegex.containsMatchIn(it.readText()) }
+            .filter { it.readText().contains("wemo", ignoreCase = true) }
             .map { it.relativeTo(repoRoot).path }
-        assertTrue("Resource XML files must not contain 'WeMo'/'Wemo' trademark, found: $resXmlHits", resXmlHits.isEmpty())
-
-        val wemoStringValues = Regex("""<string\b[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)
-            .findAll(File(repoRoot, "app/src/main/res/values/strings.xml").readText())
-            .map { it.groupValues[1] }
-            .filter { it.contains("wemo", ignoreCase = true) }
-            .toList()
-        assertTrue("strings.xml values must not contain user-visible 'wemo' text, found: $wemoStringValues", wemoStringValues.isEmpty())
+        assertTrue(
+            "Resource XML files (layout/xml/values) must not contain case-insensitive 'wemo' references, found: $resXmlHits",
+            resXmlHits.isEmpty()
+        )
 
         // Verify Play Store Data Safety & Privacy Policy parity: exact 4 LAN permissions + local-only telemetry Auto-Backup exclusion
         val declaredPermissions = Regex("""<uses-permission\s+android:name="([^"]+)"""")
