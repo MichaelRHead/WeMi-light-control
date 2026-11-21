@@ -87,6 +87,33 @@ class LicenseAndBrandGovernanceTest {
             }
         }
 
+        val tomlText = File(repoRoot, "gradle/libs.versions.toml").readText()
+        val declaredGroups = Regex("""\bgroup\s*=\s*"([^"]+)"""").findAll(tomlText).map { it.groupValues[1] }.toList()
+        assertTrue("gradle/libs.versions.toml must declare managed dependency groups", declaredGroups.isNotEmpty())
+        val unapprovedGroups = declaredGroups.filterNot { group ->
+            group.startsWith("androidx.") ||
+                group == "org.jetbrains.kotlinx" ||
+                group == "org.robolectric" ||
+                group == "junit"
+        }
+        assertTrue(
+            "gradle/libs.versions.toml contains unapproved third-party dependency groups: $unapprovedGroups",
+            unapprovedGroups.isEmpty()
+        )
+        val approvedPluginIds = setOf(
+            "com.android.application",
+            "org.jetbrains.kotlin.plugin.compose",
+            "com.google.devtools.ksp"
+        )
+        val pluginsSection = tomlText.substringAfter("[plugins]", missingDelimiterValue = "")
+        val declaredPluginIds = Regex("""\bid\s*=\s*"([^"]+)"""").findAll(pluginsSection).map { it.groupValues[1] }.toList()
+        assertTrue("gradle/libs.versions.toml [plugins] section must declare Gradle plugins", declaredPluginIds.isNotEmpty())
+        val unapprovedPluginIds = declaredPluginIds.filterNot { it in approvedPluginIds }
+        assertTrue(
+            "gradle/libs.versions.toml contains unapproved Gradle plugin IDs: $unapprovedPluginIds",
+            unapprovedPluginIds.isEmpty()
+        )
+
         val appBuildGradle = File(repoRoot, "app/build.gradle.kts")
         assertTrue("app/build.gradle.kts must exist", appBuildGradle.exists())
         val buildGradleText = appBuildGradle.readText()
@@ -106,6 +133,18 @@ class LicenseAndBrandGovernanceTest {
             "app/proguard-rules.pro must exist for R8 release shrinking & deobfuscation",
             File(repoRoot, "app/proguard-rules.pro").exists()
         )
+        val inlineCoordRegex = Regex(
+            """\b(?:implementation|api|runtimeOnly|compileOnly|testImplementation|androidTestImplementation|debugImplementation)\s*\(\s*"[^"]+:[^"]+""""
+        )
+        assertFalse(
+            "app/build.gradle.kts must manage all dependencies through gradle/libs.versions.toml (no inline coordinates)",
+            inlineCoordRegex.containsMatchIn(buildGradleText)
+        )
+        val prodImplLines = buildGradleText.lines().filter { it.trimStart().startsWith("implementation(") }
+        for (line in prodImplLines) {
+            assertFalse("Test-only Robolectric must not be in implementation scope: $line", line.contains("robolectric", ignoreCase = true))
+            assertFalse("Test-only JUnit must not be in implementation scope: $line", line.contains("junit", ignoreCase = true))
+        }
         val buildGradleLower = buildGradleText.lowercase()
         for (token in forbiddenTokens) {
             assertFalse(
@@ -130,7 +169,11 @@ class LicenseAndBrandGovernanceTest {
             disallowedMainAssets.isEmpty()
         )
 
-        // Verify zero okhttp3 imports and zero pywemo references across production Kotlin sources
+        // Verify production Kotlin sources only import platform/AndroidX/Kotlin/first-party packages and never reference pywemo
+        val allowedImportPrefixes = listOf(
+            "android.", "androidx.", "java.", "javax.", "kotlin.", "kotlinx.", "org.suppressingfire.wemi."
+        )
+        val disallowedImports = mutableListOf<String>()
         val mainJavaRoot = File(repoRoot, "app/src/main/java")
         mainJavaRoot.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
@@ -139,7 +182,20 @@ class LicenseAndBrandGovernanceTest {
                 val src = ktFile.readText()
                 assertFalse("$relPath must not import okhttp3", src.contains("okhttp3"))
                 assertFalse("$relPath must not reference pywemo", src.contains("pywemo", ignoreCase = true))
+                ktFile.readLines().forEachIndexed { idx, rawLine ->
+                    val line = rawLine.trim()
+                    if (line.startsWith("import ")) {
+                        val target = line.removePrefix("import ").trim()
+                        if (allowedImportPrefixes.none { target.startsWith(it) }) {
+                            disallowedImports += "$relPath:${idx + 1} -> $target"
+                        }
+                    }
+                }
             }
+        assertTrue(
+            "Production Kotlin sources must only import approved platform/AndroidX/Kotlin/first-party packages, found: $disallowedImports",
+            disallowedImports.isEmpty()
+        )
     }
 
     @Test
@@ -174,12 +230,14 @@ class LicenseAndBrandGovernanceTest {
             wemoNamedFiles.isEmpty()
         )
 
-        // 3. Store-facing, manifest/backup XML, screenshot generator & app resource files must not leak the "WeMo" trademark
+        // 3. Store-facing, manifest/backup/widget XML, screenshot generator & app resource files must not leak the "WeMo" trademark
+        val trademarkRegex = Regex("\\bWeMo\\b|\\bWemo\\b")
         val brandBoundaryFiles = listOf(
             "app/src/main/AndroidManifest.xml",
             "app/src/main/res/values/strings.xml",
             "app/src/main/res/xml/backup_rules.xml",
             "app/src/main/res/xml/data_extraction_rules.xml",
+            "app/src/main/res/xml/wemi_switch_widget_info.xml",
             "metadata.json",
             "play_store_assets/STORE_LISTING.md",
             "play_store_assets/RELEASE_NOTES.txt",
@@ -190,14 +248,39 @@ class LicenseAndBrandGovernanceTest {
         for (relPath in brandBoundaryFiles) {
             val file = File(repoRoot, relPath)
             assertTrue("Expected brand-boundary file $relPath to exist", file.exists())
-            val content = file.readText()
             assertFalse(
                 "Brand-boundary file $relPath must not contain 'WeMo' / 'Wemo' trademark",
-                Regex("\\bWeMo\\b|\\bWemo\\b").containsMatchIn(content)
+                trademarkRegex.containsMatchIn(file.readText())
             )
         }
+        val resXmlHits = listOf("app/src/main/res/layout", "app/src/main/res/xml", "app/src/main/res/values")
+            .flatMap { dirRel -> File(repoRoot, dirRel).listFiles().orEmpty().filter { it.isFile && it.extension == "xml" } }
+            .filter { trademarkRegex.containsMatchIn(it.readText()) }
+            .map { it.relativeTo(repoRoot).path }
+        assertTrue("Resource XML files must not contain 'WeMo'/'Wemo' trademark, found: $resXmlHits", resXmlHits.isEmpty())
 
-        // Verify Play Store Data Safety alignment: ephemeral LAN telemetry file excluded from cloud Auto-Backup
+        val wemoStringValues = Regex("""<string\b[^>]*>(.*?)</string>""", RegexOption.DOT_MATCHES_ALL)
+            .findAll(File(repoRoot, "app/src/main/res/values/strings.xml").readText())
+            .map { it.groupValues[1] }
+            .filter { it.contains("wemo", ignoreCase = true) }
+            .toList()
+        assertTrue("strings.xml values must not contain user-visible 'wemo' text, found: $wemoStringValues", wemoStringValues.isEmpty())
+
+        // Verify Play Store Data Safety & Privacy Policy parity: exact 4 LAN permissions + local-only telemetry Auto-Backup exclusion
+        val declaredPermissions = Regex("""<uses-permission\s+android:name="([^"]+)"""")
+            .findAll(File(repoRoot, "app/src/main/AndroidManifest.xml").readText())
+            .map { it.groupValues[1] }
+            .toSet()
+        assertEquals(
+            "AndroidManifest.xml permissions must match Play Store Data Safety & Privacy Policy disclosures",
+            setOf(
+                "android.permission.INTERNET",
+                "android.permission.ACCESS_NETWORK_STATE",
+                "android.permission.ACCESS_WIFI_STATE",
+                "android.permission.CHANGE_WIFI_MULTICAST_STATE"
+            ),
+            declaredPermissions
+        )
         assertTrue(
             "backup_rules.xml must exclude wemi-telemetry-latest.txt from cloud Auto-Backup",
             File(repoRoot, "app/src/main/res/xml/backup_rules.xml").readText().contains("wemi-telemetry-latest.txt")
@@ -207,21 +290,21 @@ class LicenseAndBrandGovernanceTest {
             File(repoRoot, "app/src/main/res/xml/data_extraction_rules.xml").readText().contains("wemi-telemetry-latest.txt")
         )
 
-        // 4. Modular UI composables & controllers (MainActivity.kt + ui/**/*.kt) must not expose user-visible "WeMo" string literals
+        // 4. Modular UI composables, controllers & Home Screen widgets (MainActivity.kt + ui/**/*.kt + widget/**/*.kt) must not expose user-visible "WeMo" literals
         val allowedUiProtocolOrTagTokens = setOf(
             "WeMo_WW_2.00.11532.PVT",
             "wemo_setup_ap_detected_banner",
             "wemo_setup_ap_banner",
             "more_provision_wemo_ap_button"
         )
-        val uiFiles = listOf(File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/MainActivity.kt")) +
-            File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/ui")
-                .walkTopDown()
-                .filter { it.isFile && it.extension == "kt" }
-                .toList()
+        val uiAndWidgetFiles = listOf(File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/MainActivity.kt")) +
+            listOf("app/src/main/java/org/suppressingfire/wemi/ui", "app/src/main/java/org/suppressingfire/wemi/widget")
+                .flatMap { dirRel ->
+                    File(repoRoot, dirRel).walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+                }
         val stringLiteralRegex = Regex("\"([^\"\\\\]*(?:\\\\.[^\"\\\\]*)*)\"")
         val disallowedUiStrings = mutableListOf<String>()
-        for (uiFile in uiFiles) {
+        for (uiFile in uiAndWidgetFiles) {
             uiFile.readLines().forEachIndexed { idx, line ->
                 stringLiteralRegex.findAll(line).forEach { match ->
                     val literal = match.groupValues[1]
@@ -232,7 +315,7 @@ class LicenseAndBrandGovernanceTest {
             }
         }
         assertTrue(
-            "UI files must not expose user-visible 'WeMo' brand literals, found: $disallowedUiStrings",
+            "UI and widget files must not expose user-visible 'WeMo' brand literals, found: $disallowedUiStrings",
             disallowedUiStrings.isEmpty()
         )
 
@@ -257,6 +340,26 @@ class LicenseAndBrandGovernanceTest {
         assertTrue(
             "Google Play Short Description must be <= 80 characters (found ${shortDesc.length}: '$shortDesc')",
             shortDesc.length <= 80
+        )
+        val fullDescMatch = Regex("""(?ms)^##\s+Full Description[^\n]*\n(.*?)(?=^##\s+|\z)""").find(storeListingText)
+        assertNotNull("play_store_assets/STORE_LISTING.md must declare Full Description", fullDescMatch)
+        val fullDescPlain = fullDescMatch!!.groupValues[1]
+            .replace("\r\n", "\n")
+            .lines()
+            .joinToString("\n") { rawLine ->
+                rawLine.trimEnd()
+                    .replace(Regex("^#{1,6}\\s+"), "")
+                    .replace(Regex("^\\s*[-*]\\s+"), "• ")
+                    .replace(Regex("\\[([^\\]]+)]\\([^)]+\\)"), "$1")
+                    .replace(Regex("\\*\\*([^*]+)\\*\\*"), "$1")
+                    .replace(Regex("`([^`]+)`"), "$1")
+                    .trimEnd()
+            }
+            .trim()
+            .replace(Regex("\n{3,}"), "\n\n")
+        assertTrue(
+            "Google Play Full Description must be 1..4000 characters (found ${fullDescPlain.length})",
+            fullDescPlain.length in 1..4000
         )
 
         val dataSafetyText = File(repoRoot, "play_store_assets/DATA_SAFETY_GUIDE.md").readText()

@@ -8,7 +8,7 @@ WeMi Switch Control ("the App") is a local-network smart switch controller. We r
 ## Information Collection and Use
 - **No Personal Data Collected:** The App does not require an account, login, email address, or cloud registration.
 - **Local Network Communication Only:** The App uses standard Android Wi-Fi and network permissions (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`) solely to discover UPnP/SSDP smart switches on your local Wi-Fi network (`239.255.255.250:1900`) and send local HTTP SOAP commands (`GetBinaryState`, `SetBinaryState`) directly to your switches' local IP addresses.
-- **On-Device Storage:** Device names, local IP addresses, ports, and schedules are stored locally on your device using Android Room SQLite storage. Optional local diagnostic log exports (`wemi-telemetry-latest.txt`) stay strictly on-device unless you explicitly share them and are excluded from Android cloud Auto-Backup.
+- **On-Device Storage:** Device names, local IP addresses, ports, schedules, and Home Screen widget target preferences are stored locally on your device using Android Room SQLite storage and local SharedPreferences. Optional local diagnostic log exports (`wemi-telemetry-latest.txt`) stay strictly on-device unless you explicitly share them and are excluded from Android cloud Auto-Backup.
 
 ## Third-Party Sharing & Analytics
 The App contains no advertising SDKs, no third-party analytics trackers, and does not sell or transmit user data to any external server.

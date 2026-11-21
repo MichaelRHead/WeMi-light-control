@@ -26,7 +26,7 @@
 
 ### A. Data Safety Section
 - **Does your app collect or share any of the required user data types?** → **No**
-- **Explanation:** All switch IPs, friendly names, SSDP discovery results, and rules are stored strictly on-device in local Room SQLite storage and communicated only over the user's local LAN (`239.255.255.250:1900` and `http://<local-ip>:49153`), and ephemeral diagnostic telemetry files (`wemi-telemetry-latest.txt`) are excluded from cloud Auto-Backup (`backup_rules.xml` & `data_extraction_rules.xml`).
+- **Explanation:** All switch IPs, friendly names, SSDP discovery results, rules, and Home Screen widget bindings are stored strictly on-device in local Room SQLite storage and local `SharedPreferences` and communicated only over the user's local LAN (`239.255.255.250:1900` and `http://<local-ip>:49153`), and ephemeral diagnostic telemetry files (`wemi-telemetry-latest.txt`) are excluded from cloud Auto-Backup (`backup_rules.xml` & `data_extraction_rules.xml`).
 
 ### B. App Content & Permissions
 - **Ads:** No, my app does not contain ads.
