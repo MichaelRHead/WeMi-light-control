@@ -1,4 +1,4 @@
-WeMi Switch Control v29.0:
-• Home Screen Light & Room Widgets: Place individual lights or entire rooms on your Android home screen and toggle them ON or OFF directly over local Wi-Fi without opening the app.
-• One-Tap Widget Pinning & Picker: Pin any room or switch directly from WeMi or pick from the Android widget drawer; widgets automatically sync live power, brightness, and room counts.
+WeMi Switch Control v31.0:
+• Home Screen Light & Room Widgets: Toggle any light or room ON/OFF straight from your home screen over local Wi-Fi with one-tap pinning, multi-home isolation, and rapid-tap protection.
+• Smarter Rules & Discovery: Motion-trigger rules now honor dimmer brightness & home isolation, and switching SSDP scan targets updates immediately.
 • Android TV Dimmer Navigation & R8-optimized pure Kotlin/DEX bundle (minSdk 24+).

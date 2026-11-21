@@ -36,6 +36,10 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
    - Phone/tablet (`Scaffold` with compact single-row `TopHeader` in `HeaderAndNav.kt` and `BottomNavigationBar` in `BottomNavBar.kt`) and Android TV (`TvDashboardScreen` under `Configuration.UI_MODE_TYPE_TELEVISION`) are strictly native to their hardware form factor and interaction model. Do not add manual Phone/TV mode switch buttons to either layout.
    - On Android TV (`wemi TV`), use a single compact top header row paired with a full-height **3-Column Room-Grouped Switch Grid (`GridCells.Fixed(3)`)** with full-span `TvRoomSectionHeader` headers (`tv_room_header_<Room>` in `TvRoomSectionHeader.kt`) that are deterministically selected when moving Up or Down from any column (including Column 1) and support `Left / Right` (`-10%` / `+10%`) room dimmer stepping, unmistakable 10-foot cursor focus (`3.5.dp` `#22D3EE` border, `#133B66` surface, `FOCUSED • OK` badge, with empty-home initial focus on `tv_scan_button`), and a focusable **Dimmer Slider (`tv_card_dim_mode_<id>` in `TvDimmerControls.kt`)** below the dimmer's On/Off Toggle so Google TV remotes without a Play/Menu button can navigate `Down` from the toggle into the slider, press `Left / Right` (`-10%` / `+10%`) to adjust brightness, press `Up` or system `Back` (`BackHandler`) to return to the toggle, and press `Down` to move to the widget below.
 
+5. **Zero-Launch Home Screen Light & Room Toggle Widgets (`widget/` — CUJ 8)**:
+   - Supports one-tap in-app pinning (`room_pin_widget_button_<Room>` in `RoomGroupCard.kt`, `pin_device_widget_<id>` in `DeviceDiagnosticsDrawer.kt` via API 26+ `requestPinAppWidget`) and launcher drawer configuration (`SwitchWidgetConfigureActivity.kt` + `WidgetPickerCards.kt` with Rooms/Lights tabs, Wi-Fi Home filters, and `>= 48.dp` touch targets).
+   - Mirrors WeMi's 3-state hardware language in `RemoteViews` (`widget_bg_on` Ocean Teal, `widget_bg_off` dark charcoal standby, `widget_bg_offline` red dashed) and toggles lights/rooms directly over local-LAN UPnP SOAP via `WidgetActionExecutor` without launching `MainActivity`.
+
 ---
 
 ## 2. Five Mandatory Layout & Interaction Invariants
@@ -61,11 +65,12 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
 
 ---
 
-## 3. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt` & `TvNavigationAndScenesE2ETest.kt` — `56/56` Tests Across 13 Suites)
+## 3. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt`, `TvNavigationAndScenesE2ETest.kt`, `HomeScreenWidgetTest.kt`, `HomeScreenWidgetUiE2ETest.kt` & `AppFlowsAndManagementE2ETest.kt` — `90/90` Tests Across `19` Suites)
 
-Whenever UI components, ViewModel flows, or repository methods are touched, verify all 7 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
+Whenever UI components, widgets, ViewModel flows, or repository methods are touched, verify all 8 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
 
 ```bash
 ./gradlew testDebugUnitTest --rerun-tasks
 ```
+
 
