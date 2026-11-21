@@ -9,13 +9,18 @@
 # Performance Architecture:
 #   - Reuses preinstalled system JDK 21 (e.g. /usr/lib/jvm/java-21-openjdk-*)
 #     and writable preinstalled Android SDKs (e.g. /opt/android-sdk) whenever
-#     available, downloading only the missing SDK delta (~8-10s instead of ~44s).
+#     available, deferring missing platform/build-tools deltas to AGP's built-in
+#     on-demand SDK auto-download (~0.1-0.2s VM startup instead of ~14-44s).
+#   - Ensures Android SDK licenses are accepted before returning so Gradle/AGP
+#     can download platforms;android-36.1 and build-tools;36.0.0 seamlessly on
+#     the first build. Pass --install-sdk to eagerly pre-install SDK packages.
 #   - Skips redundant keytool truststore rebuilds when system Java cacerts
 #     (/etc/ssl/certs/java/cacerts) already includes all local CA certificates.
 #   - On environments with persistent $HOME/.gemini/caches/wemi-android-v1/,
 #     restores immutable lz4/gzip archives in parallel onto fast local disk.
 #   - Falls back cleanly to direct network downloads on a cache miss or bare VM.
-#   - Pass --save-caches after a warm build/test run to refresh shared caches.
+#   - Pass --save-caches after a warm build/test run to refresh shared caches
+#     (automatically implies --install-sdk).
 #
 # Idempotent and non-interactive: safe to run repeatedly on fresh cloud VMs and
 # across VM sleep/wake cycles.
@@ -23,11 +28,16 @@
 set -euo pipefail
 
 SAVE_CACHES=0
+INSTALL_SDK=0
 for arg in "$@"; do
   case "$arg" in
-    --save-caches) SAVE_CACHES=1 ;;
+    --install-sdk) INSTALL_SDK=1 ;;
+    --save-caches)
+      SAVE_CACHES=1
+      INSTALL_SDK=1
+      ;;
     -h|--help)
-      echo "Usage: $0 [--save-caches]"
+      echo "Usage: $0 [--install-sdk] [--save-caches]"
       exit 0
       ;;
     *)
@@ -124,6 +134,9 @@ save_archive_atomic() {
 is_jdk21() {
   local dir="$1"
   [ -n "$dir" ] && [ -x "$dir/bin/java" ] && [ -x "$dir/bin/javac" ] || return 1
+  if [ -f "$dir/release" ] && grep -qE '^JAVA_VERSION="21(\.|")' "$dir/release"; then
+    return 0
+  fi
   "$dir/bin/java" -version 2>&1 | head -n 1 | grep -qE '"21(\.|")'
 }
 
@@ -135,6 +148,15 @@ has_required_sdk() {
   [ -f "$dir/platforms/android-36/android.jar" ] &&
   [ -f "$dir/platforms/android-36.1/android.jar" ] &&
   [ -x "$dir/build-tools/36.0.0/aapt2" ]
+}
+
+is_writable_base_sdk() {
+  local dir="$1"
+  [ -n "$dir" ] && [ -d "$dir" ] && [ -w "$dir" ] &&
+  [ -x "$dir/cmdline-tools/latest/bin/sdkmanager" ] &&
+  { [ ! -d "$dir/platforms" ] || [ -w "$dir/platforms" ]; } &&
+  { [ ! -d "$dir/build-tools" ] || [ -w "$dir/build-tools" ]; } &&
+  { [ ! -d "$dir/licenses" ] || [ -w "$dir/licenses" ]; }
 }
 
 # Resolve JDK 21: prefer preinstalled system JDK 21 (inherits system cacerts),
@@ -177,7 +199,7 @@ else
   fi
   if [ -z "$ANDROID_SDK_DIR" ]; then
     for cand in "/opt/android-sdk" "/usr/local/lib/android/sdk" "${ANDROID_HOME:-}" "${ANDROID_SDK_ROOT:-}" "$DEFAULT_LOCAL_SDK"; do
-      if [ -n "$cand" ] && [ -d "$cand" ] && [ -w "$cand" ] && [ -x "$cand/cmdline-tools/latest/bin/sdkmanager" ]; then
+      if is_writable_base_sdk "$cand"; then
         ANDROID_SDK_DIR="$cand"
         break
       fi
@@ -314,10 +336,12 @@ SYSTEM_JAVA_CACERTS="/etc/ssl/certs/java/cacerts"
 mkdir -p "$GRADLE_DIR"
 
 # 1. Check whether the active JDK already uses an up-to-date system Java cacerts
+JDK_USES_SYSTEM_CACERTS=0
 USE_SYSTEM_CACERTS=0
 if [ -f "$SYSTEM_JAVA_CACERTS" ] && [ -f "$JAVA_HOME_DIR/lib/security/cacerts" ] && \
    [ "$(readlink -f "$JAVA_HOME_DIR/lib/security/cacerts" 2>/dev/null || true)" = "$(readlink -f "$SYSTEM_JAVA_CACERTS" 2>/dev/null || true)" ] && \
    [ "$SSL_BUNDLE" = "/etc/ssl/certs/ca-certificates.crt" ]; then
+  JDK_USES_SYSTEM_CACERTS=1
   USE_SYSTEM_CACERTS=1
   if [ -f "$SSL_BUNDLE" ] && [ "$SSL_BUNDLE" -nt "$SYSTEM_JAVA_CACERTS" ]; then
     USE_SYSTEM_CACERTS=0
@@ -343,79 +367,112 @@ if [ "$USE_SYSTEM_CACERTS" -eq 0 ] && [ -x "$JAVA_HOME_DIR/bin/keytool" ] && [ -
     BASE_CACERTS="$JAVA_HOME_DIR/lib/security/cacerts.orig"
   fi
 
+  EXTRA_CA_FILES=()
+  for cert in /usr/local/share/ca-certificates/*.crt; do
+    [ -f "$cert" ] && EXTRA_CA_FILES+=("$cert")
+  done
   CA_FILES=()
   if [ -f "$SSL_BUNDLE" ]; then
     CA_FILES+=("$SSL_BUNDLE")
   fi
-  for cert in /usr/local/share/ca-certificates/*.crt; do
-    [ -f "$cert" ] && CA_FILES+=("$cert")
-  done
+  if [ "${#EXTRA_CA_FILES[@]}" -gt 0 ]; then
+    CA_FILES+=("${EXTRA_CA_FILES[@]}")
+  fi
 
   if [ "${#CA_FILES[@]}" -gt 0 ]; then
-    CUR_CA_FP="$(sha256sum "${CA_FILES[@]}" | sort | sha256sum | awk '{print $1}')|${BASE_CACERTS}"
+    CUR_CA_FP="$(sha256sum "${CA_FILES[@]}" "$BASE_CACERTS" | sort | sha256sum | awk '{print $1}')|${BASE_CACERTS}"
   else
     CUR_CA_FP="none|${BASE_CACERTS}"
   fi
   OLD_CA_FP="$(cat "$CA_FP_FILE" 2>/dev/null || true)"
 
-  if [ "$CUR_CA_FP" != "$OLD_CA_FP" ] || [ ! -f "$TRUSTSTORE" ]; then
-    TMP_DIR="$(mktemp -d)"
-    trap 'rm -rf "$TMP_DIR"' EXIT
-    TMP_JKS="$TMP_DIR/proxy-cacerts.jks"
-    cp "$BASE_CACERTS" "$TMP_JKS"
-    chmod 644 "$TMP_JKS"
-
-    import_pem_bundle() {
-      local src="$1"
-      local max_small="$2"
-      local tail_large="$3"
-      local count
-      count="$(grep -c "BEGIN CERTIFICATE" "$src" 2>/dev/null || true)"
-      [ "$count" -eq 0 ] && return 0
-      local start_idx=1
-      if [ "$count" -gt "$max_small" ]; then
-        start_idx=$((count - tail_large + 1))
+  # Fast-path content check: after VM wake, mtimes on /etc/ssl/certs/ca-certificates.crt
+  # or /usr/local/share/ca-certificates/*.crt can be newer than system cacerts even when
+  # every local CA cert is already present inside /etc/ssl/certs/java/cacerts.
+  if [ "$JDK_USES_SYSTEM_CACERTS" -eq 1 ]; then
+    if [ "$OLD_CA_FP" = "system|${CUR_CA_FP}" ]; then
+      USE_SYSTEM_CACERTS=1
+    elif [ "${#EXTRA_CA_FILES[@]}" -gt 0 ] && command -v python3 >/dev/null 2>&1; then
+      if python3 -S - "$SYSTEM_JAVA_CACERTS" "${EXTRA_CA_FILES[@]}" <<'PY'
+import base64, re, sys
+cacerts = open(sys.argv[1], "rb").read()
+found_any = False
+for p in sys.argv[2:]:
+    pem = open(p, "r", encoding="utf-8", errors="ignore").read()
+    for b in re.findall(r"-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----", pem, re.S):
+        found_any = True
+        if base64.b64decode(b) not in cacerts:
+            sys.exit(1)
+sys.exit(0 if found_any else 1)
+PY
+      then
+        USE_SYSTEM_CACERTS=1
+        printf 'system|%s\n' "$CUR_CA_FP" > "$CA_FP_FILE"
       fi
-      awk -v outdir="$TMP_DIR" -v start="$start_idx" '
-        /-----BEGIN CERTIFICATE-----/ { n++; in_cert = (n >= start); if (in_cert) fname = outdir "/cert_" n ".pem" }
-        in_cert { print > fname }
-        /-----END CERTIFICATE-----/ { if (in_cert) { close(fname); in_cert = 0 } }
-      ' "$src"
-    }
-
-    if [ -f "$SSL_BUNDLE" ]; then
-      import_pem_bundle "$SSL_BUNDLE" 16 5
     fi
-    for cert in /usr/local/share/ca-certificates/*.crt; do
-      [ -f "$cert" ] || continue
-      cp "$cert" "$TMP_DIR/extra_$(basename "$cert").pem"
-    done
-
-    SEEN_HASHES=""
-    IDX=0
-    for pem in "$TMP_DIR"/*.pem; do
-      [ -f "$pem" ] || continue
-      CERT_HASH="$(sha256sum "$pem" | awk '{print $1}')"
-      case "$SEEN_HASHES" in
-        *"$CERT_HASH"*) continue ;;
-      esac
-      SEEN_HASHES="$SEEN_HASHES $CERT_HASH"
-      IDX=$((IDX + 1))
-      "$JAVA_HOME_DIR/bin/keytool" -importcert -noprompt -trustcacerts \
-        -alias "local-proxy-ca-$IDX" \
-        -file "$pem" \
-        -keystore "$TMP_JKS" \
-        -storepass changeit >/dev/null 2>&1 || true
-    done
-
-    cp "$TMP_JKS" "$TRUSTSTORE.tmp.$$"
-    mv "$TRUSTSTORE.tmp.$$" "$TRUSTSTORE"
-    if [ -w "$JAVA_HOME_DIR/lib/security/cacerts" ]; then
-      cp "$TRUSTSTORE" "$JAVA_HOME_DIR/lib/security/cacerts"
-    fi
-    printf '%s\n' "$CUR_CA_FP" > "$CA_FP_FILE"
   fi
-  [ -f "$TRUSTSTORE" ] && ACTIVE_TRUSTSTORE="$TRUSTSTORE"
+
+  if [ "$USE_SYSTEM_CACERTS" -eq 0 ]; then
+    if [ "$OLD_CA_FP" != "custom|${CUR_CA_FP}" ] || [ ! -f "$TRUSTSTORE" ]; then
+      TMP_DIR="$(mktemp -d)"
+      trap 'rm -rf "$TMP_DIR"' EXIT
+      TMP_JKS="$TMP_DIR/proxy-cacerts.jks"
+      cp "$BASE_CACERTS" "$TMP_JKS"
+      chmod 644 "$TMP_JKS"
+
+      import_pem_bundle() {
+        local src="$1"
+        local max_small="$2"
+        local tail_large="$3"
+        local count
+        count="$(grep -c "BEGIN CERTIFICATE" "$src" 2>/dev/null || true)"
+        [ "$count" -eq 0 ] && return 0
+        local start_idx=1
+        if [ "$count" -gt "$max_small" ]; then
+          start_idx=$((count - tail_large + 1))
+        fi
+        awk -v outdir="$TMP_DIR" -v start="$start_idx" '
+          /-----BEGIN CERTIFICATE-----/ { n++; in_cert = (n >= start); if (in_cert) fname = outdir "/cert_" n ".pem" }
+          in_cert { print > fname }
+          /-----END CERTIFICATE-----/ { if (in_cert) { close(fname); in_cert = 0 } }
+        ' "$src"
+      }
+
+      if [ "$SSL_BUNDLE" != "/etc/ssl/certs/ca-certificates.crt" ] || [ "${#EXTRA_CA_FILES[@]}" -eq 0 ]; then
+        if [ -f "$SSL_BUNDLE" ]; then
+          import_pem_bundle "$SSL_BUNDLE" 16 5
+        fi
+      fi
+      for cert in "${EXTRA_CA_FILES[@]}"; do
+        cp "$cert" "$TMP_DIR/extra_$(basename "$cert").pem"
+      done
+
+      SEEN_HASHES=""
+      IDX=0
+      for pem in "$TMP_DIR"/*.pem; do
+        [ -f "$pem" ] || continue
+        CERT_HASH="$(sha256sum "$pem" | awk '{print $1}')"
+        case "$SEEN_HASHES" in
+          *"$CERT_HASH"*) continue ;;
+        esac
+        SEEN_HASHES="$SEEN_HASHES $CERT_HASH"
+        IDX=$((IDX + 1))
+        "$JAVA_HOME_DIR/bin/keytool" -importcert -noprompt -trustcacerts \
+          -alias "local-proxy-ca-$IDX" \
+          -file "$pem" \
+          -keystore "$TMP_JKS" \
+          -storepass changeit >/dev/null 2>&1 || true
+      done
+
+      cp "$TMP_JKS" "$TRUSTSTORE.tmp.$$"
+      mv "$TRUSTSTORE.tmp.$$" "$TRUSTSTORE"
+      if [ -w "$JAVA_HOME_DIR/lib/security/cacerts" ]; then
+        cp "$TRUSTSTORE" "$JAVA_HOME_DIR/lib/security/cacerts"
+      fi
+      printf 'custom|%s\n' "$CUR_CA_FP" > "$CA_FP_FILE"
+    fi
+    [ -f "$TRUSTSTORE" ] && ACTIVE_TRUSTSTORE="$TRUSTSTORE"
+  fi
 fi
 
 # 2. Parse HTTP_PROXY / HTTPS_PROXY and update managed blocks
@@ -513,7 +570,11 @@ if [ "$CUR_PROXY_FP" != "$OLD_PROXY_FP" ] || [ ! -f "$GRADLE_PROPS" ] || [ ! -f 
 fi
 EOF
 chmod +x "$TMP_SYNC"
-mv "$TMP_SYNC" "$SYNC_HELPER"
+if [ -x "$SYNC_HELPER" ] && cmp -s "$TMP_SYNC" "$SYNC_HELPER"; then
+  rm -f "$TMP_SYNC"
+else
+  mv -f "$TMP_SYNC" "$SYNC_HELPER"
+fi
 
 # Ensure forked Gradle Test JVMs (e.g., Robolectric on a cache miss) inherit proxy & trustStore props
 GRADLE_INIT_DIR="$GRADLE_DIR/init.d"
@@ -579,9 +640,13 @@ fi
 [ -f "$HOME/.gradle/proxy.env" ] && . "$HOME/.gradle/proxy.env"
 # END WEMI-ENV-SETUP
 EOF
-mv "$TMP_BASHRC" "$HOME/.bashrc"
+if cmp -s "$TMP_BASHRC" "$HOME/.bashrc"; then
+  rm -f "$TMP_BASHRC"
+else
+  mv -f "$TMP_BASHRC" "$HOME/.bashrc"
+fi
 
-# Activate in current process and sync proxy/truststore before invoking sdkmanager
+# Activate in current process and sync proxy/truststore before any SDK/Gradle tool runs
 export JAVA_HOME="$JAVA_HOME_DIR"
 export ANDROID_HOME="$ANDROID_SDK_DIR"
 export ANDROID_SDK_ROOT="$ANDROID_SDK_DIR"
@@ -596,38 +661,48 @@ unset _wemi_dir
 BASH_ENV= "$SYNC_HELPER"
 [ -f "$GRADLE_DIR/proxy.env" ] && . "$GRADLE_DIR/proxy.env"
 
-# 6. Network fallback: Install only the missing Android SDK 36 / 36.1 delta
-MISSING_PKGS=()
-[ -x "$ANDROID_HOME/platform-tools/adb" ] || MISSING_PKGS+=("platform-tools")
-[ -f "$ANDROID_HOME/platforms/android-36/android.jar" ] || MISSING_PKGS+=("platforms;android-36")
-[ -f "$ANDROID_HOME/platforms/android-36.1/android.jar" ] || MISSING_PKGS+=("platforms;android-36.1")
-[ -x "$ANDROID_HOME/build-tools/36.0.0/aapt2" ] || MISSING_PKGS+=("build-tools;36.0.0")
-
-if [ "${#MISSING_PKGS[@]}" -gt 0 ]; then
-  echo "[env-setup] Installing Android SDK packages: ${MISSING_PKGS[*]}"
+# 6. Ensure Android SDK licenses are accepted; defer platform/build-tools delta
+#    installation to AGP's built-in on-demand auto-download unless --install-sdk
+#    (or --save-caches) is explicitly requested.
+sdkmanager_proxy_args() {
   PROXY_ARGS=()
-  PROXY_RAW="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-}}}}"
-  if [ -n "$PROXY_RAW" ]; then
-    PROXY_STRIP="${PROXY_RAW#http://}"
-    PROXY_STRIP="${PROXY_STRIP#https://}"
-    PROXY_STRIP="${PROXY_STRIP%%/*}"
-    PROXY_STRIP="${PROXY_STRIP##*@}"
-    P_HOST="${PROXY_STRIP%:*}"
-    P_PORT="${PROXY_STRIP##*:}"
-    if [ -n "$P_HOST" ] && [ -n "$P_PORT" ] && [ "$P_HOST" != "$P_PORT" ]; then
-      PROXY_ARGS=(--proxy=http --proxy_host="$P_HOST" --proxy_port="$P_PORT")
+  local proxy_raw="${HTTPS_PROXY:-${https_proxy:-${HTTP_PROXY:-${http_proxy:-}}}}"
+  if [ -n "$proxy_raw" ]; then
+    local proxy_strip="${proxy_raw#http://}"
+    proxy_strip="${proxy_strip#https://}"
+    proxy_strip="${proxy_strip%%/*}"
+    proxy_strip="${proxy_strip##*@}"
+    local p_host="${proxy_strip%:*}"
+    local p_port="${proxy_strip##*:}"
+    if [ -n "$p_host" ] && [ -n "$p_port" ] && [ "$p_host" != "$p_port" ]; then
+      PROXY_ARGS=(--proxy=http --proxy_host="$p_host" --proxy_port="$p_port")
     fi
   fi
-  if [ ! -f "$ANDROID_HOME/licenses/android-sdk-license" ]; then
-    ( yes || true ) | sdkmanager --sdk_root="$ANDROID_HOME" "${PROXY_ARGS[@]}" --licenses >/dev/null || true
+}
+
+if [ ! -f "$ANDROID_HOME/licenses/android-sdk-license" ]; then
+  sdkmanager_proxy_args
+  ( yes || true ) | sdkmanager --sdk_root="$ANDROID_HOME" "${PROXY_ARGS[@]}" --licenses >/dev/null || true
+fi
+
+if [ "$INSTALL_SDK" -eq 1 ]; then
+  MISSING_PKGS=()
+  [ -x "$ANDROID_HOME/platform-tools/adb" ] || MISSING_PKGS+=("platform-tools")
+  [ -f "$ANDROID_HOME/platforms/android-36/android.jar" ] || MISSING_PKGS+=("platforms;android-36")
+  [ -f "$ANDROID_HOME/platforms/android-36.1/android.jar" ] || MISSING_PKGS+=("platforms;android-36.1")
+  [ -x "$ANDROID_HOME/build-tools/36.0.0/aapt2" ] || MISSING_PKGS+=("build-tools;36.0.0")
+
+  if [ "${#MISSING_PKGS[@]}" -gt 0 ]; then
+    echo "[env-setup] Installing Android SDK packages: ${MISSING_PKGS[*]}"
+    sdkmanager_proxy_args
+    ( yes || true ) | sdkmanager --sdk_root="$ANDROID_HOME" "${PROXY_ARGS[@]}" "${MISSING_PKGS[@]}"
   fi
-  ( yes || true ) | sdkmanager --sdk_root="$ANDROID_HOME" "${PROXY_ARGS[@]}" "${MISSING_PKGS[@]}"
 fi
 
 # 7. Ensure gradlew is executable; pre-warm wrapper only when saving shared caches
 GRADLE_VER="$(sed -n 's/.*gradle-\([0-9.]*\)-bin\.zip.*/\1/p' "$REPO_ROOT/gradle/wrapper/gradle-wrapper.properties" 2>/dev/null | head -n 1 || true)"
 if [ -f "$REPO_ROOT/gradlew" ]; then
-  chmod +x "$REPO_ROOT/gradlew"
+  [ -x "$REPO_ROOT/gradlew" ] || chmod +x "$REPO_ROOT/gradlew"
   if [ "$SAVE_CACHES" -eq 1 ] && { [ -z "$GRADLE_VER" ] || [ ! -d "$GRADLE_DIR/wrapper/dists/gradle-${GRADLE_VER}-bin" ]; }; then
     (cd "$REPO_ROOT" && ./gradlew --version --no-daemon >/dev/null)
   fi
@@ -674,4 +749,13 @@ if [ "$SAVE_CACHES" -eq 1 ] && [ -n "$CACHE_DIR" ]; then
   fi
 fi
 
-echo "[env-setup] Ready: $(java -version 2>&1 | head -n 1) | JAVA_HOME=$JAVA_HOME | ANDROID_HOME=$ANDROID_HOME | cache=${CACHE_DIR:-disabled} (deps=${DEPS_KEY})"
+JAVA_VER_SUMMARY="$(sed -n 's/^JAVA_VERSION="\([^"]*\)"/\1/p' "$JAVA_HOME/release" 2>/dev/null | head -n 1 || true)"
+if [ -n "$JAVA_VER_SUMMARY" ]; then
+  JAVA_VER_SUMMARY="jdk-$JAVA_VER_SUMMARY"
+else
+  JAVA_VER_SUMMARY="$("$JAVA_HOME/bin/java" -version 2>&1 | head -n 1)"
+fi
+SDK_STATE="on-demand"
+has_required_sdk "$ANDROID_HOME" && SDK_STATE="ready"
+
+echo "[env-setup] Ready: $JAVA_VER_SUMMARY | JAVA_HOME=$JAVA_HOME | ANDROID_HOME=$ANDROID_HOME ($SDK_STATE) | cache=${CACHE_DIR:-disabled} (deps=${DEPS_KEY})"

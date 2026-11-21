@@ -18,7 +18,7 @@
 ./gradlew assembleDebug
 ```
 
-- **Cloud VM Environment Setup ([`.agents/environment.json`](.agents/environment.json) & [`scripts/setup_dev_env.sh`](scripts/setup_dev_env.sh))**: Fresh VMs automatically run `bash scripts/setup_dev_env.sh`, which reuses preinstalled JDK 21 and writable `/opt/android-sdk` when present (or restores from persistent `~/.gemini/caches/wemi-android-v1/` / downloads missing packages), installs only the missing SDK delta, and configures proxy/TLS truststore hooks in `~/.bashrc` only when needed. Use `--save-caches` after dependency upgrades when persistent cache storage is available.
+- **Cloud VM Environment Setup ([`.agents/environment.json`](.agents/environment.json) & [`scripts/setup_dev_env.sh`](scripts/setup_dev_env.sh))**: Fresh VMs automatically run `bash scripts/setup_dev_env.sh`, which reuses preinstalled JDK 21 and writable `/opt/android-sdk` (guaranteeing accepted SDK licenses and deferring missing `platforms;android-36.1` / `build-tools;36.0.0` deltas to AGP's built-in on-demand auto-download in `~0.2s`), restores optional persistent `~/.gemini/caches/wemi-android-v1/` archives when present, and configures fast proxy/TLS truststore hooks in `~/.bashrc`. Pass `--install-sdk` to eagerly pre-install SDK packages or `--save-caches` after dependency upgrades.
 
 ---
 
