@@ -64,7 +64,7 @@ Never let a single test file exceed `500` lines. Organize tests by architectural
 ## 3. Compose Semantic `testTag` Conventions
 
 Every interactive or status-bearing Compose element must expose a deterministic `Modifier.testTag(...)` so E2E tests never rely on fragile layout hierarchy indexing:
-- Top Header single-row layout: static `"brand_wordmark_text"` plus 4 interactive controls (`>= 48.dp` touch height + `Role.Button`): `"all_off_devices_button"`, `"refresh_devices_button"`, `"edit_devices_button"`, `"add_device_button"`
+- Top Header single-row layout: static `"brand_wordmark_text"`, low-contrast version pill `"app_version_button"` (opens `"release_history_dialog"` / `"release_history_list"` / `"close_release_history_button"`), plus 4 interactive controls (`>= 48.dp` touch height + `Role.Button`): `"all_off_devices_button"`, `"refresh_devices_button"`, `"edit_devices_button"`, `"add_device_button"`
 - Status Feedback Banner: `"status_feedback_banner"` (scope text assertions via `hasTestTag("status_feedback_banner") and hasAnyDescendant(hasText(..., substring = true))` so device row labels never trigger ambiguous-node matches)
 - Device Row container & name: `"device_row_${device.id}"`, `"device_name_${device.id}"`
 - Power Ring button: `"power_button_${device.id}"`

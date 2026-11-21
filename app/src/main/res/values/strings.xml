@@ -29,4 +29,8 @@
     <string name="widget_power_ring_desc">Toggle power</string>
     <string name="action_add_home_widget">Add Widget</string>
     <string name="content_desc_pin_room_widget">Add %1$s widget to Home Screen</string>
+    <string name="content_desc_app_version_history">App version %1$s, view release history</string>
+    <string name="release_history_title">Release History</string>
+    <string name="release_history_subtitle">What\'s new across WeMi releases</string>
+    <string name="action_close">Close</string>
 </resources>

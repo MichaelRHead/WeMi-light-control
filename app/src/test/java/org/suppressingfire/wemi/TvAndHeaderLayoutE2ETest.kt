@@ -138,6 +138,42 @@ class TvAndHeaderLayoutE2ETest {
                 editBounds.center.x < addBounds.center.x
         )
 
+        // Subtle low-contrast version button stays inside the unused left brand zone without overlapping All Off or expanding header height
+        val versionNode = composeTestRule.onNodeWithTag("app_version_button").assertIsDisplayed()
+        val versionSem = versionNode.fetchSemanticsNode()
+        val versionBounds = versionSem.boundsInRoot
+        assertEquals(
+            "Expected app_version_button to expose Role.Button",
+            Role.Button,
+            versionSem.config.getOrNull(SemanticsProperties.Role)
+        )
+        assertTrue(
+            "Expected app_version_button to expose a non-blank accessibility ContentDescription",
+            versionSem.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().any { it.isNotBlank() }
+        )
+        assertTrue(
+            "Expected app_version_button to stay left of All Off ($versionBounds vs $allOffBounds)",
+            versionBounds.right <= allOffBounds.left + 2f
+        )
+        assertTrue(
+            "Expected app_version_button to stay vertically inside the single-row TopHeader band ($versionBounds vs $allOffBounds)",
+            versionBounds.top >= allOffBounds.top - 2f && versionBounds.bottom <= allOffBounds.bottom + 2f
+        )
+
+        // Tapping the subtle version button opens the user-friendly Release History dialog with version numbers, dates, and summaries
+        versionNode.performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("release_history_dialog").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Release History").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("release_entry_v${BuildConfig.VERSION_NAME}").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Nov 21, 2026").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("release_history_list")
+            .performScrollToNode(hasTestTag("release_entry_v1.0"))
+        composeTestRule.onNodeWithTag("release_entry_v1.0").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("close_release_history_button").assertIsDisplayed().performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("release_history_dialog").assertDoesNotExist()
+
         // Static "wemi" wordmark is displayed, and the removed legacy wordmark toggle is absent on the More tab
         composeTestRule.onNodeWithText("wemi").assertIsDisplayed()
         composeTestRule.onNodeWithTag("nav_tab_more").performClick()
@@ -155,6 +191,40 @@ class TvAndHeaderLayoutE2ETest {
                     .filter { it.networkKey == vm.activeNetworkKey.value && it.isReachable && it.parsedType != org.suppressingfire.wemi.data.DeviceType.MOTION_SENSOR }
                     .none { it.isOn }
         }
+    }
+
+    @Test
+    @Config(sdk = [36], qualifiers = "w412dp-h915dp-port-xxhdpi")
+    fun `verify standard phone TopHeader places low-contrast version pill in unused gap beside wemi without shifting buttons`() {
+        composeTestRule.waitForIdle()
+
+        val wordmarkBounds = composeTestRule.onNodeWithTag("brand_wordmark_text")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val versionBounds = composeTestRule.onNodeWithTag("app_version_button")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val allOffBounds = composeTestRule.onNodeWithTag("all_off_devices_button")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val refreshBounds = composeTestRule.onNodeWithTag("refresh_devices_button")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val editBounds = composeTestRule.onNodeWithTag("edit_devices_button")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val addBounds = composeTestRule.onNodeWithTag("add_device_button")
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+
+        // On 412dp phones, version pill sits cleanly inside the unused gap between "wemi" and "All Off" on the same row
+        assertTrue(
+            "Expected app_version_button between wordmark and All Off on 412dp phone ($wordmarkBounds | $versionBounds | $allOffBounds)",
+            wordmarkBounds.right <= versionBounds.left + 2f &&
+                versionBounds.right <= allOffBounds.left + 2f &&
+                allOffBounds.right <= refreshBounds.left + 2f &&
+                refreshBounds.right <= editBounds.left + 2f &&
+                editBounds.right <= addBounds.left + 2f
+        )
+        assertTrue(
+            "Expected version button to share exact single-row height without expanding TopHeader ($versionBounds vs $allOffBounds)",
+            abs(versionBounds.center.y - allOffBounds.center.y) <= 4f &&
+                abs(versionBounds.height - allOffBounds.height) <= 4f
+        )
     }
 
     @OptIn(ExperimentalTestApi::class)

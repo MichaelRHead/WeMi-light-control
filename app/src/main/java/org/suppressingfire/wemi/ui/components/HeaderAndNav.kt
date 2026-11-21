@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.suppressingfire.wemi.BuildConfig
 import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.ui.theme.WemoGreenBottom
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
@@ -63,6 +65,8 @@ fun TopHeader(
     onAddClick: () -> Unit,
     activeOnCount: Int = 0,
     onAllOffClick: () -> Unit = {},
+    versionName: String = BuildConfig.VERSION_NAME,
+    onVersionClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -70,6 +74,8 @@ fun TopHeader(
     val isWideHeaderWidth = screenWidthDp >= 380
 
     val brandText = stringResource(R.string.header_brand_wemi)
+    val versionLabel = "v$versionName"
+    val versionContentDesc = stringResource(R.string.content_desc_app_version_history, versionName)
     val allOffLabel = stringResource(R.string.action_all_off)
     val refreshLabel = stringResource(R.string.action_refresh)
     val editLabel = if (isEditMode) {
@@ -120,30 +126,129 @@ fun TopHeader(
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(horizontal = 12.dp, vertical = 4.dp)
     ) {
-        // Single compact row: "wemi" wordmark on left; All Off, Refresh, Edit/Done, and "+" buttons on right
+        // Single compact row: "wemi" wordmark + subtle version button on left; All Off, Refresh, Edit/Done, and "+" buttons untouched on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
+            BoxWithConstraints(
                 modifier = Modifier
-                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
-                    .semantics(mergeDescendants = true) {
-                        contentDescription = "$brandText brand header"
-                    }
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                    .testTag("brand_wordmark_text")
+                    .weight(1f)
+                    .padding(end = 2.dp)
             ) {
-                Text(
-                    text = brandText,
-                    color = Color.White,
-                    fontFamily = FontFamily.SansSerif,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 30.sp,
-                    letterSpacing = (-0.8).sp
-                )
+                val hasInlineVersionGap = maxWidth >= 116.dp
+                if (hasInlineVersionGap) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = "$brandText brand header"
+                                }
+                                .padding(horizontal = 4.dp, vertical = 2.dp)
+                                .testTag("brand_wordmark_text")
+                        ) {
+                            Text(
+                                text = brandText,
+                                color = Color.White,
+                                fontFamily = FontFamily.SansSerif,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 30.sp,
+                                letterSpacing = (-0.8).sp
+                            )
+                        }
+
+                        // Small, low-contrast version pill tucked in the unused teal space beside "wemi"
+                        Box(
+                            contentAlignment = Alignment.BottomStart,
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 36.dp, minHeight = 48.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable(role = Role.Button, onClick = onVersionClick)
+                                .semantics { contentDescription = versionContentDesc }
+                                .padding(start = 2.dp, end = 2.dp, bottom = 9.dp)
+                                .testTag("app_version_button")
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = Color.White.copy(alpha = 0.09f)
+                            ) {
+                                Text(
+                                    text = versionLabel,
+                                    color = Color.White.copy(alpha = 0.62f),
+                                    fontFamily = FontFamily.SansSerif,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 10.sp,
+                                    lineHeight = 12.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    // Compact narrow viewports: preserve exact 48.dp row height and tuck version under descenderless "wemi"
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .defaultMinSize(minHeight = 48.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.TopStart,
+                            modifier = Modifier
+                                .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                                .semantics(mergeDescendants = true) {
+                                    contentDescription = "$brandText brand header"
+                                }
+                                .padding(start = 4.dp, end = 4.dp, top = 1.dp)
+                                .testTag("brand_wordmark_text")
+                        ) {
+                            Text(
+                                text = brandText,
+                                color = Color.White,
+                                fontFamily = FontFamily.SansSerif,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 27.sp,
+                                lineHeight = 27.sp,
+                                letterSpacing = (-0.8).sp
+                            )
+                        }
+
+                        Box(
+                            contentAlignment = Alignment.BottomStart,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable(role = Role.Button, onClick = onVersionClick)
+                                .semantics { contentDescription = versionContentDesc }
+                                .padding(start = 4.dp, top = 2.dp, end = 6.dp, bottom = 1.dp)
+                                .testTag("app_version_button")
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(5.dp),
+                                color = Color.White.copy(alpha = 0.09f)
+                            ) {
+                                Text(
+                                    text = versionLabel,
+                                    color = Color.White.copy(alpha = 0.62f),
+                                    fontFamily = FontFamily.SansSerif,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 9.5.sp,
+                                    lineHeight = 11.sp,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.5.dp)
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             Row(

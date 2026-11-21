@@ -26,7 +26,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import org.suppressingfire.wemi.ui.BottomTab
 import org.suppressingfire.wemi.ui.SwitchViewModel
 import org.suppressingfire.wemi.ui.components.BottomNavigationBar
+import org.suppressingfire.wemi.ui.components.ReleaseHistoryDialog
 import org.suppressingfire.wemi.ui.components.TopHeader
 import org.suppressingfire.wemi.ui.components.TvDashboardScreen
 import org.suppressingfire.wemi.ui.components.WeMiModalDialogs
@@ -112,6 +115,7 @@ fun WeMiSwitchApp(
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val isDemoShowroomMode by viewModel.isDemoShowroomMode.collectAsStateWithLifecycle()
     val setupDebugSnapshot by viewModel.setupDebugSnapshot.collectAsStateWithLifecycle()
+    var showReleaseHistoryDialog by remember { mutableStateOf(false) }
 
     val homeDevices = remember(devices, activeNetworkKey) {
         devices.filter { it.networkKey == activeNetworkKey }
@@ -136,7 +140,8 @@ fun WeMiSwitchApp(
     }
 
     BackHandler(
-        enabled = showSsdpScannerSheet ||
+        enabled = showReleaseHistoryDialog ||
+            showSsdpScannerSheet ||
             showAddHomeDialog ||
             showProvisionApDialog ||
             isEditMode ||
@@ -144,6 +149,7 @@ fun WeMiSwitchApp(
             selectedTab != BottomTab.DEVICES
     ) {
         when {
+            showReleaseHistoryDialog -> showReleaseHistoryDialog = false
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
             showAddHomeDialog -> viewModel.closeAddHomeDialog()
             showProvisionApDialog -> viewModel.closeProvisionApDialog()
@@ -179,7 +185,8 @@ fun WeMiSwitchApp(
                         }
                     },
                     activeOnCount = activeOnCount,
-                    onAllOffClick = { viewModel.turnAllSwitches(false) }
+                    onAllOffClick = { viewModel.turnAllSwitches(false) },
+                    onVersionClick = { showReleaseHistoryDialog = true }
                 )
             }
         },
@@ -369,5 +376,10 @@ fun WeMiSwitchApp(
             homeNetworks = homeNetworks,
             activeNetworkKey = activeNetworkKey
         )
+        if (showReleaseHistoryDialog) {
+            ReleaseHistoryDialog(
+                onDismiss = { showReleaseHistoryDialog = false }
+            )
+        }
     }
 }
