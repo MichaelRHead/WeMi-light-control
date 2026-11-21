@@ -222,12 +222,19 @@ class SwitchViewModel internal constructor(
         viewModelScope.launch {
             combine(devices, rules) { devList, ruleList -> Pair(devList, ruleList) }
                 .collectLatest { (devList, ruleList) ->
-                    ruleScheduler.pruneRemovedDevices(devList.mapTo(HashSet()) { it.id })
+                    val activeDeviceIds = devList.mapTo(HashSet()) { it.id }
+                    ruleScheduler.pruneRemovedDevices(activeDeviceIds)
                     devList.forEach { dev ->
-                        ruleScheduler.onDeviceStateUpdated(dev, ruleList)
+                        ruleScheduler.onDeviceStateUpdated(dev, ruleList, activeDeviceIds)
                     }
+                }
+        }
+        viewModelScope.launch {
+            devices.collectLatest { devList ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     WidgetUpdater.refreshWidgetsForDevices(getApplication(), devList)
                 }
+            }
         }
 
         // Hybrid UPnP GENA Push Subscriptions + 30s Fallback Poll in Real LAN Mode

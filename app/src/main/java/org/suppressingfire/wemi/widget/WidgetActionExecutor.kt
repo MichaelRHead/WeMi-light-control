@@ -26,6 +26,13 @@ import org.suppressingfire.wemi.network.SharedSoapLogStore
 object WidgetActionExecutor {
     private val widgetMutexes = ConcurrentHashMap<Int, Mutex>()
 
+    internal fun clearWidgetMutex(appWidgetId: Int) {
+        widgetMutexes.remove(appWidgetId)
+    }
+
+    internal fun hasMutexFor(appWidgetId: Int): Boolean =
+        widgetMutexes.containsKey(appWidgetId)
+
     private fun logWidgetEvent(
         context: Context,
         appWidgetId: Int,
@@ -196,7 +203,7 @@ object WidgetActionExecutor {
             val updatedDevices = repository.allDevices.first()
             val activeIds = WidgetUpdater.getActiveWidgetIds(appCtx)
             WidgetUpdater.refreshWidgetsForDevices(appCtx, updatedDevices)
-            // Also update the tapped ID explicitly only if the launcher/test hasn't registered it in AppWidgetManager
+            // Only update the tapped ID explicitly if the launcher/test hasn't registered it in AppWidgetManager
             if (appWidgetId !in activeIds) {
                 WidgetUpdater.updateSingleWidget(
                     context = appCtx,
@@ -232,8 +239,9 @@ object WidgetActionExecutor {
             context = appCtx
         )
         try {
-            appWidgetIds.forEach { widgetId ->
-                widgetMutexes.computeIfAbsent(widgetId) { Mutex() }.withLock {
+            appWidgetIds.distinct().forEach { widgetId ->
+                if (widgetId <= 0) return@forEach
+                val refreshSingle: suspend () -> Unit = {
                     val devices = loadAllDevices(repository)
                     val config = WidgetConfigStore.load(appCtx, widgetId)
                     WidgetUpdater.updateSingleWidget(
@@ -243,6 +251,16 @@ object WidgetActionExecutor {
                         devices = devices,
                         isUpdating = false
                     )
+                }
+                val mutex = if (WidgetConfigStore.load(appCtx, widgetId) != null) {
+                    widgetMutexes.computeIfAbsent(widgetId) { Mutex() }
+                } else {
+                    widgetMutexes[widgetId]
+                }
+                if (mutex != null) {
+                    mutex.withLock { refreshSingle() }
+                } else {
+                    refreshSingle()
                 }
             }
         } finally {

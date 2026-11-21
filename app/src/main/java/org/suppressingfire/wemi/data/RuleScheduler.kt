@@ -61,18 +61,25 @@ class RuleScheduler(
      */
     fun onDeviceStateUpdated(
         device: DeviceEntity,
-        rules: List<RuleEntity> = emptyList()
+        rules: List<RuleEntity> = emptyList(),
+        activeDeviceIds: Set<Int> = emptySet()
     ) {
         if (!device.isOn || !device.isReachable) {
             cancelAutoOff(device.id)
             return
         }
 
-        val ruleMinutes = rules.firstOrNull { rule ->
+        val matchingAutoOffRule = rules.firstOrNull { rule ->
             rule.isEnabled &&
                 rule.parsedRuleType == RuleType.AUTO_OFF &&
-                (rule.targetDeviceId == device.id || rule.targetDeviceName.equals(device.name, ignoreCase = true))
-        }?.let { parseMinutesFromSummary(it.triggerSummary) } ?: 0
+                rule.targetDeviceId == device.id
+        } ?: rules.firstOrNull { rule ->
+            rule.isEnabled &&
+                rule.parsedRuleType == RuleType.AUTO_OFF &&
+                (rule.targetDeviceId <= 0 || (activeDeviceIds.isNotEmpty() && rule.targetDeviceId !in activeDeviceIds)) &&
+                rule.targetDeviceName.equals(device.name, ignoreCase = true)
+        }
+        val ruleMinutes = matchingAutoOffRule?.let { parseMinutesFromSummary(it.triggerSummary) } ?: 0
 
         val totalMinutes = when {
             device.autoOffMinutes > 0 -> device.autoOffMinutes
@@ -197,11 +204,16 @@ class RuleScheduler(
     }
 
     companion object {
+        private val MINUTES_SUMMARY_REGEX =
+            Regex("(\\d+)\\s*(?:min|minute|minutes|m\\b)", RegexOption.IGNORE_CASE)
+        private val SCHEDULE_TIME_REGEX =
+            Regex("(\\d{1,2}):(\\d{2})\\s*(AM|PM)?", RegexOption.IGNORE_CASE)
+
         /**
          * Parses a duration in minutes from strings like "After 30 minutes ON" or "15 min".
          */
         fun parseMinutesFromSummary(summary: String): Int {
-            val match = Regex("(\\d+)\\s*(?:min|minute|minutes|m\\b)", RegexOption.IGNORE_CASE).find(summary)
+            val match = MINUTES_SUMMARY_REGEX.find(summary)
             return match?.groupValues?.getOrNull(1)?.toIntOrNull()?.coerceIn(1, 1440) ?: 0
         }
 
@@ -214,8 +226,7 @@ class RuleScheduler(
          * - "Daily at Sunrise (6:30 AM)" -> (6, 30)
          */
         fun parseScheduleTime24h(summary: String): Pair<Int, Int>? {
-            val regex = Regex("(\\d{1,2}):(\\d{2})\\s*(AM|PM)?", RegexOption.IGNORE_CASE)
-            val match = regex.find(summary)
+            val match = SCHEDULE_TIME_REGEX.find(summary)
             if (match != null) {
                 val rawHour = match.groupValues[1].toIntOrNull() ?: return null
                 val min = match.groupValues[2].toIntOrNull() ?: return null

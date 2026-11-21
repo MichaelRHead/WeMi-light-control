@@ -120,8 +120,10 @@ internal class SetupApProber(
         val resolvedPort = foundPort ?: return@withContext null
         val xml = setupXml.orEmpty()
 
-        val friendlyName = extractXmlTag(xml, "friendlyName")?.ifBlank { null } ?: "Smart Switch"
-        val modelName = extractXmlTag(xml, "modelName")?.ifBlank { null } ?: "LightSwitch"
+        val friendlyName = extractXmlTag(xml, "friendlyName")?.let(XmlAndSkuParser::unescapeXml)?.ifBlank { null }
+            ?: "Smart Switch"
+        val modelName = extractXmlTag(xml, "modelName")?.let(XmlAndSkuParser::unescapeXml)?.ifBlank { null }
+            ?: "LightSwitch"
         val deviceTypeUrn = extractXmlTag(xml, "deviceType").orEmpty()
         val xmlSerial = extractXmlTag(xml, "serialNumber").orEmpty().trim()
         val xmlMac = extractXmlTag(xml, "macAddress").orEmpty()

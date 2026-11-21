@@ -131,11 +131,18 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         appWidgetIds.forEach { widgetId ->
             WidgetConfigStore.delete(context, widgetId)
+            WidgetActionExecutor.clearWidgetMutex(widgetId)
         }
     }
 
     override fun onRestored(context: Context, oldWidgetIds: IntArray, newWidgetIds: IntArray) {
         WidgetConfigStore.remapIds(context, oldWidgetIds, newWidgetIds)
+        val retainedNewIds = newWidgetIds.toSet()
+        oldWidgetIds.forEach { oldId ->
+            if (oldId !in retainedNewIds) {
+                WidgetActionExecutor.clearWidgetMutex(oldId)
+            }
+        }
     }
 
     companion object {

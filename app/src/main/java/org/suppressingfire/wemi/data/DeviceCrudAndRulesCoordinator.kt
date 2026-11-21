@@ -144,7 +144,11 @@ internal class DeviceCrudAndRulesCoordinator(
             devices
         }
         val target = scopedDevices.find { it.id == rule.targetDeviceId }
-            ?: scopedDevices.find { it.name.equals(rule.targetDeviceName, ignoreCase = true) }
+            ?: if (rule.targetDeviceId <= 0 || devices.none { it.id == rule.targetDeviceId }) {
+                scopedDevices.find { it.name.equals(rule.targetDeviceName, ignoreCase = true) }
+            } else {
+                null
+            }
         if (target != null) {
             if (target.parsedType == DeviceType.LIGHTBULB_DIMMER && rule.targetStateOn) {
                 updateDeviceBrightness(target, rule.targetBrightness)

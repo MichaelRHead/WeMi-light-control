@@ -46,6 +46,7 @@ class ProvisionerClient(
     companion object {
         const val METHOD_2_RTOS_SALT_SUFFIX = PasswordCrypto.METHOD_2_RTOS_SALT_SUFFIX
         const val METHOD_3_BINARY_OPTION_EXTRA = PasswordCrypto.METHOD_3_BINARY_OPTION_EXTRA
+        private val NETWORK_STATUS_REGEX = Regex("<NetworkStatus>(\\d+)</NetworkStatus>", RegexOption.IGNORE_CASE)
     }
 
     private fun nowTime(): String =
@@ -283,7 +284,7 @@ class ProvisionerClient(
                 return try {
                     val resp = httpClient.postXml(endpoint, statusBody, statusAction)
                     val elapsed = System.currentTimeMillis() - pollStart
-                    val code = Regex("<NetworkStatus>(\\d+)</NetworkStatus>", RegexOption.IGNORE_CASE)
+                    val code = NETWORK_STATUS_REGEX
                         .find(resp.body)?.groupValues?.getOrNull(1)?.toIntOrNull()
                     logStep("[POLL #$pollIndex] GetNetworkStatus -> Status=${code ?: "HTTP_${resp.code}"} (${elapsed}ms)")
                     code

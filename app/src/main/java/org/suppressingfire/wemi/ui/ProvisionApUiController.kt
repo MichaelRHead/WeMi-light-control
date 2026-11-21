@@ -51,6 +51,8 @@ internal class ProvisionApUiController(
     private val _isProvisioningAp = MutableStateFlow(false)
     val isProvisioningAp: StateFlow<Boolean> = _isProvisioningAp.asStateFlow()
 
+    private val scanLock = Any()
+
     @Volatile
     private var scanJob: Job? = null
 
@@ -74,88 +76,96 @@ internal class ProvisionApUiController(
     }
 
     fun scanSetupApNetworks(apHost: String = "10.22.22.1") {
-        if (_isProvisioningAp.value || !_isScanningSetupAp.compareAndSet(false, true)) return
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            val self = coroutineContext[Job]
-            try {
-                _setupApStatusMessage.value = null
-                val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
-                val netSnap = networkMonitor.refreshSnapshot()
-                _setupDebugSnapshot.value = SetupDebugSnapshot(
-                    timestamp = nowTimeText(),
-                    phoneLocalIp = netSnap.localIpv4,
-                    phoneGatewayIp = netSnap.gatewayIp,
-                    phoneInterface = netSnap.interfaceName,
-                    isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
-                    isWifiSocketBound = netSnap.isWifiSocketBound,
-                    isDemoMode = repository.isDemoShowroomMode.value,
-                    targetApHost = cleanHost,
-                    probeSummary = "Probing $cleanHost (ports 49152..49159)...",
-                    apScanSummary = "Waiting for probe..."
-                )
-
-                val descriptor = repository.probeSetupApDevice(apHost = cleanHost)
-                _detectedSetupDevice.value = descriptor
-                val probeTrace = descriptor?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
-                    ?: repository.latestSetupProbeSummary()
-
-                _setupDebugSnapshot.update { current ->
-                    current.copy(
+        val job: Job = synchronized(scanLock) {
+            if (_isProvisioningAp.value || scanJob?.isActive == true || _isScanningSetupAp.value) {
+                return
+            }
+            _isScanningSetupAp.value = true
+            val created = scope.launch(start = CoroutineStart.LAZY) {
+                val self = coroutineContext[Job]
+                try {
+                    _setupApStatusMessage.value = null
+                    val cleanHost = apHost.trim().ifBlank { "10.22.22.1" }
+                    val netSnap = networkMonitor.refreshSnapshot()
+                    _setupDebugSnapshot.value = SetupDebugSnapshot(
                         timestamp = nowTimeText(),
-                        detectedDevice = descriptor,
-                        probeSummary = probeTrace,
-                        apScanSummary = "Scanning 2.4 GHz APs via WiFiSetup1#GetApList..."
+                        phoneLocalIp = netSnap.localIpv4,
+                        phoneGatewayIp = netSnap.gatewayIp,
+                        phoneInterface = netSnap.interfaceName,
+                        isWemoSetupSubnet = netSnap.isWemoSetupApSubnet,
+                        isWifiSocketBound = netSnap.isWifiSocketBound,
+                        isDemoMode = repository.isDemoShowroomMode.value,
+                        targetApHost = cleanHost,
+                        probeSummary = "Probing $cleanHost (ports 49152..49159)...",
+                        apScanSummary = "Waiting for probe..."
                     )
-                }
 
-                val hostUnreachable = descriptor == null &&
-                    !repository.isDemoShowroomMode.value &&
-                    (probeTrace.contains("TCP_TIMEOUT") || probeTrace.contains("NO_ROUTE"))
-                val list = if (hostUnreachable) {
-                    emptyList()
-                } else {
-                    repository.scanSetupApNetworks(
-                        apHost = cleanHost,
-                        apPort = descriptor?.port ?: 49152
-                    )
-                }
-                _scannedSetupAps.value = list
+                    val descriptor = repository.probeSetupApDevice(apHost = cleanHost)
+                    _detectedSetupDevice.value = descriptor
+                    val probeTrace = descriptor?.probeTraceSummary?.ifBlank { repository.latestSetupProbeSummary() }
+                        ?: repository.latestSetupProbeSummary()
 
-                val scanSummary = when {
-                    hostUnreachable -> "Skipped (Setup AP unreachable)"
-                    descriptor?.macAndSerialSource == "DemoShowroom" -> "DEMO_AP_LIST(count=${list.size})"
-                    else -> repository.latestSetupApScanSummary()
-                }
-                _setupDebugSnapshot.update { current ->
-                    current.copy(
-                        timestamp = nowTimeText(),
-                        scannedAps = list,
-                        apScanSummary = scanSummary
-                    )
-                }
-
-                if (list.isNotEmpty() || descriptor != null) {
-                    val hwSummary = if (descriptor != null) {
-                        "Detected ${descriptor.friendlyName} (${descriptor.hardwareSku} • Port ${descriptor.port} • Auto Method ${descriptor.recommendedEncryptionMethod})"
-                    } else {
-                        "Smart Switch Setup AP ($cleanHost)"
+                    _setupDebugSnapshot.update { current ->
+                        current.copy(
+                            timestamp = nowTimeText(),
+                            detectedDevice = descriptor,
+                            probeSummary = probeTrace,
+                            apScanSummary = "Scanning 2.4 GHz APs via WiFiSetup1#GetApList..."
+                        )
                     }
-                    val msg = "$hwSummary • Found ${list.size} nearby 2.4 GHz Wi-Fi network(s)"
-                    _setupApStatusMessage.value = msg
-                    onShowTransientStatus(msg)
-                } else {
-                    val err = "No response from Setup AP at $cleanHost ($probeTrace) — Connect phone Wi-Fi to the switch's 10.22.22.1 setup network first."
-                    _setupApStatusMessage.value = err
-                    onShowTransientStatus(err)
-                }
-            } finally {
-                if (scanJob === self) {
-                    scanJob = null
-                    _isScanningSetupAp.value = false
+
+                    val hostUnreachable = descriptor == null &&
+                        !repository.isDemoShowroomMode.value &&
+                        (probeTrace.contains("TCP_TIMEOUT") || probeTrace.contains("NO_ROUTE"))
+                    val list = if (hostUnreachable) {
+                        emptyList()
+                    } else {
+                        repository.scanSetupApNetworks(
+                            apHost = cleanHost,
+                            apPort = descriptor?.port ?: 49152
+                        )
+                    }
+                    _scannedSetupAps.value = list
+
+                    val scanSummary = when {
+                        hostUnreachable -> "Skipped (Setup AP unreachable)"
+                        descriptor?.macAndSerialSource == "DemoShowroom" -> "DEMO_AP_LIST(count=${list.size})"
+                        else -> repository.latestSetupApScanSummary()
+                    }
+                    _setupDebugSnapshot.update { current ->
+                        current.copy(
+                            timestamp = nowTimeText(),
+                            scannedAps = list,
+                            apScanSummary = scanSummary
+                        )
+                    }
+
+                    if (list.isNotEmpty() || descriptor != null) {
+                        val hwSummary = if (descriptor != null) {
+                            "Detected ${descriptor.friendlyName} (${descriptor.hardwareSku} • Port ${descriptor.port} • Auto Method ${descriptor.recommendedEncryptionMethod})"
+                        } else {
+                            "Smart Switch Setup AP ($cleanHost)"
+                        }
+                        val msg = "$hwSummary • Found ${list.size} nearby 2.4 GHz Wi-Fi network(s)"
+                        _setupApStatusMessage.value = msg
+                        onShowTransientStatus(msg)
+                    } else {
+                        val err = "No response from Setup AP at $cleanHost ($probeTrace) — Connect phone Wi-Fi to the switch's 10.22.22.1 setup network first."
+                        _setupApStatusMessage.value = err
+                        onShowTransientStatus(err)
+                    }
+                } finally {
+                    synchronized(scanLock) {
+                        if (scanJob === self) {
+                            scanJob = null
+                            _isScanningSetupAp.value = false
+                        }
+                    }
                 }
             }
+            scanJob = created
+            created
         }
-        scanJob = job
         job.start()
     }
 
@@ -174,10 +184,13 @@ internal class ProvisionApUiController(
         keepDialogOpenOnSuccess: Boolean = false
     ) {
         if (!_isProvisioningAp.compareAndSet(false, true)) return
-        val supersededScan = scanJob
-        scanJob = null
+        val supersededScan = synchronized(scanLock) {
+            val prior = scanJob
+            scanJob = null
+            _isScanningSetupAp.value = false
+            prior
+        }
         supersededScan?.cancel()
-        _isScanningSetupAp.value = false
 
         scope.launch {
             try {

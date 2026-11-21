@@ -25,7 +25,7 @@ Every Play Store release candidate traverses 6 review stages synchronized via [`
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off telemetry_and_debugging "<verification summary>"` (setting `CURRENT_TURN: code_quality_and_testing`).
 4. **Stage 4 (Review 3) — `code_quality_and_testing` (Antigravity Code Quality & End-to-End Testing Agent)**:
    - Audits file modularity & readability (`.agents/skills/android-code-modularization/SKILL.md`), Wi-Fi socket binding (`wifiSocketFactory`), SQLite/GENA/coroutine lifecycle cleanup, and `gradlew` & script non-executable git modes (`100644`, invoked via `sh`/`bash`/`python3`).
-   - Runs the full release gate: `sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`73/73` unit, protocol, governance, and Compose E2E tests across `15` suites).
+   - Runs the full release gate: `sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`102/102` unit, protocol, widget, telemetry, governance, and Compose E2E tests across `20` suites).
    - Advances turn: `bash scripts/advance_release_turn.sh sign_off code_quality_and_testing "<verification summary>"` (setting `CURRENT_TURN: license_governance`).
 5. **Stage 5 (Review 4) — `license_governance` (Antigravity License & Brand Governance Agent)**:
    - Audits root `LICENSE` (**MIT License**) parity with `MoreScreen.kt` (`open_source_licenses_card`, `mit_license_text_surface`, and `third_party_notices_surface`), permissive-only dependency allowlist (`gradle/libs.versions.toml` & `app/build.gradle.kts` with `includeInApk = false`), `org.suppressingfire.wemi` package/filename hygiene, and Play Store trademark boundaries (`LICENSE_GOVERNANCE.md`).
@@ -69,6 +69,6 @@ When `scripts/await_release_turn.sh <your_role>` activates your turn:
 2. Perform your domain audit and run your required Gradle verification tests. If committing any domain fixes during your turn, follow [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) — write for a human reader in plain English (what changed and why, no symbol dumps or semicolon chains) via `bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh <your_role> "<plain-English subject>" "<short plain-English bullets>" --verified "<brief checks>"`.
 3. Record your sign-off and hand off `CURRENT_TURN` to the next agent in the ring with a short 1–2 sentence plain-English summary (avoid dumping long symbol lists into the commit message):
    ```bash
-   bash scripts/advance_release_turn.sh sign_off <your_role> "<short plain-English summary of what passed>" --verified "<e.g., 73/73 tests passing, lint clean, debug APK builds>"
+   bash scripts/advance_release_turn.sh sign_off <your_role> "<short plain-English summary of what passed>" --verified "<e.g., 102/102 tests passing, lint clean, debug APK builds>"
    ```
 4. **End your turn cleanly** — do **not** re-arm `await_release_turn.sh` once your stage is `SIGNED_OFF`! If `/home/antigravity/.gemini/usage/agy-usage --check-self` reports `ROTATE_RECOMMENDED` or `ROTATE_URGENT` (`>= 400` steps), advise starting a fresh conversation for the next release.

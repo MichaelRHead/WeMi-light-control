@@ -90,8 +90,12 @@ class GenaSubscriptionManager(
      */
     @Synchronized
     fun startServer(bindAddress: InetAddress? = null): Int {
-        if (isRunning.get() && serverSocket?.isClosed == false) {
+        if (isRunning.get() && serverSocket?.isClosed == false && acceptJob?.isActive == true) {
             return serverSocket?.localPort ?: -1
+        }
+        if (serverSocket?.isClosed == false) {
+            runCatching { serverSocket?.close() }
+            serverSocket = null
         }
         val socket = try {
             if (preferredListenPort > 0) {
@@ -113,7 +117,10 @@ class GenaSubscriptionManager(
             while (isActive && isRunning.get() && !socket.isClosed) {
                 try {
                     val client = socket.accept()
-                    launch { handleNotifyClient(client) }
+                    // Launch on SupervisorJob-backed `scope` so one stalled/reset peer never cancels acceptJob
+                    scope.launch { handleNotifyClient(client) }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
                 } catch (_: Exception) {
                     if (!isRunning.get()) break
                 }
@@ -144,120 +151,129 @@ class GenaSubscriptionManager(
 
     private fun handleNotifyClient(clientSocket: Socket) {
         clientSocket.use { sock ->
-            sock.soTimeout = 1500
-            val sourceIp = sock.inetAddress?.hostAddress.orEmpty()
-            val input = BufferedInputStream(sock.getInputStream())
-            val requestLine = readHttpHeaderLine(input) ?: return
-            if (!requestLine.startsWith("NOTIFY", ignoreCase = true)) {
-                sendHttp200(sock)
-                return
-            }
-
-            val path = requestLine.split(" ").getOrNull(1).orEmpty()
-            val pathDeviceKey = path
-                .substringAfterLast("/gena/", "")
-                .substringBefore('?')
-                .trimEnd('/')
-                .trim()
-
-            var contentLength = -1
-            var sidHeader = ""
-            while (true) {
-                val line = readHttpHeaderLine(input) ?: break
-                if (line.isEmpty()) break
-                val colon = line.indexOf(':')
-                if (colon > 0) {
-                    val k = line.substring(0, colon).trim().uppercase(Locale.US)
-                    val v = line.substring(colon + 1).trim()
-                    when (k) {
-                        "CONTENT-LENGTH" -> contentLength = v.toIntOrNull() ?: -1
-                        "SID" -> sidHeader = v
-                    }
+            try {
+                sock.soTimeout = 1500
+                val sourceIp = sock.inetAddress?.hostAddress.orEmpty()
+                val input = BufferedInputStream(sock.getInputStream())
+                val requestLine = readHttpHeaderLine(input) ?: return
+                if (!requestLine.startsWith("NOTIFY", ignoreCase = true)) {
+                    sendHttp200(sock)
+                    return
                 }
-            }
 
-            val xmlBody = when {
-                contentLength > 0 -> {
-                    val targetBytes = contentLength.coerceAtMost(16384)
-                    val buf = ByteArray(targetBytes)
-                    var readTotal = 0
-                    while (readTotal < targetBytes) {
-                        val n = input.read(buf, readTotal, targetBytes - readTotal)
-                        if (n == -1) break
-                        readTotal += n
-                    }
-                    String(buf, 0, readTotal, Charsets.UTF_8)
-                }
-                contentLength == 0 -> ""
-                else -> {
-                    sock.soTimeout = 150
-                    val out = ByteArrayOutputStream()
-                    val buf = ByteArray(2048)
-                    runCatching {
-                        while (out.size() < 16384) {
-                            val n = input.read(buf)
-                            if (n == -1) break
-                            out.write(buf, 0, n)
+                val path = requestLine.split(" ").getOrNull(1).orEmpty()
+                val pathDeviceKey = path
+                    .substringAfterLast("/gena/", "")
+                    .substringBefore('?')
+                    .trimEnd('/')
+                    .trim()
+
+                var contentLength = -1
+                var sidHeader = ""
+                while (true) {
+                    val line = readHttpHeaderLine(input) ?: break
+                    if (line.isEmpty()) break
+                    val colon = line.indexOf(':')
+                    if (colon > 0) {
+                        val k = line.substring(0, colon).trim().uppercase(Locale.US)
+                        val v = line.substring(colon + 1).trim()
+                        when (k) {
+                            "CONTENT-LENGTH" -> contentLength = v.toIntOrNull() ?: -1
+                            "SID" -> sidHeader = v
                         }
                     }
-                    out.toString(Charsets.UTF_8.name())
                 }
-            }
 
-            // Always reply HTTP 200 OK immediately so the embedded RTOS socket is freed
-            sendHttp200(sock)
+                val xmlBody = when {
+                    contentLength > 0 -> {
+                        val targetBytes = contentLength.coerceAtMost(16384)
+                        val buf = ByteArray(targetBytes)
+                        var readTotal = 0
+                        while (readTotal < targetBytes) {
+                            val n = input.read(buf, readTotal, targetBytes - readTotal)
+                            if (n == -1) break
+                            readTotal += n
+                        }
+                        String(buf, 0, readTotal, Charsets.UTF_8)
+                    }
+                    contentLength == 0 -> ""
+                    else -> {
+                        sock.soTimeout = 150
+                        val out = ByteArrayOutputStream()
+                        val buf = ByteArray(2048)
+                        runCatching {
+                            while (out.size() < 16384) {
+                                val n = input.read(buf)
+                                if (n == -1) break
+                                out.write(buf, 0, n)
+                            }
+                        }
+                        out.toString(Charsets.UTF_8.name())
+                    }
+                }
 
-            val parsed = parseGenaPropertySetXml(xmlBody)
-            if (parsed.first != null || parsed.second != null) {
-                val resolvedKey = pathDeviceKey.ifEmpty {
-                    deviceKeyBySid[sidHeader].orEmpty()
-                }
-                val record = subscriptionsByDeviceKey[resolvedKey]
-                val devName = record?.deviceName ?: resolvedKey.ifEmpty { sourceIp }
-                val binaryOn = parsed.first
-                val pushedBrightness = parsed.second
-                val pushStatusText = when {
-                    binaryOn != null ->
-                        "Push State: ${if (binaryOn) "ON" else "OFF"}${if (pushedBrightness != null) " ($pushedBrightness%)" else ""}"
-                    else -> "Push Brightness: $pushedBrightness%"
-                }
-                val log = SoapLogEntry(
-                    timestamp = nowTime(),
-                    deviceName = devName,
-                    endpoint = "NOTIFY http://${localIpProvider()}:${activeListenPort}$path",
-                    soapAction = "GENA PropChange (${sidHeader.take(22)})",
-                    statusText = pushStatusText,
-                    xmlSnippet = xmlBody.take(260),
-                    isLiveLanSuccess = true
-                )
-                onNotification(
-                    GenaEventNotification(
-                        deviceKey = resolvedKey,
-                        sid = sidHeader,
-                        sourceIp = sourceIp,
-                        binaryStateOn = parsed.first,
-                        brightness = parsed.second,
-                        rawXml = xmlBody,
-                        logEntry = log
+                // Always reply HTTP 200 OK immediately so the embedded RTOS socket is freed
+                sendHttp200(sock)
+
+                val parsed = parseGenaPropertySetXml(xmlBody)
+                if (parsed.first != null || parsed.second != null) {
+                    val resolvedKey = pathDeviceKey.ifEmpty {
+                        deviceKeyBySid[sidHeader].orEmpty()
+                    }
+                    val record = subscriptionsByDeviceKey[resolvedKey]
+                    val devName = record?.deviceName ?: resolvedKey.ifEmpty { sourceIp }
+                    val binaryOn = parsed.first
+                    val pushedBrightness = parsed.second
+                    val pushStatusText = when {
+                        binaryOn != null ->
+                            "Push State: ${if (binaryOn) "ON" else "OFF"}${if (pushedBrightness != null) " ($pushedBrightness%)" else ""}"
+                        else -> "Push Brightness: $pushedBrightness%"
+                    }
+                    val log = SoapLogEntry(
+                        timestamp = nowTime(),
+                        deviceName = devName,
+                        endpoint = "NOTIFY http://${localIpProvider()}:${activeListenPort}$path",
+                        soapAction = "GENA PropChange (${sidHeader.take(22)})",
+                        statusText = pushStatusText,
+                        xmlSnippet = xmlBody.take(260),
+                        isLiveLanSuccess = true
                     )
-                )
+                    onNotification(
+                        GenaEventNotification(
+                            deviceKey = resolvedKey,
+                            sid = sidHeader,
+                            sourceIp = sourceIp,
+                            binaryStateOn = parsed.first,
+                            brightness = parsed.second,
+                            rawXml = xmlBody,
+                            logEntry = log
+                        )
+                    )
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                // Ignore stalled, truncated, or malformed peer TCP connections without tearing down acceptJob
             }
         }
     }
 
     private fun readHttpHeaderLine(input: BufferedInputStream): String? {
         val out = ByteArrayOutputStream(128)
-        while (out.size() < 8192) {
+        var sawAnyByte = false
+        while (true) {
             val b = input.read()
             if (b == -1) {
-                return if (out.size() == 0) null else out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
+                return if (sawAnyByte) out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r') else null
             }
+            sawAnyByte = true
             if (b == '\n'.code) {
                 return out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
             }
-            out.write(b)
+            if (out.size() < 8192) {
+                out.write(b)
+            }
         }
-        return out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
     }
 
     private fun sendHttp200(socket: Socket) {

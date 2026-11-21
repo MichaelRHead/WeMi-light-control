@@ -1,7 +1,7 @@
 # WeMi Light Control — Upcoming Features & Next-Iteration Roadmap (`UPCOMING_FEATURES.md`)
 
 **Target Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
-**Current Baseline**: `v28.0` (See [`IMPLEMENTED.md`](IMPLEMENTED.md) for the reverse-chronological Change Log of completed features)  
+**Current Baseline**: `v31.0` (See [`IMPLEMENTED.md`](IMPLEMENTED.md) for the reverse-chronological Change Log of completed features)  
 **Target Platforms**: Android Phones, Tablets, Home Screen Widgets, Quick Settings, and Android TV (10-foot D-Pad Hub)
 
 Related documents in this repository:
@@ -10,11 +10,11 @@ Related documents in this repository:
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Minimal Permissive Dependency Policy (`Apache-2.0` AndroidX/Kotlin Only; Zero External HTTP/Font Bloat) & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
-- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v28.0`)
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v28.0`)
+- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v31.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v31.0`)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
-- [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
-- [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — 5-Agent Autonomous Round-Robin Release Review & Sign-Off Coordinator Skill
+- [`AGENTS.md`](AGENTS.md) & [`ARCHITECTURE.md`](ARCHITECTURE.md) — Concise Agent Guide & On-Demand Architecture/Test Catalog
+- [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — 6-Agent / 7-Stage Autonomous Release Review, Sign-Off & Play Store Promotion Coordinator Skill
 - [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](.agents/skills/wemi-device-telemetry-debug/SKILL.md) — On-Device Screenshot & Recorded Telemetry File Debugging Skill *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
 - [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md) — Device Discovery Logic, 3-Tier Identity Resolution & Automatic Room Grouping Skill *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`.agents/skills/wemi-license-governance/SKILL.md`](.agents/skills/wemi-license-governance/SKILL.md) — Open-Source MIT License Parity, Minimal Permissive Dependency Policy & Trademark Governance Skill *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
@@ -29,12 +29,12 @@ Related documents in this repository:
 
 ## 1. Upcoming Features Overview
 
-With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Real-LAN `<100ms` GENA subscriptions, and parallel `Semaphore(3)` health polling), 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3` with `minSdk 24` compatibility), compact single-row `TopHeader` (`48.dp` accessible controls + `"All Off"`) and 3-column room-grouped Android TV dashboard (`wemi TV` with focusable inline dimmer sliders & Room Bar dimming), dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), one-tap LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, `100%` `< 500`-line modularization across all `77` production and test `.kt` files, and `56` unit, protocol, governance, and full-stack E2E tests across `13` suites complete in `v28.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
+With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Real-LAN `<100ms` GENA subscriptions, and parallel `Semaphore(3)` health polling), 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3` with `minSdk 24` compatibility), compact single-row `TopHeader` (`48.dp` accessible controls + `"All Off"`), zero-dependency Home Screen Light & Room Toggle Widgets (`WeMiSwitchWidgetProvider`, one-tap pinning & serial/UDN resolution), 3-column room-grouped Android TV dashboard (`wemi TV` with focusable inline dimmer sliders & Room Bar dimming), dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), one-tap LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, `100%` `< 500`-line modularization across all `90` production and test `.kt` files, and `102` unit, protocol, widget, telemetry, governance, and full-stack E2E tests across `20` suites complete in `v31.0`, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
 
 | Track | Upcoming Feature Area | Key Deliverables |
 | :--- | :--- | :--- |
 | **Track 1** | **On-Device Hardware Rules DB (`rules.db` SQLite over SOAP)** | Read, decode, and write the embedded SQLite `rules.db` (`urn:Belkin:service:rules:1#FetchRules` & `#StoreRules` Base64 ZIP) on OpenWrt switches (`F7C030`, `F7C059`, `F7C063`) plus `timesync1#TimeSync` so schedules & auto-off timers run inside the wall switch even when all phones are away from home. |
-| **Track 2** | **Android Quick Settings Tiles, Home Screen Widgets & Always-On TV Hub Service** | Android `TileService` quick toggles, Jetpack Glance / `AppWidgetProvider` skeuomorphic 1x1 & 4x1 room widgets, and an optional `BOOT_COMPLETED` foreground service for Android TV / wall tablets acting as a 24/7 LAN controller. |
+| **Track 2** | **Android Quick Settings Tiles, Multi-Switch 4x1 Widget Bar & Always-On TV Hub Service** | Android `TileService` quick toggles, a multi-switch 4x1 room bar widget companion to the shipped single-light/room Home Screen widget, and an optional `BOOT_COMPLETED` foreground service for Android TV / wall tablets acting as a 24/7 LAN controller. |
 | **Track 3** | **Expanded Hardware Fleet (`Insight`, `Maker`, `Link`, Dimmer Long-Press & Faders)** | Real-time power/wattage/kWh monitoring for **Insight (`F7C029`)** via `insight1#GetInsightParams`, hardware fade ramps & `<LongPress>` scene triggers for **Dimmers (`F7C059`/`WDS060`)**, and **Maker (`F7C043`)** / **Link (`F7C031`)** support. |
 | **Track 4** | **One-Tap OS Wi-Fi Handoff (`WifiNetworkSpecifier`) & Hardware `ReSetup`** | Android 10+ `WifiNetworkSpecifier` in-app connection to `WeMo.Light.*` / `WeMo.Mini.*` APs without leaving the app to open Android Settings, plus a confirmation-protected `basicevent1#ReSetup` factory reset action. |
 | **Track 5** | **Offline Astronomical Solar Calculator & GENA Motion-Sensor Automation Chains** | Offline NOAA latitude/longitude solar calculator for exact daily Sunrise/Sunset times (`Sunset - 20m`, `Sunrise + 15m`) and sub-second GENA `Motion` (`F7C028`) → multi-switch trigger chains with configurable hold timers. |
@@ -57,10 +57,9 @@ Currently, `RuleScheduler` executes schedules and auto-off timers from the Andro
 
 ---
 
-### Track 2: Android OS Widgets, Quick Settings & Always-On TV Hub Mode
-1. **Skeuomorphic Home Screen Widgets (`AppWidgetProvider`)**:
-   - **Single Switch 1x1 Widget**: Classic brushed-aluminum tile with glowing green/amber power ring and live latency dot.
-   - **Room Group 4x1 Bar Widget**: Shows active Wi-Fi Home, room master toggle, and up to 4 pinned switches/dimmers.
+### Track 2: Android Quick Settings Tiles, Multi-Switch 4x1 Widget Bar & Always-On TV Hub Mode
+1. **Multi-Switch Room Group 4x1 Bar Widget**:
+   - Builds on the shipped one-tap single-light and room-toggle Home Screen widget (`WeMiSwitchWidgetProvider`, `v29.0–v31.0`) by adding a wider 4x1 bar displaying the active Wi-Fi Home, room master toggle, and up to 4 individual pinned switches/dimmers.
 2. **Android Quick Settings Tile (`QuickSettingsTileService`)**:
    - Allows pulling down the Android notification shade and toggling a favorite switch or whole room (e.g., `"Living Room Lights"`) with a single tap — even from the lock screen.
 3. **Always-On Android TV / Tablet LAN Hub Service (`HubForegroundService`)**:

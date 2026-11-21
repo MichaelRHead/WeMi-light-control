@@ -89,7 +89,7 @@ fun AddOrEditDeviceDialog(
     var brightness by remember(formKey) { mutableFloatStateOf((initialDevice?.brightness ?: 100).toFloat()) }
     var isReachable by remember(formKey) { mutableStateOf(initialDevice?.isReachable ?: true) }
     var isOn by remember(formKey) { mutableStateOf(initialDevice?.isOn ?: true) }
-    var autoOffText by remember(formKey) { mutableStateOf((initialDevice?.autoOffMinutes ?: 0).toString()) }
+    val preservedAutoOffMinutes = initialDevice?.autoOffMinutes ?: 0
     var syncNameToHardware by remember(formKey) { mutableStateOf(true) }
     val detectedCategory = classifyDeviceCategory(
         name = name.ifBlank { "Switch" },
@@ -356,7 +356,6 @@ fun AddOrEditDeviceDialog(
             Button(
                 onClick = {
                     val parsedPort = portText.toIntOrNull() ?: 49153
-                    val parsedAutoOff = autoOffText.toIntOrNull() ?: 0
                     val finalName = name.trim()
                     val finalRoom = roomName.trim()
                     onSave(
@@ -369,7 +368,7 @@ fun AddOrEditDeviceDialog(
                         brightness.roundToInt(),
                         isReachable,
                         isOn,
-                        parsedAutoOff,
+                        preservedAutoOffMinutes,
                         syncNameToHardware
                     )
                 },

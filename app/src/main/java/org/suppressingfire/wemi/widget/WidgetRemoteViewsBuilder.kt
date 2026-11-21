@@ -5,7 +5,6 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.widget.RemoteViews
@@ -34,6 +33,7 @@ data class WidgetDisplayState(
  * Pure renderer & updater for WeMi Home Screen light and room widgets.
  */
 object WidgetRemoteViewsBuilder {
+    private const val COLOR_TEXT_TITLE = 0xFF0F172A.toInt()
     private const val COLOR_TEXT_ACTIVE = 0xFF0E7490.toInt()
     private const val COLOR_TEXT_STANDBY = 0xFF64748B.toInt()
     private const val COLOR_TEXT_OFFLINE = 0xFFDC2626.toInt()
@@ -298,7 +298,7 @@ object WidgetRemoteViewsBuilder {
         views.setTextViewText(R.id.widget_title, state.title)
         views.setTextViewText(R.id.widget_subtitle, state.subtitle)
         views.setTextColor(R.id.widget_subtitle, subtitleColor)
-        views.setTextColor(R.id.widget_title, Color.parseColor("#0F172A"))
+        views.setTextColor(R.id.widget_title, COLOR_TEXT_TITLE)
         views.setImageViewResource(R.id.widget_power_ring, powerRes)
         views.setContentDescription(R.id.widget_root, state.contentDescription)
         views.setContentDescription(R.id.widget_power_ring, state.contentDescription)

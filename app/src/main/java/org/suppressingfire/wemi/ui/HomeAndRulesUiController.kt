@@ -42,14 +42,19 @@ internal class HomeAndRulesUiController(
     private val _showAddRuleDialog = MutableStateFlow(false)
     val showAddRuleDialog: StateFlow<Boolean> = _showAddRuleDialog.asStateFlow()
 
+    private val reconnectLock = Any()
+
     @Volatile
     private var reconnectJob: Job? = null
 
     private fun cancelActiveReconnect() {
-        val prior = reconnectJob
-        reconnectJob = null
+        val prior = synchronized(reconnectLock) {
+            val existing = reconnectJob
+            reconnectJob = null
+            _isReconnectingHome.value = false
+            existing
+        }
         prior?.cancel()
-        _isReconnectingHome.value = false
     }
 
     fun setActiveNetworkKey(networkKey: String) {
@@ -64,28 +69,33 @@ internal class HomeAndRulesUiController(
 
     fun reconnectCurrentHomeNetwork() {
         val targetKey = _activeNetworkKey.value
-        val superseded = reconnectJob
-        reconnectJob = null
-        superseded?.cancel()
-        _isReconnectingHome.value = true
-        val job = scope.launch(start = CoroutineStart.LAZY) {
-            val self = coroutineContext[Job]
-            try {
-                val summary = repository.reconnectAndRediscoverHome(targetKey)
-                if (!repository.isDemoShowroomMode.value) {
-                    repository.refreshGenaSubscriptionsForHome(targetKey)
-                }
-                onShowTransientStatus(
-                    "Welcome back to ${summary.homeName} (${summary.ssidLabel}): Reconnected ${summary.reconnectedCount}/${summary.totalRememberedCount} remembered switches (Avg ${summary.averageLatencyMs}ms)"
-                )
-            } finally {
-                if (reconnectJob === self) {
-                    reconnectJob = null
-                    _isReconnectingHome.value = false
+        val superseded: Job?
+        val job: Job
+        synchronized(reconnectLock) {
+            superseded = reconnectJob
+            _isReconnectingHome.value = true
+            job = scope.launch(start = CoroutineStart.LAZY) {
+                val self = coroutineContext[Job]
+                try {
+                    val summary = repository.reconnectAndRediscoverHome(targetKey)
+                    if (!repository.isDemoShowroomMode.value) {
+                        repository.refreshGenaSubscriptionsForHome(targetKey)
+                    }
+                    onShowTransientStatus(
+                        "Welcome back to ${summary.homeName} (${summary.ssidLabel}): Reconnected ${summary.reconnectedCount}/${summary.totalRememberedCount} remembered switches (Avg ${summary.averageLatencyMs}ms)"
+                    )
+                } finally {
+                    synchronized(reconnectLock) {
+                        if (reconnectJob === self) {
+                            reconnectJob = null
+                            _isReconnectingHome.value = false
+                        }
+                    }
                 }
             }
+            reconnectJob = job
         }
-        reconnectJob = job
+        superseded?.cancel()
         job.start()
     }
 

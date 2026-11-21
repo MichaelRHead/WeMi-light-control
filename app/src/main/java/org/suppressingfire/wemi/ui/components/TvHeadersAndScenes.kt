@@ -33,7 +33,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -361,79 +360,44 @@ private fun TvTopRightActionChips(
         testTag = "tv_scene_bedtime"
     )
 
-    var isScanFocused by remember { mutableStateOf(false) }
-    val currentOnScanSsdpClick by androidx.compose.runtime.rememberUpdatedState(onScanSsdpClick)
-    val currentOnNavigateTopHorizontal by androidx.compose.runtime.rememberUpdatedState(onNavigateTopActionHorizontal)
-    val currentOnNavigateDownFromTopBar by androidx.compose.runtime.rememberUpdatedState(onNavigateDownFromTopBar)
-    val scanRequester = topActionFocusRequesters.getOrNull(3)
-    Surface(
-        shape = RoundedCornerShape(10.dp),
-        color = if (isScanFocused) WemoGreenPrimary else WemoGreenDark,
-        border = BorderStroke(
-            width = if (isScanFocused) 2.5.dp else 1.dp,
-            color = if (isScanFocused) Color.White else TvCyanFocusBorder.copy(alpha = 0.65f)
-        ),
-        modifier = Modifier
-            .let { mod -> if (scanRequester != null) mod.focusRequester(scanRequester) else mod }
-            .onFocusChanged { state ->
-                isScanFocused = state.isFocused
-                if (state.isFocused) onSelectTopActionFocus(3)
-            }
-            .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown) {
-                    when (event.key) {
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { currentOnScanSsdpClick(); true }
-                        Key.DirectionLeft -> currentOnNavigateTopHorizontal(2)
-                        Key.DirectionRight -> true
-                        Key.DirectionDown -> currentOnNavigateDownFromTopBar()
-                        Key.DirectionUp -> true
-                        else -> false
-                    }
-                } else {
-                    false
-                }
-            }
-            .focusable()
-            .focusProperties { canFocus = false }
-            .clickable { onScanSsdpClick() }
-            .testTag("tv_scan_button")
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Radar,
-                contentDescription = "Rescan LAN Switches",
-                tint = Color.White,
-                modifier = Modifier.size(15.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = if (isRefreshing) "Scanning..." else "Rescan",
-                color = Color.White,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.sp,
-                maxLines = 1,
-                softWrap = false
-            )
-        }
-    }
+    TvSceneChip(
+        title = if (isRefreshing) "Scanning..." else "Rescan",
+        icon = Icons.Default.Radar,
+        iconContentDescription = "Rescan LAN Switches",
+        focusRequester = topActionFocusRequesters.getOrNull(3),
+        onFocusGained = { onSelectTopActionFocus(3) },
+        onNavigateLeft = { onNavigateTopActionHorizontal(2) },
+        onNavigateRight = { true },
+        onNavigateDown = onNavigateDownFromTopBar,
+        onClick = onScanSsdpClick,
+        testTag = "tv_scan_button",
+        focusedContainerColor = WemoGreenPrimary,
+        unfocusedContainerColor = WemoGreenDark,
+        focusedBorderColor = Color.White,
+        unfocusedBorderColor = TvCyanFocusBorder.copy(alpha = 0.65f),
+        iconTint = Color.White,
+        fontWeight = FontWeight.Bold
+    )
 }
-
 
 @Composable
 internal fun TvSceneChip(
     title: String,
     icon: ImageVector,
+    iconContentDescription: String? = null,
     focusRequester: FocusRequester? = null,
     onFocusGained: () -> Unit = {},
     onNavigateLeft: () -> Boolean = { false },
     onNavigateRight: () -> Boolean = { false },
     onNavigateDown: () -> Boolean = { false },
     onClick: () -> Unit,
-    testTag: String
+    testTag: String,
+    focusedContainerColor: Color = Color(0xFF133B66),
+    unfocusedContainerColor: Color = Color(0xFF0F2540),
+    focusedBorderColor: Color = TvCyanFocusBorder,
+    unfocusedBorderColor: Color = TvCyanFocusBorder.copy(alpha = 0.35f),
+    iconTint: Color = TvCyanFocusBorder,
+    fontWeight: FontWeight = FontWeight.SemiBold
 ) {
     var isFocused by remember { mutableStateOf(false) }
     val currentOnClick by androidx.compose.runtime.rememberUpdatedState(onClick)
@@ -441,11 +405,11 @@ internal fun TvSceneChip(
     val currentOnNavigateRight by androidx.compose.runtime.rememberUpdatedState(onNavigateRight)
     val currentOnNavigateDown by androidx.compose.runtime.rememberUpdatedState(onNavigateDown)
     Surface(
-        color = if (isFocused) Color(0xFF133B66) else Color(0xFF0F2540),
+        color = if (isFocused) focusedContainerColor else unfocusedContainerColor,
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(
             width = if (isFocused) 2.5.dp else 1.dp,
-            color = if (isFocused) TvCyanFocusBorder else TvCyanFocusBorder.copy(alpha = 0.35f)
+            color = if (isFocused) focusedBorderColor else unfocusedBorderColor
         ),
         modifier = Modifier
             .let { mod -> if (focusRequester != null) mod.focusRequester(focusRequester) else mod }
@@ -476,13 +440,13 @@ internal fun TvSceneChip(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = TvCyanFocusBorder, modifier = Modifier.size(15.dp))
+            Icon(icon, contentDescription = iconContentDescription, tint = iconTint, modifier = Modifier.size(15.dp))
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = title,
                 color = Color.White,
                 fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = fontWeight,
                 fontSize = 12.sp,
                 maxLines = 1,
                 softWrap = false

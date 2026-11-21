@@ -17,6 +17,23 @@ object XmlAndSkuParser {
     const val URN_META_INFO = "urn:Belkin:service:metainfo:1"
     const val URN_WIFI_SETUP = "urn:Belkin:service:WiFiSetup:1"
 
+    private val BINARY_STATE_REGEX = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
+    private val BRIGHTNESS_REGEX = Regex("<Brightness>(\\d+)</Brightness>", RegexOption.IGNORE_CASE)
+    private val NIGHT_MODE_REGEX = Regex("<NightMode>(\\d+)</NightMode>", RegexOption.IGNORE_CASE)
+    private val FRIENDLY_NAME_REGEX = Regex("<friendlyName>([^<]+)</friendlyName>", RegexOption.IGNORE_CASE)
+    private val SERIAL_NUMBER_REGEX = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
+    private val MODEL_NAME_REGEX = Regex("<modelName>([^<]+)</modelName>", RegexOption.IGNORE_CASE)
+    private val MODEL_DESC_REGEX = Regex("<modelDescription>([^<]+)</modelDescription>", RegexOption.IGNORE_CASE)
+    private val FIRMWARE_REGEX = Regex("<firmwareVersion>([^<]+)</firmwareVersion>", RegexOption.IGNORE_CASE)
+    private val MAC_ADDRESS_REGEX = Regex("<macAddress>([^<]+)</macAddress>", RegexOption.IGNORE_CASE)
+    private val UDN_REGEX = Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
+    private val RTOS_REGEX = Regex("<rtos>\\s*1\\s*</rtos>", RegexOption.IGNORE_CASE)
+    private val HOST_PORT_REGEX = Regex("http://([^:/]+):(\\d+)")
+    private val META_INFO_REGEX = Regex("<MetaInfo>([^<]+)</MetaInfo>", RegexOption.IGNORE_CASE)
+    private val SIGNAL_STRENGTH_REGEX = Regex("<SignalStrength>([^<]+)</SignalStrength>", RegexOption.IGNORE_CASE)
+    private val AP_LIST_REGEX = Regex("<(?:ApList|NetworkList)>([\\s\\S]*?)</(?:ApList|NetworkList)>", RegexOption.IGNORE_CASE)
+    private val AP_PAGE_REGEX = Regex("Page:[^$\\n]*\\$?")
+
     /**
      * Escapes XML special characters (`&`, `<`, `>`, `"`, `'`) in user-supplied strings
      * such as friendly names, SSIDs, and encrypted password payloads.
@@ -31,11 +48,12 @@ object XmlAndSkuParser {
     }
 
     /**
-     * Unescapes standard XML entities (`&lt;`, `&gt;`, `&quot;`, `&apos;`, `&#39;`, `&amp;`)
-     * returned inside `/setup.xml`, `GetMetaInfo`, GENA `NOTIFY`, and `GetApList` payloads.
+     * Decodes standard XML character entities (`&lt;`, `&gt;`, `&quot;`, `&apos;`, `&#39;`,
+     * and `&amp;` last to prevent double-unescaping) returned by UPnP `/setup.xml`, `GetMetaInfo`,
+     * `GetApList`, and GENA payloads.
      */
     fun unescapeXml(input: String): String {
-        if (!input.contains('&')) return input
+        if ('&' !in input) return input
         return input
             .replace("&lt;", "<")
             .replace("&gt;", ">")
@@ -86,7 +104,7 @@ object XmlAndSkuParser {
         unescapeEntities: Boolean = false
     ): ParsedBinaryState {
         val xml = if (unescapeEntities) unescapeXml(rawXml) else rawXml
-        val rawState = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
+        val rawState = BINARY_STATE_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
         val parts = if (rawState.isEmpty()) emptyList() else rawState.split("|")
         val firstToken = parts.firstOrNull()?.trim().orEmpty()
@@ -97,11 +115,8 @@ object XmlAndSkuParser {
             else -> null
         }
         val brightness: Int? = parts.getOrNull(1)?.trim()?.toIntOrNull()
-            ?: Regex("<Brightness>(\\d+)</Brightness>", RegexOption.IGNORE_CASE)
-                .find(xml)?.groupValues?.getOrNull(1)?.toIntOrNull()
-            ?: Regex("<brightness>(\\d+)</brightness>", RegexOption.IGNORE_CASE)
-                .find(xml)?.groupValues?.getOrNull(1)?.toIntOrNull()
-        val nightMode: Boolean? = Regex("<NightMode>(\\d+)</NightMode>", RegexOption.IGNORE_CASE)
+            ?: BRIGHTNESS_REGEX.find(xml)?.groupValues?.getOrNull(1)?.toIntOrNull()
+        val nightMode: Boolean? = NIGHT_MODE_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.let { it == "1" }
 
         return ParsedBinaryState(
@@ -189,30 +204,29 @@ object XmlAndSkuParser {
         responseTimeMs: Long,
         isLiveUdp: Boolean
     ): SsdpDiscoveredDevice {
-        val friendlyName = Regex("<friendlyName>([^<]+)</friendlyName>", RegexOption.IGNORE_CASE)
+        val friendlyName = FRIENDLY_NAME_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim()
             ?.takeIf { it.isNotEmpty() } ?: "WeMi Smart Switch"
-        val serial = Regex("<serialNumber>([^<]+)</serialNumber>", RegexOption.IGNORE_CASE)
+        val serial = SERIAL_NUMBER_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL
-        val modelName = Regex("<modelName>([^<]+)</modelName>", RegexOption.IGNORE_CASE)
+        val modelName = MODEL_NAME_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim()
             ?.takeIf { it.isNotEmpty() } ?: "LightSwitch"
-        val modelDescription = Regex("<modelDescription>([^<]+)</modelDescription>", RegexOption.IGNORE_CASE)
+        val modelDescription = MODEL_DESC_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim().orEmpty()
-        val firmware = Regex("<firmwareVersion>([^<]+)</firmwareVersion>", RegexOption.IGNORE_CASE)
+        val firmware = FIRMWARE_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "WeMo_WW_2.00.11532.PVT"
-        val macAddress = Regex("<macAddress>([^<]+)</macAddress>", RegexOption.IGNORE_CASE)
+        val macAddress = MAC_ADDRESS_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
         val udn = LanRuntimeUtils.canonicalHardwareUdn(
-            Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
-                .find(xml)?.groupValues?.getOrNull(1)?.trim()
+            UDN_REGEX.find(xml)?.groupValues?.getOrNull(1)?.trim()
                 ?: usnHeader.ifEmpty {
                     if (!LanRuntimeUtils.isPlaceholderSerial(serial)) "uuid:Lightswitch-1_0-$serial" else ""
                 }
         )
-        val isRtos = Regex("<rtos>\\s*1\\s*</rtos>", RegexOption.IGNORE_CASE).containsMatchIn(xml)
+        val isRtos = RTOS_REGEX.containsMatchIn(xml)
 
-        val hostPortMatch = Regex("http://([^:/]+):(\\d+)").find(locationUrl)
+        val hostPortMatch = HOST_PORT_REGEX.find(locationUrl)
         val ip = hostPortMatch?.groupValues?.getOrNull(1) ?: "192.168.1.101"
         val port = hostPortMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 49153
 
@@ -290,7 +304,7 @@ object XmlAndSkuParser {
      * so it is never mistaken for the user's home Wi-Fi router SSID.
      */
     fun parseMetaInfoSoapResponse(body: String): SwitchMetaInfo? {
-        val rawMeta = Regex("<MetaInfo>([^<]+)</MetaInfo>", RegexOption.IGNORE_CASE)
+        val rawMeta = META_INFO_REGEX
             .find(body)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim() ?: return null
         val parts = rawMeta.split("|")
         if (parts.size < 2) return null
@@ -310,7 +324,7 @@ object XmlAndSkuParser {
      * Parses `basicevent1#GetSignalStrength` SOAP response XML and normalizes dBm/percentage to `0..100%`.
      */
     fun parseSignalStrengthSoapResponse(body: String): Int? {
-        val raw = Regex("<SignalStrength>([^<]+)</SignalStrength>", RegexOption.IGNORE_CASE)
+        val raw = SIGNAL_STRENGTH_REGEX
             .find(body)?.groupValues?.getOrNull(1)?.trim()?.toIntOrNull() ?: return null
         return if (raw < 0) {
             ((raw + 95) * 2).coerceIn(5, 100)
@@ -324,18 +338,24 @@ object XmlAndSkuParser {
      * `SSID|Channel|RSSI|AuthMode/EncrypType`.
      */
     fun parseApListXml(xml: String): List<ScannedAp> {
-        val unescaped = unescapeXml(xml)
-        val rawList = Regex("<(?:ApList|NetworkList)>([\\s\\S]*?)</(?:ApList|NetworkList)>", RegexOption.IGNORE_CASE)
-            .find(unescaped)?.groupValues?.getOrNull(1)?.trim() ?: return emptyList()
+        val directMatch = AP_LIST_REGEX.find(xml)?.groupValues?.getOrNull(1)?.trim()
+        val (rawList, alreadyUnescaped) = if (directMatch != null) {
+            directMatch to false
+        } else {
+            val fallback = AP_LIST_REGEX.find(unescapeXml(xml))?.groupValues?.getOrNull(1)?.trim()
+                ?: return emptyList()
+            fallback to true
+        }
 
         val results = mutableListOf<ScannedAp>()
-        val normalizedList = rawList.replace(Regex("Page:[^$\\n]*\\$?"), "\n")
+        val normalizedList = rawList.replace(AP_PAGE_REGEX, "\n")
         for (rawLine in normalizedList.lines()) {
             val clean = rawLine.trim().removeSuffix(",").trim()
             if (clean.isEmpty() || clean.startsWith("Page:") || !clean.contains("|")) continue
             val parts = clean.split("|")
             if (parts.size >= 4) {
-                val ssid = parts[0].trim()
+                val rawSsid = parts[0].trim()
+                val ssid = if (alreadyUnescaped) rawSsid else unescapeXml(rawSsid)
                 if (ssid.isEmpty()) continue
                 val channel = parts[1].trim().toIntOrNull() ?: 6
                 val rssi = parts[2].trim().toIntOrNull()?.coerceIn(1, 100) ?: 75

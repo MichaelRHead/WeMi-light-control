@@ -72,6 +72,7 @@ object WidgetConfigStore {
     private fun prefix(appWidgetId: Int): String = "widget_${appWidgetId}_"
 
     fun save(context: Context, config: WidgetTargetConfig) {
+        if (config.appWidgetId <= 0) return
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val existingIds = prefs.getStringSet(KEY_IDS, emptySet()).orEmpty().toMutableSet()
         existingIds.add(config.appWidgetId.toString())
@@ -127,7 +128,7 @@ object WidgetConfigStore {
         val remapped = (0 until count).mapNotNull { i ->
             val oldId = oldIds[i]
             val newId = newIds[i]
-            if (oldId == newId) return@mapNotNull null
+            if (oldId <= 0 || newId <= 0 || oldId == newId) return@mapNotNull null
             load(context, oldId)?.let { existing -> oldId to existing.copy(appWidgetId = newId) }
         }
         val destinationIds = remapped.map { it.second.appWidgetId }.toSet()

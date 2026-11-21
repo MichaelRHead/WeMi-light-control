@@ -105,6 +105,7 @@ fun AddRuleDialog(
                             selected = ruleType == typeKey,
                             onClick = {
                                 ruleType = typeKey
+                                targetStateOn = typeKey != "AUTO_OFF"
                                 triggerSummary = when (typeKey) {
                                     "MOTION_TRIGGER" -> "When Bedroom Light Motion senses movement"
                                     "AUTO_OFF" -> "After 30 minutes ON"

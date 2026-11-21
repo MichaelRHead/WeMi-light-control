@@ -7,6 +7,9 @@ import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.Calendar
+import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import javax.net.SocketFactory
 import kotlin.concurrent.thread
@@ -14,12 +17,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.suppressingfire.wemi.data.DEFAULT_CABIN_HOME_KEY
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
@@ -30,9 +35,17 @@ import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.data.UNASSIGNED_ROOM
 import org.suppressingfire.wemi.data.normalizeRoomName
+import org.suppressingfire.wemi.network.GenaEventNotification
+import org.suppressingfire.wemi.network.GenaSubscriptionManager
 import org.suppressingfire.wemi.network.LanHttpClient
 import org.suppressingfire.wemi.network.NetworkClient
+import org.suppressingfire.wemi.network.ProvisionerClient
+import org.suppressingfire.wemi.network.XmlAndSkuParser
 import org.suppressingfire.wemi.ui.SwitchViewModel
+import org.suppressingfire.wemi.widget.WeMiSwitchWidgetProvider
+import org.suppressingfire.wemi.widget.WidgetActionExecutor
+import org.suppressingfire.wemi.widget.WidgetConfigStore
+import org.suppressingfire.wemi.widget.WidgetTargetConfig
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -246,6 +259,229 @@ class RuleAndTransportTest {
             vm.clearSoapLogs()
             injectedRepo.close()
             SwitchDatabase.closeCurrentInstance()
+        }
+    }
+
+    @Test
+    fun genaServerSurvivesStalledAndResetPeerSocketsWithoutStoppingAcceptLoop() {
+        val received = CopyOnWriteArrayList<GenaEventNotification>()
+        val delivered = CountDownLatch(1)
+        val manager = GenaSubscriptionManager(
+            localIpProvider = { "127.0.0.1" },
+            preferredListenPort = 0,
+            onNotification = { event ->
+                received.add(event)
+                delivered.countDown()
+            }
+        )
+        try {
+            val port = manager.startServer(InetAddress.getByName("127.0.0.1"))
+            assertTrue("Expected bound ephemeral GENA port", port > 0)
+
+            // 1. Peer resets mid-request (RST via SO_LINGER=0)
+            Socket("127.0.0.1", port).use { resetPeer ->
+                resetPeer.setSoLinger(true, 0)
+                resetPeer.getOutputStream().write("NOTIFY /gena/BAD HTTP/1.1\r\nContent-Length: 400\r\n\r\n<part".toByteArray())
+                resetPeer.getOutputStream().flush()
+            }
+
+            // 2. Peer opens a silent socket that triggers server read timeout (SocketTimeoutException)
+            Socket("127.0.0.1", port).use { stalledPeer ->
+                stalledPeer.soTimeout = 3000
+                // Wait until server closes socket after its 1500ms soTimeout
+                assertEquals(-1, stalledPeer.getInputStream().read())
+            }
+
+            // 3. Subsequent valid NOTIFY must still be accepted and dispatched cleanly
+            val body = "<e:propertyset><e:property><BinaryState>1</BinaryState></e:property></e:propertyset>"
+            val bodyBytes = body.toByteArray(Charsets.UTF_8)
+            Socket("127.0.0.1", port).use { goodPeer ->
+                goodPeer.soTimeout = 2000
+                val req = "NOTIFY /gena/WLS040SURVIVE HTTP/1.1\r\n" +
+                    "Host: 127.0.0.1:$port\r\n" +
+                    "SID: uuid:gena-survive\r\n" +
+                    "Content-Length: ${bodyBytes.size}\r\n\r\n"
+                goodPeer.getOutputStream().write(req.toByteArray(Charsets.US_ASCII))
+                goodPeer.getOutputStream().write(bodyBytes)
+                goodPeer.getOutputStream().flush()
+                val statusLine = goodPeer.getInputStream().bufferedReader().readLine()
+                assertEquals("HTTP/1.1 200 OK", statusLine)
+            }
+
+            assertTrue("GENA accept loop must remain alive after peer reset/timeout", delivered.await(2, TimeUnit.SECONDS))
+            assertEquals("WLS040SURVIVE", received.single().deviceKey)
+            assertEquals(true, received.single().binaryStateOn)
+        } finally {
+            manager.close()
+        }
+    }
+
+    @Test
+    fun xmlEntityUnescapingRoundTripsFriendlyNamesAndSsidsAcrossSetupMetaAndApList() = runBlocking {
+        assertEquals("Ben & Jerry's \"Lamp\"", XmlAndSkuParser.unescapeXml("Ben &amp; Jerry&apos;s &quot;Lamp&quot;"))
+        assertEquals("A&lt;B", XmlAndSkuParser.unescapeXml("A&amp;lt;B"))
+
+        val meta = XmlAndSkuParser.parseMetaInfoSoapResponse(
+            "<MetaInfo>AA11BB22CC33|SN1|WLS040|fw|Mike&apos;s &amp; Co WiFi|LightSwitch</MetaInfo>"
+        )
+        assertEquals("Mike's & Co WiFi", meta?.accessPointSsid)
+
+        val directAps = XmlAndSkuParser.parseApListXml(
+            "<ApList>Mike&apos;s &amp; Co|6|82|WPA2PSK/AES\nA&amp;lt;B|1|70|WPA2PSK/AES</ApList>"
+        )
+        assertEquals(listOf("Mike's & Co", "A&lt;B"), directAps.map { it.ssid })
+
+        val escapedAps = XmlAndSkuParser.parseApListXml(
+            "&lt;ApList&gt;Tom&apos;s WiFi|11|90|WPA2PSK/AES&lt;/ApList&gt;"
+        )
+        assertEquals(listOf("Tom's WiFi"), escapedAps.map { it.ssid })
+
+        // End-to-end wire round-trip: ChangeFriendlyName escapes XML -> /setup.xml returns escaped -> parsers decode
+        FakeUpnpServer(
+            initialFriendlyName = "Plain Switch",
+            modelName = "WLS040",
+            serialNumber = "WLS040XML01",
+            udn = "uuid:Lightswitch-3_0-WLS040XML01"
+        ).use { server ->
+            val client = NetworkClient(extraCandidatePorts = listOf(server.port))
+            val device = DeviceEntity(
+                id = 1, name = "Plain Switch", ipAddress = "127.0.0.1",
+                port = server.port, serialNumber = "WLS040XML01"
+            )
+            val specialName = "Ben & Jerry's \"Lamp\""
+            val renameRes = client.changeFriendlyName(device, specialName)
+            assertTrue(renameRes.reachableOnLan)
+
+            val fetched = client.probeAndFetchDeviceDescriptor("127.0.0.1", server.port)
+            assertEquals(specialName, fetched?.name)
+
+            val setupDesc = ProvisionerClient().probeSetupDevice("127.0.0.1", server.port)
+            assertEquals(specialName, setupDesc?.friendlyName)
+        }
+    }
+
+    @Test
+    fun autoOffAndMotionRulesIsolateSameNamedSwitchesAcrossWifiHomes() = runBlocking {
+        // 1. RuleScheduler AUTO_OFF isolates same-named switches across homes while keeping deleted-ID fallback
+        val scheduler = RuleScheduler(onAutoOffExpired = {}, onScheduleRuleTriggered = {})
+        try {
+            val mainPorch = DeviceEntity(id = 1, name = "Porch Light", networkKey = DEFAULT_MAIN_HOME_KEY, isOn = true, isReachable = true)
+            val cabinPorch = DeviceEntity(id = 10, name = "Porch Light", networkKey = DEFAULT_CABIN_HOME_KEY, isOn = true, isReachable = true)
+            val mainOnlyRule = listOf(
+                RuleEntity(
+                    id = 5, name = "Main Porch Auto-Off", ruleType = RuleType.AUTO_OFF.name,
+                    targetDeviceId = 1, targetDeviceName = "Porch Light",
+                    triggerSummary = "After 15 minutes ON", actionSummary = "Turn OFF Porch Light",
+                    targetStateOn = false, isEnabled = true
+                )
+            )
+            val bothActive = setOf(1, 10)
+            scheduler.onDeviceStateUpdated(cabinPorch, mainOnlyRule, bothActive)
+            assertFalse("Foreign-home AUTO_OFF rule must not start timer on same-named device", scheduler.activeCountdownsSec.value.containsKey(10))
+
+            scheduler.onDeviceStateUpdated(mainPorch, mainOnlyRule, bothActive)
+            assertEquals(900, scheduler.activeCountdownsSec.value[1])
+
+            // When targetDeviceId=1 no longer exists in activeDeviceIds, fallback by name still works
+            scheduler.onDeviceStateUpdated(cabinPorch, mainOnlyRule, setOf(10))
+            assertEquals(900, scheduler.activeCountdownsSec.value[10])
+        } finally {
+            scheduler.stopAll()
+        }
+
+        // 2. Motion-trigger rule targeting Cabin's "Porch Light" must NOT hijack Main Home's "Porch Light"
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        SwitchDatabase.closeCurrentInstance()
+        val dao = SwitchDatabase.getDatabase(app).switchDao()
+        FakeUpnpServer(initialFriendlyName = "Porch Light", serialNumber = "WLS040MAINP1", initialRelayOn = false).use { mainServer ->
+            FakeUpnpServer(initialFriendlyName = "Porch Light", serialNumber = "WLS040CABP2", initialRelayOn = false).use { cabinServer ->
+                val repo = SwitchRepository(dao = dao, context = app, initialDemoModeOverride = false)
+                try {
+                    val mainPorchId = dao.insertDevice(
+                        DeviceEntity(
+                            name = "Porch Light", roomName = "Porch", networkKey = DEFAULT_MAIN_HOME_KEY,
+                            ipAddress = "127.0.0.1", port = mainServer.port, isOn = false, isReachable = true,
+                            serialNumber = "WLS040MAINP1"
+                        )
+                    ).toInt()
+                    val cabinPorchId = dao.insertDevice(
+                        DeviceEntity(
+                            name = "Porch Light", roomName = "Porch", networkKey = DEFAULT_CABIN_HOME_KEY,
+                            ipAddress = "127.0.0.1", port = cabinServer.port, isOn = false, isReachable = true,
+                            serialNumber = "WLS040CABP2"
+                        )
+                    ).toInt()
+                    val mainSensor = DeviceEntity(
+                        name = "Main Porch Motion", roomName = "Porch", networkKey = DEFAULT_MAIN_HOME_KEY,
+                        deviceType = DeviceType.MOTION_SENSOR.name, ipAddress = "127.0.0.1", port = 49159
+                    ).let { it.copy(id = dao.insertDevice(it).toInt()) }
+
+                    dao.insertRule(
+                        RuleEntity(
+                            name = "Cabin Porch Motion", ruleType = RuleType.MOTION_TRIGGER.name,
+                            targetDeviceId = cabinPorchId, targetDeviceName = "Porch Light",
+                            triggerSummary = "Cabin motion", actionSummary = "Turn ON Porch Light",
+                            targetStateOn = true, isEnabled = true
+                        )
+                    )
+
+                    repo.triggerMotionEvent(mainSensor)
+                    assertFalse("Main Home same-named switch must not be hijacked by Cabin rule", mainServer.relayStateOn.get())
+                    assertFalse("Cabin Home switch must stay isolated from Main Home sensor", cabinServer.relayStateOn.get())
+
+                    // Deleting Cabin switch allows same-home name fallback to recover
+                    dao.deleteDeviceById(cabinPorchId)
+                    repo.triggerMotionEvent(mainSensor)
+                    assertTrue("Deleted targetDeviceId should fall back by name within triggering home", mainServer.relayStateOn.get())
+                    assertTrue(dao.getDeviceById(mainPorchId)?.isOn == true)
+                } finally {
+                    repo.close()
+                    SwitchDatabase.closeCurrentInstance()
+                }
+            }
+        }
+    }
+
+    @Test
+    fun widgetConfigStoreRejectsNonPositiveIdsAndProviderCleansWidgetMutexes() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        WidgetConfigStore.clearAll(context)
+        try {
+            WidgetConfigStore.save(context, WidgetTargetConfig.forRoom(0, "Kitchen", DEFAULT_MAIN_HOME_KEY))
+            WidgetConfigStore.save(context, WidgetTargetConfig.forRoom(-4, "Kitchen", DEFAULT_MAIN_HOME_KEY))
+            assertTrue(WidgetConfigStore.allConfiguredWidgetIds(context).isEmpty())
+
+            WidgetConfigStore.save(context, WidgetTargetConfig.forRoom(777, "Kitchen", DEFAULT_MAIN_HOME_KEY))
+            WidgetConfigStore.remapIds(context, intArrayOf(777), intArrayOf(-1))
+            assertNotNull("Invalid negative destination ID must not wipe existing binding", WidgetConfigStore.load(context, 777))
+
+            // Allocate a per-widget Mutex, remap 777 -> 888, then delete 888 and verify cleanup
+            val repo = SwitchRepository(
+                dao = SwitchDatabase.getDatabase(context).switchDao(),
+                context = context,
+                initialDemoModeOverride = true
+            )
+            try {
+                WidgetActionExecutor.toggleWidgetTarget(context, 777, repositoryOverride = repo)
+                assertTrue(WidgetActionExecutor.hasMutexFor(777))
+
+                val provider = WeMiSwitchWidgetProvider()
+                provider.onRestored(context, intArrayOf(777), intArrayOf(888))
+                assertFalse("Retired widget ID mutex should be evicted on onRestored", WidgetActionExecutor.hasMutexFor(777))
+                assertNotNull(WidgetConfigStore.load(context, 888))
+
+                WidgetActionExecutor.toggleWidgetTarget(context, 888, repositoryOverride = repo)
+                assertTrue(WidgetActionExecutor.hasMutexFor(888))
+
+                provider.onDeleted(context, intArrayOf(888))
+                assertFalse("Deleted widget mutex should be evicted on onDeleted", WidgetActionExecutor.hasMutexFor(888))
+                assertNull(WidgetConfigStore.load(context, 888))
+            } finally {
+                repo.close()
+                SwitchDatabase.closeCurrentInstance()
+            }
+        } finally {
+            WidgetConfigStore.clearAll(context)
         }
     }
 }

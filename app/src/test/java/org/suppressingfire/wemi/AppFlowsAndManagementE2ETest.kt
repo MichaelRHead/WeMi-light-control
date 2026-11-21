@@ -261,28 +261,41 @@ class AppFlowsAndManagementE2ETest {
                     composeRule.onNodeWithTag("save_device_button").performClick()
 
                     composeRule.awaitLoopbackIo {
-                        runBlocking {
-                            val row = dao().getDeviceById(fanId)
-                            row?.name == "Local Patio Fan" && row.roomName == "Patio"
-                        }
+                        val vmRow = vm.devices.value.find { it.id == fanId }
+                        vmRow?.name == "Local Patio Fan" &&
+                            vmRow.roomName == "Patio" &&
+                            runBlocking {
+                                val row = dao().getDeviceById(fanId)
+                                row?.name == "Local Patio Fan" && row.roomName == "Patio"
+                            }
                     }
                     assertEquals("Deck Breeze Fan", fanServer.friendlyName.get())
 
                     // 3. Move Down on Patio Lamp swaps sortOrder below Local Patio Fan inside Patio
-                    awaitListTag("devices_list", "device_row_$lampId")
+                    awaitListTag("devices_list", "move_down_$lampId")
                     composeRule.onNodeWithTag("move_down_$lampId").performClick()
                     composeRule.awaitLoopbackIo {
-                        runBlocking {
-                            (dao().getDeviceById(lampId)?.sortOrder ?: -1) >
-                                (dao().getDeviceById(fanId)?.sortOrder ?: -1)
-                        }
+                        val vmList = vm.devices.value
+                        val vmLampIdx = vmList.indexOfFirst { it.id == lampId }
+                        val vmFanIdx = vmList.indexOfFirst { it.id == fanId }
+                        vmLampIdx > vmFanIdx &&
+                            vmFanIdx >= 0 &&
+                            runBlocking {
+                                (dao().getDeviceById(lampId)?.sortOrder ?: -1) >
+                                    (dao().getDeviceById(fanId)?.sortOrder ?: -1)
+                            }
                     }
 
                     // 4. Delete Patio Lamp via Edit Mode -> removes row & prunes active Auto-Off countdown
+                    awaitListTag("devices_list", "delete_device_$lampId")
                     composeRule.onNodeWithTag("delete_device_$lampId").performClick()
                     composeRule.awaitLoopbackIo {
                         runBlocking { dao().getDeviceById(lampId) == null } &&
-                            !vm.activeAutoOffCountdownsSec.value.containsKey(lampId)
+                            !vm.activeAutoOffCountdownsSec.value.containsKey(lampId) &&
+                            runCatching {
+                                composeRule.onNodeWithTag("device_row_$lampId").assertDoesNotExist()
+                                true
+                            }.getOrDefault(false)
                     }
                     composeRule.onNodeWithTag("device_row_$lampId").assertDoesNotExist()
                 }
@@ -408,14 +421,18 @@ class AppFlowsAndManagementE2ETest {
                         )
                     }
 
-                    // 1. Create a Motion Trigger rule targeting Hallway Sconce dimmer via RuleDialog
+                    // 1. Verify AUTO_OFF defaults to Turn Switch OFF, then create Motion Trigger rule targeting Hallway Sconce
                     composeRule.onNodeWithTag("nav_tab_rules").performClick()
                     awaitTagDisplayed("add_rule_button")
                     composeRule.onNodeWithTag("add_rule_button").performClick()
                     awaitTagDisplayed("rule_name_input")
+                    composeRule.onNodeWithText("Auto-Off Timer").performClick()
+                    composeRule.waitForIdle()
+                    composeRule.onNodeWithText("Action: Turn Switch OFF").assertIsDisplayed()
                     composeRule.onNodeWithTag("rule_name_input").performTextReplacement("Hallway Night Glow")
                     composeRule.onNodeWithText("Motion Trigger").performClick()
                     composeRule.waitForIdle()
+                    composeRule.onNodeWithText("Action: Turn Switch ON").assertIsDisplayed()
                     composeRule.onNodeWithTag("rule_brightness_slider").performScrollTo().performTouchInput {
                         click(percentOffset(0.45f, 0.5f))
                     }
@@ -443,7 +460,11 @@ class AppFlowsAndManagementE2ETest {
                     awaitListTag("rules_list", "rule_row_$createdRuleId")
                     composeRule.onNodeWithTag("delete_rule_$createdRuleId").performClick()
                     composeRule.awaitLoopbackIo {
-                        runBlocking { dao().getAllRules().first().none { it.id == createdRuleId } }
+                        runBlocking { dao().getAllRules().first().none { it.id == createdRuleId } } &&
+                            runCatching {
+                                composeRule.onNodeWithTag("rule_row_$createdRuleId").assertDoesNotExist()
+                                true
+                            }.getOrDefault(false)
                     }
                     composeRule.onNodeWithTag("rule_row_$createdRuleId").assertDoesNotExist()
                     assertNull(runBlocking { dao().getAllRules().first().find { it.id == createdRuleId } })
