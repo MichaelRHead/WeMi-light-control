@@ -391,18 +391,22 @@ internal fun SoapPacketLogCard(
                         Column(modifier = Modifier.padding(10.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.Top
                             ) {
                                 Text(
                                     text = "${entry.deviceName} • ${entry.soapAction}",
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 12.sp,
-                                    color = WemoTextPrimary
+                                    color = WemoTextPrimary,
+                                    modifier = Modifier.weight(1f)
                                 )
                                 Text(
                                     text = entry.timestamp,
                                     fontSize = 11.sp,
-                                    color = WemoTextSecondary
+                                    color = WemoTextSecondary,
+                                    maxLines = 1,
+                                    softWrap = false
                                 )
                             }
                             Text(

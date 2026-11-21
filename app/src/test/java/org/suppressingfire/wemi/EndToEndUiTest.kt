@@ -333,6 +333,9 @@ class EndToEndUiTest {
             }.getOrDefault(false)
         }
         composeTestRule.onNodeWithTag("empty_devices_state_card").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("devices_list")
+            .performScrollToNode(hasTestTag("ssdp_discovery_banner"))
         composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
 
         composeTestRule.onNodeWithTag("devices_list")

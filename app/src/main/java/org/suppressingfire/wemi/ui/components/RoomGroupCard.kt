@@ -414,10 +414,13 @@ fun RoomGroupHeaderCard(
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Lightbulb,
                                 contentDescription = null,
@@ -438,7 +441,9 @@ fun RoomGroupHeaderCard(
                             color = WemoGreenDark,
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     }
                     Slider(
