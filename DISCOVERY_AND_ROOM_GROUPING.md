@@ -1,6 +1,6 @@
 # WeMi Light Control — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture (`DISCOVERY_AND_ROOM_GROUPING.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v32.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v33.0`)  
 **Document & Skill Owner**: **Antigravity Device Discovery & Room Grouping Agent — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](.agents/skills/wemi-discovery-and-room-grouping/SKILL.md)  
 **Companion User Guides**: [`docs/user-guide/room-grouping.md`](docs/user-guide/room-grouping.md) & [`docs/user-guide/switch-discovery.md`](docs/user-guide/switch-discovery.md)
@@ -16,7 +16,7 @@ Related documentation:
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry & `10.22.22.1` Provisioning Diagnostics *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source Licensing, Third-Party Attribution & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`RELEASE_PROCESS.md`](RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](RELEASE_SIGN_OFF.md) — 6-Agent / 7-Stage Autonomous Release Process & Sign-Off Ledger
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v32.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v33.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -87,7 +87,7 @@ flowchart TD
 ### 3.1 Multi-Path Discovery Pipeline (`SsdpDiscoveryEngine.kt`)
 When `executeSsdpScan` or `reconnectAndRediscoverHome` runs (with `DeviceActionsUiController.selectSearchTargetAndScan` cancelling any superseded active `ssdpScanJob` cleanly):
 1. **Stage A — UDP Multicast `M-SEARCH` (`239.255.255.250:1900`)**:
-   - Acquires `WifiManager.MulticastLock("wemi_ssdp_multicast_lock")`, binds an ephemeral UDP socket on the active Wi-Fi IPv4 interface (`LanRuntimeUtils.resolvePreferredLanInterfaceIpv4`), and transmits two `M-SEARCH` bursts separated by a `550ms` retransmit interval within a `1.25s` receive window (`90ms`/`220ms` in `fastMode` under Robolectric/loopback) with `ensureActive()` cancellation checks.
+   - Acquires `WifiManager.MulticastLock("wemi_ssdp_multicast_lock")`, binds an ephemeral UDP socket on the active Wi-Fi IPv4 interface (`LanRuntimeUtils.resolvePreferredLanInterfaceIpv4`), and transmits two `M-SEARCH` bursts measured from post-burst `burstStartMs` with a `550ms` retransmit interval within a `1.25s` receive window (`250ms`/`1.0s` with immediate early-exit once all registered loopback servers reply, or `90ms`/`220ms` in empty Robolectric `fastMode`) and `ensureActive()` cancellation checks.
    - Simultaneously mirrors `M-SEARCH` datagrams to any registered loopback `FakeUpnpServer` UDP ports (`127.0.0.1`) in registration order for deterministic E2E testing, fetches descriptors concurrently via order-preserving `Semaphore(3)` coroutines, unescapes XML entities in `<friendlyName>`/`<MetaInfo>`, and deduplicates responses via `SsdpDiscoveredDevice.matchesEndpointOrSerial` (real serial → canonical UDN → exact `ipAddress:port`).
 2. **Stage B — Known-Device Unicast Verification (Placeholder-Serial Safe & Concurrent)**:
    - Probes all unseen remembered switches for the active home in parallel (order-preserving `Semaphore(3)` concurrency) across the 9 Belkin UPnP ports (`49153, 49152, 49154, 49151, 49155..49159`) and `/setup.xml` + `/Lightsetup.xml`, passing `LanRuntimeUtils.expectedHardwareIdentity(known.serialNumber, known.udn)` to `probeWemoPort` and guarding `unseenKnown` with `!LanRuntimeUtils.isPlaceholderSerial` + `canonicalHardwareUdn` so switches on APs that drop UDP multicast are discovered immediately without cross-suppressing unprobed manual-IP entries.

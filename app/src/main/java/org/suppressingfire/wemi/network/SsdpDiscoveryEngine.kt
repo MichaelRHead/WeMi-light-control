@@ -133,7 +133,19 @@ internal class SsdpDiscoveryEngine(
 
         val isRobolectric = LanRuntimeUtils.isRunningInRobolectric()
         val loopbackPorts = loopbackSsdpUdpPorts.toList()
-        val fastMode = loopbackPorts.isNotEmpty() || isRobolectric
+        val hasLoopbackTargets = loopbackPorts.isNotEmpty()
+        val fastMode = hasLoopbackTargets || isRobolectric
+        val receiveTimeoutMs = when {
+            hasLoopbackTargets -> 250
+            fastMode -> 90
+            else -> 550
+        }
+        val retransmitAfterMs = receiveTimeoutMs.toLong()
+        val receiveWindowMs = when {
+            hasLoopbackTargets -> 1000L
+            fastMode -> 220L
+            else -> 1250L
+        }
         val probeSemaphore = Semaphore(3)
 
         try {
@@ -147,7 +159,7 @@ internal class SsdpDiscoveryEngine(
                     }
                 }.getOrElse { InetSocketAddress(0) }
                 runCatching { socket.bind(bindAddr) }.onFailure { socket.bind(InetSocketAddress(0)) }
-                socket.soTimeout = if (fastMode) 90 else 550
+                socket.soTimeout = receiveTimeoutMs
 
                 val multicastGroup = InetAddress.getByName("239.255.255.250")
                 val loopbackAddr = InetAddress.getByName("127.0.0.1")
@@ -164,34 +176,37 @@ internal class SsdpDiscoveryEngine(
                 }
 
                 sendBurst()
+                val burstStartMs = System.currentTimeMillis()
                 var retransmitted = false
                 val receiveBuffer = ByteArray(4096)
                 val seenLocations = mutableMapOf<String, Triple<Map<String, String>, Long, Int>>()
-                val deadline = System.currentTimeMillis() + if (fastMode) 220L else 1250L
+                val deadline = burstStartMs + receiveWindowMs
 
                 while (System.currentTimeMillis() < deadline) {
                     ensureActive()
-                    if (!retransmitted && System.currentTimeMillis() - scanStartMs >= (if (fastMode) 90L else 550L)) {
+                    if (!retransmitted && System.currentTimeMillis() - burstStartMs >= retransmitAfterMs) {
                         sendBurst()
                         retransmitted = true
                     }
                     try {
                         val respPacket = DatagramPacket(receiveBuffer, receiveBuffer.size)
                         socket.receive(respPacket)
-                        val elapsed = (System.currentTimeMillis() - scanStartMs).coerceAtLeast(1L)
+                        val elapsed = (System.currentTimeMillis() - burstStartMs).coerceAtLeast(1L)
                         val rawText = String(respPacket.data, 0, respPacket.length, Charsets.UTF_8)
                         val headers = XmlAndSkuParser.parseSsdpHeaders(rawText)
                         val loc = headers["LOCATION"]
                         if (!loc.isNullOrEmpty() && !seenLocations.containsKey(loc)) {
                             seenLocations[loc] = Triple(headers, elapsed, respPacket.port)
-                            if (loopbackPorts.isNotEmpty() && seenLocations.size >= loopbackPorts.size) {
+                            if (hasLoopbackTargets && seenLocations.size >= loopbackPorts.size) {
                                 break
                             }
                         }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (_: SocketTimeoutException) {
-                        if (retransmitted) break
+                        if (retransmitted && (!hasLoopbackTargets || seenLocations.isNotEmpty())) {
+                            break
+                        }
                     } catch (_: Exception) {
                         break
                     }
