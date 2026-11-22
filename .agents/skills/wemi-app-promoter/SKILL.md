@@ -19,6 +19,7 @@ Use this skill when acting as the **Antigravity App Promoter Agent (`app_promote
 3. **Trademark & Play Limit Hygiene**: Before syncing `play_store_assets/`, validate locally with `python3 scripts/sync_play_assets.py validate-local` (`title <= 30`, `shortDescription <= 80`, `fullDescription <= 4000`, `<= 8` screenshots per slot, valid PNG headers, zero `"WeMo"` / `"Wemo"` word-boundary leaks).
 4. **Zero Idle Polling**: Never run `scripts/await_release_turn.sh` for `app_promoter` — Stage 7 triggers automatically on `push` to `main` touching `app/build.gradle.kts` at zero Antigravity LLM quota cost.
 5. **Commit Attribution**: Always commit via `bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh app_promoter ...` (`Agent: Antigravity App Promoter Agent (app_promoter)`).
+6. **Proactive CI, Runtime & API Deprecation Hygiene**: After GitHub Actions runs, check job annotations (`gh api repos/MichaelRHead/WeMi-light-control/check-runs/<job_id>/annotations`) and logs for runner, Node.js, GitHub Action, Python (`python3 -W default`), `google-auth`/`requests`, or `androidpublisher/v3` deprecation warnings, and proactively upgrade `.github/workflows/play-store-promote.yml` and `scripts/*.py` when deprecations appear.
 
 ---
 
