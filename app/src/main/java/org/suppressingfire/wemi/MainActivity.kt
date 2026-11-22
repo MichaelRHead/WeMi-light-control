@@ -116,6 +116,9 @@ fun WeMiSwitchApp(
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val isDemoShowroomMode by viewModel.isDemoShowroomMode.collectAsStateWithLifecycle()
     val setupDebugSnapshot by viewModel.setupDebugSnapshot.collectAsStateWithLifecycle()
+    val hardwareRulesByDeviceId by viewModel.hardwareRulesByDeviceId.collectAsStateWithLifecycle()
+    val inspectingRuleDeviceIds by viewModel.inspectingRuleDeviceIds.collectAsStateWithLifecycle()
+    val isScanningAllDeviceRules by viewModel.isScanningAllDeviceRules.collectAsStateWithLifecycle()
     var showReleaseHistoryDialog by rememberSaveable { mutableStateOf(false) }
 
     val homeDevices = remember(devices, activeNetworkKey) {
@@ -267,6 +270,9 @@ fun WeMiSwitchApp(
                                 allDevices = viewModel.devices.value
                             )
                             viewModel.showTransientStatus(msg)
+                        },
+                        onInspectDeviceHardwareRules = { device ->
+                            viewModel.inspectDeviceHardwareRules(device, forceRecheck = true)
                         }
                     )
                 }
@@ -299,7 +305,9 @@ fun WeMiSwitchApp(
                                     togglingDeviceIds = togglingDeviceIds,
                                     isEditMode = isEditMode,
                                     isDemoShowroomMode = isDemoShowroomMode,
-                                    activeAutoOffCountdownsSec = activeAutoOffCountdownsSec
+                                    activeAutoOffCountdownsSec = activeAutoOffCountdownsSec,
+                                    hardwareRulesByDeviceId = hardwareRulesByDeviceId,
+                                    inspectingRuleDeviceIds = inspectingRuleDeviceIds
                                 ),
                                 actions = devicesTabActions
                             )
@@ -311,7 +319,15 @@ fun WeMiSwitchApp(
                                 onToggleRule = { viewModel.toggleRule(it) },
                                 onRunRuleNow = { viewModel.runRuleNow(it) },
                                 onDeleteRule = { viewModel.deleteRule(it) },
-                                onAddRuleClick = { viewModel.openAddRuleDialog() }
+                                onAddRuleClick = { viewModel.openAddRuleDialog() },
+                                homeDevices = homeDevices,
+                                hardwareRulesByDeviceId = hardwareRulesByDeviceId,
+                                inspectingRuleDeviceIds = inspectingRuleDeviceIds,
+                                isScanningAllDeviceRules = isScanningAllDeviceRules,
+                                onScanAllHardwareRules = { viewModel.inspectAllHomeHardwareRules() },
+                                onInspectDeviceHardwareRules = { device, force ->
+                                    viewModel.inspectDeviceHardwareRules(device, forceRecheck = force)
+                                }
                             )
                         }
 

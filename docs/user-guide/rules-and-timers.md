@@ -2,16 +2,32 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-The **Rules** tab lets you automate switches, dimmers, and smart plugs from Belkin's discontinued smart switch platform directly over your local Wi-Fi network — with no cloud account or external server required.
-
-> [!NOTE]
-> **How Local Rules Run**: Schedules, Auto-Off countdowns, and Motion Trigger rules execute directly from your Android device over your home Wi-Fi while WeMi is running (they are not uploaded into the physical wall switch's internal memory). Each rule stays isolated to the Wi-Fi Home where its switch lives, so two switches with the same name in different homes never interfere with each other.
+The **Rules** tab lets you inspect **On-Device Switch Rules** stored inside supported switches and manage local schedules, auto-off timers, and motion triggers over your home Wi-Fi — with no cloud account or external server required.
 
 ---
 
-## 1. Types of Local Rules
+## 1. Inspecting On-Device Switch Rules (Read-Only)
 
-**WeMi Light Control** supports three kinds of local automation rules:
+Supported 1st-Gen and 2nd-Gen OpenWrt wall switches, dimmers, and plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`) run their own built-in rule engine inside the switch hardware so rules keep firing even when your phone leaves the house. Newer RTOS models (`WDS060` Dimmer V2, `WSP080` Mini V2) do not expose on-device rule storage (though Dimmer V2 still stores hardware **Night Mode** on-device).
+
+### How WeMi Detects Capability Without Slowing Down Scans
+- **Instant Discovery Hints**: When WeMi discovers or adds a switch, it reads the device descriptor you already fetched with zero extra network calls to label switches as **`Likely Supported`** or **`Likely Unsupported (RTOS)`**.
+- **Verified Read-Only Inspection**: When you tap **`Read Rules`** on the **Rules** tab (or **`Inspect Rules`** inside any switch's expanded drawer on the **Devices** tab), WeMi verifies the switch's exact rule service actions and caches the result against its firmware version so unsupported switches are never re-probed unnecessarily.
+
+### What You Can See on Each Switch
+- **Capability Badges**: **`On-Device Ready`** (plus **`• Long Press`** on wall switches and 1st-Gen dimmers that support 2-second wall-paddle holds) or **`No On-Device Rules`** on RTOS firmware.
+- **Stored On-Device Rules**: Displays existing **`Long Press`** rules (resolving target switch names automatically), **`Auto-Off Delay`** timers, **`Schedule`** intervals (including on-device **`Sunrise`** / **`Sunset`** offsets and stored solar location), **`Away Mode`** occupancy rules, and **`Motion / Sensor`** triggers, along with the switch's rules database version (`DB v...`).
+- **Switch Clock Warning**: If a switch lost power and its internal clock drifted or reset (for example, back to the year 2000 without cloud NTP), WeMi flags **`Switch clock needs sync`**.
+- **Automatic Local Backup**: Every time WeMi reads a valid rules archive from a switch, it keeps a rotating local backup of the untouched raw archive on your device in preparation for full on-device rule editing.
+
+---
+
+## 2. Local App Rules & Timers
+
+> [!NOTE]
+> **How Local App Rules Run**: The **Local Switch Rules & Timers** section below the on-device inspector executes directly from your Android device over your home Wi-Fi while WeMi is running. Each rule stays isolated to the Wi-Fi Home where its switch lives, so two switches with the same name in different homes never interfere with each other.
+
+**WeMi Light Control** currently supports three kinds of local app automation rules:
 
 | Rule Type | Icon | How It Works | Example Trigger |
 | :--- | :--- | :--- | :--- |
@@ -21,7 +37,7 @@ The **Rules** tab lets you automate switches, dimmers, and smart plugs from Belk
 
 ---
 
-## 2. Live Auto-Off Countdown Badges
+## 3. Live Auto-Off Countdown Badges
 
 When an **Auto-Off Timer** rule is enabled for a switch:
 - As soon as the switch turns **ON**, WeMi starts a live second-by-second countdown (supporting durations from `1` minute up to `1440` minutes / 24 hours).
@@ -30,7 +46,7 @@ When an **Auto-Off Timer** rule is enabled for a switch:
 
 ---
 
-## 3. Creating a New Rule
+## 4. Creating a New Local App Rule
 
 1. Open the **Rules** tab from the bottom navigation bar and tap **`New Rule`** (or tap **`+`** in the top header while on the **Rules** tab).
 2. In the **New Smart Switch Rule** dialog:
@@ -46,7 +62,7 @@ When an **Auto-Off Timer** rule is enabled for a switch:
 
 ---
 
-## 4. Testing & Managing Existing Rules
+## 5. Testing & Managing Local App Rules
 
 Each row on the **Rules** tab has three controls on the right:
 - **`▶` (Play Button — Test Rule Now)**: Runs the rule immediately against the target switch on your local Wi-Fi so you can verify it works without waiting for the scheduled time.

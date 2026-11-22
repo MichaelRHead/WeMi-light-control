@@ -35,7 +35,7 @@ With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Re
 
 | Track | Upcoming Feature Area | Key Deliverables |
 | :--- | :--- | :--- |
-| **Track 1** | **On-Device Hardware Rules DB (`rules.db` SQLite over SOAP)** | Read, decode, and write the embedded SQLite `rules.db` (`urn:Belkin:service:rules:1#FetchRules` & `#StoreRules` Base64 ZIP) on OpenWrt switches (`F7C030`, `F7C059`, `F7C063`) plus `timesync1#TimeSync` so schedules & auto-off timers run inside the wall switch even when all phones are away from home. |
+| **Track 1** | **On-Device Hardware Rules Management — Step 2 (Live Editing & App-Rule Removal)** | *(Step 1 Complete: zero-RTT Tier-1 + firmware-cached Tier-2 capability detection, read-only `rules.db` extraction & UI readout, rotating raw-ZIP backups, and anti-brick pre-store validator)* Step 2 adds live editing/creation/deletion for **Long Press**, **Auto-Off Delay (`Countdown Rule`)**, and **Schedules (`Time Interval` + Sunrise/Sunset)** via armored `StoreRules` + automatic `timesync1#TimeSync`, and drops legacy phone-only app automations (`RuleEntity`/`RuleScheduler`). |
 | **Track 2** | **Android Quick Settings Tiles, Multi-Switch 4x1 Widget Bar & Always-On TV Hub Service** | Android `TileService` quick toggles, a multi-switch 4x1 room bar widget companion to the shipped single-light/room Home Screen widget, and an optional `BOOT_COMPLETED` foreground service for Android TV / wall tablets acting as a 24/7 LAN controller. |
 | **Track 3** | **Expanded Hardware Fleet (`Insight`, `Maker`, `Link`, Dimmer Long-Press & Faders)** | Real-time power/wattage/kWh monitoring for **Insight (`F7C029`)** via `insight1#GetInsightParams`, hardware fade ramps & `<LongPress>` scene triggers for **Dimmers (`F7C059`/`WDS060`)**, and **Maker (`F7C043`)** / **Link (`F7C031`)** support. |
 | **Track 4** | **One-Tap OS Wi-Fi Handoff (`WifiNetworkSpecifier`) & Hardware `ReSetup`** | Android 10+ `WifiNetworkSpecifier` in-app connection to `WeMo.Light.*` / `WeMo.Mini.*` APs without leaving the app to open Android Settings, plus a confirmation-protected `basicevent1#ReSetup` factory reset action. |
@@ -47,16 +47,14 @@ With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Re
 
 ## 2. Detailed Specifications for Upcoming Features
 
-### Track 1: On-Device Hardware Rules DB (`HardwareRulesManager.kt`)
-Currently, `RuleScheduler` executes schedules and auto-off timers from the Android device over the LAN. However, 1st-Gen OpenWrt switches (`F7C030`, `F7C059`, `F7C063`) also run a local SQLite rule engine (`/tmp/Belkin_settings/rules.db`) inside the switch itself:
-1. **`FetchRules` Inspection (`urn:Belkin:service:rules:1#FetchRules`)**:
-   - Query `<ruleDbPath>` (typically `http://<ip>:<port>/rules.db`) and `<ruleDbVersion>`.
-   - Download the ZIP archive from `<ruleDbPath>`, extract the inner `rules.db` SQLite file into a temporary cache file, and read `RULES`, `RULEDEVICES`, and `DEVICECOMBINATION` using Android's built-in `SQLiteDatabase.openDatabase`.
-2. **Two-Way Hardware Rule Sync (`StoreRules`)**:
-   - Package modified `rules.db` into a deflated ZIP archive, Base64-encode it into `<ruleDbBody>`, increment `<ruleDbVersion>`, and push via `urn:Belkin:service:rules:1#StoreRules` (`<processDb>1</processDb>`).
-   - Gracefully fall back to app-driven `RuleScheduler` for 2nd-Gen RTOS devices (`WLS0403`, `WDS060`, `WSP080`) that return HTTP 404 on `/upnp/control/rules1`.
-3. **Hardware Time Sync (`timesync1#TimeSync`)**:
-   - Because legacy NTP servers were retired alongside the cloud shutdown, add `urn:Belkin:service:timesync:1#TimeSync` to push the phone's current UTC epoch, timezone offset, and DST flags directly to each switch so hardware schedules fire at the right local clock time.
+### Track 1: On-Device Hardware Rules DB — Step 2 (Live Write Management & Phone-App Rule Retirement)
+Step 1 (owned by `discovery_and_grouping`) shipped zero-RTT Tier-1 `/setup.xml` capability hints, authoritative Tier-2 `/rulesservice.xml` + `rules1#FetchRules` verification cached per firmware in Room v6 (`MIGRATION_5_6`), schema-tolerant read-only `rules.db` SQLite-in-ZIP readout in the **Rules** tab and per-switch **Expanded Diagnostics Drawer**, rotating raw-ZIP backups, `timesync1#GetDeviceTime` / `#TimeSync`, and the anti-brick pre-store validator (`HardwareRulesSafetyValidator` + armored `StoreRules` read-back verification). Step 2 completes full on-device rule management:
+1. **In-Place Hardware Rule Editors (`Long Press`, `Auto-Off Delay`, `Time Interval` + Sunrise/Sunset)**:
+   - Mutate a switch's downloaded SQLite `rules.db` in place (preserving all pre-existing firmware tables and the original ZIP entry name), pass every write through `HardwareRulesSafetyValidator.validateAndPackToBase64Zip`, push via `HardwareRulesClient.storeValidatedRulesDb` (with mandatory `<errorInfo>` `"Successful"` check + post-store `FetchRules` version verification), and expose one-tap restore from the saved raw-ZIP backup.
+2. **Automatic Switch Clock & Solar Location Sync (`timesync1#TimeSync` + `LOCATIONINFO`)**:
+   - Automatically push local UTC + timezone offset via `timesync1#TimeSync` whenever `needsTimeSync == true` before writing schedules, and let users configure optional city/lat-lon coordinates in `LOCATIONINFO` for native Sunrise/Sunset rules.
+3. **Drop Phone-Only App Automations**:
+   - Once true on-device rule creation/editing/deletion is live in Step 2, retire the legacy phone-only `RuleEntity` / `RuleScheduler` / `RuleDialog` app automations from the phone app so the **Rules** tab is dedicated cleanly to on-device switch automation.
 
 ---
 

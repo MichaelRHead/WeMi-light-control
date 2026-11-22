@@ -3,6 +3,7 @@ package org.suppressingfire.wemi.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 import java.util.Locale
+import org.suppressingfire.wemi.network.HardwareRulesCapability
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 const val DEFAULT_MAIN_HOME_KEY = "wifi_home_192_168_1"
@@ -114,11 +115,22 @@ data class DeviceEntity(
     val signalStrengthPercent: Int = 85,
     val nightModeEnabled: Boolean = false,
     val sortOrder: Int = 0,
-    val autoOffMinutes: Int = 0
+    val autoOffMinutes: Int = 0,
+    val hardwareRulesCapability: String = HardwareRulesCapability.UNKNOWN.name,
+    val hardwareRulesLongPressCapable: Boolean = false,
+    val hardwareRulesVerifiedFirmware: String = ""
 ) {
     val parsedType: DeviceType
         get() = runCatching { DeviceType.valueOf(deviceType) }
             .getOrDefault(DeviceType.SWITCH_PLUG)
+
+    val parsedHardwareRulesCapability: HardwareRulesCapability
+        get() = HardwareRulesCapability.fromRaw(hardwareRulesCapability)
+
+    val isHardwareRulesCapabilityFresh: Boolean
+        get() = parsedHardwareRulesCapability.isVerified &&
+            hardwareRulesVerifiedFirmware.isNotBlank() &&
+            hardwareRulesVerifiedFirmware.equals(firmwareVersion.trim(), ignoreCase = true)
 
     val normalizedRoomName: String
         get() = normalizeRoomName(roomName)
@@ -242,7 +254,9 @@ data class SsdpDiscoveredDevice(
     val hardwareSku: String = modelName,
     val macAddress: String = "",
     val wifiSsid: String = "",
-    val signalStrengthPercent: Int = 85
+    val signalStrengthPercent: Int = 85,
+    val rulesCapabilityHint: HardwareRulesCapability = HardwareRulesCapability.UNKNOWN,
+    val longPressCapableHint: Boolean = false
 ) {
     val visualCategory: DeviceCategory
         get() = classifyDeviceCategory(name = name, deviceType = deviceType)

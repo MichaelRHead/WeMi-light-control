@@ -22,6 +22,19 @@ internal data class LanHttpResponse(
         headers[name.lowercase(Locale.US)]
 }
 
+internal class LanHttpBinaryResponse(
+    val code: Int,
+    val statusMessage: String,
+    val headers: Map<String, String>,
+    val bodyBytes: ByteArray
+) {
+    val isSuccessful: Boolean
+        get() = code in 200..299
+
+    fun header(name: String): String? =
+        headers[name.lowercase(Locale.US)]
+}
+
 /**
  * Lightweight zero-dependency local-LAN HTTP/1.1 & UPnP GENA client built directly on [SocketFactory].
  *
@@ -29,7 +42,8 @@ internal data class LanHttpResponse(
  * - Uses zero-argument `socketFactory.createSocket()` + `connect(InetSocketAddress, timeout)` so
  *   Android Wi-Fi bound [SocketFactory] instances bypass mobile data while keeping `127.0.0.1`
  *   loopback tests unbound.
- * - Supports standard HTTP (`GET`, `POST`) and UPnP GENA (`SUBSCRIBE`, `UNSUBSCRIBE`) methods.
+ * - Supports standard HTTP (`GET`, `POST`) and UPnP GENA (`SUBSCRIBE`, `UNSUBSCRIBE`) methods,
+ *   plus byte-exact binary downloads ([getBytes]) for zipped on-device `rules.db` archives.
  * - Frames responses strictly by byte-exact `Content-Length` (or `Transfer-Encoding: chunked`)
  *   before falling back to EOF, avoiding 1000ms+ hangs on embedded switch HTTP daemons that delay TCP `FIN`.
  */
@@ -39,7 +53,8 @@ internal class LanHttpClient(
     private val readTimeoutMs: Int = 1200
 ) {
     companion object {
-        private const val MAX_RESPONSE_BODY_BYTES = 512 * 1024
+        private const val MAX_TEXT_RESPONSE_BODY_BYTES = 512 * 1024
+        internal const val MAX_BINARY_RESPONSE_BODY_BYTES = 2 * 1024 * 1024
     }
 
     fun get(
@@ -50,6 +65,18 @@ internal class LanHttpClient(
         url = url,
         headers = headers,
         body = null
+    )
+
+    fun getBytes(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        maxBytes: Int = MAX_BINARY_RESPONSE_BODY_BYTES
+    ): LanHttpBinaryResponse = executeRaw(
+        method = "GET",
+        url = url,
+        headers = headers,
+        body = null,
+        maxResponseBytes = maxBytes.coerceIn(1024, MAX_BINARY_RESPONSE_BODY_BYTES)
     )
 
     fun postXml(
@@ -78,6 +105,28 @@ internal class LanHttpClient(
         headers: Map<String, String> = emptyMap(),
         body: String? = null
     ): LanHttpResponse {
+        val raw = executeRaw(
+            method = method,
+            url = url,
+            headers = headers,
+            body = body,
+            maxResponseBytes = MAX_TEXT_RESPONSE_BODY_BYTES
+        )
+        return LanHttpResponse(
+            code = raw.code,
+            statusMessage = raw.statusMessage,
+            headers = raw.headers,
+            body = String(raw.bodyBytes, Charsets.UTF_8)
+        )
+    }
+
+    private fun executeRaw(
+        method: String,
+        url: String,
+        headers: Map<String, String>,
+        body: String?,
+        maxResponseBytes: Int
+    ): LanHttpBinaryResponse {
         val uri = URI(url)
         val host = requireNotNull(uri.host?.takeIf { it.isNotBlank() }) {
             "Missing host in URL: $url"
@@ -143,21 +192,21 @@ internal class LanHttpClient(
             val responseBodyBytes = when {
                 statusCode in 100..199 || statusCode == 204 || statusCode == 304 -> ByteArray(0)
                 responseHeaders["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true ->
-                    readChunkedBody(input)
+                    readChunkedBody(input, maxResponseBytes)
                 responseHeaders.containsKey("content-length") -> {
                     val contentLength = responseHeaders["content-length"]
                         ?.toIntOrNull()
-                        ?.coerceIn(0, MAX_RESPONSE_BODY_BYTES) ?: 0
+                        ?.coerceIn(0, maxResponseBytes) ?: 0
                     readExactBytes(input, contentLength)
                 }
-                else -> readUntilEof(input)
+                else -> readUntilEof(input, maxResponseBytes)
             }
 
-            LanHttpResponse(
+            LanHttpBinaryResponse(
                 code = statusCode,
                 statusMessage = statusMessage,
                 headers = responseHeaders,
-                body = String(responseBodyBytes, Charsets.UTF_8)
+                bodyBytes = responseBodyBytes
             )
         }
     }
@@ -193,7 +242,7 @@ internal class LanHttpClient(
         return if (offset == length) out else out.copyOf(offset)
     }
 
-    private fun readChunkedBody(input: InputStream): ByteArray {
+    private fun readChunkedBody(input: InputStream, maxResponseBytes: Int): ByteArray {
         val out = ByteArrayOutputStream()
         while (true) {
             val sizeLine = readHeaderLine(input)?.trim() ?: break
@@ -206,7 +255,7 @@ internal class LanHttpClient(
                 }
                 break
             }
-            val cappedSize = chunkSize.coerceAtMost(MAX_RESPONSE_BODY_BYTES - out.size())
+            val cappedSize = chunkSize.coerceAtMost(maxResponseBytes - out.size())
             if (cappedSize > 0) {
                 val chunk = readExactBytes(input, cappedSize)
                 out.write(chunk)
@@ -219,12 +268,12 @@ internal class LanHttpClient(
         return out.toByteArray()
     }
 
-    private fun readUntilEof(input: InputStream): ByteArray {
+    private fun readUntilEof(input: InputStream, maxResponseBytes: Int): ByteArray {
         val out = ByteArrayOutputStream()
         val buf = ByteArray(4096)
-        while (out.size() < MAX_RESPONSE_BODY_BYTES) {
+        while (out.size() < maxResponseBytes) {
             val n = try {
-                input.read(buf, 0, minOf(buf.size, MAX_RESPONSE_BODY_BYTES - out.size()))
+                input.read(buf, 0, minOf(buf.size, maxResponseBytes - out.size()))
             } catch (timeout: java.net.SocketTimeoutException) {
                 if (out.size() > 0) break else throw timeout
             }

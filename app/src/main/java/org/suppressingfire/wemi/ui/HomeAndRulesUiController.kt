@@ -304,6 +304,32 @@ internal class HomeAndRulesUiController(
         }
     }
 
+    val hardwareRulesByDeviceId: StateFlow<Map<Int, org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot>> =
+        repository.hardwareRulesByDeviceId
+    val inspectingRuleDeviceIds: StateFlow<Set<Int>> = repository.inspectingRuleDeviceIds
+    val isScanningAllDeviceRules: StateFlow<Boolean> = repository.isScanningAllDeviceRules
+
+    fun inspectDeviceHardwareRules(device: DeviceEntity, forceRecheck: Boolean = false) {
+        scope.launch {
+            val snapshot = repository.inspectDeviceHardwareRules(device, forceRecheck)
+            onShowTransientStatus("${device.name}: ${snapshot.diagnosticMessage.ifBlank { snapshot.capability.displayLabel }}")
+        }
+    }
+
+    fun inspectAllHomeHardwareRules(forceRecheck: Boolean = false) {
+        val targetKey = _activeNetworkKey.value
+        scope.launch {
+            val results = repository.inspectAllHomeHardwareRules(targetKey, forceRecheck)
+            val supportedCount = results.count {
+                it.capability == org.suppressingfire.wemi.network.HardwareRulesCapability.VERIFIED_SUPPORTED
+            }
+            val totalRules = results.sumOf { snap -> snap.rules.count { it.appliesToInspectedSwitch } }
+            onShowTransientStatus(
+                "Scanned ${results.size} switch(es): $supportedCount on-device ready • $totalRules rule(s) read"
+            )
+        }
+    }
+
     fun deleteRule(rule: RuleEntity) {
         scope.launch {
             repository.deleteRule(rule.id)

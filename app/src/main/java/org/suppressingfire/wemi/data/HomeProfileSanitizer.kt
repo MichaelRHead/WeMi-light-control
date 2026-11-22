@@ -177,7 +177,9 @@ internal class HomeProfileSanitizer(
                 macAddress = discovered.macAddress,
                 udn = cleanDiscoveredUdn,
                 signalStrengthPercent = discovered.signalStrengthPercent,
-                sortOrder = nextSortOrder
+                sortOrder = nextSortOrder,
+                hardwareRulesCapability = discovered.rulesCapabilityHint.name,
+                hardwareRulesLongPressCapable = discovered.longPressCapableHint
             )
             val newId = dao.insertDevice(newEntity).toInt()
             syncHomeSubnetFromIp(activeNetworkKey, discovered.ipAddress)
@@ -190,6 +192,9 @@ internal class HomeProfileSanitizer(
                 discoveredRoomName = discovered.roomName,
                 isDemoMode = isDemoShowroomMode()
             )
+            val nextFw = discovered.firmwareVersion.ifBlank { existing.firmwareVersion }
+            val keepVerified = existing.parsedHardwareRulesCapability.isVerified &&
+                existing.hardwareRulesVerifiedFirmware.equals(nextFw.trim(), ignoreCase = true)
             val updated = existing.copy(
                 name = resolvedName,
                 roomName = resolvedRoom,
@@ -203,11 +208,14 @@ internal class HomeProfileSanitizer(
                 latencyMs = discovered.responseTimeMs.toInt().coerceAtLeast(1),
                 lastCheckedTime = checkedAt,
                 serialNumber = cleanDiscoveredSerial ?: existing.serialNumber,
-                firmwareVersion = discovered.firmwareVersion.ifBlank { existing.firmwareVersion },
+                firmwareVersion = nextFw,
                 hardwareModel = discovered.hardwareSku.ifBlank { existing.hardwareModel },
                 macAddress = discovered.macAddress.ifBlank { existing.macAddress },
                 udn = cleanDiscoveredUdn.ifBlank { LanRuntimeUtils.canonicalHardwareUdn(existing.udn) },
-                signalStrengthPercent = discovered.signalStrengthPercent
+                signalStrengthPercent = discovered.signalStrengthPercent,
+                hardwareRulesCapability = if (keepVerified) existing.hardwareRulesCapability else discovered.rulesCapabilityHint.name,
+                hardwareRulesLongPressCapable = if (keepVerified) existing.hardwareRulesLongPressCapable else discovered.longPressCapableHint,
+                hardwareRulesVerifiedFirmware = if (keepVerified) existing.hardwareRulesVerifiedFirmware else ""
             )
             dao.updateDevice(updated)
             syncHomeSubnetFromIp(activeNetworkKey, discovered.ipAddress)
@@ -441,48 +449,34 @@ internal class HomeProfileSanitizer(
     }
 
     fun mergeDiscoveredMetadata(
-        base: DeviceEntity,
-        discovered: SsdpDiscoveredDevice?,
-        ipAddress: String,
-        port: Int,
-        isOn: Boolean,
-        brightness: Int,
-        latencyMs: Int,
-        checkedAt: String,
-        demoMode: Boolean
+        base: DeviceEntity, discovered: SsdpDiscoveredDevice?, ipAddress: String, port: Int,
+        isOn: Boolean, brightness: Int, latencyMs: Int, checkedAt: String, demoMode: Boolean
     ): DeviceEntity {
         val resolvedName = base.name.ifBlank { discovered?.name.orEmpty() }
-        val resolvedRoom = resolveDeviceRoomAssignment(
-            existingRoomName = base.roomName,
-            deviceName = resolvedName,
-            discoveredRoomName = discovered?.roomName.orEmpty(),
-            isDemoMode = demoMode
-        )
-        val cleanSerial = discovered?.serialNumber
-            ?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
-            ?: base.serialNumber
-        val cleanSsid = discovered?.wifiSsid?.trim()
-            ?.takeIf { it.isNotEmpty() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it) }
-            ?: base.wifiSsid.takeUnless { XmlAndSkuParser.isWemoDeviceSetupSsid(it) }
-            ?: "Local LAN"
-        val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered?.usn)
-            .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(base.udn) }
+        val resolvedRoom = resolveDeviceRoomAssignment(base.roomName, resolvedName, discovered?.roomName.orEmpty(), demoMode)
+        val cleanSerial = discovered?.serialNumber?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: base.serialNumber
+        val cleanSsid = discovered?.wifiSsid?.trim()?.takeIf { it.isNotEmpty() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it) }
+            ?: base.wifiSsid.takeUnless { XmlAndSkuParser.isWemoDeviceSetupSsid(it) } ?: "Local LAN"
+        val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered?.usn).ifBlank { LanRuntimeUtils.canonicalHardwareUdn(base.udn) }
+        val nextFw = discovered?.firmwareVersion?.ifBlank { base.firmwareVersion } ?: base.firmwareVersion
+        val keepVerified = base.parsedHardwareRulesCapability.isVerified &&
+            base.hardwareRulesVerifiedFirmware.equals(nextFw.trim(), ignoreCase = true)
+        val nextCap = when {
+            keepVerified -> base.hardwareRulesCapability
+            discovered != null && discovered.rulesCapabilityHint != org.suppressingfire.wemi.network.HardwareRulesCapability.UNKNOWN ->
+                discovered.rulesCapabilityHint.name
+            else -> base.hardwareRulesCapability
+        }
+        val nextLp = if (keepVerified || discovered == null) base.hardwareRulesLongPressCapable else discovered.longPressCapableHint
         return base.copy(
-            name = resolvedName,
-            roomName = resolvedRoom,
-            ipAddress = ipAddress,
-            port = port,
-            isReachable = true,
-            isOn = isOn,
-            brightness = brightness,
-            latencyMs = latencyMs,
-            lastCheckedTime = checkedAt,
-            serialNumber = cleanSerial,
-            firmwareVersion = discovered?.firmwareVersion?.ifBlank { base.firmwareVersion } ?: base.firmwareVersion,
+            name = resolvedName, roomName = resolvedRoom, ipAddress = ipAddress, port = port,
+            isReachable = true, isOn = isOn, brightness = brightness, latencyMs = latencyMs,
+            lastCheckedTime = checkedAt, serialNumber = cleanSerial, firmwareVersion = nextFw,
             hardwareModel = discovered?.hardwareSku?.ifBlank { base.hardwareModel } ?: base.hardwareModel,
             macAddress = discovered?.macAddress?.ifBlank { base.macAddress } ?: base.macAddress,
-            udn = cleanUdn,
-            wifiSsid = cleanSsid
+            udn = cleanUdn, wifiSsid = cleanSsid, hardwareRulesCapability = nextCap,
+            hardwareRulesLongPressCapable = nextLp,
+            hardwareRulesVerifiedFirmware = if (keepVerified) base.hardwareRulesVerifiedFirmware else ""
         )
     }
 }

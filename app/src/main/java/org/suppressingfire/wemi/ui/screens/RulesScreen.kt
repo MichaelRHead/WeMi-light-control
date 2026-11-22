@@ -31,7 +31,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -40,7 +45,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.RuleEntity
+import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
+import org.suppressingfire.wemi.ui.components.HardwareRulesDeviceCard
+import org.suppressingfire.wemi.ui.components.HardwareRulesHeaderCard
+import org.suppressingfire.wemi.ui.components.buildUdnToFriendlyNameMap
 import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
@@ -57,8 +68,20 @@ fun RulesScreen(
     onRunRuleNow: (RuleEntity) -> Unit,
     onDeleteRule: (RuleEntity) -> Unit,
     onAddRuleClick: () -> Unit,
+    homeDevices: List<DeviceEntity> = emptyList(),
+    hardwareRulesByDeviceId: Map<Int, DeviceHardwareRulesSnapshot> = emptyMap(),
+    inspectingRuleDeviceIds: Set<Int> = emptySet(),
+    isScanningAllDeviceRules: Boolean = false,
+    onScanAllHardwareRules: () -> Unit = {},
+    onInspectDeviceHardwareRules: (DeviceEntity, Boolean) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
+    val controllableDevices = homeDevices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
+    val udnToName = buildUdnToFriendlyNameMap(homeDevices)
+    var showDeviceCards by rememberSaveable { mutableStateOf(false) }
+    val hasInspectedSnapshots = controllableDevices.any { it.id in hardwareRulesByDeviceId }
+    val expandHardwareDevices = showDeviceCards || hasInspectedSnapshots || isScanningAllDeviceRules
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -66,7 +89,66 @@ fun RulesScreen(
             .testTag("rules_list"),
         contentPadding = PaddingValues(bottom = 24.dp)
     ) {
-        item {
+        if (controllableDevices.isNotEmpty()) {
+            item(key = "hardware_rules_header") {
+                HardwareRulesHeaderCard(
+                    devices = controllableDevices,
+                    snapshotsByDeviceId = hardwareRulesByDeviceId,
+                    isScanningAll = isScanningAllDeviceRules,
+                    onScanAllClick = {
+                        showDeviceCards = true
+                        onScanAllHardwareRules()
+                    }
+                )
+            }
+            if (!expandHardwareDevices) {
+                item(key = "hardware_rules_expand_row") {
+                    Surface(color = WemoRowSurface, modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 2.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Inspect per-switch capability & stored rules",
+                                color = WemoTextSecondary,
+                                fontSize = 12.sp,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(
+                                onClick = { showDeviceCards = true },
+                                modifier = Modifier.testTag("toggle_hardware_rules_device_list_button")
+                            ) {
+                                Text(
+                                    text = "Show Switches (${controllableDevices.size})",
+                                    color = WemoGreenDark,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            }
+                        }
+                    }
+                    HorizontalDivider(thickness = 1.dp, color = WemoDividerGray)
+                }
+            } else {
+                items(controllableDevices, key = { "hw_rules_dev_${it.id}" }) { device ->
+                    HardwareRulesDeviceCard(
+                        device = device,
+                        snapshot = hardwareRulesByDeviceId[device.id],
+                        isInspecting = device.id in inspectingRuleDeviceIds,
+                        udnToName = udnToName,
+                        onReadDeviceRules = { forceRecheck ->
+                            onInspectDeviceHardwareRules(device, forceRecheck)
+                        }
+                    )
+                }
+            }
+        }
+
+        item(key = "local_app_rules_header") {
             Surface(
                 color = WemoRowSurface,
                 modifier = Modifier.fillMaxWidth()

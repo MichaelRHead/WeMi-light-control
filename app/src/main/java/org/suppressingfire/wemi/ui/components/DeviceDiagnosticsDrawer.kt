@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sensors
@@ -46,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
+import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
+import org.suppressingfire.wemi.network.HardwareRulesCapability
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
@@ -66,7 +69,11 @@ internal fun ExpandedDrawer(
     onEditDevice: () -> Unit,
     onToggleNightMode: (() -> Unit)? = null,
     onPinDeviceWidget: (() -> Unit)? = null,
-    isDemoShowroomMode: Boolean = false
+    isDemoShowroomMode: Boolean = false,
+    hardwareRulesSnapshot: DeviceHardwareRulesSnapshot? = null,
+    isInspectingHardwareRules: Boolean = false,
+    udnToFriendlyName: Map<String, String> = emptyMap(),
+    onInspectHardwareRules: (() -> Unit)? = null
 ) {
     val type = device.parsedType
     var sliderVal by remember(device.brightness) {
@@ -301,6 +308,109 @@ internal fun ExpandedDrawer(
                     },
                     shape = RoundedCornerShape(8.dp)
                 )
+            }
+        }
+
+        if (onInspectHardwareRules != null && type != DeviceType.MOTION_SENSOR) {
+            ExpandedDrawerHardwareRulesSection(
+                device = device,
+                snapshot = hardwareRulesSnapshot,
+                isInspecting = isInspectingHardwareRules,
+                udnToName = udnToFriendlyName,
+                onInspectHardwareRules = onInspectHardwareRules
+            )
+        }
+    }
+}
+
+/**
+ * Compact per-switch on-device rules readout inside [ExpandedDrawer] (placed below Dimmer
+ * Brightness and Connection Telemetry so Layout Invariant 4 stays intact).
+ */
+@Composable
+private fun ExpandedDrawerHardwareRulesSection(
+    device: DeviceEntity,
+    snapshot: DeviceHardwareRulesSnapshot?,
+    isInspecting: Boolean,
+    udnToName: Map<String, String>,
+    onInspectHardwareRules: () -> Unit
+) {
+    val cap = snapshot?.capability ?: device.parsedHardwareRulesCapability
+    val lp = snapshot?.longPressCapable ?: device.hardwareRulesLongPressCapable
+    val rules = snapshot?.rules?.filter { it.appliesToInspectedSwitch }.orEmpty()
+
+    Surface(
+        color = Color.White,
+        shape = RoundedCornerShape(10.dp),
+        border = BorderStroke(1.dp, WemoDividerGray),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 6.dp)
+            .testTag("hardware_rules_drawer_section_${device.id}")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    val statusLine = buildString {
+                        append("On-Device Rules: ${cap.displayLabel}")
+                        if (lp && cap.isSupportedOrLikely) append(" • Long Press")
+                    }
+                    Text(
+                        text = statusLine,
+                        color = if (cap.isSupportedOrLikely) WemoGreenDark else WemoTextPrimary,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp
+                    )
+                    val subtitle = when {
+                        snapshot != null && cap == HardwareRulesCapability.VERIFIED_SUPPORTED ->
+                            "${rules.size} rule(s) stored on switch (DB v${snapshot.dbVersion})"
+                        snapshot != null -> snapshot.diagnosticMessage
+                        else -> "Read stored schedules, auto-off delays & long-press targets"
+                    }
+                    Text(
+                        text = subtitle,
+                        color = WemoTextSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+                AssistChip(
+                    onClick = onInspectHardwareRules,
+                    enabled = !isInspecting && device.isReachable,
+                    label = { Text(if (isInspecting) "Reading..." else "Inspect Rules", fontSize = 11.sp) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Memory,
+                            contentDescription = "Inspect on-device rules for ${device.name}",
+                            modifier = Modifier.size(15.dp)
+                        )
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        leadingIconContentColor = WemoGreenDark,
+                        labelColor = WemoGreenDark
+                    ),
+                    modifier = Modifier.testTag("inspect_device_rules_${device.id}")
+                )
+            }
+            if (rules.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    rules.take(4).forEach { rule ->
+                        val (_, actionText) = rule.formatTriggerAndAction(udnToName)
+                        Text(
+                            text = "• ${rule.name} (${rule.type.displayLabel}): $actionText",
+                            color = WemoTextPrimary,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
             }
         }
     }

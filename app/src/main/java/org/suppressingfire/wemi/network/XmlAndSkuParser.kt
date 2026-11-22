@@ -16,6 +16,8 @@ object XmlAndSkuParser {
     const val URN_BASIC_EVENT = "urn:Belkin:service:basicevent:1"
     const val URN_META_INFO = "urn:Belkin:service:metainfo:1"
     const val URN_WIFI_SETUP = "urn:Belkin:service:WiFiSetup:1"
+    const val URN_RULES = "urn:Belkin:service:rules:1"
+    const val URN_TIMESYNC = "urn:Belkin:service:timesync:1"
 
     private val BINARY_STATE_REGEX = Regex("<BinaryState>([^<]+)</BinaryState>", RegexOption.IGNORE_CASE)
     private val BRIGHTNESS_REGEX = Regex("<Brightness>(\\d+)</Brightness>", RegexOption.IGNORE_CASE)
@@ -28,6 +30,9 @@ object XmlAndSkuParser {
     private val MAC_ADDRESS_REGEX = Regex("<macAddress>([^<]+)</macAddress>", RegexOption.IGNORE_CASE)
     private val UDN_REGEX = Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
     private val RTOS_REGEX = Regex("<rtos>\\s*1\\s*</rtos>", RegexOption.IGNORE_CASE)
+    private val SERVICE_BLOCK_REGEX = Regex("<service>([\\s\\S]*?)</service>", RegexOption.IGNORE_CASE)
+    private val CONTROL_URL_REGEX = Regex("<controlURL>([^<]+)</controlURL>", RegexOption.IGNORE_CASE)
+    private val SCPD_URL_REGEX = Regex("<SCPDURL>([^<]+)</SCPDURL>", RegexOption.IGNORE_CASE)
     private val HOST_PORT_REGEX = Regex("http://([^:/]+):(\\d+)")
     private val META_INFO_REGEX = Regex("<MetaInfo>([^<]+)</MetaInfo>", RegexOption.IGNORE_CASE)
     private val SIGNAL_STRENGTH_REGEX = Regex("<SignalStrength>([^<]+)</SignalStrength>", RegexOption.IGNORE_CASE)
@@ -254,6 +259,13 @@ object XmlAndSkuParser {
         val parsedBinary = parseBinaryStatePayload(xml)
         val parsedIsOn = parsedBinary.binaryOn ?: true
         val parsedBrightness = parsedBinary.brightness?.coerceIn(1, 100) ?: 100
+        val rulesHint = inferRulesCapabilityFromSetupXml(
+            xml = xml,
+            locationUrl = locationUrl,
+            udn = udn,
+            firmwareVersion = firmware,
+            isRtosTag = isRtos
+        )
 
         return SsdpDiscoveredDevice(
             name = friendlyName,
@@ -271,7 +283,76 @@ object XmlAndSkuParser {
             brightness = parsedBrightness,
             isLiveUdpResponse = isLiveUdp,
             hardwareSku = sku,
-            macAddress = macAddress
+            macAddress = macAddress,
+            rulesCapabilityHint = rulesHint.capability,
+            longPressCapableHint = rulesHint.longPressCapable
+        )
+    }
+
+    /**
+     * Tier-1 zero-RTT on-device rules capability inference directly from `/setup.xml` (no extra
+     * HTTP requests during SSDP/unicast scans).
+     *
+     * Note: Some later OpenWrt builds (`PVT-OWRT-SNS` `2.00.11851`) emit `<rtos>1</rtos>` while
+     * still running the full OpenWrt `rules.db` engine, whereas true RTOS units (`WDS060`
+     * `PVT-RTOS-DimmerV2`, `WSP080` `PVT-RTOS-SNSV4`, `WSP090` `PVT-RTOS-OutdoorV1`) omit
+     * `FetchRules` from `/rulesservice.xml`. Authoritative confirmation is deferred lazily to
+     * Tier 2 (`HardwareRulesClient.probeRulesCapability`).
+     */
+    fun inferRulesCapabilityFromSetupXml(
+        xml: String,
+        locationUrl: String,
+        udn: String,
+        firmwareVersion: String,
+        isRtosTag: Boolean = RTOS_REGEX.containsMatchIn(xml)
+    ): SetupXmlRulesHint {
+        val hasServiceList = xml.contains("<serviceList", ignoreCase = true)
+        var hasRulesService = false
+        var hasTimeSyncService = false
+        var rulesControlUrl = "/upnp/control/rules1"
+        var rulesScpdUrl = "/rulesservice.xml"
+        for (serviceMatch in SERVICE_BLOCK_REGEX.findAll(xml)) {
+            val block = serviceMatch.groupValues[1]
+            if (block.contains(URN_RULES, ignoreCase = true)) {
+                hasRulesService = true
+                CONTROL_URL_REGEX.find(block)?.groupValues?.getOrNull(1)?.trim()
+                    ?.takeIf { it.isNotEmpty() }?.let { rulesControlUrl = it }
+                SCPD_URL_REGEX.find(block)?.groupValues?.getOrNull(1)?.trim()
+                    ?.takeIf { it.isNotEmpty() }?.let { rulesScpdUrl = it }
+            } else if (block.contains(URN_TIMESYNC, ignoreCase = true)) {
+                hasTimeSyncService = true
+            }
+        }
+        val fwLower = firmwareVersion.lowercase(Locale.US)
+        val isExplicitOpenWrt = fwLower.contains("owrt")
+        val isExplicitRtos = fwLower.contains("-rtos-") ||
+            udn.contains("Dimmer-2_0", ignoreCase = true) ||
+            udn.contains("OutdoorPlug", ignoreCase = true) ||
+            (isRtosTag && !isExplicitOpenWrt)
+
+        val capability = when {
+            isExplicitRtos -> HardwareRulesCapability.LIKELY_UNSUPPORTED
+            hasServiceList && !hasRulesService -> HardwareRulesCapability.LIKELY_UNSUPPORTED
+            hasRulesService || isExplicitOpenWrt -> HardwareRulesCapability.LIKELY_SUPPORTED
+            else -> HardwareRulesCapability.UNKNOWN
+        }
+        val isLongPressModel = (
+            udn.startsWith("uuid:Lightswitch-1_0", ignoreCase = true) &&
+                !locationUrl.endsWith("/Lightsetup.xml", ignoreCase = true)
+            ) ||
+            udn.startsWith("uuid:Lightswitch-2_0", ignoreCase = true) ||
+            udn.startsWith("uuid:Lightswitch-3_0", ignoreCase = true) ||
+            udn.startsWith("uuid:Dimmer-1_0", ignoreCase = true)
+        val longPressCapable = isLongPressModel &&
+            capability != HardwareRulesCapability.LIKELY_UNSUPPORTED
+
+        return SetupXmlRulesHint(
+            capability = capability,
+            longPressCapable = longPressCapable,
+            hasRulesService = hasRulesService,
+            hasTimeSyncService = hasTimeSyncService,
+            rulesControlUrl = rulesControlUrl,
+            rulesScpdUrl = rulesScpdUrl
         )
     }
 

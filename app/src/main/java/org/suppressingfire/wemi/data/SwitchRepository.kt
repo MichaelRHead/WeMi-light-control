@@ -21,8 +21,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
 import org.suppressingfire.wemi.network.GenaEventNotification
 import org.suppressingfire.wemi.network.GenaSubscriptionManager
+import org.suppressingfire.wemi.network.HardwareRulesClient
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkClient
 import org.suppressingfire.wemi.network.NetworkMonitor
@@ -47,23 +49,20 @@ data class HomeReconnectSummary(
 /**
  * Primary data and domain repository for WeMi Light Control.
  *
- * Responsibilities kept cohesive here:
- * - RTOS-safe LAN concurrency limiting (`Semaphore(3)`) and per-device `Mutex` serialization
- *   using canonical [DeviceEntity.concurrencyKey]
- * - Unified optimistic SOAP command pipeline ([executeOptimisticDeviceCommand]) with 2-stage
- *   self-healing reconnect and offline rollback
- *
- * Delegates SSDP discovery & startup probing to [DiscoveryCoordinator], UPnP GENA push handling &
- * concurrent health polling to [GenaAndHealthPollingCoordinator], `10.22.22.1` Setup AP
- * provisioning to [ProvisioningCoordinator], Room/rule CRUD & manual-IP enrichment to
- * [DeviceCrudAndRulesCoordinator], and showcase presets to [DemoFixtures].
+ * Keeps RTOS-safe `Semaphore(3)` concurrency, per-device `Mutex` serialization, and unified
+ * optimistic SOAP execution here while delegating discovery, GENA/health polling, provisioning,
+ * hardware rules inspection ([HardwareRulesCoordinator]), and CRUD to focused coordinators.
  */
 class SwitchRepository(
     private val dao: SwitchDao,
     private val context: Context? = null,
     private val networkClient: NetworkClient = NetworkClient(context),
     private val provisionerClient: ProvisionerClient = ProvisionerClient(context),
-    initialDemoModeOverride: Boolean? = null
+    initialDemoModeOverride: Boolean? = null,
+    private val hardwareRulesClient: HardwareRulesClient = HardwareRulesClient(
+        appContext = context,
+        portProber = { ip, port, expected -> networkClient.probeWemoPort(ip, port, expected) }
+    )
 ) {
     private val repoScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val prefs = context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -76,11 +75,6 @@ class SwitchRepository(
 
     private val initialSeedDone = MutableStateFlow(false)
     private val seedAndModeMutex = Mutex()
-
-    /**
-     * Limits concurrent HTTP/SOAP connections across the LAN to 3 so 2nd-Gen RTOS switches
-     * (`WLS040` / `WLS0403` / `WDS060`) never suffer lwIP socket starvation.
-     */
     private val lanSemaphore = Semaphore(3)
     private val deviceMutexes = ConcurrentHashMap<String, Mutex>()
     private val lastSetStateTimestampMs = ConcurrentHashMap<Int, Long>()
@@ -95,62 +89,44 @@ class SwitchRepository(
         _soapLogs.update { (listOf(entry) + it).take(50) }
     }
 
-    private fun nowFormatted(): String =
-        SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
+    private fun nowFormatted(): String = SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
 
     private fun mutexFor(device: DeviceEntity): Mutex =
         deviceMutexes.getOrPut(device.concurrencyKey()) { Mutex() }
 
     private val discoveryCoordinator = DiscoveryCoordinator(
-        dao = dao,
-        networkClient = networkClient,
-        lanSemaphore = lanSemaphore,
-        deviceMutexes = deviceMutexes,
-        lastSetStateTimestampMs = lastSetStateTimestampMs,
-        isDemoShowroomMode = { _isDemoShowroomMode.value },
-        onSsdpReport = { _latestSsdpReport.value = it },
-        appendLog = ::appendLog,
-        nowFormatted = ::nowFormatted
+        dao, networkClient, lanSemaphore, deviceMutexes, lastSetStateTimestampMs,
+        { _isDemoShowroomMode.value }, { _latestSsdpReport.value = it }, ::appendLog, ::nowFormatted
     )
 
     private val provisioningCoordinator = ProvisioningCoordinator(
-        dao = dao,
-        provisionerClient = provisionerClient,
-        detectCurrentLanIp = ::detectCurrentLanIp,
-        isDemoShowroomMode = { _isDemoShowroomMode.value },
-        appendLog = ::appendLog,
-        nowFormatted = ::nowFormatted
+        dao, provisionerClient, ::detectCurrentLanIp, { _isDemoShowroomMode.value }, ::appendLog, ::nowFormatted
     )
 
     private val crudCoordinator = DeviceCrudAndRulesCoordinator(
-        dao = dao, networkClient = networkClient, lanSemaphore = lanSemaphore,
-        deviceMutexes = deviceMutexes, isDemoShowroomMode = { _isDemoShowroomMode.value },
-        appendLog = ::appendLog, nowFormatted = ::nowFormatted,
-        setDevicePowerExplicit = ::setDevicePowerExplicit, updateDeviceBrightness = ::updateDeviceBrightness
+        dao, networkClient, lanSemaphore, deviceMutexes, { _isDemoShowroomMode.value },
+        ::appendLog, ::nowFormatted, ::setDevicePowerExplicit, ::updateDeviceBrightness
     )
 
-    /**
-     * Embedded UPnP GENA event manager for `<100ms` physical wall-switch push notifications.
-     */
+    private val hardwareRulesCoordinator = HardwareRulesCoordinator(
+        dao, hardwareRulesClient, lanSemaphore, deviceMutexes,
+        { _isDemoShowroomMode.value }, ::appendLog, ::nowFormatted
+    )
+    val hardwareRulesByDeviceId: StateFlow<Map<Int, DeviceHardwareRulesSnapshot>> =
+        hardwareRulesCoordinator.hardwareRulesByDeviceId
+    val inspectingRuleDeviceIds: StateFlow<Set<Int>> = hardwareRulesCoordinator.inspectingDeviceIds
+    val isScanningAllDeviceRules: StateFlow<Boolean> = hardwareRulesCoordinator.isScanningAll
+
+    /** Embedded UPnP GENA event manager for `<100ms` physical wall-switch push notifications. */
     val genaManager: GenaSubscriptionManager = GenaSubscriptionManager(
         localIpProvider = { detectCurrentLanIp() },
         wifiSocketFactory = NetworkMonitor.createWifiBoundSocketFactory(context),
-        onNotification = { notification ->
-            repoScope.launch { handleGenaNotification(notification) }
-        }
+        onNotification = { notification -> repoScope.launch { handleGenaNotification(notification) } }
     )
 
     private val genaPollingCoordinator: GenaAndHealthPollingCoordinator = GenaAndHealthPollingCoordinator(
-        dao = dao,
-        networkClient = networkClient,
-        genaManager = genaManager,
-        lanSemaphore = lanSemaphore,
-        deviceMutexes = deviceMutexes,
-        lastSetStateTimestampMs = lastSetStateTimestampMs,
-        isDemoShowroomMode = { _isDemoShowroomMode.value },
-        attemptTwoStageReconnect = discoveryCoordinator::attemptTwoStageReconnect,
-        appendLog = ::appendLog,
-        nowFormatted = ::nowFormatted
+        dao, networkClient, genaManager, lanSemaphore, deviceMutexes, lastSetStateTimestampMs,
+        { _isDemoShowroomMode.value }, discoveryCoordinator::attemptTwoStageReconnect, ::appendLog, ::nowFormatted
     )
 
     val allDevices: Flow<List<DeviceEntity>> =
@@ -188,6 +164,7 @@ class SwitchRepository(
         lastSetStateTimestampMs.clear()
         deviceMutexes.clear()
         _latestSsdpReport.value = null
+        hardwareRulesCoordinator.clearRuntimeState()
     }
 
     suspend fun setDemoShowroomMode(
@@ -454,21 +431,31 @@ class SwitchRepository(
         val existing = dao.getDeviceById(id)
         crudCoordinator.deleteDevice(id)
         lastSetStateTimestampMs.remove(id)
+        hardwareRulesCoordinator.evictDevice(id)
         if (existing != null) {
             deviceMutexes.remove(existing.concurrencyKey())
             if (!_isDemoShowroomMode.value) genaManager.unsubscribeDevice(existing)
         }
     }
 
+    suspend fun inspectDeviceHardwareRules(
+        device: DeviceEntity,
+        forceRecheck: Boolean = false
+    ): DeviceHardwareRulesSnapshot =
+        awaitDemoSeedIfPending().let { hardwareRulesCoordinator.inspectDeviceHardwareRules(device, forceRecheck) }
+
+    suspend fun inspectAllHomeHardwareRules(
+        networkKey: String,
+        forceRecheck: Boolean = false
+    ): List<DeviceHardwareRulesSnapshot> =
+        awaitDemoSeedIfPending().let { hardwareRulesCoordinator.inspectAllHomeHardwareRules(networkKey, forceRecheck) }
+
     suspend fun moveDeviceOrder(device: DeviceEntity, moveUp: Boolean, withinRoomOnly: Boolean = false) =
         awaitDemoSeedIfPending().let { crudCoordinator.moveDeviceOrder(device, moveUp, withinRoomOnly) }
 
     suspend fun toggleRule(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.toggleRule(rule) }
-
     suspend fun runRuleNow(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.runRuleNow(rule) }
-
     suspend fun addRule(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.addRule(rule) }
-
     suspend fun deleteRule(id: Int) = awaitDemoSeedIfPending().let { crudCoordinator.deleteRule(id) }
 
     fun clearLogs() {

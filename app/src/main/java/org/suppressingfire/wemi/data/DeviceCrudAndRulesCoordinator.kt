@@ -267,6 +267,20 @@ internal class DeviceCrudAndRulesCoordinator(
                 val cleanBaseSsid = baseEntity.wifiSsid.trim().takeIf {
                     it.isNotEmpty() && !org.suppressingfire.wemi.network.XmlAndSkuParser.isWemoDeviceSetupSsid(it)
                 }
+                val nextFirmware = liveDesc.firmwareVersion.ifBlank { baseEntity.firmwareVersion }
+                val keepVerifiedRulesCap = baseEntity.parsedHardwareRulesCapability.isVerified &&
+                    baseEntity.hardwareRulesVerifiedFirmware.isNotBlank() &&
+                    baseEntity.hardwareRulesVerifiedFirmware.equals(nextFirmware.trim(), ignoreCase = true)
+                val nextRulesCap = if (keepVerifiedRulesCap) {
+                    baseEntity.hardwareRulesCapability
+                } else {
+                    liveDesc.rulesCapabilityHint.name
+                }
+                val nextLongPress = if (keepVerifiedRulesCap) {
+                    baseEntity.hardwareRulesLongPressCapable
+                } else {
+                    liveDesc.longPressCapableHint
+                }
                 baseEntity.copy(
                     name = resolvedName,
                     roomName = resolvedRoom,
@@ -282,7 +296,7 @@ internal class DeviceCrudAndRulesCoordinator(
                     serialNumber = liveDesc.serialNumber
                         .takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }
                         ?: baseEntity.serialNumber.takeUnless { !demoMode && LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
-                    firmwareVersion = liveDesc.firmwareVersion.ifBlank { baseEntity.firmwareVersion },
+                    firmwareVersion = nextFirmware,
                     hardwareModel = liveDesc.hardwareSku.ifBlank { baseEntity.hardwareModel },
                     macAddress = liveDesc.macAddress.ifBlank { baseEntity.macAddress },
                     udn = LanRuntimeUtils.canonicalHardwareUdn(liveDesc.usn)
@@ -293,7 +307,10 @@ internal class DeviceCrudAndRulesCoordinator(
                         baseEntity.autoOffMinutes
                     } else {
                         device.autoOffMinutes
-                    }
+                    },
+                    hardwareRulesCapability = nextRulesCap,
+                    hardwareRulesLongPressCapable = nextLongPress,
+                    hardwareRulesVerifiedFirmware = if (keepVerifiedRulesCap) baseEntity.hardwareRulesVerifiedFirmware else ""
                 )
             } else {
                 val fallbackName = device.name.trim().ifBlank { liveRow?.name?.ifBlank { null } ?: "WeMi Light Switch" }

@@ -151,6 +151,9 @@ class SwitchViewModel internal constructor(
     val isReconnectingHome: StateFlow<Boolean> = homeAndRulesController.isReconnectingHome
     val showAddHomeDialog: StateFlow<Boolean> = homeAndRulesController.showAddHomeDialog
     val showAddRuleDialog: StateFlow<Boolean> = homeAndRulesController.showAddRuleDialog
+    val hardwareRulesByDeviceId = homeAndRulesController.hardwareRulesByDeviceId
+    val inspectingRuleDeviceIds = homeAndRulesController.inspectingRuleDeviceIds
+    val isScanningAllDeviceRules = homeAndRulesController.isScanningAllDeviceRules
 
     private val deviceActionsController = DeviceActionsUiController(
         scope = viewModelScope,
@@ -391,28 +394,24 @@ class SwitchViewModel internal constructor(
     fun turnAllSwitches(turnOn: Boolean) = deviceActionsController.turnAllSwitches(turnOn)
 
     fun toggleRule(rule: RuleEntity) = homeAndRulesController.toggleRule(rule)
-
     fun runRuleNow(rule: RuleEntity) = homeAndRulesController.runRuleNow(rule)
-
     fun openAddRuleDialog() = homeAndRulesController.openAddRuleDialog()
-
     fun closeAddRuleDialog() = homeAndRulesController.closeAddRuleDialog()
 
     fun addRule(
-        name: String,
-        ruleType: String,
-        targetDevice: DeviceEntity,
-        triggerSummary: String,
-        targetStateOn: Boolean,
-        targetBrightness: Int
-    ) = homeAndRulesController.addRule(
-        name, ruleType, targetDevice, triggerSummary, targetStateOn, targetBrightness
-    )
+        name: String, ruleType: String, targetDevice: DeviceEntity,
+        triggerSummary: String, targetStateOn: Boolean, targetBrightness: Int
+    ) = homeAndRulesController.addRule(name, ruleType, targetDevice, triggerSummary, targetStateOn, targetBrightness)
 
     fun deleteRule(rule: RuleEntity) = homeAndRulesController.deleteRule(rule)
 
-    fun toggleDimmerNightMode(device: DeviceEntity) =
-        deviceActionsController.toggleDimmerNightMode(device)
+    fun inspectDeviceHardwareRules(device: DeviceEntity, forceRecheck: Boolean = false) =
+        homeAndRulesController.inspectDeviceHardwareRules(device, forceRecheck)
+
+    fun inspectAllHomeHardwareRules(forceRecheck: Boolean = false) =
+        homeAndRulesController.inspectAllHomeHardwareRules(forceRecheck)
+
+    fun toggleDimmerNightMode(device: DeviceEntity) = deviceActionsController.toggleDimmerNightMode(device)
 
     fun openProvisionApDialog() = provisionApUiController.openProvisionApDialog()
 

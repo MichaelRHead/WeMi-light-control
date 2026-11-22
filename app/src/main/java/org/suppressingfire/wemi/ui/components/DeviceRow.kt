@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
+import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
 import org.suppressingfire.wemi.ui.theme.WemoErrorRed
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
@@ -120,6 +121,10 @@ fun DeviceRow(
     onPinDeviceWidget: (() -> Unit)? = null,
     isDemoShowroomMode: Boolean = false,
     autoOffRemainingSeconds: Int? = null,
+    hardwareRulesSnapshot: DeviceHardwareRulesSnapshot? = null,
+    isInspectingHardwareRules: Boolean = false,
+    udnToFriendlyName: Map<String, String> = emptyMap(),
+    onInspectHardwareRules: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val type = device.parsedType
@@ -409,7 +414,11 @@ fun DeviceRow(
                         onEditDevice = onEditDevice,
                         onToggleNightMode = onToggleNightMode,
                         onPinDeviceWidget = onPinDeviceWidget,
-                        isDemoShowroomMode = isDemoShowroomMode
+                        isDemoShowroomMode = isDemoShowroomMode,
+                        hardwareRulesSnapshot = hardwareRulesSnapshot,
+                        isInspectingHardwareRules = isInspectingHardwareRules,
+                        udnToFriendlyName = udnToFriendlyName,
+                        onInspectHardwareRules = onInspectHardwareRules
                     )
                 }
             }

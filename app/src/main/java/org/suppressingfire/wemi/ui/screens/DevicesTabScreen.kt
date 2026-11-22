@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.data.DeviceCategory
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.HomeNetworkEntity
+import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
 import org.suppressingfire.wemi.network.LanNetworkSnapshot
 import org.suppressingfire.wemi.network.SsdpScanReport
 import org.suppressingfire.wemi.ui.components.DeviceCategoryIllustration
@@ -46,6 +47,7 @@ import org.suppressingfire.wemi.ui.components.RoomFilterBar
 import org.suppressingfire.wemi.ui.components.RoomGroupHeaderCard
 import org.suppressingfire.wemi.ui.components.SsdpDiscoveryBanner
 import org.suppressingfire.wemi.ui.components.WifiHomeBar
+import org.suppressingfire.wemi.ui.components.buildUdnToFriendlyNameMap
 import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
@@ -79,7 +81,9 @@ data class DevicesTabUiState(
     val togglingDeviceIds: Set<Int>,
     val isEditMode: Boolean,
     val isDemoShowroomMode: Boolean = false,
-    val activeAutoOffCountdownsSec: Map<Int, Int>
+    val activeAutoOffCountdownsSec: Map<Int, Int>,
+    val hardwareRulesByDeviceId: Map<Int, DeviceHardwareRulesSnapshot> = emptyMap(),
+    val inspectingRuleDeviceIds: Set<Int> = emptySet()
 )
 
 /**
@@ -109,7 +113,8 @@ data class DevicesTabActions(
     val onPingDeviceLatency: (DeviceEntity) -> Unit,
     val onToggleNightMode: (DeviceEntity) -> Unit,
     val onPinRoomWidget: ((String) -> Unit)? = null,
-    val onPinDeviceWidget: ((DeviceEntity) -> Unit)? = null
+    val onPinDeviceWidget: ((DeviceEntity) -> Unit)? = null,
+    val onInspectDeviceHardwareRules: ((DeviceEntity) -> Unit)? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -271,6 +276,7 @@ private fun BoundDeviceRow(
     actions: DevicesTabActions,
     modifier: Modifier = Modifier
 ) {
+    val udnToName = buildUdnToFriendlyNameMap(state.homeDevices)
     DeviceRow(
         device = device,
         isExpanded = device.id in state.expandedDeviceIds,
@@ -290,6 +296,10 @@ private fun BoundDeviceRow(
         onPinDeviceWidget = actions.onPinDeviceWidget?.let { pin -> { pin(device) } },
         isDemoShowroomMode = state.isDemoShowroomMode,
         autoOffRemainingSeconds = state.activeAutoOffCountdownsSec[device.id],
+        hardwareRulesSnapshot = state.hardwareRulesByDeviceId[device.id],
+        isInspectingHardwareRules = device.id in state.inspectingRuleDeviceIds,
+        udnToFriendlyName = udnToName,
+        onInspectHardwareRules = actions.onInspectDeviceHardwareRules?.let { inspect -> { inspect(device) } },
         modifier = modifier
     )
 }
