@@ -65,6 +65,7 @@ class TelemetryDiagnosticsTest {
 
     @After
     fun tearDown() {
+        WeMiSwitchWidgetProvider.cancelAndJoinPendingWorkForTests()
         WeMiSwitchWidgetProvider.actionRunnerForTests = null
         WeMiSwitchWidgetProvider.repositoryProviderForTests = null
         WeMiSwitchWidgetProvider.broadcastTimeoutMs = 8_500L

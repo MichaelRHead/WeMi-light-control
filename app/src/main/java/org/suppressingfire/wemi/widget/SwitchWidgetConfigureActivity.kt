@@ -85,10 +85,6 @@ class SwitchWidgetConfigureActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.light(AndroidColor.WHITE, AndroidColor.LTGRAY)
-        )
 
         // Default to RESULT_CANCELED if the user backs out without picking a target
         setResult(RESULT_CANCELED)
@@ -102,6 +98,11 @@ class SwitchWidgetConfigureActivity : ComponentActivity() {
             finish()
             return
         }
+
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(AndroidColor.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(AndroidColor.WHITE, AndroidColor.LTGRAY)
+        )
 
         val existingConfig = WidgetConfigStore.load(this, appWidgetId)
 

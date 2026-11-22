@@ -83,6 +83,7 @@ class HomeScreenWidgetUiE2ETest {
     }
 
     private fun resetWidgetAndPrefsState() {
+        WeMiSwitchWidgetProvider.cancelAndJoinPendingWorkForTests()
         WeMiSwitchWidgetProvider.actionRunnerForTests = null
         WeMiSwitchWidgetProvider.repositoryProviderForTests = null
         context.getSharedPreferences("wemi_controller_prefs", Context.MODE_PRIVATE).edit().clear().commit()
@@ -389,7 +390,7 @@ class HomeScreenWidgetUiE2ETest {
         val invalidController = Robolectric.buildActivity(
             SwitchWidgetConfigureActivity::class.java,
             configureIntent(-3)
-        ).setup()
+        ).create()
         assertTrue(invalidController.get().isFinishing)
         assertEquals(Activity.RESULT_CANCELED, Shadows.shadowOf(invalidController.get()).resultCode)
         invalidController.destroy()

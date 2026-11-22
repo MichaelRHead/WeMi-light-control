@@ -120,16 +120,25 @@ class ExampleRobolectricTest {
 
         // Switch to the remembered Lake Cabin Wi-Fi network ("PineLake-Cabin-WiFi") and verify remembered switches load & reconnect
         composeTestRule.onNodeWithTag("home_chip_wifi_cabin_192_168_50").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("devices_list")
-            .performScrollToNode(hasText("Cabin Porch Floodlight"))
-        composeTestRule.onNodeWithText("Cabin Porch Floodlight").assertIsDisplayed()
+        composeTestRule.awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("devices_list")
+                    .performScrollToNode(hasText("Cabin Porch Floodlight"))
+                composeTestRule.onNodeWithText("Cabin Porch Floodlight").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
 
         // Switch back to Main Home Wi-Fi network ("WeMi-Home-5G") and trigger one-tap Reconnect
         composeTestRule.onNodeWithTag("devices_list")
             .performScrollToNode(hasTestTag("wifi_home_selector_bar"))
         composeTestRule.onNodeWithTag("home_chip_wifi_home_192_168_1").performClick()
-        composeTestRule.waitForIdle()
+        composeTestRule.awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("reconnect_home_wifi_button").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
         composeTestRule.onNodeWithTag("reconnect_home_wifi_button").performClick()
         composeTestRule.waitForIdle()
 
@@ -266,12 +275,16 @@ class ExampleRobolectricTest {
             .assertIsDisplayed()
 
         composeTestRule.onNodeWithTag("confirm_provision_ap_button").performClick()
-        composeTestRule.waitForIdle()
 
-        // Verify the newly provisioned switch is added to the device list
-        composeTestRule.onNodeWithTag("devices_list")
-            .performScrollToNode(hasText("Porch Christmas Tree"))
-        composeTestRule.onNodeWithText("Porch Christmas Tree").assertIsDisplayed()
+        // Verify the newly provisioned switch is added to the device list after async Room commit
+        composeTestRule.awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("devices_list")
+                    .performScrollToNode(hasText("Porch Christmas Tree"))
+                composeTestRule.onNodeWithText("Porch Christmas Tree").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
     }
 
     @Test
@@ -285,10 +298,14 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithTag("wifi_home_ssid_input").performTextReplacement("Beach-WiFi-2.4G")
         composeTestRule.onNodeWithTag("wifi_home_subnet_input").performTextReplacement("192.168.88")
         composeTestRule.onNodeWithTag("save_wifi_home_button").performClick()
-        composeTestRule.waitForIdle()
 
-        // SSDP discovery banner appears automatically on an empty home
-        composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
+        // SSDP discovery banner appears automatically once Room switches to the new empty home
+        composeTestRule.awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
 
         // Verify the EmptyDevicesState onboarding card and its 3 real-LAN setup actions (no classic restore button)
         composeTestRule.onNodeWithTag("devices_list")
@@ -310,11 +327,15 @@ class ExampleRobolectricTest {
             .performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertDoesNotExist()
-        composeTestRule.onNodeWithTag("devices_list")
-            .performScrollToNode(hasText("Christmas Tree Living"))
-        composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()
+        composeTestRule.awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("ssdp_discovery_banner").assertDoesNotExist()
+                composeTestRule.onNodeWithTag("devices_list")
+                    .performScrollToNode(hasText("Christmas Tree Living"))
+                composeTestRule.onNodeWithText("Christmas Tree Living").assertIsDisplayed()
+                true
+            }.getOrDefault(false)
+        }
     }
 
     @Test

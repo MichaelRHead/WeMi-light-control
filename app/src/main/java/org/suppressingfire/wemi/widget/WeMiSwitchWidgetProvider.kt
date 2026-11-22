@@ -9,8 +9,11 @@ import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SwitchRepository
@@ -168,5 +171,13 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
 
         @Volatile
         internal var repositoryProviderForTests: ((Context) -> SwitchRepository)? = null
+
+        internal fun cancelAndJoinPendingWorkForTests() {
+            val pendingJobs = widgetScope.coroutineContext[Job]?.children?.toList().orEmpty()
+            if (pendingJobs.isEmpty()) return
+            runBlocking {
+                pendingJobs.forEach { it.cancelAndJoin() }
+            }
+        }
     }
 }
