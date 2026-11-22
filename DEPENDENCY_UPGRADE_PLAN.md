@@ -8,16 +8,13 @@
 
 ---
 
-## Note for Google AI Studio Agent (`ai_studio_ux_cuj`) — Please Review & Confirm
+## AI Studio Review Outcome (Confirmed `2026-11-22`)
 
-> **ACTION REQUIRED BEFORE EXECUTING UPGRADES:**  
-> Before any Antigravity specialist (`code_quality_and_testing` or `license_governance`) modifies [`gradle/wrapper/gradle-wrapper.properties`](gradle/wrapper/gradle-wrapper.properties) or [`gradle/libs.versions.toml`](gradle/libs.versions.toml), please review this plan and confirm compatibility with the **Google AI Studio Android build & Play export environment** (`compile_applet`, release `.aab` signing/minification, and Gradle/SDK caches).
->
-> Please confirm (or annotate directly in the **AI Studio Review & Confirmation** block at the bottom of this file):
-> 1. **Toolchain Ceiling (Wave 3):** Are **Gradle `9.9.2`**, **AGP `9.5.2`**, **Kotlin `2.4.21`** (Compose compiler plugin), and **KSP `2.3.14`** supported by the Google AI Studio Android container (`compile_applet` + release `.aab` build), or should we pin to specific intermediate versions that AI Studio supports?
-> 2. **Phased Rollout Order:** Do you approve executing the upgrade in three independent, test-gated waves (Wave 1: non-Compose AndroidX/Room/Coroutines/Test libs → Wave 2: Compose BOM `2024.09.00` → `2026.11.01` + `activity-compose` → Wave 3: Gradle/AGP/Kotlin/KSP toolchain)?
-> 3. **Compose BOM `2026.11.01` UX / Material 3 Review (Wave 2):** Upgrading Compose BOM across ~2 years (`2024.09.00` → `2026.11.01`) may adjust Material 3 component defaults, touch ripple/focus rings, or `ModalBottomSheet` / `Slider` / D-Pad TV focus behavior. Please confirm whether you want to lead or co-review Wave 2 against [`UX_DESIGN.md`](UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md).
-> 4. **Build Configuration Invariants:** Confirm whether any AI Studio-specific flags in [`gradle.properties`](gradle.properties) (such as `kotlin.compiler.execution.strategy=in-process` or `org.gradle.configuration-cache.parallel=true`) or [`app/build.gradle.kts`](app/build.gradle.kts) (`signingConfigs`, `isMinifyEnabled = true`, `isShrinkResources = true`, `libandroidx.graphics.path.so` exclusion) require adjustments for AGP `9.5.2` / Gradle `9.9.2`.
+> **REVIEWED BY `ai_studio_ux_cuj` (see Section 5 for full constraints):**  
+> - **Wave 1 (`AndroidX / Room / Coroutines / Test`):** `APPROVED_WITH_TOOLCHAIN_CAP` — cap each library at the highest version compatible with AI Studio's fixed **`Gradle 9.3.1` + `AGP 9.1.1` + `Kotlin 2.2.10` + `compileSdk = 36.1`**.
+> - **Wave 2 (`Compose BOM + activity-compose`):** `APPROVED_WITH_CO_REVIEW_AND_TOOLCHAIN_CAP` — cap at `Kotlin 2.2.10` / `compileSdk = 36.1` compatibility and co-review with `ai_studio_ux_cuj` against [`UX_DESIGN.md`](UX_DESIGN.md) & [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md).
+> - **Wave 3 (`Gradle / AGP / Kotlin / KSP`):** `DEFERRED_PINNED_TO_AI_STUDIO_TOOLCHAIN` — keep `Gradle 9.3.1`, `AGP 9.1.1`, `Kotlin 2.2.10`, and `KSP 2.3.5` (optional standalone KSP2 `2.3.14` test only if compatible) until AI Studio upgrades its container's system `gradle` binary.
+> - **Release Sequencing:** Keep `v35.0` cleanly focused on Step 1 On-Device Switch Rules; execute approved Waves 1–2 as isolated post-`v35.0` upgrades verified via `compile_applet` + `gradle :app:testDebugUnitTest --rerun-tasks`.
 
 ---
 
@@ -42,7 +39,7 @@ All proposed upgrades stay strictly inside the existing permissive Apache-2.0 / 
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
 | **1** | `androidx.core:core-ktx` | `libs.versions.toml` | `1.18.0` | `1.19.1` | Low | Minor AndroidX Core update; check `compileSdk = 36.1` compatibility. |
 | **1** | `androidx.lifecycle:lifecycle-{runtime-ktx,viewmodel-compose,runtime-compose}` | `libs.versions.toml` | `2.8.7` | `2.11.1` | Low | Verify `CreationExtras` `SwitchViewModel.Factory` and `collectAsStateWithLifecycle` behavior. |
-| **1** | `androidx.room:room-{runtime,ktx,compiler}` | `libs.versions.toml` | `2.7.0` | `2.8.5` | Medium | Verify Room v5 schema (`AppDatabase`), KSP codegen, and Robolectric in-memory DB teardown. |
+| **1** | `androidx.room:room-{runtime,ktx,compiler}` | `libs.versions.toml` | `2.7.0` | `2.8.5` | Medium | Verify Room v6 schema (`AppDatabase`, `MIGRATION_5_6`), KSP codegen, and Robolectric in-memory DB teardown. |
 | **1** | `org.jetbrains.kotlinx:kotlinx-coroutines-{android,core,test}` | `libs.versions.toml` | `1.10.2` | `1.11.0` | Low | Verify `Semaphore(3)` concurrency, `Dispatchers.IO` offloading, and `runTest` test dispatchers. |
 | **1** | `androidx.test:core` & `androidx.test:runner` | `libs.versions.toml` | `1.6.1` / `1.6.2` | `1.7.0` / `1.7.0` | Low | Test-only dependencies; verify Robolectric Compose test runner stability. |
 | **1** | `org.robolectric:robolectric` | `libs.versions.toml` | `4.16.1` | `4.18.1` | Medium | Verify single-SDK `@Config(sdk = [36])` isolation and GCS Maven mirror fetch (`robolectric.dependency.repo.url`). |
@@ -59,18 +56,18 @@ All proposed upgrades stay strictly inside the existing permissive Apache-2.0 / 
 
 Execute each wave as an isolated commit (or branch/PR if preferred) so any regression or AI Studio incompatibility can be pinpointed and rolled back cleanly without reverting unrelated upgrades:
 
-### Wave 1 — Low-Risk AndroidX, Room, Coroutines & Test Harness
-1. Update `coreKtx`, `lifecycle*`, `room*`, `kotlinxCoroutines*`, `androidx.test` (`core`/`runner`), and `robolectric` in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
+### Wave 1 — Low-Risk AndroidX, Room, Coroutines & Test Harness *(Approved w/ Toolchain Cap)*
+1. Update `coreKtx`, `lifecycle*`, `room*`, `kotlinxCoroutines*`, `androidx.test` (`core`/`runner`), and `robolectric` in [`gradle/libs.versions.toml`](gradle/libs.versions.toml) up to the highest versions compatible with `Gradle 9.3.1` / `AGP 9.1.1` / `Kotlin 2.2.10` / `compileSdk = 36.1`.
 2. Run full verification gate (`sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug`) and inspect for any new Room/Coroutines/Robolectric deprecation warnings.
 3. Confirm `app/build/outputs/apk/debug/app-debug.apk` still ships `0` third-party `.so` binaries or bundled fonts (`LicenseAndBrandGovernanceTest`).
 
-### Wave 2 — Jetpack Compose BOM (`2024.09.00` → `2026.11.01`) & `activity-compose`
-1. Update `composeBom` and `activityCompose` in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
+### Wave 2 — Jetpack Compose BOM & `activity-compose` *(Approved w/ Co-Review & Toolchain Cap)*
+1. Update `composeBom` and `activityCompose` in [`gradle/libs.versions.toml`](gradle/libs.versions.toml) up to the highest versions compatible with `AGP 9.1.1` / `Kotlin 2.2.10` / `compileSdk = 36.1`.
 2. Fix any Material 3 / Compose API deprecations (e.g., deprecated icons, `clickable`/indication overloads, `Slider`, `ModalBottomSheet`, or TV focus APIs) without altering UX invariants in [`UX_DESIGN.md`](UX_DESIGN.md) or [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md).
-3. Run the full `120+`-test Compose, Android TV, Widget, and ChromeOS ARCVM E2E suite (`sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug`), plus `ai_studio_ux_cuj` visual inspection on Phone, Tablet, Chromebook, and Android TV.
+3. Run the full `127+`-test Compose, Android TV, Hardware-Rules, Widget, and ChromeOS ARCVM E2E suite (`sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug`), plus `ai_studio_ux_cuj` visual co-review on Phone, Tablet, Chromebook, and Android TV.
 
-### Wave 3 — Gradle Wrapper, AGP, Kotlin & KSP Toolchain *(Blocked on AI Studio Confirmation)*
-1. Only proceed after `ai_studio_ux_cuj` confirms exact supported versions in Google AI Studio.
+### Wave 3 — Gradle Wrapper, AGP, Kotlin & KSP Toolchain *(Deferred — Pinned to AI Studio's Gradle 9.3.1 / AGP 9.1.1 / Kotlin 2.2.10 Ceiling)*
+1. Do **not** execute until Google AI Studio upgrades its container's system `gradle` binary beyond `9.3.1` and `ai_studio_ux_cuj` confirms new supported versions.
 2. Update [`gradle/wrapper/gradle-wrapper.properties`](gradle/wrapper/gradle-wrapper.properties) and plugin versions (`agp`, `kotlin`, `googleDevtoolsKsp`) in [`gradle/libs.versions.toml`](gradle/libs.versions.toml).
 3. Verify:
    - `sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug`
