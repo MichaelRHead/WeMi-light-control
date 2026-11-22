@@ -1523,13 +1523,18 @@ public class GeneratePlayStoreAssets {
         g.setFont(fBrand(64 * s, Font.BOLD));
         g.drawString("wemi", lx, (int) (100 * s));
 
-        fillRoundRect(g, lx + 200 * s, 66 * s, 184 * s, 34 * s, 10 * s, C_TEAL_DARK, C_TV_CYAN, 1.8 * s);
-        drawFittedString(g, "LAN • WIDGETS • TV", lx + 214 * s, 88 * s, 156 * s, 13.0 * s, Font.BOLD, C_WHITE);
+        double badgeX = lx + 204 * s;
+        double badgeW = 228 * s;
+        fillRoundRect(g, badgeX, 66 * s, badgeW, 34 * s, 10 * s, C_TEAL_DARK, C_TV_CYAN, 1.8 * s);
+        String badgeLbl = "CHROMEBOOK • WIDGETS • TV";
+        g.setFont(fUi(12.2 * s, Font.BOLD));
+        int badgeTw = g.getFontMetrics().stringWidth(badgeLbl);
+        drawFittedString(g, badgeLbl, badgeX + Math.max(10 * s, (badgeW - badgeTw) / 2.0), 88 * s, badgeW - 20 * s, 12.2 * s, Font.BOLD, C_WHITE);
 
         drawFittedString(g, "WeMi Switch Control", lx, 150 * s, maxLeftW, 28.0 * s, Font.BOLD, C_TV_CYAN);
         drawFittedString(g, "Local UPnP / SSDP / SOAP / GENA Smart Switch Controller", lx, 180 * s, maxLeftW, 14.0 * s, Font.PLAIN, new Color(226, 232, 240));
 
-        String[] pills = {"Home Screen Widgets", "Zero-Cloud 10.22.22.1 Setup", "Auto Room Grouping", "3-Col Room TV Grid"};
+        String[] pills = {"Chromebook Ready", "Home Screen Widgets", "Zero-Cloud 10.22.22.1 Setup", "3-Col Room TV Grid"};
         double py = 208 * s;
         double px = lx;
         for (String p : pills) {
@@ -1554,7 +1559,7 @@ public class GeneratePlayStoreAssets {
             drawFittedString(g, (String) ringStates[i][0], rcx + 33 * s, ry + 5 * s, 100 * s, 12.5 * s, Font.BOLD, C_WHITE);
         }
 
-        // Right: Live UI Card Preview matching actual v33.0 single-row TopHeader look & feel
+        // Right: Live UI Card Preview matching actual single-row TopHeader look & feel
         int cx0 = (int) (556 * s), cy0 = (int) (26 * s), cx1 = (int) (992 * s), cy1 = (int) (474 * s);
         fillRoundRect(g, cx0, cy0, cx1 - cx0, cy1 - cy0, 20 * s, C_BG_GRAY, C_TV_CYAN, 2.0 * s);
         fillRoundRect(g, cx0 + 2, cy0 + 2, cx1 - cx0 - 4, 52 * s, 18 * s, C_TEAL_PRIMARY, null, 0);
@@ -1618,6 +1623,466 @@ public class GeneratePlayStoreAssets {
         cyRow = drawDeviceRow(g, cx0 + (int) (16 * s), cyRow, cx1 - (int) (10 * s), "Bedroom Ceiling Fan", "Fan / Vent", false, true, 15, "192.168.1.114", null, false, false, "", "", s * 0.78);
         cyRow = drawDeviceRow(g, cx0 + (int) (16 * s), cyRow, cx1 - (int) (10 * s), "Lightbulb Bedroom", "Lightbulb", false, false, 0, "192.168.1.108", 100, false, false, "", "", s * 0.78);
 
+        g.dispose();
+        return img;
+    }
+
+    private static int drawChromeOsDesktopHeader(Graphics2D g, int w, double s, String windowSubtitle) {
+        // 1. Sleek ChromeOS desktop window title bar (30dp)
+        int titleBarH = (int) (30 * s);
+        g.setColor(new Color(0x0B, 0x16, 0x28));
+        g.fillRect(0, 0, w, titleBarH);
+
+        // Mini teal icon badge + title on left
+        double icSz = 16 * s;
+        fillRoundRect(g, 14 * s, (titleBarH - icSz) / 2.0, icSz, icSz, 4.5 * s, C_TEAL_PRIMARY, C_TV_CYAN, 0.8 * s);
+        drawIecPowerSymbol(g, 14 * s + icSz / 2.0, titleBarH / 2.0, 4.2 * s, C_WHITE, 1.4 * s);
+        drawFittedString(g, "WeMi Switch Control — ChromeOS Desktop", 38 * s, 19.5 * s, 460 * s, 11.5 * s, Font.BOLD, new Color(0xE2, 0xE8, 0xF0));
+
+        // Center-right LAN context badge
+        g.setFont(fUi(10.0 * s, Font.BOLD));
+        int subW = g.getFontMetrics().stringWidth(windowSubtitle) + (int) (18 * s);
+        double subX = w - 118 * s - subW;
+        fillRoundRect(g, subX, 6 * s, subW, 18 * s, 9 * s, new Color(0x0E, 0x74, 0x90, 120), new Color(0x22, 0xD3, 0xEE, 120), 0.9 * s);
+        g.setColor(new Color(0xE0, 0xF7, 0xFA));
+        g.drawString(windowSubtitle, (int) (subX + 9 * s), (int) (18.5 * s));
+
+        // Minimize / Maximize / Close window controls on far right
+        double ctrlY = titleBarH / 2.0;
+        g.setColor(new Color(0x94, 0xA3, 0xB8));
+        g.setStroke(new BasicStroke((float) (1.5 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        // Minimize
+        g.draw(new Line2D.Double(w - 90 * s, ctrlY + 2 * s, w - 80 * s, ctrlY + 2 * s));
+        // Maximize
+        g.draw(new Rectangle2D.Double(w - 60 * s, ctrlY - 4.5 * s, 9 * s, 9 * s));
+        // Close
+        g.draw(new Line2D.Double(w - 30 * s, ctrlY - 4.5 * s, w - 21 * s, ctrlY + 4.5 * s));
+        g.draw(new Line2D.Double(w - 21 * s, ctrlY - 4.5 * s, w - 30 * s, ctrlY + 4.5 * s));
+
+        // 2. Authentic single-row WeMi TopHeader right beneath title bar (48dp)
+        int headerH = (int) (48 * s);
+        int y0 = titleBarH;
+        LinearGradientPaint lg = new LinearGradientPaint(
+            new Point2D.Double(0, y0),
+            new Point2D.Double(w * 0.9, y0 + headerH),
+            new float[]{0f, 0.5f, 1f},
+            new Color[]{C_CYAN_TOP, C_TEAL_PRIMARY, C_SAPPHIRE_BOT}
+        );
+        g.setPaint(lg);
+        g.fillRect(0, y0, w, headerH);
+
+        double cy = y0 + headerH / 2.0;
+        g.setColor(C_WHITE);
+        g.setFont(fBrand(27 * s, Font.BOLD));
+        int brandX = (int) (18 * s);
+        g.drawString("wemi", brandX, (int) (cy + 9 * s));
+        int brandW = g.getFontMetrics().stringWidth("wemi");
+
+        // Subtle low-contrast version pill beside "wemi"
+        g.setFont(fUi(9.5 * s, Font.PLAIN));
+        double verW = g.getFontMetrics().stringWidth(appVersionTag) + 9 * s;
+        double verH = 14.5 * s;
+        double verX = brandX + brandW + 5 * s;
+        double verY = cy + 9 * s - verH + 1.5 * s;
+        fillRoundRect(g, verX, verY, verW, verH, 5 * s, new Color(255, 255, 255, 24), null, 0);
+        g.setColor(new Color(255, 255, 255, 162));
+        g.drawString(appVersionTag, (int) (verX + 4.5 * s), (int) (verY + 10.6 * s));
+
+        // Right-aligned single-row actions: All Off, Refresh, Edit, '+'
+        double addSz = 28 * s;
+        double ax0 = w - 18 * s - addSz;
+        double ay0 = cy - addSz / 2.0;
+        fillRoundRect(g, ax0, ay0, addSz, addSz, 8.5 * s, C_WHITE, null, 0);
+        g.setColor(C_TEAL_DARK);
+        g.setStroke(new BasicStroke((float) (2.2 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        double acx = ax0 + addSz / 2.0;
+        double arm = 6.2 * s;
+        g.draw(new Line2D.Double(acx - arm, cy, acx + arm, cy));
+        g.draw(new Line2D.Double(acx, cy - arm, acx, cy + arm));
+
+        double editW = 48 * s, editH = 27 * s;
+        double ex0 = ax0 - 7 * s - editW;
+        fillRoundRect(g, ex0, cy - editH / 2.0, editW, editH, 13.5 * s, new Color(255, 255, 255, 42), null, 0);
+        g.setColor(C_WHITE);
+        g.setFont(fUi(12.2 * s, Font.BOLD));
+        int editTw = g.getFontMetrics().stringWidth("Edit");
+        g.drawString("Edit", (int) (ex0 + (editW - editTw) / 2.0), (int) (cy + 4.5 * s));
+
+        double btnR = 14 * s;
+        double cxRef = ex0 - 7 * s - btnR;
+        g.setColor(new Color(255, 255, 255, 42));
+        g.fill(new Ellipse2D.Double(cxRef - btnR, cy - btnR, btnR * 2, btnR * 2));
+        g.setColor(C_WHITE);
+        g.setStroke(new BasicStroke((float) (1.9 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        double ar = 6.5 * s;
+        g.draw(new Arc2D.Double(cxRef - ar, cy - ar, ar * 2, ar * 2, 35, 285, Arc2D.OPEN));
+        double ahx = cxRef + ar * Math.cos(Math.toRadians(35));
+        double ahy = cy - ar * Math.sin(Math.toRadians(35));
+        g.draw(new Line2D.Double(ahx, ahy, ahx - 3.4 * s, ahy - 0.8 * s));
+        g.draw(new Line2D.Double(ahx, ahy, ahx + 0.6 * s, ahy - 3.6 * s));
+
+        double allOffW = 72 * s, allOffH = 27 * s;
+        double aox0 = cxRef - btnR - 7 * s - allOffW;
+        fillRoundRect(g, aox0, cy - allOffH / 2.0, allOffW, allOffH, 13.5 * s, new Color(255, 255, 255, 58), null, 0);
+        drawIecPowerSymbol(g, aox0 + 14 * s, cy, 4.3 * s, C_WHITE, 1.55 * s);
+        g.setColor(C_WHITE);
+        g.setFont(fUi(11.8 * s, Font.BOLD));
+        g.drawString("All Off", (int) (aox0 + 23 * s), (int) (cy + 4.3 * s));
+
+        return y0 + headerH;
+    }
+
+    private static void drawChromeOsBottomChrome(Graphics2D g, int w, int h, String selectedTab, double s) {
+        int shelfH = (int) (34 * s);
+        int navH = (int) (46 * s);
+        int navY0 = h - shelfH - navH;
+
+        // App bottom navigation bar sitting cleanly above ChromeOS shelf
+        g.setColor(C_WHITE);
+        g.fillRect(0, navY0, w, navH);
+        g.setColor(C_TEAL_PRIMARY);
+        g.fillRect(0, navY0, w, Math.max(2, (int) (2.0 * s)));
+
+        String[] tabs = {"Devices", "Rules", "More"};
+        int barSpan = (int) (420 * s);
+        int startX = (w - barSpan) / 2;
+        int colW = barSpan / 3;
+        for (int i = 0; i < tabs.length; i++) {
+            String tab = tabs[i];
+            boolean active = tab.equals(selectedTab);
+            double cx = startX + i * colW + colW / 2.0;
+            double cyIcon = navY0 + 16 * s;
+            Color tint = active ? C_TEAL_DARK : C_TEXT_SECONDARY;
+            if (active) {
+                fillRoundRect(g, cx - 26 * s, cyIcon - 10 * s, 52 * s, 20 * s, 10 * s, C_CYAN_SOFT, null, 0);
+            }
+            g.setColor(tint);
+            g.setStroke(new BasicStroke((float) (1.8 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            if ("Devices".equals(tab)) {
+                fillRoundRect(g, cx - 7 * s, cyIcon - 6 * s, 10 * s, 12 * s, 3.5 * s, tint, null, 0);
+                g.draw(new Line2D.Double(cx - 12 * s, cyIcon, cx - 7 * s, cyIcon));
+                g.draw(new Line2D.Double(cx + 3 * s, cyIcon - 3.5 * s, cx + 9 * s, cyIcon - 3.5 * s));
+                g.draw(new Line2D.Double(cx + 3 * s, cyIcon + 3.5 * s, cx + 9 * s, cyIcon + 3.5 * s));
+            } else if ("Rules".equals(tab)) {
+                fillRoundRect(g, cx - 7.5 * s, cyIcon - 7.5 * s, 15 * s, 15 * s, 3 * s, null, tint, 1.8 * s);
+                g.draw(new Line2D.Double(cx - 7.5 * s, cyIcon - 2.5 * s, cx + 7.5 * s, cyIcon - 2.5 * s));
+            } else {
+                for (int dx : new int[]{-7, 0, 7}) {
+                    double dr = 2.2 * s;
+                    g.fill(new Ellipse2D.Double(cx + dx * s - dr, cyIcon - dr, dr * 2, dr * 2));
+                }
+            }
+            g.setFont(fUi(10.2 * s, active ? Font.BOLD : Font.PLAIN));
+            int tw = g.getFontMetrics().stringWidth(tab);
+            g.drawString(tab, (int) (cx - tw / 2.0), (int) (navY0 + 39 * s));
+        }
+
+        // ChromeOS Desktop Shelf
+        int shelfY0 = h - shelfH;
+        g.setColor(new Color(0x0B, 0x12, 0x20));
+        g.fillRect(0, shelfY0, w, shelfH);
+        g.setColor(new Color(255, 255, 255, 24));
+        g.fillRect(0, shelfY0, w, 1);
+
+        // Launcher button on left
+        double lcx = 22 * s, lcy = shelfY0 + shelfH / 2.0;
+        g.setColor(new Color(255, 255, 255, 34));
+        g.fill(new Ellipse2D.Double(lcx - 10 * s, lcy - 10 * s, 20 * s, 20 * s));
+        g.setColor(C_WHITE);
+        g.setStroke(new BasicStroke((float) (1.6 * s)));
+        g.draw(new Ellipse2D.Double(lcx - 5.5 * s, lcy - 5.5 * s, 11 * s, 11 * s));
+
+        // Centered pinned ChromeOS shelf icons (WeMi active in middle)
+        double centerShelfX = w / 2.0;
+        double[] iconOffsets = {-44 * s, 0, 44 * s};
+        Color[] iconCols = {new Color(0x33, 0x41, 0x55), C_TEAL_PRIMARY, new Color(0x33, 0x41, 0x55)};
+        for (int i = 0; i < iconOffsets.length; i++) {
+            double icx = centerShelfX + iconOffsets[i];
+            double r = 10.5 * s;
+            g.setColor(iconCols[i]);
+            g.fill(new Ellipse2D.Double(icx - r, lcy - r - 1 * s, r * 2, r * 2));
+            if (i == 1) {
+                drawIecPowerSymbol(g, icx, lcy - 1 * s, 4.8 * s, C_WHITE, 1.5 * s);
+                fillRoundRect(g, icx - 7 * s, h - 4 * s, 14 * s, 2.5 * s, 1.2 * s, C_TV_CYAN, null, 0);
+            } else if (i == 0) {
+                g.setColor(new Color(0x94, 0xA3, 0xB8));
+                g.draw(new Ellipse2D.Double(icx - 4.5 * s, lcy - 5.5 * s, 9 * s, 9 * s));
+            } else {
+                fillRoundRect(g, icx - 4.5 * s, lcy - 5 * s, 9 * s, 8 * s, 2 * s, new Color(0x94, 0xA3, 0xB8), null, 0);
+            }
+        }
+
+        // System tray pill on right
+        double trayW = 104 * s, trayH = 22 * s;
+        double trayX = w - 14 * s - trayW;
+        double trayY = shelfY0 + (shelfH - trayH) / 2.0;
+        fillRoundRect(g, trayX, trayY, trayW, trayH, 11 * s, new Color(255, 255, 255, 24), null, 0);
+        g.setColor(C_WHITE);
+        g.setStroke(new BasicStroke((float) (1.4 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(new Arc2D.Double(trayX + 12 * s, trayY + 6 * s, 11 * s, 11 * s, 45, 90, Arc2D.OPEN));
+        g.draw(new Arc2D.Double(trayX + 14.5 * s, trayY + 8.5 * s, 6 * s, 6 * s, 45, 90, Arc2D.OPEN));
+        fillRoundRect(g, trayX + 34 * s, trayY + 7 * s, 14 * s, 8 * s, 1.8 * s, null, C_WHITE, 1.2 * s);
+        fillRoundRect(g, trayX + 36 * s, trayY + 9 * s, 9 * s, 4 * s, 0.8 * s, C_WHITE, null, 0);
+        g.setFont(fUi(10.5 * s, Font.BOLD));
+        g.drawString("9:41", (int) (trayX + 60 * s), (int) (trayY + 15 * s));
+    }
+
+    private static int drawChromeOsWifiHomeBar(Graphics2D g, int x0, int y0, int x1, double s) {
+        int h = (int) (60 * s);
+        fillRoundRect(g, x0, y0, x1 - x0, h, 11 * s, C_WHITE, new Color(0x08, 0x91, 0xB2, 95), 1.2 * s);
+
+        double ir = 13 * s;
+        double icx = x0 + 12 * s + ir;
+        double icy = y0 + h / 2.0;
+        g.setColor(C_CYAN_SOFT);
+        g.fill(new Ellipse2D.Double(icx - ir, icy - ir, ir * 2, ir * 2));
+        g.setColor(C_TEAL_DARK);
+        g.setStroke(new BasicStroke((float) (1.8 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        g.draw(new Arc2D.Double(icx - 7 * s, icy - 5 * s, 14 * s, 14 * s, 45, 90, Arc2D.OPEN));
+        g.draw(new Arc2D.Double(icx - 3.5 * s, icy - 1.5 * s, 7 * s, 7 * s, 45, 90, Arc2D.OPEN));
+
+        double bw = 88 * s;
+        double bh = 28 * s;
+        double bx0 = x1 - 12 * s - bw;
+        double by0 = y0 + (h - bh) / 2.0;
+        fillRoundRect(g, bx0, by0, bw, bh, 8 * s, C_TEAL_PRIMARY, null, 0);
+        drawFittedString(g, "Reconnect", bx0 + 13 * s, by0 + 18 * s, bw - 20 * s, 11.0 * s, Font.BOLD, C_WHITE);
+
+        // Inline home profile chips to the left of Reconnect
+        String[][] chips = {{"Main Home (18)", "1"}, {"Lake Cabin (3)", "0"}, {"+ Add Home", "0"}};
+        double ch = 24 * s;
+        double totalChipsW = 0;
+        for (String[] c : chips) {
+            boolean sel = "1".equals(c[1]);
+            g.setFont(fUi(10.2 * s, sel ? Font.BOLD : Font.PLAIN));
+            totalChipsW += g.getFontMetrics().stringWidth(c[0]) + 16 * s + 6 * s;
+        }
+        double chipsStartX = bx0 - 12 * s - totalChipsW;
+        double cx = chipsStartX;
+        double cyChip = y0 + (h - ch) / 2.0;
+        for (String[] c : chips) {
+            boolean sel = "1".equals(c[1]);
+            g.setFont(fUi(10.2 * s, sel ? Font.BOLD : Font.PLAIN));
+            int cw = g.getFontMetrics().stringWidth(c[0]) + (int) (16 * s);
+            fillRoundRect(g, cx, cyChip, cw, ch, 7 * s, sel ? C_TEAL_PRIMARY : C_WHITE, sel ? C_TEAL_PRIMARY : C_DIVIDER, 1.1 * s);
+            g.setColor(sel ? C_WHITE : C_TEXT_PRIMARY);
+            g.drawString(c[0], (int) (cx + 8 * s), (int) (cyChip + 16 * s));
+            cx += cw + 6 * s;
+        }
+
+        double tx = icx + ir + 10 * s;
+        double maxTextW = chipsStartX - tx - 12 * s;
+        drawFittedString(g, "Main Home", tx, y0 + 24 * s, maxTextW, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "17/18 Active • 1 Offline • 192.168.86.0/24 • 15s ChromeOS LAN Sync", tx, y0 + 42 * s, maxTextW, 10.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+
+        return y0 + h + (int) (6 * s);
+    }
+
+    private static BufferedImage renderChromebookDesktopDashboard(int w, int h) {
+        double s = w / 1280.0;
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = createG2(img);
+        g.setColor(C_BG_GRAY);
+        g.fillRect(0, 0, w, h);
+
+        int y = drawChromeOsDesktopHeader(g, w, s, "Local LAN • 192.168.86.0/24") + (int) (8 * s);
+        int pad = (int) (18 * s);
+        y = drawChromeOsWifiHomeBar(g, pad, y, w - pad, s);
+        y = drawRoomFilterBar(g, pad, y, w - pad, s, "All Rooms (9)") + (int) (2 * s);
+
+        int gap = (int) (14 * s);
+        int colW = (w - pad * 2 - gap * 2) / 3;
+        int c1x0 = pad, c1x1 = pad + colW;
+        int c2x0 = c1x1 + gap, c2x1 = c2x0 + colW;
+        int c3x0 = c2x1 + gap, c3x1 = w - pad;
+        double cs = s * 0.84;
+
+        // Column 1: Living Room (expanded Floor Lamp dimmer & Pin Widget drawer) + Porch
+        int y1 = y;
+        y1 = drawRoomGroupHeader(g, c1x0, y1, c1x1, "Living Room", 3, 3, "3/3 Active • Avg 12ms", true, false, 80, cs);
+        y1 = drawDeviceRow(g, c1x0 + (int) (6 * s), y1, c1x1, "Christmas Tree Living", "Tree Lights", true, true, 11, "192.168.86.101", null, false, false, "", "", cs);
+        y1 = drawDeviceRow(g, c1x0 + (int) (6 * s), y1, c1x1, "Living Room Floor Lamp", "Lightbulb", true, true, 14, "192.168.86.103", 80, true, true, "231844K1200455", "WDS060 (Dimmer)", cs);
+        y1 += (int) (4 * s);
+        y1 = drawRoomGroupHeader(g, c1x0, y1, c1x1, "Porch", 1, 1, "1/1 Active • Avg 13ms", true, false, 100, cs);
+        y1 = drawDeviceRow(g, c1x0 + (int) (6 * s), y1, c1x1, "Front Porch Switch", "Smart Switch", true, true, 13, "192.168.86.119", null, false, false, "", "", cs);
+
+        // Column 2: Bedroom (all 3 visual states: ON, Standby OFF, Disconnected) + Kitchen
+        int y2 = y;
+        y2 = drawRoomGroupHeader(g, c2x0, y2, c2x1, "Bedroom", 1, 3, "2/3 Active • Avg 15ms", true, false, 100, cs);
+        y2 = drawDeviceRow(g, c2x0 + (int) (6 * s), y2, c2x1, "Master Bath Ensuite Light", "Lightbulb", true, true, 12, "192.168.86.112", 65, false, false, "", "", cs);
+        y2 = drawDeviceRow(g, c2x0 + (int) (6 * s), y2, c2x1, "Bedroom Ceiling Fan", "Fan / Vent", false, true, 15, "192.168.86.114", null, false, false, "", "", cs);
+        y2 = drawDeviceRow(g, c2x0 + (int) (6 * s), y2, c2x1, "Lightbulb Bedroom", "Lightbulb", false, false, 0, "192.168.86.108", 100, false, false, "", "", cs);
+        y2 += (int) (4 * s);
+        y2 = drawRoomGroupHeader(g, c2x0, y2, c2x1, "Kitchen", 2, 2, "2/2 Active • Avg 11ms", true, false, 60, cs);
+        y2 = drawDeviceRow(g, c2x0 + (int) (6 * s), y2, c2x1, "Christmas Tree Kitchen", "Tree Lights", true, true, 11, "192.168.86.104", null, false, false, "", "", cs);
+        y2 = drawDeviceRow(g, c2x0 + (int) (6 * s), y2, c2x1, "Kitchen Under-Cabinet", "Lightbulb", true, true, 12, "192.168.86.107", 60, false, false, "", "", cs);
+
+        // Column 3: Hallway & Landing (Master Room Dimmer) + Office
+        int y3 = y;
+        y3 = drawRoomGroupHeader(g, c3x0, y3, c3x1, "Hallway & Landing", 2, 2, "2/2 Active • Avg 12ms", true, true, 75, cs);
+        y3 = drawDeviceRow(g, c3x0 + (int) (6 * s), y3, c3x1, "Lightbulb Landing", "Lightbulb", true, true, 12, "192.168.86.105", 75, false, false, "", "", cs);
+        y3 = drawDeviceRow(g, c3x0 + (int) (6 * s), y3, c3x1, "Stairway Wall Sconce", "Lightbulb", true, true, 13, "192.168.86.106", 50, false, false, "", "", cs);
+        y3 += (int) (4 * s);
+        y3 = drawRoomGroupHeader(g, c3x0, y3, c3x1, "Office & Study", 2, 2, "2/2 Active • Avg 11ms", true, false, 100, cs);
+        y3 = drawDeviceRow(g, c3x0 + (int) (6 * s), y3, c3x1, "Desk Lamp Switch", "Lightbulb", true, true, 10, "192.168.86.121", 90, false, false, "", "", cs);
+        y3 = drawDeviceRow(g, c3x0 + (int) (6 * s), y3, c3x1, "Hallway 3-Way Switch", "Smart Switch", true, true, 12, "192.168.86.118", null, false, false, "", "", cs);
+
+        drawChromeOsBottomChrome(g, w, h, "Devices", s);
+        g.dispose();
+        return img;
+    }
+
+    private static BufferedImage renderChromebookSsdpScanner(int w, int h) {
+        double s = w / 1280.0;
+        BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = createG2(img);
+        g.setColor(C_BG_GRAY);
+        g.fillRect(0, 0, w, h);
+
+        int y0 = drawChromeOsDesktopHeader(g, w, s, "ChromeOS LAN • Guided /24 Subnet Discovery") + (int) (12 * s);
+        int pad = (int) (20 * s);
+        int gap = (int) (16 * s);
+        int leftW = (int) ((w - pad * 2 - gap) * 0.58);
+        int lx0 = pad, lx1 = pad + leftW;
+        int rx0 = lx1 + gap, rx1 = w - pad;
+        int paneH = h - (int) (80 * s) - y0 - (int) (10 * s);
+
+        // LEFT PANE: SSDP Network Discovery Scan with ChromeOS ArcVmManualSubnetFallbackCard
+        fillRoundRect(g, lx0, y0, lx1 - lx0, paneH, 14 * s, C_WHITE, C_TEAL_PRIMARY, 1.5 * s);
+        int px = lx0 + (int) (18 * s);
+        double leftInnerW = (lx1 - lx0) - 36 * s;
+        int y = y0 + (int) (28 * s);
+
+        drawFittedString(g, "SSDP Network Discovery Scan", px, y, leftInnerW, 18.0 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "Multicast M-SEARCH • 239.255.255.250:1900 • Automatic Physical Subnet Fallback", px, y + 18 * s, leftInnerW, 11.2 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        y += (int) (34 * s);
+
+        // Search target pills + interface pill
+        double cx = px;
+        String[][] targets = {{"Belkin BasicEvent", "1"}, {"All Smart Switches", "0"}, {"UPnP Root", "0"}};
+        for (String[] t : targets) {
+            boolean sel = "1".equals(t[1]);
+            g.setFont(fUi(10.5 * s, sel ? Font.BOLD : Font.PLAIN));
+            int cw = g.getFontMetrics().stringWidth(t[0]) + (int) (18 * s);
+            fillRoundRect(g, cx, y, cw, 25 * s, 7 * s, sel ? C_CYAN_SOFT : C_WHITE, sel ? C_TEAL_PRIMARY : C_DIVIDER, 1.1 * s);
+            g.setColor(sel ? C_TEAL_DARK : C_TEXT_PRIMARY);
+            g.drawString(t[0], (int) (cx + 9 * s), (int) (y + 16.5 * s));
+            cx += cw + 6 * s;
+        }
+        fillRoundRect(g, lx1 - 18 * s - 220 * s, y, 220 * s, 25 * s, 7 * s, new Color(0xF1, 0xF5, 0xF9), C_DIVIDER, 1.0 * s);
+        drawFittedString(g, "Interface: 100.115.92.6 • 42ms", lx1 - 18 * s - 210 * s, y + 16.5 * s, 200 * s, 10.2 * s, Font.BOLD, C_SAPPHIRE_BOT);
+        y += (int) (34 * s);
+
+        // Authentic ChromeOS Virtual Network Manual Subnet Fallback Card (ArcVmManualSubnetFallbackCard)
+        int fbH = (int) (122 * s);
+        fillRoundRect(g, px, y, leftInnerW, fbH, 12 * s, new Color(0xF0, 0xF9, 0xFF), new Color(0x08, 0x91, 0xB2, 130), 1.3 * s);
+        drawFittedString(g, "ChromeOS Virtual Network Detected (100.115.92.6)", px + 14 * s, y + 22 * s, leftInnerW - 28 * s, 13.0 * s, Font.BOLD, C_TEAL_DARK);
+        drawFittedString(g, "ChromeOS isolates Android apps on a virtual subnet. If your router blocks multicast discovery,", px + 14 * s, y + 40 * s, leftInnerW - 28 * s, 10.8 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        drawFittedString(g, "enter your home router IPv4 prefix (such as 192.168.1 or 192.168.86) to scan for local smart switches.", px + 14 * s, y + 55 * s, leftInnerW - 28 * s, 10.8 * s, Font.PLAIN, C_TEXT_SECONDARY);
+
+        // OutlinedTextField + >=48dp Scan Subnet Button
+        double scanBtnW = 118 * s;
+        double scanBtnH = 38 * s;
+        double scanBtnX = px + leftInnerW - 14 * s - scanBtnW;
+        double fieldY = y + 70 * s;
+        double fieldW = scanBtnX - (px + 14 * s) - 10 * s;
+        fillRoundRect(g, px + 14 * s, fieldY, fieldW, scanBtnH, 8 * s, C_WHITE, C_TEAL_PRIMARY, 1.3 * s);
+        drawFittedString(g, "Home Subnet (e.g. 192.168.1)", px + 24 * s, fieldY + 12 * s, fieldW - 20 * s, 8.8 * s, Font.BOLD, C_TEAL_DARK);
+        drawFittedString(g, "192.168.86", px + 24 * s, fieldY + 29 * s, fieldW - 20 * s, 13.0 * s, Font.BOLD, C_TEXT_PRIMARY);
+
+        fillRoundRect(g, scanBtnX, fieldY, scanBtnW, scanBtnH, 9 * s, C_TEAL_PRIMARY, null, 0);
+        g.setFont(fUi(12.2 * s, Font.BOLD));
+        int scanTw = g.getFontMetrics().stringWidth("Scan Subnet");
+        drawFittedString(g, "Scan Subnet", scanBtnX + (scanBtnW - scanTw) / 2.0, fieldY + 23.5 * s, scanBtnW - 16 * s, 12.2 * s, Font.BOLD, C_WHITE);
+        y += fbH + (int) (14 * s);
+
+        // Discovered Devices header + Rescan + Adopt All
+        double btnAdoptAllW = 86 * s;
+        double btnRescanW = 74 * s;
+        double btnRescanX = px + leftInnerW - btnAdoptAllW - 8 * s - btnRescanW;
+        drawFittedString(g, "Discovered Switches on 192.168.86.0/24 (4)", px, y + 18 * s, btnRescanX - px - 10 * s, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
+        fillRoundRect(g, btnRescanX, y, btnRescanW, 27 * s, 7 * s, C_WHITE, C_TEAL_PRIMARY, 1.1 * s);
+        drawFittedString(g, "Rescan", btnRescanX + 15 * s, y + 17.5 * s, btnRescanW - 20 * s, 11.2 * s, Font.BOLD, C_TEAL_DARK);
+        fillRoundRect(g, px + leftInnerW - btnAdoptAllW, y, btnAdoptAllW, 27 * s, 7 * s, C_TEAL_PRIMARY, null, 0);
+        drawFittedString(g, "Adopt All", px + leftInnerW - btnAdoptAllW + 15 * s, y + 17.5 * s, btnAdoptAllW - 20 * s, 11.2 * s, Font.BOLD, C_WHITE);
+        y += (int) (35 * s);
+
+        Object[][] found = {
+            {"Christmas Tree Living", "Tree Lights", true, "192.168.86.101:49153 • F7C063", "SN: 221517K01018AA • 11ms • /setup.xml", true},
+            {"Living Room Floor Lamp", "Lightbulb", true, "192.168.86.103:49153 • WDS060", "SN: 231844K12004BB • 14ms • /setup.xml", true},
+            {"Master Bath Ensuite Light", "Lightbulb", true, "192.168.86.112:49153 • F7C059", "SN: 211902K09011CC • 12ms • Room: Ensuite", true},
+            {"Hallway 3-Way Switch", "Smart Switch", false, "192.168.86.118:49154 • WLS0403", "SN: 240199K33082DD • 16ms • Port Healed", false}
+        };
+        for (Object[] it : found) {
+            int rh = (int) (58 * s);
+            boolean synced = (Boolean) it[5];
+            fillRoundRect(g, px, y, leftInnerW, rh, 10 * s, synced ? new Color(0xF8, 0xFA, 0xFC) : new Color(0xEB, 0xFA, 0xFC), synced ? C_DIVIDER : C_TEAL_PRIMARY, 1.1 * s);
+            drawCategoryIllustration(g, px + 8 * s, y + 8 * s, 38 * s, 40 * s, (String) it[1], (Boolean) it[2], true, s * 0.92);
+
+            double bw = 72 * s, bh = 26 * s;
+            double bx0 = px + leftInnerW - 10 * s - bw;
+            double by0 = y + (rh - bh) / 2.0;
+            double tx = px + 54 * s;
+            double maxRowW = bx0 - tx - 10 * s;
+            drawFittedString(g, (String) it[0], tx, y + 19 * s, maxRowW, 13.2 * s, Font.BOLD, C_TEXT_PRIMARY);
+            drawFittedString(g, (String) it[3], tx, y + 35 * s, maxRowW, 10.2 * s, Font.BOLD, C_TEAL_DARK);
+            drawFittedString(g, (String) it[4], tx, y + 49 * s, maxRowW, 9.4 * s, Font.PLAIN, C_TEXT_SECONDARY);
+
+            fillRoundRect(g, bx0, by0, bw, bh, 7 * s, synced ? C_WHITE : C_TEAL_PRIMARY, synced ? C_TEAL_DARK : null, 1.0 * s);
+            drawFittedString(g, synced ? "Adopted" : "Adopt", bx0 + (synced ? 12 : 18) * s, by0 + 17 * s, bw - 14 * s, 10.8 * s, Font.BOLD, synced ? C_TEAL_DARK : C_WHITE);
+            y += rh + (int) (7 * s);
+        }
+
+        // RIGHT PANE: ChromeOS Network Diagnostics + Clean Home & Live SOAP Sync
+        double rightInnerW = (rx1 - rx0) - 32 * s;
+        int topCardH = (int) (274 * s);
+        fillRoundRect(g, rx0, y0, rx1 - rx0, topCardH, 14 * s, new Color(0x12, 0x16, 0x1F), new Color(0x2E, 0x38, 0x4D), 1.2 * s);
+        drawFittedString(g, "CHROMEOS LAN DIAGNOSTICS", rx0 + 16 * s, y0 + 26 * s, rightInnerW - 110 * s, 11.2 * s, Font.BOLD, new Color(0x8B, 0xE8, 0x36));
+        fillRoundRect(g, rx1 - 16 * s - 94 * s, y0 + 11 * s, 94 * s, 21 * s, 10 * s, new Color(0x1E, 0x29, 0x3B), new Color(0x47, 0x55, 0x69), 1.0 * s);
+        drawFittedString(g, "Save/Share Log", rx1 - 16 * s - 86 * s, y0 + 25 * s, 78 * s, 9.5 * s, Font.BOLD, new Color(0xE2, 0xE8, 0xF0));
+
+        String[][] diagLines = {
+            {"[NET] ip=100.115.92.6 boundWifi=true arcVmNat=true", "ok"},
+            {"[DNS] dns=192.168.86.1 (RFC 1918 physical router hint)", "ok"},
+            {"[SSDP] MulticastSocket bound -> eth1 (239.255.255.250)", "norm"},
+            {"[STAGE C] Unicast sweep 192.168.86.0/24 -> 4 switches", "ok"},
+            {"[HOME] Physical subnet saved -> 192.168.86.0/24", "norm"},
+            {"[HOME] Virtual 100.115.92.x filtered from Home profiles", "norm"},
+            {"[GENA] SUBSCRIBE skipped on CGNAT guest IP (100.115.92.6)", "warn"},
+            {"[POLL] Active 15s SOAP state sync -> 4/4 healthy (12ms)", "ok"}
+        };
+        int dy = y0 + (int) (54 * s);
+        for (String[] dl : diagLines) {
+            Color c = "ok".equals(dl[1])
+                ? new Color(0x86, 0xEF, 0xAC)
+                : ("warn".equals(dl[1]) ? new Color(0xFB, 0xBF, 0x24) : new Color(0xE2, 0xE8, 0xF0));
+            drawFittedString(g, dl[0], rx0 + 16 * s, dy, rightInnerW, 10.2 * s, Font.PLAIN, c);
+            dy += (int) (26 * s);
+        }
+
+        // Bottom-right card: Clean Wi-Fi Home & Live SOAP Sync Log
+        int botY = y0 + topCardH + (int) (14 * s);
+        int botH = (y0 + paneH) - botY;
+        fillRoundRect(g, rx0, botY, rx1 - rx0, botH, 14 * s, C_WHITE, C_DIVIDER, 1.1 * s);
+        drawFittedString(g, "Live Local SOAP Sync & Privacy", rx0 + 16 * s, botY + 26 * s, rightInnerW, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "Zero cloud servers • Zero extra permissions • Pure local LAN", rx0 + 16 * s, botY + 44 * s, rightInnerW, 10.6 * s, Font.BOLD, C_TEAL_DARK);
+
+        String[][] soapRows = {
+            {"GetBinaryState • Christmas Tree Living", "http://192.168.86.101:49153/upnp/control/basicevent1", "HTTP 200 OK (11ms) • 15s ChromeOS LAN Sync"},
+            {"SetBinaryState (1, 80%) • Living Room Floor Lamp", "http://192.168.86.103:49153/upnp/control/basicevent1", "HTTP 200 OK (14ms) • Dimmer Updated"},
+            {"Open Source MIT License • Local-Only Telemetry", "wemi-telemetry-latest.txt excluded from cloud Auto-Backup", "MIT License • Copyright (c) 2026 Michael R. Head"}
+        };
+        int sy = botY + (int) (58 * s);
+        for (String[] sr : soapRows) {
+            int sh = (int) (58 * s);
+            fillRoundRect(g, rx0 + 14 * s, sy, rx1 - rx0 - 28 * s, sh, 9 * s, new Color(0xF3, 0xF6, 0xF8), null, 0);
+            drawFittedString(g, sr[0], rx0 + 22 * s, sy + 18 * s, rightInnerW - 12 * s, 11.0 * s, Font.BOLD, C_TEXT_PRIMARY);
+            drawFittedString(g, sr[1], rx0 + 22 * s, sy + 35 * s, rightInnerW - 12 * s, 9.8 * s, Font.BOLD, C_TEAL_DARK);
+            drawFittedString(g, sr[2], rx0 + 22 * s, sy + 50 * s, rightInnerW - 12 * s, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+            sy += sh + (int) (8 * s);
+        }
+
+        drawChromeOsBottomChrome(g, w, h, "More", s);
         g.dispose();
         return img;
     }
@@ -1720,6 +2185,13 @@ public class GeneratePlayStoreAssets {
         saveImage(t10_1, "play_store_assets/screenshots/tablet_10_inch/tablet10_1_devices_dashboard.png", "PNG");
         BufferedImage t10_2 = renderTabletSsdpAndRules(1600, 2560);
         saveImage(t10_2, "play_store_assets/screenshots/tablet_10_inch/tablet10_2_ssdp_and_rules.png", "PNG");
+
+        BufferedImage cb1 = renderChromebookDesktopDashboard(1920, 1080);
+        saveImage(cb1, "play_store_assets/screenshots/chromebook/chromebook_1_desktop_dashboard.png", "PNG");
+        saveImage(cb1, "play_store_assets/screenshots/tablet_10_inch/tablet10_3_chromebook_desktop.png", "PNG");
+        BufferedImage cb2 = renderChromebookSsdpScanner(1920, 1080);
+        saveImage(cb2, "play_store_assets/screenshots/chromebook/chromebook_2_ssdp_subnet_scanner.png", "PNG");
+        saveImage(cb2, "play_store_assets/screenshots/tablet_10_inch/tablet10_4_chromebook_ssdp_scanner.png", "PNG");
 
         BufferedImage tv1 = renderTvScreen(1920, 1080, "focus");
         saveImage(tv1, "play_store_assets/screenshots/android_tv/tv_1_room_groups_and_remote_focus.png", "PNG");

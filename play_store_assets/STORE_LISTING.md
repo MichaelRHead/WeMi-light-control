@@ -51,7 +51,12 @@ WeMi Switch Control communicates directly with your switches over your home Wi-F
 6. **7-Inch Tablet Screenshots (`screenshots/tablet_7_inch/` — 1200 × 1920 px PNG):**
    - `tablet7_1_devices_dashboard.png` (Two-Column Room Dashboard, Expanded Dimmer & `Pin Widget` Drawer)
    - `tablet7_2_ssdp_and_rules.png` (Zero-Cloud `10.22.22.1` Switch AP Provisioning, Collapsible `SETUP DIAGNOSTICS` & Local Rules)
-7. **10-Inch Tablet Screenshots (`screenshots/tablet_10_inch/` — 1600 × 2560 px PNG):**
+7. **10-Inch Tablet & Large-Screen Screenshots (`screenshots/tablet_10_inch/` — 1600 × 2560 px & 1920 × 1080 px PNG):**
    - `tablet10_1_devices_dashboard.png` (Two-Column Room Dashboard, Expanded Dimmer & `Pin Widget` Drawer)
    - `tablet10_2_ssdp_and_rules.png` (Zero-Cloud `10.22.22.1` Switch AP Provisioning, Collapsible `SETUP DIAGNOSTICS` & Local Rules)
-8. **Release Notes (`RELEASE_NOTES.txt`), Privacy Policy (`PRIVACY_POLICY.md`), and Upload & Data Safety Guide (`DATA_SAFETY_GUIDE.md`).**
+   - `tablet10_3_chromebook_desktop.png` (Chromebook 16:9 Widescreen Desktop 3-Column Multi-Room Dashboard & `15s` LAN Sync)
+   - `tablet10_4_chromebook_ssdp_scanner.png` (Chromebook Split-Subnet SSDP Discovery, Guided `/24` Subnet Fallback & ChromeOS LAN Diagnostics)
+8. **Chromebook (ChromeOS) 16:9 Desktop Screenshots (`screenshots/chromebook/` — 1920 × 1080 px, 16:9 PNG):**
+   - `chromebook_1_desktop_dashboard.png` (Chromebook Widescreen Multi-Room Switch & Dimmer Dashboard with Clean Physical LAN Profile)
+   - `chromebook_2_ssdp_subnet_scanner.png` (ChromeOS Virtual Network Detection, Guided `/24` Subnet Scanner & Live ChromeOS LAN Diagnostics)
+9. **Release Notes (`RELEASE_NOTES.txt`), Privacy Policy (`PRIVACY_POLICY.md`), and Upload & Data Safety Guide (`DATA_SAFETY_GUIDE.md`).**

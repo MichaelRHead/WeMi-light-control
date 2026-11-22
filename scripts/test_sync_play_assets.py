@@ -138,9 +138,16 @@ class SyncPlayAssetsTests(unittest.TestCase):
         self.assertEqual(images["tvBanner"][0].path.name, "tv_banner_1280x720.png")
         self.assertEqual(len(images["phoneScreenshots"]), 4)
         self.assertEqual(len(images["sevenInchScreenshots"]), 2)
-        self.assertEqual(len(images["tenInchScreenshots"]), 2)
+        self.assertEqual(len(images["tenInchScreenshots"]), 4)
         self.assertEqual(len(images["tvScreenshots"]), 3)
-        self.assertEqual(sum(len(v) for v in images.values()), 14)
+        self.assertEqual(sum(len(v) for v in images.values()), 16)
+
+        chromebook_dir = REPO_ROOT / "play_store_assets/screenshots/chromebook"
+        chromebook_pngs = sorted(p.name for p in chromebook_dir.glob("*.png"))
+        self.assertEqual(
+            chromebook_pngs,
+            ["chromebook_1_desktop_dashboard.png", "chromebook_2_ssdp_subnet_scanner.png"],
+        )
 
     def test_parse_store_listing_rejects_overflow_and_trademark(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
