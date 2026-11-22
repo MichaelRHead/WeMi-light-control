@@ -9,6 +9,12 @@ data class ReleaseHistoryEntry(
 
 val WEMI_RELEASE_HISTORY: List<ReleaseHistoryEntry> = listOf(
     ReleaseHistoryEntry(
+        version = "v33.0",
+        releaseDate = "Nov 21, 2026",
+        headline = "In-App Release History, Cleaner UI & Smarter TV Scenes",
+        summary = "Added the subtle top-bar version pill and in-app Release History dialog, removed obsolete clutter across tabs and dialogs, added a confirmation prompt before resetting homes, made Android TV Holiday ON conditional with D-Pad focus recovery, and sharpened room, icon, and setup diagnostics."
+    ),
+    ReleaseHistoryEntry(
         version = "v32.0",
         releaseDate = "Nov 21, 2026",
         headline = "Stronger Discovery, Rules & Widget Diagnostics",

@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v32.0 — Phone, Tablet, Widgets & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v33.0 — Phone, Tablet, Widgets & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `32.0` (`versionCode = 32`)
+- **Version:** `33.0` (`versionCode = 33`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Android Home Screen Widgets**, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,12 +17,12 @@ WeMi Switch Control brings fast, reliable local-network control back to Belkin's
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery, local SOAP HTTP commands, and `<100ms` UPnP GENA push updates—with no cloud account, external server, or subscription required.
 
-### What's New in Version 32.0
-- **Hardened Discovery & Unified Room Grouping:** Symmetric 4-pass hardware identity matching, Tier-2 UDN deduplication across LAN discovery and Home Screen Widgets, XML entity decoding for switch names, and case-insensitive room grouping shared across phone, TV, and widgets.
-- **More Reliable Rules & Live Push Sync:** Isolated UPnP GENA push socket handling keeps physical switch updates responsive, cross-home same-named switch rules stay isolated, and Auto-Off timers now default to turning lights OFF.
-- **Home Screen Light & Room Widgets + Local Diagnostics:** Place resizable one-tap light or room widgets with multi-home isolation and rapid-tap protection, plus headless widget SOAP logging and widget summaries in strictly local diagnostics with hardened password redaction.
-- **Google TV Focusable Dimmer Slider & Room Navigation:** Press `Down` from any Android TV dimmer toggle to focus the inline brightness slider (`Left`/`Right` steps `-10%`/`+10%`), step whole-room dimmers from Room Master Headers, and navigate cleanly across all 3 columns with a steady single-row top bar.
-- **Zero-Cloud `10.22.22.1` Switch Setup & Lean Pure Kotlin/DEX Release (`minSdk 24+`):** Provision factory-reset switches directly over local Wi-Fi with MIT open-source transparency, R8 optimization, and local diagnostics excluded from cloud backup.
+### What's New in Version 33.0
+- **In-App Release History & Cleaner Top Bar:** Tap the subtle version badge in the top bar anytime to browse short, user-friendly release summaries and dates without disrupting your single-row header layout.
+- **Streamlined Everyday UI & Safer Resets:** Removed obsolete toggles and internal cards from the More tab and dialogs, strictly gated Demo presets behind Demo Showroom Mode, added a confirmation prompt before resetting saved homes, and fixed long SOAP log timestamps.
+- **Smarter Android TV Holiday Scene & D-Pad Focus:** The `Holiday ON` TV scene now appears only when your home has matching holiday lights (Christmas tree, holiday, Diwali, Hanukkah, Halloween, fairy/string lights) with automatic focus recovery when switches change.
+- **Sharper Room/Icon Classification & Setup Diagnostics:** Word-bounded icon matching prevents false matches on names like "Front Street Light", bath-before-bed room icons keep rooms accurate, and collapsible `SETUP DIAGNOSTICS` auto-expands cleanly on new errors.
+- **Zero-Cloud `10.22.22.1` Setup, Widgets & Pure Kotlin/DEX (`minSdk 24+`):** Provision factory-reset switches directly over local Wi-Fi with Home Screen Light & Room Widgets, MIT open-source transparency, and local diagnostics excluded from cloud backup.
 
 ### Key Features
 - **Home Screen Light & Room Widgets:** One-tap local Wi-Fi toggles for individual lights or whole rooms straight from your Android launcher without opening the app.

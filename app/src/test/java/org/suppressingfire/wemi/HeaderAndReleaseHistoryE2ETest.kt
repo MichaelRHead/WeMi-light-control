@@ -166,7 +166,10 @@ class HeaderAndReleaseHistoryE2ETest {
         composeTestRule.onNodeWithTag("release_history_dialog").assertIsDisplayed()
         composeTestRule.onNodeWithText("Release History").assertIsDisplayed()
         composeTestRule.onNodeWithTag("release_entry_v${BuildConfig.VERSION_NAME}").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Nov 21, 2026").assertIsDisplayed()
+        composeTestRule.onNode(
+            hasTestTag("release_entry_v${BuildConfig.VERSION_NAME}") and
+                hasAnyDescendant(androidx.compose.ui.test.hasText(WEMI_RELEASE_HISTORY.first().releaseDate))
+        ).assertIsDisplayed()
         composeTestRule.onNodeWithTag("release_history_list")
             .performScrollToNode(hasTestTag("release_entry_v1.0"))
         composeTestRule.onNodeWithTag("release_entry_v1.0").assertIsDisplayed()

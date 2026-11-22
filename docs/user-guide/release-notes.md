@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v32.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v33.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v32.0`)
+## Quick Release Summary (`v1.0` → `v33.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v33.0`](#version-330-versioncode--33--november-21-2026)** | `33` | Nov 21, 2026 | **In-App Release History, UX Hygiene Cleanup, Conditional TV Holiday Scene & Discovery/Diagnostics Polish**: Subtle top-bar version pill + scrollable `Release History` dialog, streamlined top bar/More/dialogs with Demo-only preset gating and reset confirmation, conditional Android TV `Holiday ON` with D-Pad focus recovery, word-bounded icon/room classification, and collapsible `SETUP DIAGNOSTICS` auto-expansion |
 | **[`v32.0`](#version-320-versioncode--32--november-21-2026)** | `32` | Nov 21, 2026 | **Discovery, Rules, GENA Push & Widget Diagnostics Hardening**: 4-pass hardware identity & widget UDN self-healing, decoded XML switch names, unified case-insensitive room grouping across phone/TV/widgets, isolated GENA push handlers, cross-home rule isolation & Auto-Off OFF default, and headless widget SOAP telemetry |
 | **[`v31.0`](#version-310-versioncode--31--november-1920-2026)** | `31` | Nov 19–20, 2026 | **Home Screen Light & Room Toggle Widgets** (zero-app-launch local Wi-Fi toggles, one-tap pinning, multi-home isolation & rapid-tap protection), plus motion-trigger dimmer brightness & Wi-Fi Home isolation fix and instant SSDP search-target switching |
 | **[`v28.0`](#version-280-versioncode--28--november-1519-2026)** | `28` | Nov 15–19, 2026 | Google TV focusable inline & Room-Header dimmer controls, steady single-row TV top bar while dimming, deterministic `Up`/`Down` Room Master Header navigation across all 3 columns (`wemi TV`), immediate `<100ms` GENA push on adoption, hardened UDN/SSDP discovery & `10.22.22.1` setup diagnostics |
@@ -47,6 +48,14 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 33.0 (`versionCode = 33`) — November 21, 2026
+- **Subtle Top-Bar Version Pill & In-App Release History**: Tap the low-contrast **`v33.0`** pill tucked neatly into the unused space beside the **`wemi`** wordmark to browse user-friendly release summaries and dates (`v33.0` → `v1.0`) without changing the top bar's height or shifting any action buttons.
+- **Streamlined Everyday UI & Safer Reset Flows**: Removed obsolete toggles and internal cards (`Header Logo Wordmark`, `Google Play Store Assets Ready`, and manual reachability toggles), strictly gated Demo presets behind **Demo Showroom Mode**, auto-hid the discovery banner once switches are present, clarified Motion Sensor actions (**`Simulate Motion`** in Demo Mode vs. **`Refresh Motion`** on Real LAN), added a confirmation prompt before resetting saved homes on the **More** tab, and fixed long SOAP log titles from squishing timestamps.
+- **Smarter Android TV Holiday Scene & D-Pad Focus Recovery**: The **`Holiday ON`** quick scene on Android TV now appears only when your active home includes matching holiday lights (Christmas tree, holiday, Diwali/Dewali, Hanukkah, Halloween, fairy/string lights), targets only those holiday switches, and automatically recovers D-Pad focus to **`Movie 20%`** if the last holiday switch is removed while focused.
+- **Sharper Discovery, Room Icons & Setup Diagnostics**: Word-bounded icon classification prevents false matches on names like `"Front Street Light"` or `"Tiffany Lamp"`, bath/ensuite room icons take precedence over bedroom keywords (e.g., `"Kids Bath"`), blank-serial switches recover cleanly from UPnP port hops, and the collapsible **`SETUP DIAGNOSTICS`** card automatically re-expands on new setup errors or traces.
+
+---
 
 ### Version 32.0 (`versionCode = 32`) — November 21, 2026
 - **Stronger Hardware Identity, Name Decoding & Unified Room Grouping**: Symmetric 4-pass identity matching and Tier-2 UDN deduplication prevent duplicate switches after discovery, adoption, or `10.22.22.1` setup and carry over to Home Screen Widgets. Switch names containing `&amp;` or apostrophes decode cleanly, and phone, Android TV, and Home Screen Widgets share unified case-insensitive room grouping (`Upstairs Bedroom` → `Bedroom`, `Finished Basement` → `Basement`, `WCLight` → `Ensuite`).

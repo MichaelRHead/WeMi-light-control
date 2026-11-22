@@ -1,4 +1,4 @@
-WeMi Switch Control v32.0:
-• Smarter Discovery & Rooms: Stronger 4-pass hardware identity matching, widget UDN self-healing, decoded switch names, and unified room grouping across phones, TV, and widgets.
-• Reliable Rules & Live Sync: Isolated GENA push handling, cross-home rule fixes, and Auto-Off defaulting to OFF.
-• Widget Diagnostics: Home screen widget SOAP logs and widget inventory now appear in local diagnostics with stricter password redaction.
+WeMi Switch Control v33.0:
+• In-App Release History: Tap the subtle version pill in the top bar to browse release summaries and dates.
+• Cleaner Everyday UI: Streamlined the top bar, More tab, and dialogs, gated Demo presets to Demo Mode, added a reset confirmation prompt, and fixed long SOAP log timestamps.
+• Smarter TV & Discovery: Conditional Android TV Holiday ON scene with D-Pad focus recovery, word-bounded room/icon matching, and collapsible setup diagnostics.

@@ -12,7 +12,7 @@ At the top of the screen, the compact single-row WeMi header provides quick acce
 
 | Control | Location | What It Does |
 | :--- | :--- | :--- |
-| **`wemi` Wordmark** | Top-left | Displays the **`wemi`** brand wordmark. |
+| **`wemi` Wordmark & Version Pill** | Top-left | Displays the static **`wemi`** brand wordmark alongside a subtle low-contrast version pill (`app_version_button`, e.g. `v33.0`) that opens the scrollable in-app **Release History** dialog without disrupting top-bar alignment. |
 | **`All Off` Button** | Next to Refresh | Turns **OFF** all reachable switches and dimmers on your active Wi-Fi Home in one tap (`all_off_devices_button`). |
 | **Refresh Icon** | Top-right | Opens the live **SSDP Network Discovery Scanner** and starts an immediate local Wi-Fi scan (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
 | **`Edit` / `Done` Button** | Top-right | Toggles **Edit Mode** so you can reorder, rename, reconfigure, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
@@ -96,8 +96,7 @@ Tap the body of any reachable switch or dimmer row to expand its **Inline Contro
 
 ## 7. Empty Wi-Fi Home Onboarding Card
 
-When a Wi-Fi Home has `0` saved switches (such as on first launch in **Real LAN Mode** before scanning your network), the **Devices** tab displays an onboarding card with a 4-icon category showcase (**Switch**, **Lightbulb**, **Christmas Tree**, and **Fan** in standby) and four quick-start actions:
+When a Wi-Fi Home has `0` saved switches (such as on first launch in **Real LAN Mode** before scanning your network), the **Devices** tab displays an onboarding card with a 4-icon category showcase (**Switch**, **Lightbulb**, **Christmas Tree**, and **Fan** in standby) and three quick-start actions:
 - **`Scan Local Network (SSDP)`**: Broadcasts a live UPnP SSDP scan (`239.255.255.250:1900`) and automatically adopts discovered smart switches onto the current Wi-Fi Home.
 - **`Setup Factory-Reset Switch AP (10.22.22.1)`**: Opens the zero-cloud `WiFiSetup1` provisioning wizard.
 - **`Add Switch Manually`**: Opens the manual IP/Port entry dialog (which automatically probes all 9 UPnP ports `49151–49159` at that IP).
-- **`Restore Classic Setup`**: Enables **Demo Showroom Mode** with the 14 showcase switches across 3 Wi-Fi Homes.
