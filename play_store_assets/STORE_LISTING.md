@@ -40,18 +40,18 @@ WeMi Switch Control communicates directly with your switches over your home Wi-F
    - `tv/tv_banner_1280x720.png`: 1280 × 720 px, 24-bit PNG (Google Play Console Android TV Banner upload).
    - `tv/tv_banner_320x180.png`: 320 × 180 px, 24-bit PNG (also bundled in APK at `res/drawable-xhdpi/tv_banner.png`).
 4. **Android TV 16:9 Screenshots (`screenshots/android_tv/` — 1920 × 1080 px, 16:9 PNG):**
-   - `tv_1_room_groups_and_remote_focus.png` (3-Column Room-Grouped TV Grid & Glowing Cyan `"FOCUSED • OK"` D-Pad Remote Focus)
-   - `tv_2_dimmer_and_ssdp_discovery.png` (Non-Interfering `"DIM -/+"` Dimmer Adjust Mode & Background LAN Rescan)
-   - `tv_3_living_room_scenes_and_rules.png` (TV Remote Quick Scenes — Movie Mode 20%, Holiday Lights ON, All OFF & Room Master Toggle)
+   - `tv_1_room_groups_and_remote_focus.png` (3-Column Room-Grouped TV Grid, Room Header `-10%`/`+10%` Dimming & Glowing Cyan `"FOCUSED • OK"` Focus Ring)
+   - `tv_2_dimmer_and_ssdp_discovery.png` (Inline `"DIM -/+"` Dimmer Mode with `"Done Dimming"` Header Bar & Left/Right D-Pad Controls)
+   - `tv_3_living_room_scenes_and_rules.png` (TV Remote Quick Scenes — Movie Mode 20%, Conditional Holiday ON, All OFF & Room Master Toggle)
 5. **Phone Screenshots (`screenshots/phone/` — 1080 × 1920 px, 9:16 PNG):**
-   - `phone_1_devices_and_power_rings.png` (Room Grouping System & Master Room Power Rings)
-   - `phone_2_ssdp_network_scanner.png` (Pull-to-Refresh & SSDP Network Discovery Scanner)
-   - `phone_3_inline_dimmer_control.png` (Master Room Dimmer & Inline Bulb Brightness Presets)
-   - `phone_4_local_rules_and_upnp_log.png` (Local LAN Automation Rules & Live UPnP/SOAP Packet Log)
+   - `phone_1_devices_and_power_rings.png` (Single-Row Top Bar with Subtle Version Badge, Room Grouping & 3-State Power Rings)
+   - `phone_2_ssdp_network_scanner.png` (Pull-to-Refresh & SSDP Network Discovery Scanner with Port-Healed Switch Adoption)
+   - `phone_3_inline_dimmer_control.png` (Master Room Dimmer, Inline Brightness Presets & `Pin Widget` Home Screen Action)
+   - `phone_4_local_rules_and_upnp_log.png` (Local LAN Automation Rules, Headless Widget SOAP Telemetry & MIT License Notice)
 6. **7-Inch Tablet Screenshots (`screenshots/tablet_7_inch/` — 1200 × 1920 px PNG):**
-   - `tablet7_1_devices_dashboard.png`
-   - `tablet7_2_ssdp_and_rules.png`
+   - `tablet7_1_devices_dashboard.png` (Two-Column Room Dashboard, Expanded Dimmer & `Pin Widget` Drawer)
+   - `tablet7_2_ssdp_and_rules.png` (Zero-Cloud `10.22.22.1` Switch AP Provisioning, Collapsible `SETUP DIAGNOSTICS` & Local Rules)
 7. **10-Inch Tablet Screenshots (`screenshots/tablet_10_inch/` — 1600 × 2560 px PNG):**
-   - `tablet10_1_devices_dashboard.png`
-   - `tablet10_2_ssdp_and_rules.png`
+   - `tablet10_1_devices_dashboard.png` (Two-Column Room Dashboard, Expanded Dimmer & `Pin Widget` Drawer)
+   - `tablet10_2_ssdp_and_rules.png` (Zero-Cloud `10.22.22.1` Switch AP Provisioning, Collapsible `SETUP DIAGNOSTICS` & Local Rules)
 8. **Release Notes (`RELEASE_NOTES.txt`), Privacy Policy (`PRIVACY_POLICY.md`), and Upload & Data Safety Guide (`DATA_SAFETY_GUIDE.md`).**
