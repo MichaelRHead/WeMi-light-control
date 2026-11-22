@@ -31,7 +31,10 @@ import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.HomeNetworkEntity
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.network.ActiveLanBinding
+import org.suppressingfire.wemi.network.LanNetworkSnapshot
 import org.suppressingfire.wemi.network.NetworkClient
+import org.suppressingfire.wemi.network.NetworkMonitor
 import org.suppressingfire.wemi.network.ProvisionerClient
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.SharedSoapLogStore
@@ -55,6 +58,7 @@ class TelemetryDiagnosticsTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        NetworkMonitor.resetTestOverrides()
         WeMiSwitchWidgetProvider.actionRunnerForTests = null
         WeMiSwitchWidgetProvider.repositoryProviderForTests = null
         WeMiSwitchWidgetProvider.broadcastTimeoutMs = 8_500L
@@ -66,6 +70,7 @@ class TelemetryDiagnosticsTest {
     @After
     fun tearDown() {
         WeMiSwitchWidgetProvider.cancelAndJoinPendingWorkForTests()
+        NetworkMonitor.resetTestOverrides()
         WeMiSwitchWidgetProvider.actionRunnerForTests = null
         WeMiSwitchWidgetProvider.repositoryProviderForTests = null
         WeMiSwitchWidgetProvider.broadcastTimeoutMs = 8_500L
@@ -77,32 +82,19 @@ class TelemetryDiagnosticsTest {
     @Test
     fun sharedSoapLogStoreStreamsHeadlessWidgetSoapAndOrphanEventsIntoAppRepository() = runBlocking {
         FakeUpnpServer(
-            initialFriendlyName = "Porch Lantern",
-            modelName = "WLS040",
-            serialNumber = "WLS040TELEM01",
-            udn = "uuid:Lightswitch-3_0-WLS040TELEM01",
-            initialRelayOn = false
+            initialFriendlyName = "Porch Lantern", modelName = "WLS040",
+            serialNumber = "WLS040TELEM01", udn = "uuid:Lightswitch-3_0-WLS040TELEM01", initialRelayOn = false
         ).use { server ->
             val dao = SwitchDatabase.getDatabase(context).switchDao()
             // Simulate main app repository observing shared SOAP logs for this Application
-            val appRepo = SwitchRepository(
-                dao = dao,
-                context = context,
-                initialDemoModeOverride = false
-            )
+            val appRepo = SwitchRepository(dao = dao, context = context, initialDemoModeOverride = false)
             try {
                 appRepo.setDemoShowroomMode(false)
                 val saved = appRepo.saveDevice(
                     DeviceEntity(
-                        name = "Porch Lantern",
-                        roomName = "Porch",
-                        networkKey = DEFAULT_MAIN_HOME_KEY,
-                        deviceType = DeviceType.SWITCH_PLUG.name,
-                        ipAddress = "127.0.0.1",
-                        port = server.port,
-                        isOn = false,
-                        isReachable = true,
-                        serialNumber = "WLS040TELEM01"
+                        name = "Porch Lantern", roomName = "Porch", networkKey = DEFAULT_MAIN_HOME_KEY,
+                        deviceType = DeviceType.SWITCH_PLUG.name, ipAddress = "127.0.0.1", port = server.port,
+                        isOn = false, isReachable = true, serialNumber = "WLS040TELEM01"
                     )
                 )
                 appRepo.clearLogs()
@@ -132,21 +124,14 @@ class TelemetryDiagnosticsTest {
                 WidgetConfigStore.save(
                     context,
                     WidgetTargetConfig(
-                        appWidgetId = 502,
-                        targetType = org.suppressingfire.wemi.widget.WidgetTargetType.DEVICE,
-                        deviceId = 9999,
-                        serialNumber = "WLS040MISSING",
-                        roomName = "Garage",
-                        networkKey = DEFAULT_MAIN_HOME_KEY,
-                        displayName = "Deleted Garage Light",
+                        appWidgetId = 502, targetType = org.suppressingfire.wemi.widget.WidgetTargetType.DEVICE,
+                        deviceId = 9999, serialNumber = "WLS040MISSING", roomName = "Garage",
+                        networkKey = DEFAULT_MAIN_HOME_KEY, displayName = "Deleted Garage Light",
                         udn = "uuid:Lightswitch-3_0-WLS040MISSING"
                     )
                 )
                 assertFalse(WidgetActionExecutor.toggleWidgetTarget(context, 502))
-                WidgetConfigStore.save(
-                    context,
-                    WidgetTargetConfig.forRoom(503, "Attic", DEFAULT_MAIN_HOME_KEY)
-                )
+                WidgetConfigStore.save(context, WidgetTargetConfig.forRoom(503, "Attic", DEFAULT_MAIN_HOME_KEY))
                 assertFalse(WidgetActionExecutor.toggleWidgetTarget(context, 503))
 
                 val allLogs = appRepo.soapLogs.value
@@ -169,12 +154,7 @@ class TelemetryDiagnosticsTest {
     fun widgetProviderLogsBroadcastTimeoutIntoSharedSoapLogStore() = runBlocking {
         ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")).use { stalledServer ->
             val stalledThread = kotlin.concurrent.thread(isDaemon = true) {
-                runCatching {
-                    stalledServer.accept().use { sock ->
-                        Thread.sleep(600L)
-                        sock.close()
-                    }
-                }
+                runCatching { stalledServer.accept().use { sock -> Thread.sleep(600L); sock.close() } }
             }
             val dao = SwitchDatabase.getDatabase(context).switchDao()
             val setupRepo = SwitchRepository(dao = dao, context = context, initialDemoModeOverride = false)
@@ -182,20 +162,12 @@ class TelemetryDiagnosticsTest {
                 setupRepo.setDemoShowroomMode(false)
                 val insertedId = dao.insertDevice(
                     DeviceEntity(
-                        name = "Stalled Patio Switch",
-                        roomName = "Patio",
-                        networkKey = DEFAULT_MAIN_HOME_KEY,
-                        ipAddress = "127.0.0.1",
-                        port = stalledServer.localPort,
-                        isOn = false,
-                        isReachable = true,
-                        serialNumber = "WLS040STALL1"
+                        name = "Stalled Patio Switch", roomName = "Patio", networkKey = DEFAULT_MAIN_HOME_KEY,
+                        ipAddress = "127.0.0.1", port = stalledServer.localPort,
+                        isOn = false, isReachable = true, serialNumber = "WLS040STALL1"
                     )
                 ).toInt()
-                WidgetConfigStore.save(
-                    context,
-                    WidgetTargetConfig.forDevice(550, dao.getDeviceById(insertedId)!!)
-                )
+                WidgetConfigStore.save(context, WidgetTargetConfig.forDevice(550, dao.getDeviceById(insertedId)!!))
                 SharedSoapLogStore.clear(context)
 
                 WeMiSwitchWidgetProvider.broadcastTimeoutMs = 80L
@@ -229,46 +201,19 @@ class TelemetryDiagnosticsTest {
 
     @Test
     fun telemetryExporterRendersSection5WidgetsAndHomeKeyAcrossResolvedAndOrphanedTargets() {
-        val home = HomeNetworkEntity(
-            networkKey = DEFAULT_MAIN_HOME_KEY,
-            homeName = "Main Home",
-            ssidLabel = "HeadFamily-2.4G",
-            subnetPrefix = "192.168.86",
-            gatewayIp = "192.168.86.1"
-        )
+        val home = HomeNetworkEntity(DEFAULT_MAIN_HOME_KEY, "Main Home", "HeadFamily-2.4G", "192.168.86", "192.168.86.1")
         val switchOn = DeviceEntity(
-            id = 11,
-            name = "Patio String Lights",
-            roomName = "Patio",
-            networkKey = DEFAULT_MAIN_HOME_KEY,
-            ipAddress = "192.168.86.21",
-            port = 49153,
-            isOn = true,
-            isReachable = true,
-            serialNumber = "WLS040PAT11"
+            id = 11, name = "Patio String Lights", roomName = "Patio", networkKey = DEFAULT_MAIN_HOME_KEY,
+            ipAddress = "192.168.86.21", port = 49153, isOn = true, isReachable = true, serialNumber = "WLS040PAT11"
         )
         val unassignedSwitch = DeviceEntity(
-            id = 12,
-            name = "Mystery Plug",
-            roomName = "",
-            networkKey = DEFAULT_MAIN_HOME_KEY,
-            ipAddress = "192.168.86.22",
-            port = 49153,
-            isOn = false,
-            isReachable = true,
-            serialNumber = "WSP080MYS12",
-            udn = "uuid:Socket-1_0-WSP080MYS12"
+            id = 12, name = "Mystery Plug", roomName = "", networkKey = DEFAULT_MAIN_HOME_KEY,
+            ipAddress = "192.168.86.22", port = 49153, isOn = false, isReachable = true,
+            serialNumber = "WSP080MYS12", udn = "uuid:Socket-1_0-WSP080MYS12"
         )
         val patioOffline = DeviceEntity(
-            id = 13,
-            name = "Patio Floodlight",
-            roomName = "Patio",
-            networkKey = DEFAULT_MAIN_HOME_KEY,
-            ipAddress = "192.168.86.23",
-            port = 49153,
-            isOn = false,
-            isReachable = false,
-            serialNumber = "WLS040PAT13"
+            id = 13, name = "Patio Floodlight", roomName = "Patio", networkKey = DEFAULT_MAIN_HOME_KEY,
+            ipAddress = "192.168.86.23", port = 49153, isOn = false, isReachable = false, serialNumber = "WLS040PAT13"
         )
 
         WidgetConfigStore.save(context, WidgetTargetConfig.forDevice(603, switchOn.copy(id = 999, serialNumber = "WLS040GONE")))
@@ -292,6 +237,49 @@ class TelemetryDiagnosticsTest {
         assertTrue(report.contains("[WIDGET #602] type=ROOM room=\"Patio\" home=$DEFAULT_MAIN_HOME_KEY -> resolved=1/2 ON (1/2 reachable)"))
         assertTrue(report.contains("[WIDGET #603] type=DEVICE name=\"Patio String Lights\" devId=999 sn=WLS040GONE room=\"Patio\" home=$DEFAULT_MAIN_HOME_KEY -> ORPHANED (no matching switch)"))
         assertTrue(report.contains("[WIDGET #604] type=DEVICE name=\"Mystery Plug\" devId=12 sn=WSP080MYS12 udn=uuid:Socket-1_0-WSP080MYS12 room=\"Unassigned\" home=$DEFAULT_MAIN_HOME_KEY -> resolved=#12 \"Mystery Plug\" (OFF_STANDBY)"))
+    }
+
+    @Test
+    fun arcVmTelemetryRendersCgnatDnsUnsetHomeAndDeduplicatesGenaSkipLog() = runBlocking {
+        val arcLan = LanNetworkSnapshot(
+            localIpv4 = "100.115.92.6", subnetPrefix = "100.115.92", gatewayIp = "100.115.92.5",
+            interfaceName = "eth1", isWifiSocketBound = true,
+            dnsServersIpv4 = listOf("192.168.86.1", "8.8.8.8"), isArcVmNatSubnet = true
+        )
+        val resolvedArc = TelemetryFileExporter.resolveExportSetupSnapshot(SetupDebugSnapshot(), arcLan, isDemoMode = false)
+        val unsetHome = HomeNetworkEntity("wifi_lan_chromeos_default", "My Home", "Local LAN", "", "")
+        val report = TelemetryFileExporter.buildFullTelemetryReport(setupSnapshot = resolvedArc, homes = listOf(unsetHome))
+        assertTrue(report.contains("[NET] mode=REAL-LAN ip=100.115.92.6 (eth1) gw=100.115.92.5 setupSubnet=false wifiBound=true arcVmNat=true dns=192.168.86.1,8.8.8.8"))
+        assertTrue(report.contains("[HOME] key=wifi_lan_chromeos_default name=\"My Home\" ssid=\"Local LAN\" subnet=unset gw=none"))
+        assertFalse(report.contains("subnet=.0/24"))
+
+        // Captured phone 10.22.22.x session stays session-consistent and does not inherit ARCVM flags/DNS
+        val phoneSession = SetupDebugSnapshot(timestamp = "9:10:00 AM", phoneLocalIp = "10.22.22.2", phoneGatewayIp = "10.22.22.1", isWemoSetupSubnet = true, isWifiSocketBound = true)
+        val phoneLine = TelemetryFileExporter.resolveExportSetupSnapshot(phoneSession, arcLan, isDemoMode = false).toDisplayLines().first()
+        assertFalse(phoneLine.contains("arcVmNat=true"))
+        assertFalse(phoneLine.contains("dns="))
+
+        // ChromeOS CGNAT skips GENA SUBSCRIBE and logs one deduplicated entry per active guest IP
+        var activeGuestIp = "100.115.92.6"
+        NetworkMonitor.activeLanBindingOverrideForTests = { ActiveLanBinding(null, "eth1", activeGuestIp, listOf("192.168.86.1")) }
+        val dao = SwitchDatabase.getDatabase(context).switchDao()
+        val repo = SwitchRepository(dao = dao, context = context, initialDemoModeOverride = false)
+        try {
+            repo.setDemoShowroomMode(false)
+            dao.insertDevice(DeviceEntity(name = "Desk Switch", networkKey = DEFAULT_MAIN_HOME_KEY, ipAddress = "192.168.86.42", port = 49153, isReachable = true, serialNumber = "SNARC01"))
+            repo.clearLogs()
+            assertEquals(0, repo.refreshGenaSubscriptionsForHome(DEFAULT_MAIN_HOME_KEY))
+            assertEquals(0, repo.refreshGenaSubscriptionsForHome(DEFAULT_MAIN_HOME_KEY))
+            val skipLogs = repo.soapLogs.value.filter { it.soapAction == "GENA#SUBSCRIBE (Skipped)" }
+            assertEquals(1, skipLogs.size)
+            assertTrue(skipLogs.single().statusText.contains("100.115.92.6") && skipLogs.single().isLiveLanSuccess)
+
+            activeGuestIp = "100.115.92.10"
+            assertEquals(0, repo.refreshGenaSubscriptionsForHome(DEFAULT_MAIN_HOME_KEY))
+            assertEquals(2, repo.soapLogs.value.count { it.soapAction == "GENA#SUBSCRIBE (Skipped)" })
+        } finally {
+            repo.close()
+        }
     }
 
     @Test

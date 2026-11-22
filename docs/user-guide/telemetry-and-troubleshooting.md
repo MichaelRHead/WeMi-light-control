@@ -20,7 +20,7 @@ Whenever you need help troubleshooting `10.22.22.1` Wi-Fi setup, switch discover
 You can take a standard Android screenshot (**Power + Volume Down**) of any of the three diagnostic views below and share the image directly:
 
 ### A1. During `10.22.22.1` Switch Setup (`SETUP DIAGNOSTICS`)
-1. Open the **Provision New Switch AP (`10.22.22.1`)** dialog (by tapping the green **Switch Setup AP Detected (`10.22.22.1`)** banner at the top of the **Devices** tab, or via **`More` → `Provision New Switch AP (10.22.22.1)`**).
+1. Open the **Provision New Switch AP (`10.22.22.1`)** dialog (by tapping the green **Switch Setup AP Detected (`10.22.22.1`)** banner at the top of the **Devices** tab on Android phones/tablets, or directly via **`More` → `Provision New Switch AP (10.22.22.1)`** — on Chromebooks, Android runs in a virtual `100.115.92.x` network so open it via **`More`** after connecting ChromeOS Wi-Fi to the switch's setup hotspot).
 2. Look for the **`SETUP DIAGNOSTICS`** dark terminal card inside the dialog:
    - **Compact While Idle, Auto-Expands on Errors or Traces**: While waiting for input, the card stays compact — tap **`Details`** to inspect the live `[NET]` / `[PROBE]` lines or **`Hide`** to collapse them. Whenever provisioning starts or fails (`NetworkStatus = 0` or `2`, or unreachable), the card automatically expands so the full trace is immediately visible.
    - **Automatic Hold on Failure**: If the switch fails to join your home Wi-Fi (`NetworkStatus = 0` or `2`) or cannot be reached on `10.22.22.1`, the app **automatically keeps the switch's `10.22.22.1` setup AP open** (`[STEP 6 HOLD] ... Skipping CloseSetup so 10.22.22.1 AP stays open for retry`) and keeps the dialog on screen so you can screenshot the full trace immediately.
@@ -30,7 +30,7 @@ You can take a standard Android screenshot (**Power + Volume Down**) of any of t
 ### A2. Live UPnP / SOAP Packet Log (`More` Tab)
 1. Tap the **`More`** tab in the bottom navigation bar.
 2. Scroll down to the **`UPnP / SOAP Packet Log`** card at the bottom of the screen.
-3. Each entry displays the timestamp (`h:mm:ss a`), switch or widget name, SOAP/widget action (e.g., `SetBinaryState`, `GetBinaryState`, `GetMetaInfo`, `WiFiSetup1#ConnectHomeNetwork`, `GENA PropChange`, or headless Home Screen `Widget#Toggle`), target `http://<ip>:<port>/upnp/control/...` URL, and HTTP status / exact offline failure reason / round-trip latency in milliseconds.
+3. Each entry displays the timestamp (`h:mm:ss a`), switch or widget name, SOAP/widget action (e.g., `SetBinaryState`, `GetBinaryState`, `GetMetaInfo`, `WiFiSetup1#ConnectHomeNetwork`, `GENA PropChange`, `GENA#SUBSCRIBE (Skipped)` on ChromeOS VMs using `15s` SOAP polling, or headless Home Screen `Widget#Toggle`), target `http://<ip>:<port>/upnp/control/...` URL, and HTTP status / exact offline failure reason / round-trip latency in milliseconds.
 4. Take a screenshot of the packet log card to share recent network traffic (including background Home Screen widget taps).
 
 ### A3. Per-Switch Hardware & Latency Drawer (`Devices` Tab)
@@ -51,22 +51,22 @@ Inside the **`SETUP DIAGNOSTICS`** header bar in the **Provision New Switch AP (
   2. Copies the entire report to your Android clipboard.
   3. Opens Android's **Share Sheet (`Save or Share WeMi Telemetry`)** so you can save `wemi-telemetry-latest.txt` to **Files / Google Drive**, email it, or send it directly to chat.
 - **Tap `Copy`**:
-  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v33.0 [33] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
+  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v34.0 [34] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
   2. Paste the copied text directly into your chat message or issue report.
 
 ### B2. Exporting from the `More` Tab (`Save/Share Log`)
 In the header of the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
 - **Tap `Save/Share Log`**:
-  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v33.0 (versionCode=33, com.aistudio.wemiswitch.kxpqzr)`) containing:
-     - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt (keeping `[NET]` subnet/Wi-Fi-binding flags consistent with the captured session).
-     - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet, and gateway IP).
+  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v34.0 (versionCode=34, com.aistudio.wemiswitch.kxpqzr)`) containing:
+     - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt (keeping `[NET]` subnet/Wi-Fi-binding/ChromeOS VM flags consistent with the captured session).
+     - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet — or `subnet=unset gw=none` on a fresh Chromebook before the first switch is discovered — and gateway IP).
      - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its normalized room, Wi-Fi Home (`home=<networkKey>`), IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), dimmer brightness/Night Mode (`dim=<n>%`, `night=1`), latency (`ms`), hardware SKU, firmware, serial number, MAC, and canonical UPnP `UDN`.
-     - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries — including Top-Header **`All Off`**, Room Master toggles, Android TV D-Pad switch/dimmer commands, and **headless Home Screen widget taps/timeouts** — with timestamps, endpoints, HTTP statuses, exact offline failure causes, and password-redacted single-line `xml:` payload summaries.
+     - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries — including ChromeOS VM discovery/swept subnets, `GENA#SUBSCRIBE (Skipped)` polling notices, Top-Header **`All Off`**, Room Master toggles, Android TV D-Pad switch/dimmer commands, and **headless Home Screen widget taps/timeouts** — with timestamps, endpoints, HTTP statuses, exact offline failure causes, and password-redacted single-line `xml:` payload summaries.
      - **`--- [5. HOME SCREEN WIDGETS] ---`**: Every configured Home Screen light or room widget with its `appWidgetId`, bound serial/UDN/room/Wi-Fi Home, and whether it resolves to active switches or is `ORPHANED` (needs reconfiguring).
   2. Copies the full report to your clipboard and opens the Android **Share Sheet**.
 
 ### B3. Pulling `wemi-telemetry-latest.txt` via USB (`adb`)
-If your Android phone or Android TV is connected to a computer with USB debugging enabled, you can also pull the latest recorded file directly from the terminal after tapping **`Copy`**, **`Save/Share`**, or **`Save/Share Log`**:
+If your Android phone, Chromebook (ARCVM), or Android TV is connected to a computer with USB debugging enabled, you can also pull the latest recorded file directly from the terminal after tapping **`Copy`**, **`Save/Share`**, or **`Save/Share Log`**:
 
 ```bash
 adb exec-out run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-latest.txt > wemi-telemetry-latest.txt
@@ -78,7 +78,7 @@ adb exec-out run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-late
 
 | Line Prefix | Example | What It Tells You |
 | :--- | :--- | :--- |
-| **`[NET]`** | `mode=REAL-LAN ip=10.22.22.2 (wlan0) gw=10.22.22.1 setupSubnet=true wifiBound=true` | Confirms whether the app is in `REAL-LAN` mode, connected to the switch's `10.22.22.x` Wi-Fi AP (`setupSubnet=true`), and binding sockets directly to `wlan0` (`wifiBound=true`) bypassing mobile data. |
+| **`[NET]`** | `mode=REAL-LAN ip=10.22.22.2 (wlan0) gw=10.22.22.1 setupSubnet=true wifiBound=true` *(or `ip=100.115.92.6 (eth1) ... arcVmNat=true dns=192.168.86.1` on ChromeOS)* | Confirms whether the app is in `REAL-LAN` mode, connected to the switch's `10.22.22.x` Wi-Fi AP (`setupSubnet=true`), binding sockets directly to Wi-Fi/Ethernet (`wifiBound=true`), or running inside ChromeOS ARCVM (`arcVmNat=true`) with its detected IPv4 `dns=` hint. |
 | **`[PROBE]`** | `host=10.22.22.1 -> :49152/setup.xml=HTTP_200(14ms,1420B)` | Shows per-port probe diagnostics across all 9 UPnP ports (`49151..49159`) and which descriptor path (`/setup.xml` or `/Lightsetup.xml`) responded with `HTTP_200`. |
 | **`[XML]`** | `/setup.xml :49152 name="Smart Switch" model=LightSwitch sku=... fw=WeMo_WW_...` | Hardware model name, default friendly name, SKU, and firmware version read from `/setup.xml`. |
 | **`[FLAGS]`** | `rtos=0 iot=0 binaryOption=0 new_algo=0 -> autoMethod=1 autoLen=true` | Hardware encryption flags from `/setup.xml` and which OpenSSL AES-128-CBC method (`1`, `2`, or `3`) and length suffix (`autoLen`) were auto-selected. |
@@ -89,5 +89,7 @@ adb exec-out run-as com.aistudio.wemiswitch.kxpqzr cat files/wemi-telemetry-late
 | **`[STEP 5 SEND #1]`** | `ConnectHomeNetwork -> HTTP_200 (18ms) PairingStatus=1` | Confirms the switch accepted the `ConnectHomeNetwork` SOAP command. |
 | **`[POLL #n]`** | `GetNetworkStatus -> Status=1 (14ms)` | Status codes from the switch while joining your router: **`1` = Connected**, **`3` = Connected (Handshake Complete)**, **`0` = Still Connecting / Handshake Failed**, **`2` = Bad Password / Auth Rejected** (reports the exact `Method` and `lengths` tried on `>=8`-char passwords so you know which encryption chip to toggle on retry). |
 | **`[STEP 6 CLOSE/HOLD]`** | `CloseSetup -> success` or `Skipping CloseSetup so 10.22.22.1 AP stays open for retry` | Shows whether the setup AP was closed after a successful connection (`1` or `3`) or intentionally kept open (`kept_open_for_retry`) so you can retry immediately. |
+| **`[HOME]`** | `key=wifi_lan_chromeos_default name="My Home" ssid="Local LAN" subnet=unset gw=none` | Lists each saved Wi-Fi Home profile and its physical `/24` subnet (`subnet=unset` on a fresh Chromebook until the first switch is discovered or a manual subnet is scanned). |
+| **`GENA#SUBSCRIBE (Skipped)`** | `Skipped in ChromeOS VM (NAT guest IP 100.115.92.6); using 15s SOAP state polling` | Confirms ChromeOS ARCVM intentionally skipped unreachable GENA push callbacks (protecting switch sockets) and switched to `15s` SOAP polling instead. |
 | **`[WIDGET #id]`** | `type=DEVICE name="Patio" devId=7 sn=... udn=... home=... -> resolved=#7 "Patio" (ON)` | Confirms each placed Home Screen widget's bound target (serial, optional canonical `udn`, room, and Wi-Fi Home) and whether it resolves to a live switch/room or is `ORPHANED` (tap the widget to reconfigure). |
 

@@ -1,6 +1,7 @@
 package org.suppressingfire.wemi.data
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -32,6 +33,8 @@ internal class GenaAndHealthPollingCoordinator(
     private val appendLog: (SoapLogEntry) -> Unit,
     private val nowFormatted: () -> String
 ) {
+    private val lastLoggedCgnatGenaSkipIp = AtomicReference<String?>(null)
+
     private fun mutexFor(device: DeviceEntity): Mutex =
         deviceMutexes.getOrPut(device.concurrencyKey()) { Mutex() }
 
@@ -86,6 +89,24 @@ internal class GenaAndHealthPollingCoordinator(
             it.networkKey == networkKey && it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR
         }
         if (devices.isEmpty()) return@coroutineScope 0
+        val localIp = networkClient.resolveLocalIpv4Address()
+        if (devices.any { it.ipAddress != "127.0.0.1" } && LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)) {
+            if (lastLoggedCgnatGenaSkipIp.getAndSet(localIp) != localIp) {
+                appendLog(
+                    SoapLogEntry(
+                        timestamp = nowFormatted(),
+                        deviceName = "GENA Push Listener",
+                        endpoint = "http://$localIp/gena (ChromeOS VM)",
+                        soapAction = "GENA#SUBSCRIBE (Skipped)",
+                        statusText = "Skipped in ChromeOS VM (NAT guest IP $localIp); using 15s SOAP state polling",
+                        xmlSnippet = "",
+                        isLiveLanSuccess = true
+                    )
+                )
+            }
+        } else if (!LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)) {
+            lastLoggedCgnatGenaSkipIp.set(null)
+        }
         devices.map { dev ->
             async {
                 lanSemaphore.withPermit {

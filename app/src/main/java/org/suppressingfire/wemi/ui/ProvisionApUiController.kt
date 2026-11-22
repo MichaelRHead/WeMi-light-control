@@ -101,7 +101,9 @@ internal class ProvisionApUiController(
                         isDemoMode = repository.isDemoShowroomMode.value,
                         targetApHost = cleanHost,
                         probeSummary = "Probing $cleanHost (ports 49151..49159)...",
-                        apScanSummary = "Waiting for probe..."
+                        apScanSummary = "Waiting for probe...",
+                        isArcVmNatSubnet = netSnap.isArcVmNatSubnet,
+                        dnsServersIpv4 = netSnap.dnsServersIpv4
                     )
 
                     val descriptor = repository.probeSetupApDevice(apHost = cleanHost)
@@ -212,7 +214,9 @@ internal class ProvisionApUiController(
                         isDemoMode = repository.isDemoShowroomMode.value,
                         targetApHost = cleanHost,
                         targetSsid = ssid.trim(),
-                        traceLines = listOf("[START] Starting WiFiSetup1 provisioning to \"$ssid\" on $cleanHost...")
+                        traceLines = listOf("[START] Starting WiFiSetup1 provisioning to \"$ssid\" on $cleanHost..."),
+                        isArcVmNatSubnet = netSnap.isArcVmNatSubnet,
+                        dnsServersIpv4 = netSnap.dnsServersIpv4
                     )
                 }
 

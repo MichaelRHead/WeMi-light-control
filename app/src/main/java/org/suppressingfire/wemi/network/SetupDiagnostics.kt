@@ -68,7 +68,9 @@ data class SetupDebugSnapshot(
     val detectedDevice: SetupDeviceDescriptor? = null,
     val apScanSummary: String = "Not scanned yet",
     val scannedAps: List<ScannedAp> = emptyList(),
-    val traceLines: List<String> = emptyList()
+    val traceLines: List<String> = emptyList(),
+    val isArcVmNatSubnet: Boolean = false,
+    val dnsServersIpv4: List<String> = emptyList()
 ) {
     /**
      * Formats all setup telemetry into compact, high-signal lines designed to fit inside a single
@@ -78,8 +80,11 @@ data class SetupDebugSnapshot(
         val effectiveSsid = selectedSsid.ifBlank { targetSsid }
         val lines = mutableListOf<String>()
         val modeTag = if (isDemoMode) "DEMO" else "REAL-LAN"
+        val effectiveArcVmNat = isArcVmNatSubnet || LanRuntimeUtils.isCarrierGradeNatIpv4(phoneLocalIp)
+        val arcVmPart = if (effectiveArcVmNat) " arcVmNat=true" else ""
+        val dnsPart = if (dnsServersIpv4.isNotEmpty()) " dns=${dnsServersIpv4.joinToString(",")}" else ""
         lines.add(
-            "[NET] mode=$modeTag ip=$phoneLocalIp ($phoneInterface) gw=$phoneGatewayIp setupSubnet=$isWemoSetupSubnet wifiBound=$isWifiSocketBound"
+            "[NET] mode=$modeTag ip=$phoneLocalIp ($phoneInterface) gw=$phoneGatewayIp setupSubnet=$isWemoSetupSubnet wifiBound=$isWifiSocketBound$arcVmPart$dnsPart"
         )
         lines.add("[PROBE] host=$targetApHost -> $probeSummary")
         if (detectedDevice != null) {
@@ -202,7 +207,17 @@ object TelemetryFileExporter {
             } else {
                 lanSnapshot.isWifiSocketBound
             },
-            isDemoMode = if (hasCapturedSession) setupSnapshot.isDemoMode else isDemoMode
+            isDemoMode = if (hasCapturedSession) setupSnapshot.isDemoMode else isDemoMode,
+            isArcVmNatSubnet = if (hasCapturedSession) {
+                setupSnapshot.isArcVmNatSubnet || LanRuntimeUtils.isCarrierGradeNatIpv4(setupSnapshot.phoneLocalIp)
+            } else {
+                lanSnapshot.isArcVmNatSubnet || LanRuntimeUtils.isCarrierGradeNatIpv4(lanSnapshot.localIpv4)
+            },
+            dnsServersIpv4 = if (hasCapturedSession) {
+                setupSnapshot.dnsServersIpv4
+            } else {
+                lanSnapshot.dnsServersIpv4.ifEmpty { setupSnapshot.dnsServersIpv4 }
+            }
         )
     }
 
@@ -228,8 +243,10 @@ object TelemetryFileExporter {
                 appendLine("(none)")
             } else {
                 homes.forEach { h ->
+                    val subnetLabel = if (h.subnetPrefix.isBlank()) "unset" else "${h.subnetPrefix}.0/24"
+                    val gatewayLabel = h.gatewayIp.ifBlank { "none" }
                     appendLine(
-                        "[HOME] key=${h.networkKey} name=\"${h.homeName}\" ssid=\"${h.ssidLabel}\" subnet=${h.subnetPrefix}.0/24 gw=${h.gatewayIp}"
+                        "[HOME] key=${h.networkKey} name=\"${h.homeName}\" ssid=\"${h.ssidLabel}\" subnet=$subnetLabel gw=$gatewayLabel"
                     )
                 }
             }
