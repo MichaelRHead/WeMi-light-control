@@ -2,7 +2,7 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
+Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, Chromebooks (ChromeOS), and Android TV.
 
 Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v34.0`**) all the way back to **`v1.0`**.
 
@@ -53,8 +53,8 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ### Version 34.0 (`versionCode = 34`) — November 21, 2026
 - **Chromebook (ChromeOS ARCVM) Local-LAN Discovery & Control**: Run WeMi Switch Control directly on Chromebooks with zero extra permissions. Network-bound multicast SSDP discovery, non-Belkin Router IGD subnet harvesting, and a 5-tier physical `/24` subnet fallback automatically discover switches across ChromeOS's virtual Android network (`100.115.92.x`) while preserving full phone and Android TV discovery behavior.
 - **Guided Manual `/24` Subnet Scanner Fallback**: When a strict mesh router or isolated Wi-Fi access point blocks multicast on ChromeOS, the SSDP Scanner displays a clean card letting you enter your router's IPv4 prefix (e.g., `192.168.1` or `192.168.86`) to scan and adopt local switches in one tap.
-- **Clean Virtual-Subnet Home Hygiene & Smooth Chromebook Sync**: Phantom ChromeOS CGNAT addresses (`100.115.92.0/24`) are excluded from saved Wi-Fi Homes and `Add Home` pre-fills, unreachable GENA push subscriptions are skipped safely on virtual NAT interfaces to protect 2nd-Gen RTOS switches, and Chromebooks automatically refresh switch states every 15 seconds while in the foreground.
-- **Refreshed Google Play Store & Android TV Graphics**: Updated all phone, tablet, Android TV screenshots, feature graphic, and TV banners to reflect the live single-row top bar, subtle version pill, Home Screen Widget pinning, collapsible setup diagnostics, and room-header TV dimming.
+- **Clean Virtual-Subnet Home Hygiene, Diagnostics & Smooth Chromebook Sync**: Phantom ChromeOS CGNAT addresses (`100.115.92.0/24`) are excluded from saved Wi-Fi Homes and `Add Home` pre-fills (and legacy CGNAT home names repair cleanly), unreachable GENA push subscriptions are skipped with a single diagnostic notice on virtual NAT interfaces to protect 2nd-Gen RTOS switches, `[NET]` exports include ChromeOS NAT/DNS context, network-interface lookups run off the UI thread, and Chromebooks automatically refresh switch states every 15 seconds while in the foreground.
+- **Refreshed Google Play Store, Chromebook & Android TV Graphics**: Updated all phone, tablet, Android TV screenshots, feature graphic, and TV banners—and added dedicated 16:9 **Chromebook desktop** screenshots—to showcase the single-row top bar, subtle version pill, Home Screen Widget pinning, ChromeOS guided `/24` subnet discovery, collapsible setup diagnostics, and room-header TV dimming.
 
 ---
 

@@ -1,7 +1,7 @@
 # WeMi Light Control — Upcoming Features & Next-Iteration Roadmap (`UPCOMING_FEATURES.md`)
 
 **Target Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
-**Current Baseline**: `v33.0` (See [`IMPLEMENTED.md`](IMPLEMENTED.md) for the reverse-chronological Change Log of completed features)  
+**Current Baseline**: `v34.0` (See [`IMPLEMENTED.md`](IMPLEMENTED.md) for the reverse-chronological Change Log of completed features)  
 **Target Platforms**: Android Phones, Tablets, Chromebooks (ChromeOS ARCVM), Home Screen Widgets, Quick Settings, and Android TV (10-foot D-Pad Hub)
 
 Related documents in this repository:
@@ -11,8 +11,8 @@ Related documents in this repository:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Minimal Permissive Dependency Policy (`Apache-2.0` AndroidX/Kotlin Only; Zero External HTTP/Font Bloat) & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`CHROMEOS_ARCVM_DISCOVERY_DESIGN.md`](CHROMEOS_ARCVM_DISCOVERY_DESIGN.md) — ChromeOS VM (ARCVM) Local-LAN SSDP Discovery, Physical-Subnet Stage C Fallback, Home Profile Hygiene & GENA Safety Architecture *(Implemented)*
-- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v33.0`)
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v33.0`)
+- [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v34.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v34.0`)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 - [`AGENTS.md`](AGENTS.md) & [`ARCHITECTURE.md`](ARCHITECTURE.md) — Concise Agent Guide & On-Demand Architecture/Test Catalog
 - [`.agents/skills/wemi-release-coordinator/SKILL.md`](.agents/skills/wemi-release-coordinator/SKILL.md) — 6-Agent / 7-Stage Autonomous Release Review, Sign-Off & Play Store Promotion Coordinator Skill
@@ -30,7 +30,7 @@ Related documents in this repository:
 
 ## 1. Upcoming Features Overview
 
-With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Real-LAN `<100ms` GENA subscriptions, parallel `Semaphore(3)` health polling, and ChromeOS ARCVM network-bound `MulticastSocket` discovery + physical-subnet fallback), 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3` with `minSdk 24` compatibility), compact single-row `TopHeader` (`48.dp` accessible controls + `"All Off"` + in-app `ReleaseHistoryDialog`), zero-dependency Home Screen Light & Room Toggle Widgets (`WeMiSwitchWidgetProvider`, one-tap pinning & serial/UDN resolution), 3-column room-grouped Android TV dashboard (`wemi TV` with focusable inline dimmer sliders, Room Bar dimming & conditional `Holiday ON`), dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), confirmation-protected LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, `100%` `< 500`-line modularization across all `96` production and test `.kt` files, and `115` unit, protocol, widget, telemetry, governance, ChromeOS ARCVM, and full-stack E2E tests across `22` suites complete, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
+With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Real-LAN `<100ms` GENA subscriptions, parallel `Semaphore(3)` health polling, and ChromeOS ARCVM network-bound `MulticastSocket` discovery + physical-subnet fallback), 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3` with `minSdk 24` compatibility), compact single-row `TopHeader` (`48.dp` accessible controls + `"All Off"` + in-app `ReleaseHistoryDialog`), zero-dependency Home Screen Light & Room Toggle Widgets (`WeMiSwitchWidgetProvider`, one-tap pinning & serial/UDN resolution), 3-column room-grouped Android TV dashboard (`wemi TV` with focusable inline dimmer sliders, Room Bar dimming & conditional `Holiday ON`), dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), confirmation-protected LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, `100%` `< 500`-line modularization across all `98` production and test `.kt` files, and `120` unit, protocol, widget, telemetry, governance, ChromeOS ARCVM, and full-stack E2E tests across `23` suites complete, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
 
 | Track | Upcoming Feature Area | Key Deliverables |
 | :--- | :--- | :--- |
