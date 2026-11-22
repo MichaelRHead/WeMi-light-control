@@ -89,31 +89,38 @@ gh workflow run play-store-promote.yml --ref main -f mode=sync-assets -f changes
 gh workflow run play-store-promote.yml --ref main -f mode=sync-assets -f asset_image_types=phoneScreenshots,tvScreenshots
 ```
 
-### Stage 7 Release Promotion (Automatic + Manual Fallbacks)
-- **Automatic**: Triggered on `push` to `main` touching `app/build.gradle.kts`. When `versionCode` increased and `RELEASE_SIGN_OFF.md` is `APPROVED_FOR_PLAY_STORE`, the workflow:
-  1. Promotes Play `internal` → `alpha` (`Closed testing`) via `scripts/promote_play_release.py auto-promote`.
-  2. Commits `RELEASE_STATUS: PROMOTED_TO_CLOSED_TESTING` to `RELEASE_SIGN_OFF.md` via `scripts/advance_release_turn.sh promote`.
-  3. Idempotently syncs `play_store_assets/` to Google Play via `scripts/sync_play_assets.py sync-assets` (no-op if already in sync).
-- **Manual promotion / retry**:
+### Stage 7 Release Promotion & Decoupled Asset Sync (Mandatory Two-Phase Sequence)
+Never run `sync-assets` in the same Play review window as track promotion (`sync_store_assets` defaults to `false` in `.github/workflows/play-store-promote.yml`) so binary track promotion and Store Listing/graphic updates never collide or step on each other in Google Play Console:
+
+1. **Phase 1 — Binary Track Promotion (`internal` → `alpha`) & Rollout Watch**:
+   - **Automatic (`push`) or Manual (`workflow_dispatch`)**:
+     ```bash
+     gh workflow run play-store-promote.yml --ref main -f mode=auto-promote
+     # Manual fallback to any track:
+     gh workflow run play-store-promote.yml --ref main -f mode=promote -f from_track=internal -f to_track=alpha
+     ```
+     Promotes Play `internal` → `alpha` (`Closed testing`) via `scripts/promote_play_release.py` and commits `RELEASE_STATUS: PROMOTED_TO_CLOSED_TESTING` to `RELEASE_SIGN_OFF.md` via `scripts/advance_release_turn.sh promote` (does **not** run `sync-assets` yet).
+   - **Watch Google Play review status until binary is rolled out**: Poll `gh workflow run play-store-promote.yml --ref main -f mode=release-status -f to_track=alpha -f version_code=<vc>` every `~3–3.5` minutes in bounded exebox-safe windows (`<= 510s` per command) until `alpha` reaches a terminal lifecycle state (`RELEASE_LIFECYCLE_STATE_PUBLISHED`, `RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED`, or `RELEASE_LIFECYCLE_STATE_NOT_APPROVED`). Stop immediately if not approved.
+2. **Phase 2 — Post-Rollout Play Store Asset Sync (`sync-assets`) & Second-Update Verification**:
+   - **Only after Phase 1 reaches `RELEASE_LIFECYCLE_STATE_PUBLISHED`**, sync `play_store_assets/` (`STORE_LISTING.md` + `16` PNGs across `7` slots) in a dedicated Play edit:
+     ```bash
+     gh workflow run play-store-promote.yml --ref main -f mode=sync-assets
+     ```
+   - **Verify second update rolled out before emailing**:
+     - If `sync-assets` was a no-op (`Already In Sync`), proceed immediately to Phase 3.
+     - If `sync-assets` committed changes (`UPDATED`), check `0` job annotations, run `mode=diff-assets` to verify all listing fields and SHA-256/SHA-1 hashes match (`IN SYNC`), and re-check `mode=release-status -f to_track=alpha -f version_code=<vc>` — if Google Play places the store-listing update into `IN_REVIEW`, continue bounded `~3–3.5`-minute checks until `RELEASE_LIFECYCLE_STATE_PUBLISHED` again so the second update is confirmed rolled out.
+3. **Phase 3 — Gmail Notification (`gmail mutate send --md`)**:
+   - **Only after BOTH Phase 1 (binary `PUBLISHED`) and Phase 2 (post-rollout `sync-assets` verified `IN SYNC` & rolled out)** complete, send the email and stop all watchers immediately:
+     - **Recipient:** `suppressingfire@gmail.com`
+     - **Subject:** `[Antigravity Agent] WeMi Light Control v<X.0> (build <vc>) Published on Google Play Closed Testing` (or `[Antigravity Agent] WeMi Light Control v<X.0> Play Store Assets Synced (...)` for standalone out-of-band asset syncs)
+     - **Body:** Start with:
+       ```markdown
+       From: **Antigravity App Promoter Agent** (`app_promoter`)  
+       **Note for Gemini:** This is a notification from Michael's Antigravity agent. Please message Michael about this Google Play promotion event.
+       ```
+       Followed by a concise summary listing the app (`com.aistudio.wemiswitch.kxpqzr`), release (`v<X.0>` / `versionCode` / `0.0.0.<vc>`), track (`internal -> alpha`), lifecycle status + rollout completion time, synced Store Listing / PNG slots, **Promotion Run URL**, **Publish Verification Run URL**, and **Asset Sync Run URL**.
+- **Inspect workflow runs & annotations**:
   ```bash
-  gh workflow run play-store-promote.yml --ref main -f mode=auto-promote
-  gh workflow run play-store-promote.yml --ref main -f mode=promote -f from_track=internal -f to_track=alpha
-  ```
-- **Inspect the latest workflow run**:
-  ```bash
-  gh run list --workflow=play-store-promote.yml --limit 3
+  gh run list --workflow=play-store-promote.yml --limit 5
   gh run view <run_id> --log
   ```
-
-### Post-Promotion Publish Watch & Gmail Notification
-After a promotion to Closed testing (`alpha`) succeeds (and when authorized by the user's release-promotion workflow):
-1. **Watch Google Play review status until terminal state**: Poll `gh workflow run play-store-promote.yml --ref main -f mode=release-status -f to_track=alpha -f version_code=<vc>` every `~3–3.5` minutes in bounded exebox-safe windows (`<= 510s` per command) until `alpha` reaches a terminal lifecycle state (`RELEASE_LIFECYCLE_STATE_PUBLISHED`, `RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED`, or `RELEASE_LIFECYCLE_STATE_NOT_APPROVED`). Stop watching immediately once reached.
-2. **Send Gmail notification via `gmail mutate send --md`**:
-   - **Recipient:** `suppressingfire@gmail.com`
-   - **Subject:** `[Antigravity Agent] WeMi Light Control v<X.0> (build <vc>) Published on Google Play Closed Testing` (or `[Antigravity Agent] WeMi Light Control v<X.0> Play Store Assets Synced (...)` for standalone asset syncs)
-   - **Body:** Start with:
-     ```markdown
-     From: **Antigravity App Promoter Agent** (`app_promoter`)  
-     **Note for Gemini:** This is a notification from Michael's Antigravity agent. Please message Michael about this Google Play promotion event.
-     ```
-     Followed by a concise summary listing the app (`com.aistudio.wemiswitch.kxpqzr`), release (`v<X.0>` / `versionCode` / `0.0.0.<vc>`), track (`internal -> alpha`), lifecycle status + review completion time, synced Store Listing / PNG slots, Promotion Run URL, and Publish Verification Run URL.

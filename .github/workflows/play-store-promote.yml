@@ -79,10 +79,10 @@ on:
         type: boolean
         default: true
       sync_store_assets:
-        description: "Also sync play_store_assets/ (STORE_LISTING.md & 7 PNG slots) after promoting"
+        description: "Also sync play_store_assets/ in the same run (default false: run sync-assets after Closed testing rollout completes)"
         required: false
         type: boolean
-        default: true
+        default: false
       asset_image_types:
         description: "Optional comma-separated Play image types for diff-assets / sync-assets (blank = all 7)"
         required: false
@@ -284,8 +284,8 @@ jobs:
             --track "${TO_TRACK}" \
             --verified "Play API promotion succeeded; build ${PROMOTED_VC} live on ${TO_TRACK}"
 
-      - name: Sync Play Store listing and graphic assets (Stage 7)
-        if: steps.play.outputs.promoted == 'true' && (github.event_name == 'push' || inputs.sync_store_assets == true)
+      - name: Sync Play Store listing and graphic assets (opt-in inline; default is post-rollout mode=sync-assets)
+        if: steps.play.outputs.promoted == 'true' && github.event_name != 'push' && inputs.sync_store_assets == true
         env:
           KEY_FILE: ${{ steps.creds.outputs.key_file }}
           EVENT_NAME: ${{ github.event_name }}
