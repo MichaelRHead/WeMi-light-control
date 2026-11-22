@@ -262,7 +262,8 @@ internal class DiscoveryCoordinator(
             searchTarget = XmlAndSkuParser.URN_BASIC_EVENT,
             knownLocalDevices = rememberedForHome,
             includeDemoFallbacks = demoMode,
-            onlySweepWhenKnownMissing = rememberedForHome.isNotEmpty()
+            onlySweepWhenKnownMissing = rememberedForHome.isNotEmpty(),
+            activeHomeSubnetPrefix = homeNetwork.subnetPrefix.takeIf { it.isNotBlank() }
         )
         onSsdpReport(report)
         appendLog(report.logEntry)
@@ -273,6 +274,8 @@ internal class DiscoveryCoordinator(
                 activeNetworkKey = networkKey,
                 activeWifiSsid = homeNetwork.ssidLabel
             )
+            homeSanitizer.syncHomeSubnetFromDiscoveredDevices(networkKey, report.discoveredDevices)
+            homeSanitizer.syncFirstRouterSsid(networkKey, report.discoveredDevices)
             val freshHome = dao.getAllHomeNetworks().first().find { it.networkKey == networkKey } ?: homeNetwork
             dao.updateHomeNetwork(freshHome.copy(lastConnectedTime = "Reconnected at $checkedAt"))
             val avgRtt = report.discoveredDevices.map { it.responseTimeMs }.average()
@@ -351,6 +354,7 @@ internal class DiscoveryCoordinator(
             }.awaitAll()
         }.filterNotNull()
 
+        homeSanitizer.syncHomeSubnetFromDiscoveredDevices(networkKey, report.discoveredDevices)
         homeSanitizer.syncFirstRouterSsid(networkKey, report.discoveredDevices)
         val freshHome = dao.getAllHomeNetworks().first().find { it.networkKey == networkKey } ?: homeNetwork
         dao.updateHomeNetwork(freshHome.copy(lastConnectedTime = "Reconnected at $checkedAt"))
@@ -370,17 +374,21 @@ internal class DiscoveryCoordinator(
         searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
         autoAdoptNew: Boolean = false,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
-        activeWifiSsid: String = "WeMi-Home-5G"
+        activeWifiSsid: String = "WeMi-Home-5G",
+        manualSubnetOverride: String? = null
     ): SsdpScanReport {
         val demoMode = isDemoShowroomMode()
         val allDevs = dao.getAllDevices().first().let {
             if (it.isEmpty() && demoMode) DemoFixtures.defaultClassicDevices() else it
         }
+        val activeHome = dao.getAllHomeNetworks().first().find { it.networkKey == activeNetworkKey }
         val currentDevicesForHome = allDevs.filter { it.networkKey == activeNetworkKey }
         val report = networkClient.performSsdpDiscoveryScan(
             searchTarget = searchTarget,
             knownLocalDevices = currentDevicesForHome,
-            includeDemoFallbacks = demoMode
+            includeDemoFallbacks = demoMode,
+            activeHomeSubnetPrefix = activeHome?.subnetPrefix?.takeIf { it.isNotBlank() },
+            manualSubnetOverride = manualSubnetOverride
         )
         appendLog(report.logEntry)
 
@@ -413,6 +421,7 @@ internal class DiscoveryCoordinator(
             }
         }
 
+        homeSanitizer.syncHomeSubnetFromDiscoveredDevices(activeNetworkKey, report.discoveredDevices)
         homeSanitizer.syncFirstRouterSsid(activeNetworkKey, report.discoveredDevices)
         if (autoAdoptNew || currentDevicesForHome.isEmpty()) {
             adoptDiscoveredDevices(report.discoveredDevices, activeNetworkKey, activeWifiSsid)

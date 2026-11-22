@@ -253,10 +253,27 @@ internal class DeviceActionsUiController(
     @Volatile
     private var ssdpScanJob: Job? = null
 
-    fun openSsdpScannerAndScan(searchTarget: String = _selectedSearchTarget.value) {
+    fun openSsdpScannerAndScan(
+        searchTarget: String = _selectedSearchTarget.value,
+        manualSubnetOverride: String? = null
+    ) {
         _selectedSearchTarget.value = searchTarget
         _showSsdpScannerSheet.value = true
-        runSsdpScan(searchTarget = searchTarget, autoAdoptNew = false)
+        runSsdpScan(
+            searchTarget = searchTarget,
+            autoAdoptNew = false,
+            cancelExisting = !manualSubnetOverride.isNullOrBlank(),
+            manualSubnetOverride = manualSubnetOverride
+        )
+    }
+
+    fun scanManualSubnet(subnetPrefix: String) {
+        runSsdpScan(
+            searchTarget = _selectedSearchTarget.value,
+            autoAdoptNew = false,
+            cancelExisting = true,
+            manualSubnetOverride = subnetPrefix
+        )
     }
 
     fun closeSsdpScanner() {
@@ -275,7 +292,8 @@ internal class DeviceActionsUiController(
     private fun runSsdpScan(
         searchTarget: String,
         autoAdoptNew: Boolean,
-        cancelExisting: Boolean = false
+        cancelExisting: Boolean = false,
+        manualSubnetOverride: String? = null
     ) {
         val superseded: Job?
         val job: Job
@@ -294,7 +312,8 @@ internal class DeviceActionsUiController(
                         searchTarget = searchTarget,
                         autoAdoptNew = autoAdoptNew,
                         activeNetworkKey = activeKey,
-                        activeWifiSsid = activeSsid
+                        activeWifiSsid = activeSsid,
+                        manualSubnetOverride = manualSubnetOverride
                     )
                     refreshGenaIfRealLan(activeKey)
                     onShowTransientStatus(

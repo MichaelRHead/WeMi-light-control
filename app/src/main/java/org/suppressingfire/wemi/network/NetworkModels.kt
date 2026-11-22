@@ -34,7 +34,9 @@ data class SsdpScanReport(
     val discoveredDevices: List<SsdpDiscoveredDevice>,
     val rawSocketHitCount: Int,
     val scanDurationMs: Long,
-    val logEntry: SoapLogEntry
+    val logEntry: SoapLogEntry,
+    val isArcVmEnvironment: Boolean = false,
+    val scannedSubnets: List<String> = emptyList()
 )
 
 data class ScannedAp(

@@ -95,7 +95,8 @@ class NetworkClient(
         (listOf(preferredPort) + extraCandidatePorts + loopbackCandidatePorts + PROBE_PORTS).distinct()
 
     fun resolveLocalIpv4Address(): String =
-        LanRuntimeUtils.resolvePreferredLanInterfaceIpv4().first
+        NetworkMonitor.resolveActiveLanBinding(appContext)?.localIpv4
+            ?: LanRuntimeUtils.resolvePreferredLanInterfaceIpv4().first
 
     fun buildSsdpMSearchPacket(searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT): String =
         XmlAndSkuParser.buildSsdpMSearchPacket(searchTarget)
@@ -470,12 +471,16 @@ class NetworkClient(
         knownLocalDevices: List<DeviceEntity> = emptyList(),
         includeDemoFallbacks: Boolean = false,
         allowUnicastSubnetFallback: Boolean = true,
-        onlySweepWhenKnownMissing: Boolean = false
+        onlySweepWhenKnownMissing: Boolean = false,
+        activeHomeSubnetPrefix: String? = null,
+        manualSubnetOverride: String? = null
     ): SsdpScanReport = ssdpEngine.performSsdpDiscoveryScan(
         searchTarget,
         knownLocalDevices,
         includeDemoFallbacks,
         allowUnicastSubnetFallback,
-        onlySweepWhenKnownMissing
+        onlySweepWhenKnownMissing,
+        activeHomeSubnetPrefix,
+        manualSubnetOverride
     )
 }

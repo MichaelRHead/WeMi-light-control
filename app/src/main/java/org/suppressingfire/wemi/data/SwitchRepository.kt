@@ -251,8 +251,11 @@ class SwitchRepository(
         searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
         autoAdoptNew: Boolean = false,
         activeNetworkKey: String = DEFAULT_MAIN_HOME_KEY,
-        activeWifiSsid: String = "WeMi-Home-5G"
-    ): SsdpScanReport = discoveryCoordinator.executeSsdpScan(searchTarget, autoAdoptNew, activeNetworkKey, activeWifiSsid)
+        activeWifiSsid: String = "WeMi-Home-5G",
+        manualSubnetOverride: String? = null
+    ): SsdpScanReport = discoveryCoordinator.executeSsdpScan(
+        searchTarget, autoAdoptNew, activeNetworkKey, activeWifiSsid, manualSubnetOverride
+    )
 
     suspend fun adoptDiscoveredDevice(
         discovered: SsdpDiscoveredDevice,

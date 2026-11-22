@@ -180,6 +180,7 @@ internal class HomeProfileSanitizer(
                 sortOrder = nextSortOrder
             )
             val newId = dao.insertDevice(newEntity).toInt()
+            syncHomeSubnetFromIp(activeNetworkKey, discovered.ipAddress)
             newEntity.copy(id = newId) to true
         } else {
             val resolvedName = discovered.name.ifBlank { existing.name }
@@ -209,6 +210,7 @@ internal class HomeProfileSanitizer(
                 signalStrengthPercent = discovered.signalStrengthPercent
             )
             dao.updateDevice(updated)
+            syncHomeSubnetFromIp(activeNetworkKey, discovered.ipAddress)
             updated to false
         }
     }
@@ -248,89 +250,110 @@ internal class HomeProfileSanitizer(
 
     /**
      * Sanitizes any persisted Wi-Fi Homes or devices whose names/SSIDs were polluted by Belkin
-     * `GetMetaInfo` soft-AP SSIDs (`WeMo.*` / `Wemo.LS3W.*`) or stuck in legacy `"Living Room"`
-     * room assignments, and resolves (or creates) the active Real LAN Home profile.
+     * `GetMetaInfo` soft-AP SSIDs (`WeMo.*` / `Wemo.LS3W.*`), stuck in legacy `"Living Room"`
+     * room assignments, or recorded with a ChromeOS ARCVM CGNAT prefix (`100.64.0.0/10`), and
+     * resolves (or creates) the active Real LAN Home profile.
      */
     suspend fun sanitizeAndResolveInitialLanHome(localIp: String): String {
+        val isCgnatLocal = LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)
         val subnetPrefix = localIp.substringBeforeLast('.', "192.168.1")
 
         val rawHomes = dao.getAllHomeNetworks().first()
+        val rawDevices = dao.getAllDevices().first()
         val existingHomes = rawHomes.mapIndexed { idx, home ->
             val pollutedName = XmlAndSkuParser.isWemoDeviceSetupSsid(home.homeName) ||
                 home.homeName.startsWith("Home Wi-Fi (", ignoreCase = true)
             val pollutedSsid = XmlAndSkuParser.isWemoDeviceSetupSsid(home.ssidLabel)
-            if (pollutedName || pollutedSsid) {
-                val repaired = home.copy(
-                    homeName = if (pollutedName) {
-                        if (idx == 0) "My Home" else "Home (${home.subnetPrefix}.x)"
-                    } else {
-                        home.homeName
-                    },
-                    ssidLabel = if (pollutedSsid) "LAN ${home.subnetPrefix}.0/24" else home.ssidLabel
-                )
-                dao.updateHomeNetwork(repaired)
-                repaired
-            } else {
+            val isCgnatHome = LanRuntimeUtils.isCarrierGradeNatIpv4(home.subnetPrefix)
+            if (!pollutedName && !pollutedSsid && !isCgnatHome) {
                 home
+            } else {
+                val inferredPrefix = if (isCgnatHome) {
+                    rawDevices.filter { it.networkKey == home.networkKey }
+                        .firstNotNullOfOrNull { dev ->
+                            LanRuntimeUtils.normalizeSubnetPrefixOrNull(dev.ipAddress)
+                                ?.takeIf { LanRuntimeUtils.isPrivateRfc1918Ipv4(it) }
+                        }
+                } else {
+                    null
+                }
+                val repairedSubnet = if (isCgnatHome) inferredPrefix.orEmpty() else home.subnetPrefix
+                val repairedGateway = if (isCgnatHome) inferredPrefix?.let { "$it.1" }.orEmpty() else home.gatewayIp
+                val genericLanLabel = if (repairedSubnet.isNotBlank()) "LAN $repairedSubnet.0/24" else "Local LAN"
+                val repairedSsid = if (pollutedSsid || (isCgnatHome && home.ssidLabel.startsWith("LAN 100.", true))) {
+                    genericLanLabel
+                } else {
+                    home.ssidLabel
+                }
+                val repairedName = when {
+                    !pollutedName -> home.homeName
+                    idx == 0 || repairedSubnet.isBlank() -> "My Home"
+                    else -> "Home ($repairedSubnet.x)"
+                }
+                home.copy(
+                    homeName = repairedName,
+                    ssidLabel = repairedSsid,
+                    subnetPrefix = repairedSubnet,
+                    gatewayIp = repairedGateway
+                ).also { dao.updateHomeNetwork(it) }
             }
         }
 
         val homeByKey = existingHomes.associateBy { it.networkKey }
-        val rawDevices = dao.getAllDevices().first()
         rawDevices.forEach { dev ->
             val cleanSsid = if (XmlAndSkuParser.isWemoDeviceSetupSsid(dev.wifiSsid)) {
                 val homeSsid = homeByKey[dev.networkKey]?.ssidLabel?.takeIf {
                     it.isNotBlank() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it)
                 }
-                val deviceSubnet = dev.ipAddress.substringBeforeLast('.', "").takeIf {
-                    it.count { ch -> ch == '.' } == 2 && it != "127.0.0" && it != "10.22.22"
+                val deviceSubnet = LanRuntimeUtils.normalizeSubnetPrefixOrNull(dev.ipAddress)
+                    ?.takeIf { LanRuntimeUtils.isPrivateRfc1918Ipv4(it) }
+                homeSsid ?: when {
+                    deviceSubnet != null -> "LAN $deviceSubnet.0/24"
+                    !isCgnatLocal -> "LAN $subnetPrefix.0/24"
+                    else -> "Local LAN"
                 }
-                homeSsid ?: "LAN ${deviceSubnet ?: subnetPrefix}.0/24"
             } else {
                 dev.wifiSsid
             }
-            val cleanRoom = resolveDeviceRoomAssignment(
-                existingRoomName = dev.roomName,
-                deviceName = dev.name,
-                isDemoMode = false
-            )
+            val cleanRoom = resolveDeviceRoomAssignment(dev.roomName, dev.name, isDemoMode = false)
             if (cleanSsid != dev.wifiSsid || cleanRoom != dev.roomName) {
                 dao.updateDevice(dev.copy(wifiSsid = cleanSsid, roomName = cleanRoom))
             }
         }
 
-        val matchedHome = existingHomes.find { it.subnetPrefix == subnetPrefix }
-        val activeHome = when {
-            matchedHome != null -> matchedHome
-            existingHomes.isNotEmpty() -> existingHomes.first()
-            else -> {
-                val key = "wifi_lan_${subnetPrefix.replace('.', '_')}"
-                val newHome = HomeNetworkEntity(
-                    networkKey = key,
-                    homeName = "My Home",
-                    ssidLabel = "LAN $subnetPrefix.0/24",
-                    subnetPrefix = subnetPrefix,
-                    gatewayIp = "$subnetPrefix.1",
-                    lastConnectedTime = "Connected now",
-                    autoReconnectOnArrival = true,
-                    sortOrder = 0
-                )
-                dao.insertHomeNetwork(newHome)
-                newHome
-            }
+        val activeHome = if (isCgnatLocal) {
+            existingHomes.firstOrNull { LanRuntimeUtils.isPrivateRfc1918Ipv4(it.subnetPrefix) }
+                ?: existingHomes.firstOrNull()
+                ?: HomeNetworkEntity(
+                    networkKey = "wifi_lan_chromeos_default", homeName = "My Home", ssidLabel = "Local LAN",
+                    subnetPrefix = "", gatewayIp = "", lastConnectedTime = "Connected now",
+                    autoReconnectOnArrival = true, sortOrder = 0
+                ).also { dao.insertHomeNetwork(it) }
+        } else {
+            existingHomes.find { it.subnetPrefix == subnetPrefix }
+                ?: existingHomes.firstOrNull()
+                ?: HomeNetworkEntity(
+                    networkKey = "wifi_lan_${subnetPrefix.replace('.', '_')}", homeName = "My Home",
+                    ssidLabel = "LAN $subnetPrefix.0/24", subnetPrefix = subnetPrefix, gatewayIp = "$subnetPrefix.1",
+                    lastConnectedTime = "Connected now", autoReconnectOnArrival = true, sortOrder = 0
+                ).also { dao.insertHomeNetwork(it) }
         }
         return activeHome.networkKey
     }
 
     /**
      * Zero-Permission Subnet matching:
-     * finds or creates a [HomeNetworkEntity] for [subnetPrefix] when on a real LAN.
+     * finds or creates a [HomeNetworkEntity] for [subnetPrefix] when on a real RFC 1918 LAN.
+     * Ignores Belkin `10.22.22` Setup AP subnets and RFC 6598 CGNAT (`100.64.0.0/10`) ChromeOS
+     * ARCVM virtual subnets so guest link updates never create phantom homes.
      */
     suspend fun resolveOrCreateHomeForSubnet(
         subnetPrefix: String,
         gatewayIp: String = "$subnetPrefix.1"
     ): HomeNetworkEntity? {
-        if (isDemoShowroomMode() || subnetPrefix == "10.22.22") return null
+        if (isDemoShowroomMode() || subnetPrefix == "10.22.22" || LanRuntimeUtils.isCarrierGradeNatIpv4(subnetPrefix)) {
+            return null
+        }
         val cleanPrefix = subnetPrefix.trim().ifEmpty { "192.168.1" }
         val existingHomes = dao.getAllHomeNetworks().first()
         val matched = existingHomes.find { it.subnetPrefix == cleanPrefix }
@@ -379,6 +402,36 @@ internal class HomeProfileSanitizer(
                 it.wifiSsid.trim().takeIf { s -> s.isNotEmpty() && !XmlAndSkuParser.isWemoDeviceSetupSsid(s) }
             }
             ?.let { syncHomeSsidFromDeviceSsid(networkKey, it) }
+    }
+
+    /**
+     * Backfills a Home profile's blank or CGNAT (`100.64.0.0/10`) `subnetPrefix` and `gatewayIp`
+     * once a live physical switch is discovered or added on an RFC 1918 LAN IPv4 address.
+     */
+    suspend fun syncHomeSubnetFromIp(networkKey: String, discoveredIp: String) {
+        val prefix = LanRuntimeUtils.normalizeSubnetPrefixOrNull(discoveredIp) ?: return
+        if (!LanRuntimeUtils.isPrivateRfc1918Ipv4(prefix)) return
+        val home = dao.getAllHomeNetworks().first().find { it.networkKey == networkKey } ?: return
+        if (home.subnetPrefix.isNotBlank() && !LanRuntimeUtils.isCarrierGradeNatIpv4(home.subnetPrefix)) return
+        val updatedSsid = if (home.ssidLabel.equals("Local LAN", ignoreCase = true) ||
+            home.ssidLabel.startsWith("LAN 100.", ignoreCase = true)
+        ) {
+            "LAN $prefix.0/24"
+        } else {
+            home.ssidLabel
+        }
+        dao.updateHomeNetwork(
+            home.copy(subnetPrefix = prefix, gatewayIp = "$prefix.1", ssidLabel = updatedSsid)
+        )
+    }
+
+    suspend fun syncHomeSubnetFromDiscoveredDevices(
+        networkKey: String,
+        discovered: List<SsdpDiscoveredDevice>
+    ) {
+        discovered
+            .firstOrNull { LanRuntimeUtils.isPrivateRfc1918Ipv4(it.ipAddress) }
+            ?.let { syncHomeSubnetFromIp(networkKey, it.ipAddress) }
     }
 
     fun mergeDiscoveredMetadata(

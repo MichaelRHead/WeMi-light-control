@@ -352,4 +352,77 @@ object DemoFixtures {
             isEnabled = true
         )
     )
+
+    /**
+     * Appends synthetic Demo Showroom SSDP responses for reachable remembered demo switches plus a
+     * sample adoptable `"Patio String Lights"` switch on an RFC 1918 `/24` subnet.
+     */
+    fun appendSsdpDemoFallbacks(
+        combinedList: MutableList<SsdpDiscoveredDevice>,
+        knownLocalDevices: List<DeviceEntity>,
+        localIp: String,
+        searchTarget: String,
+        isCgnatSubnet: Boolean
+    ) {
+        val subnetPrefix = localIp.substringBeforeLast('.', "192.168.1").let {
+            if (it.startsWith("10.0.2") || it.startsWith("127.") || isCgnatSubnet) "192.168.1" else it
+        }
+        val responderNodes = knownLocalDevices.filter { it.isReachable }
+        responderNodes.forEachIndexed { idx, dev ->
+            val alreadyInLive = combinedList.any {
+                it.ipAddress == dev.ipAddress || it.name.equals(dev.name, ignoreCase = true)
+            }
+            if (!alreadyInLive) {
+                val model = when (dev.parsedType) {
+                    DeviceType.SWITCH_PLUG -> "Socket-1_0"
+                    DeviceType.MOTION_SENSOR -> "Sensor-1_0"
+                    DeviceType.LIGHTBULB_DIMMER -> "Dimmer-1_0"
+                }
+                combinedList.add(
+                    SsdpDiscoveredDevice(
+                        name = dev.name,
+                        roomName = dev.roomName,
+                        ipAddress = dev.ipAddress,
+                        port = dev.port,
+                        deviceType = dev.parsedType,
+                        modelName = model,
+                        serialNumber = dev.serialNumber,
+                        firmwareVersion = dev.firmwareVersion,
+                        usn = "uuid:$model-${dev.serialNumber}::$searchTarget",
+                        searchTarget = searchTarget,
+                        locationUrl = "http://${dev.ipAddress}:${dev.port}/setup.xml",
+                        responseTimeMs = 14L + (idx * 7L),
+                        isOn = dev.isOn,
+                        brightness = dev.brightness,
+                        isLiveUdpResponse = false,
+                        hardwareSku = dev.hardwareModel
+                    )
+                )
+            }
+        }
+        val extraCandidateIp = "$subnetPrefix.118"
+        if (combinedList.none { it.ipAddress == extraCandidateIp || it.name == "Patio String Lights" }) {
+            combinedList.add(
+                0,
+                SsdpDiscoveredDevice(
+                    name = "Patio String Lights",
+                    roomName = "Outdoor",
+                    ipAddress = extraCandidateIp,
+                    port = 49153,
+                    deviceType = DeviceType.SWITCH_PLUG,
+                    modelName = "Lightswitch-1_0",
+                    serialNumber = "221644K01092FE",
+                    firmwareVersion = "WeMo_WW_2.00.11532.PVT",
+                    usn = "uuid:Lightswitch-1_0-221644K01092FE::$searchTarget",
+                    searchTarget = searchTarget,
+                    locationUrl = "http://$extraCandidateIp:49153/setup.xml",
+                    responseTimeMs = 11L,
+                    isOn = true,
+                    brightness = 100,
+                    isLiveUdpResponse = true,
+                    hardwareSku = "F7C030 (1st-Gen Light Switch)"
+                )
+            )
+        }
+    }
 }

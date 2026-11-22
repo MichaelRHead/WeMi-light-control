@@ -100,7 +100,8 @@ internal fun WeMiModalDialogs(
             onRescan = { viewModel.openSsdpScannerAndScan(selectedSearchTarget) },
             onAdoptDevice = { item -> viewModel.adoptSsdpDevice(item) },
             onAdoptAll = { viewModel.adoptAllSsdpDevices() },
-            onDismiss = { viewModel.closeSsdpScanner() }
+            onDismiss = { viewModel.closeSsdpScanner() },
+            onScanManualSubnet = { subnet -> viewModel.scanManualSubnet(subnet) }
         )
     }
 

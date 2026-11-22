@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -20,17 +21,24 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.SsdpScanReport
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
@@ -146,6 +154,87 @@ fun SsdpDiscoveryBanner(
                     maxLines = 1,
                     softWrap = false
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Shown inside [SsdpScannerModal] only when running inside ChromeOS's virtual Android network
+ * (`100.115.92.x`) and automatic discovery found zero switches, letting the user enter their
+ * physical router `/24` prefix (e.g. `192.168.1`) for direct unicast switch discovery.
+ */
+@Composable
+internal fun ArcVmManualSubnetFallbackCard(
+    localInterfaceIp: String,
+    scannedSubnets: List<String>,
+    onScanManualSubnet: (String) -> Unit
+) {
+    var subnetInput by remember(scannedSubnets) {
+        mutableStateOf(scannedSubnets.firstOrNull().orEmpty())
+    }
+    val validSubnetPrefix = LanRuntimeUtils.normalizeSubnetPrefixOrNull(subnetInput)
+        ?.takeIf { LanRuntimeUtils.isPrivateRfc1918Ipv4(it) }
+
+    Surface(
+        color = Color(0xFFF0F9FF),
+        shape = RoundedCornerShape(12.dp),
+        border = BorderStroke(1.dp, WemoGreenPrimary.copy(alpha = 0.45f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("arcvm_manual_subnet_card")
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = "ChromeOS Virtual Network Detected ($localInterfaceIp)",
+                color = WemoGreenDark,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 13.5.sp
+            )
+            Text(
+                text = "ChromeOS isolates Android apps on a virtual subnet. If your router blocks multicast discovery, enter your home router IPv4 prefix (such as 192.168.1 or 192.168.86) to scan for local smart switches.",
+                color = WemoTextSecondary,
+                fontFamily = FontFamily.SansSerif,
+                fontSize = 12.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = subnetInput,
+                    onValueChange = { subnetInput = it },
+                    label = { Text("Home Subnet (e.g. 192.168.1)", fontSize = 12.sp) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("ssdp_manual_subnet_input")
+                )
+                Button(
+                    onClick = { validSubnetPrefix?.let { onScanManualSubnet(it) } },
+                    enabled = validSubnetPrefix != null,
+                    colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp),
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("ssdp_scan_manual_subnet_button")
+                ) {
+                    Text(
+                        text = "Scan Subnet",
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
             }
         }
     }

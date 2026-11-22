@@ -52,6 +52,7 @@ import org.suppressingfire.wemi.data.DEFAULT_CABIN_HOME_KEY
 import org.suppressingfire.wemi.data.DEFAULT_OFFICE_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.HomeNetworkEntity
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
@@ -143,7 +144,12 @@ fun WifiHomeBar(
                                     append(" • $offlineCount Offline")
                                 }
                                 if (activeHome != null) {
-                                    append(" • ${activeHome.subnetPrefix}.0/24")
+                                    val cleanSubnet = activeHome.subnetPrefix.trim()
+                                    if (cleanSubnet.isNotEmpty() && !LanRuntimeUtils.isCarrierGradeNatIpv4(cleanSubnet)) {
+                                        append(" • $cleanSubnet.0/24")
+                                    } else if (activeHome.ssidLabel.isNotBlank()) {
+                                        append(" • ${activeHome.ssidLabel}")
+                                    }
                                 }
                             },
                             color = WemoTextSecondary,
@@ -266,7 +272,11 @@ fun AddWifiHomeNetworkDialog(
     onDismiss: () -> Unit,
     onSaveHome: (homeName: String, ssidLabel: String, subnetPrefix: String) -> Unit
 ) {
-    val defaultSubnet = detectedLocalIp.substringBeforeLast('.', "192.168.1")
+    val defaultSubnet = if (LanRuntimeUtils.isCarrierGradeNatIpv4(detectedLocalIp)) {
+        ""
+    } else {
+        detectedLocalIp.substringBeforeLast('.', "192.168.1")
+    }
     var homeName by remember { mutableStateOf("") }
     var ssidLabel by remember { mutableStateOf("") }
     var subnetPrefix by remember { mutableStateOf(defaultSubnet) }

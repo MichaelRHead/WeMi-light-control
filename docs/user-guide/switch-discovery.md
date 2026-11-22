@@ -67,3 +67,14 @@ flowchart TD
   Switch firmware frequently shifts its HTTP SOAP listener across ports `49151–49159` after a power blink or firmware reboot. Whenever a switch stops responding on its old port or IP:
   1. **Stage 1 (9-Port Sweep)**: The app probes all 9 candidate ports (`49153, 49152, 49154, 49151, 49155..49159`) at the last-known IP and verifies the hardware `<serialNumber>` / `<UDN>` in `/setup.xml`.
   2. **Stage 2 (Serial/UDN-Matched SSDP Re-Discovery)**: If the router assigned the switch a new DHCP IP address, the app runs a targeted discovery pass, matches the switch by its unique `<serialNumber>` or `<UDN>` (preventing factory-named switches from ever cross-matching across peers), and updates its IP and port automatically—both in the app and for pinned Home Screen widgets.
+
+---
+
+## 5. Using WeMi Light Control on Chromebooks (ChromeOS)
+
+Chromebooks run Android apps inside a virtual network (`100.115.92.x`), separate from your home router's physical LAN subnet (such as `192.168.1.x` or `192.168.86.x`):
+
+- **Automatic Multicast & Smart Subnet Fallback**: **WeMi Light Control** automatically binds SSDP discovery to your Chromebook's active Wi-Fi or Ethernet network so ChromeOS forwards `M-SEARCH` requests and replies across the VM boundary. If your router drops multicast, the app automatically avoids scanning ChromeOS's virtual `100.115.92.x` subnet and falls back to your saved Home subnet, remembered switch IPs, or local router UPnP/DNS hints.
+- **Manual Home Subnet Scan (Multicast-Blocked Routers)**: If you are launching on a Chromebook for the first time on a router that blocks all multicast discovery, open the **SSDP Network Discovery Scan** sheet. When zero switches are found inside a ChromeOS virtual network, the scanner displays a **ChromeOS Virtual Network Detected** box where you can enter your home router's IPv4 prefix (for example, `192.168.1` or `192.168.86`) and tap **Scan Subnet**. Once your switches are found, your Home profile saves that physical subnet automatically for future scans.
+- **Live State Sync**: Because physical switches cannot open inbound connections back into ChromeOS's virtual subnet, the app skips GENA push callbacks on Chromebooks and refreshes switch states automatically over local SOAP polling while keeping full toggle, dimmer, and room controls responsive.
+- **VPN Note**: If a VPN is active on ChromeOS or inside Android, pause it while discovering or controlling local switches so traffic stays on your home LAN.

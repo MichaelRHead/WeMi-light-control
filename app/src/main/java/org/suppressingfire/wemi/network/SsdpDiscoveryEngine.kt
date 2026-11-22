@@ -2,32 +2,34 @@ package org.suppressingfire.wemi.network
 
 import android.content.Context
 import android.net.wifi.WifiManager
+import org.suppressingfire.wemi.data.DemoFixtures
+import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
-import org.suppressingfire.wemi.data.DeviceEntity
-import org.suppressingfire.wemi.data.DeviceType
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.net.ConnectException
 import java.net.DatagramPacket
-import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
+import java.net.MulticastSocket
+import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 import java.util.concurrent.CopyOnWriteArraySet
 import javax.net.SocketFactory
 
 /**
- * Executes UPnP SSDP multicast discovery (`239.255.255.250:1900`, `MulticastLock` + 1-second
- * retransmit burst), unicast known-device verification, `/24` unicast subnet sweeps when multicast
- * is blocked by AP isolation, and optional Demo Showroom fallback synthesis.
+ * Executes UPnP SSDP multicast discovery (`239.255.255.250:1900`, `MulticastLock` + retransmit
+ * burst), unicast known-device verification, `/24` unicast subnet sweeps when multicast is
+ * blocked by AP isolation or ChromeOS ARCVM NAT, and optional Demo Showroom fallback synthesis.
  */
 internal class SsdpDiscoveryEngine(
     private val appContext: Context?,
@@ -57,7 +59,8 @@ internal class SsdpDiscoveryEngine(
         if (cleanPrefix.isBlank() ||
             cleanPrefix.startsWith("10.0.2") ||
             cleanPrefix.startsWith("10.22.22") ||
-            cleanPrefix.startsWith("127.")
+            cleanPrefix.startsWith("127.") ||
+            LanRuntimeUtils.isCarrierGradeNatIpv4(cleanPrefix)
         ) {
             return@coroutineScope emptyList()
         }
@@ -113,52 +116,66 @@ internal class SsdpDiscoveryEngine(
         knownLocalDevices: List<DeviceEntity> = emptyList(),
         includeDemoFallbacks: Boolean = false,
         allowUnicastSubnetFallback: Boolean = true,
-        onlySweepWhenKnownMissing: Boolean = false
+        onlySweepWhenKnownMissing: Boolean = false,
+        activeHomeSubnetPrefix: String? = null,
+        manualSubnetOverride: String? = null
     ): SsdpScanReport = withContext(Dispatchers.IO) {
         val scanStartMs = System.currentTimeMillis()
-        val localIp = resolveLocalIpv4Address()
+        val isRobolectric = LanRuntimeUtils.isRunningInRobolectric()
+        val loopbackPorts = loopbackSsdpUdpPorts.toList()
+        val hasLoopbackTargets = loopbackPorts.isNotEmpty()
+        val fastMode = hasLoopbackTargets || isRobolectric
+        val activeBinding = if (fastMode) null else NetworkMonitor.resolveActiveLanBinding(appContext)
+        val localIp = activeBinding?.localIpv4 ?: resolveLocalIpv4Address()
+        val isArcVm = LanRuntimeUtils.isArcVmRuntime(appContext, localIp)
         val liveDiscovered = mutableListOf<SsdpDiscoveredDevice>()
+        val observedSsdpPeerIps = LinkedHashSet<String>()
         val primaryMSearch = XmlAndSkuParser.buildSsdpMSearchPacket(searchTarget)
-        val searchTargets = listOf(
-            searchTarget,
-            XmlAndSkuParser.URN_BASIC_EVENT,
-            "upnp:rootdevice"
-        ).distinct()
+        val searchTargets = listOf(searchTarget, XmlAndSkuParser.URN_BASIC_EVENT, "upnp:rootdevice").distinct()
 
         val wifiManager = appContext?.applicationContext?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
         val multicastLock = wifiManager?.createMulticastLock("wemi_ssdp_multicast_lock")?.apply {
             setReferenceCounted(false)
             runCatching { acquire() }
         }
+        if (!fastMode && isArcVm && multicastLock != null) {
+            delay(100L) // Allow ChromeOS patchpanel Mojo IPC to enable bidirectional Wi-Fi multicast
+        }
 
-        val isRobolectric = LanRuntimeUtils.isRunningInRobolectric()
-        val loopbackPorts = loopbackSsdpUdpPorts.toList()
-        val hasLoopbackTargets = loopbackPorts.isNotEmpty()
-        val fastMode = hasLoopbackTargets || isRobolectric
         val receiveTimeoutMs = when {
             hasLoopbackTargets -> 250
             fastMode -> 90
+            isArcVm -> 700
             else -> 550
         }
-        val retransmitAfterMs = receiveTimeoutMs.toLong()
+        val retransmitAfterMs = if (!fastMode && isArcVm) 750L else receiveTimeoutMs.toLong()
         val receiveWindowMs = when {
             hasLoopbackTargets -> 1000L
             fastMode -> 220L
+            isArcVm -> 2000L
             else -> 1250L
         }
         val probeSemaphore = Semaphore(3)
 
         try {
-            DatagramSocket(null).use { socket ->
+            MulticastSocket(null).use { socket ->
                 socket.reuseAddress = true
+                runCatching { socket.timeToLive = 4 }
                 val bindAddr = runCatching {
-                    if (!fastMode && localIp != "192.168.1.50" && !localIp.startsWith("127.")) {
+                    if (!fastMode && !isArcVm && localIp != "192.168.1.50" && !localIp.startsWith("127.")) {
                         InetSocketAddress(InetAddress.getByName(localIp), 0)
                     } else {
                         InetSocketAddress(0)
                     }
                 }.getOrElse { InetSocketAddress(0) }
                 runCatching { socket.bind(bindAddr) }.onFailure { socket.bind(InetSocketAddress(0)) }
+                if (!fastMode) {
+                    activeBinding?.network?.let { net -> runCatching { net.bindSocket(socket) } }
+                    val targetIf = activeBinding?.interfaceName
+                        ?.let { name -> runCatching { NetworkInterface.getByName(name) }.getOrNull() }
+                        ?: runCatching { NetworkInterface.getByInetAddress(InetAddress.getByName(localIp)) }.getOrNull()
+                    if (targetIf != null) runCatching { socket.networkInterface = targetIf }
+                }
                 socket.soTimeout = receiveTimeoutMs
 
                 val multicastGroup = InetAddress.getByName("239.255.255.250")
@@ -195,10 +212,13 @@ internal class SsdpDiscoveryEngine(
                         val rawText = String(respPacket.data, 0, respPacket.length, Charsets.UTF_8)
                         val headers = XmlAndSkuParser.parseSsdpHeaders(rawText)
                         val loc = headers["LOCATION"]
-                        if (!loc.isNullOrEmpty() && !seenLocations.containsKey(loc)) {
-                            seenLocations[loc] = Triple(headers, elapsed, respPacket.port)
-                            if (hasLoopbackTargets && seenLocations.size >= loopbackPorts.size) {
-                                break
+                        if (!loc.isNullOrEmpty()) {
+                            LanSubnetHintResolver.extractRfc1918HostIp(loc)?.let { observedSsdpPeerIps.add(it) }
+                            if (!seenLocations.containsKey(loc)) {
+                                seenLocations[loc] = Triple(headers, elapsed, respPacket.port)
+                                if (hasLoopbackTargets && seenLocations.size >= loopbackPorts.size) {
+                                    break
+                                }
                             }
                         }
                     } catch (e: CancellationException) {
@@ -304,25 +324,40 @@ internal class SsdpDiscoveryEngine(
             }
         }
 
+        val scannedSubnets = mutableListOf<String>()
+        val hasManualOverride = !LanRuntimeUtils.normalizeSubnetPrefixOrNull(manualSubnetOverride).isNullOrBlank()
         if (shouldRunUnicastSubnetFallback(
                 liveDiscovered = liveDiscovered,
                 knownLocalDevices = knownLocalDevices,
                 allowUnicastSubnetFallback = allowUnicastSubnetFallback,
                 fastMode = fastMode,
                 includeDemoFallbacks = includeDemoFallbacks,
-                onlyWhenKnownMissing = onlySweepWhenKnownMissing
+                onlyWhenKnownMissing = onlySweepWhenKnownMissing,
+                hasManualSubnetOverride = hasManualOverride
             )
         ) {
-            val activePrefix = localIp.substringBeforeLast('.', "")
-            val skipIps = buildSet {
-                add(localIp)
-                liveDiscovered.forEach { add(it.ipAddress) }
-            }
-            val swept = scanSubnetUnicast(activePrefix, searchTarget, skipIps = skipIps)
-            for (desc in swept) {
-                if (liveDiscovered.none { it.matchesEndpointOrSerial(desc) }) {
-                    liveDiscovered.add(desc)
+            val candidateSubnets = LanSubnetHintResolver.resolveCandidateSubnets(
+                localIp = localIp,
+                isArcVm = isArcVm,
+                manualSubnetOverride = manualSubnetOverride,
+                activeHomeSubnetPrefix = activeHomeSubnetPrefix,
+                rememberedDeviceIps = knownLocalDevices.map { it.ipAddress },
+                observedSsdpPeerIps = observedSsdpPeerIps,
+                dnsServerIps = activeBinding?.dnsServersIpv4.orEmpty()
+            )
+            for (prefix in candidateSubnets) {
+                scannedSubnets.add(prefix)
+                val skipIps = buildSet {
+                    add(localIp)
+                    liveDiscovered.forEach { add(it.ipAddress) }
                 }
+                val swept = scanSubnetUnicast(prefix, searchTarget, skipIps = skipIps)
+                for (desc in swept) {
+                    if (liveDiscovered.none { it.matchesEndpointOrSerial(desc) }) {
+                        liveDiscovered.add(desc)
+                    }
+                }
+                if (swept.isNotEmpty()) break
             }
         }
 
@@ -330,75 +365,27 @@ internal class SsdpDiscoveryEngine(
         combinedList.addAll(liveDiscovered)
 
         if (includeDemoFallbacks) {
-            val subnetPrefix = localIp.substringBeforeLast('.', "192.168.1").let {
-                if (it.startsWith("10.0.2") || it.startsWith("127.")) "192.168.1" else it
-            }
-
-            val responderNodes = knownLocalDevices.filter { it.isReachable }
-            responderNodes.forEachIndexed { idx, dev ->
-                val alreadyInLive = combinedList.any {
-                    it.ipAddress == dev.ipAddress || it.name.equals(dev.name, ignoreCase = true)
-                }
-                if (!alreadyInLive) {
-                    val model = when (dev.parsedType) {
-                        DeviceType.SWITCH_PLUG -> "Socket-1_0"
-                        DeviceType.MOTION_SENSOR -> "Sensor-1_0"
-                        DeviceType.LIGHTBULB_DIMMER -> "Dimmer-1_0"
-                    }
-                    combinedList.add(
-                        SsdpDiscoveredDevice(
-                            name = dev.name,
-                            roomName = dev.roomName,
-                            ipAddress = dev.ipAddress,
-                            port = dev.port,
-                            deviceType = dev.parsedType,
-                            modelName = model,
-                            serialNumber = dev.serialNumber,
-                            firmwareVersion = dev.firmwareVersion,
-                            usn = "uuid:$model-${dev.serialNumber}::$searchTarget",
-                            searchTarget = searchTarget,
-                            locationUrl = "http://${dev.ipAddress}:${dev.port}/setup.xml",
-                            responseTimeMs = 14L + (idx * 7L),
-                            isOn = dev.isOn,
-                            brightness = dev.brightness,
-                            isLiveUdpResponse = false,
-                            hardwareSku = dev.hardwareModel
-                        )
-                    )
-                }
-            }
-
-            val extraCandidateIp = "$subnetPrefix.118"
-            if (combinedList.none { it.ipAddress == extraCandidateIp || it.name == "Patio String Lights" }) {
-                combinedList.add(
-                    0,
-                    SsdpDiscoveredDevice(
-                        name = "Patio String Lights",
-                        roomName = "Outdoor",
-                        ipAddress = extraCandidateIp,
-                        port = 49153,
-                        deviceType = DeviceType.SWITCH_PLUG,
-                        modelName = "Lightswitch-1_0",
-                        serialNumber = "221644K01092FE",
-                        firmwareVersion = "WeMo_WW_2.00.11532.PVT",
-                        usn = "uuid:Lightswitch-1_0-221644K01092FE::$searchTarget",
-                        searchTarget = searchTarget,
-                        locationUrl = "http://$extraCandidateIp:49153/setup.xml",
-                        responseTimeMs = 11L,
-                        isOn = true,
-                        brightness = 100,
-                        isLiveUdpResponse = true,
-                        hardwareSku = "F7C030 (1st-Gen Light Switch)"
-                    )
-                )
-            }
+            DemoFixtures.appendSsdpDemoFallbacks(
+                combinedList = combinedList,
+                knownLocalDevices = knownLocalDevices,
+                localIp = localIp,
+                searchTarget = searchTarget,
+                isCgnatSubnet = LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)
+            )
         }
 
         val totalMs = (System.currentTimeMillis() - scanStartMs).coerceAtLeast(1L)
+        val endpointLabel = buildString {
+            append("udp://239.255.255.250:1900 (")
+            if (isArcVm) append("ChromeOS VM • ")
+            append("Local IP: $localIp")
+            if (scannedSubnets.isNotEmpty()) append(" • Swept: ${scannedSubnets.joinToString(",") { "$it.0/24" }}")
+            append(")")
+        }
         val log = SoapLogEntry(
             timestamp = nowTime(),
             deviceName = "SSDP M-SEARCH Scanner",
-            endpoint = "udp://239.255.255.250:1900 (Local IP: $localIp)",
+            endpoint = endpointLabel,
             soapAction = "M-SEARCH ST: $searchTarget",
             statusText = "Discovered ${combinedList.size} UPnP smart switch device(s) in ${totalMs}ms",
             xmlSnippet = primaryMSearch.trim(),
@@ -412,28 +399,26 @@ internal class SsdpDiscoveryEngine(
             discoveredDevices = combinedList,
             rawSocketHitCount = liveDiscovered.size,
             scanDurationMs = totalMs,
-            logEntry = log
+            logEntry = log,
+            isArcVmEnvironment = isArcVm,
+            scannedSubnets = scannedSubnets.toList()
         )
     }
 
     companion object {
         private val loopbackSsdpUdpPorts = CopyOnWriteArraySet<Int>()
 
-        fun registerLoopbackSsdpPort(udpPort: Int) {
-            loopbackSsdpUdpPorts.add(udpPort)
-        }
+        fun registerLoopbackSsdpPort(udpPort: Int) { loopbackSsdpUdpPorts.add(udpPort) }
 
-        fun unregisterLoopbackSsdpPort(udpPort: Int) {
-            loopbackSsdpUdpPorts.remove(udpPort)
-        }
+        fun unregisterLoopbackSsdpPort(udpPort: Int) { loopbackSsdpUdpPorts.remove(udpPort) }
 
         /**
          * Determines whether Stage C (`/24` unicast sweep) should run after Stages A & B:
          * - Skipped when disabled, in fast/loopback/Robolectric mode, or in Demo Showroom mode.
-         * - Skipped when UDP multicast already received at least one live response (`isLiveUdpResponse`).
-         * - Otherwise, runs unconditionally during explicit LAN scans (`onlyWhenKnownMissing == false`)
-         *   or on an empty home, and runs during home reconnects (`onlyWhenKnownMissing == true`)
-         *   only when at least one remembered switch is still missing after Stage B unicast probing.
+         * - Always runs when [hasManualSubnetOverride] is true (explicit user subnet scan).
+         * - Otherwise skipped when UDP multicast already received a live response (`isLiveUdpResponse`),
+         *   runs unconditionally during explicit LAN scans (`onlyWhenKnownMissing == false`) or on an
+         *   empty home, and runs during home reconnects only when a remembered switch is still missing.
          */
         internal fun shouldRunUnicastSubnetFallback(
             liveDiscovered: List<SsdpDiscoveredDevice>,
@@ -441,9 +426,11 @@ internal class SsdpDiscoveryEngine(
             allowUnicastSubnetFallback: Boolean,
             fastMode: Boolean,
             includeDemoFallbacks: Boolean,
-            onlyWhenKnownMissing: Boolean
+            onlyWhenKnownMissing: Boolean,
+            hasManualSubnetOverride: Boolean = false
         ): Boolean {
             if (!allowUnicastSubnetFallback || fastMode || includeDemoFallbacks) return false
+            if (hasManualSubnetOverride) return true
             if (liveDiscovered.any { it.isLiveUdpResponse }) return false
             if (!onlyWhenKnownMissing || knownLocalDevices.isEmpty()) return true
             return knownLocalDevices.any { known ->

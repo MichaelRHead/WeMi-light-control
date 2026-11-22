@@ -14,6 +14,13 @@ import java.net.InetAddress
 import java.net.Socket
 import javax.net.SocketFactory
 
+data class ActiveLanBinding(
+    val network: Network?,
+    val interfaceName: String,
+    val localIpv4: String,
+    val dnsServersIpv4: List<String> = emptyList()
+)
+
 data class LanNetworkSnapshot(
     val isConnected: Boolean = true,
     val localIpv4: String = "192.168.1.50",
@@ -21,16 +28,20 @@ data class LanNetworkSnapshot(
     val gatewayIp: String = "192.168.1.1",
     val isWemoSetupApSubnet: Boolean = false,
     val interfaceName: String = "wlan0",
-    val isWifiSocketBound: Boolean = false
+    val isWifiSocketBound: Boolean = false,
+    val dnsServersIpv4: List<String> = emptyList(),
+    val isArcVmNatSubnet: Boolean = false
 )
 
 /**
  * Zero-Location-permission Wi-Fi / LAN subnet monitor using ConnectivityManager.NetworkCallback
  * and LinkProperties.
- * - Detects live IPv4 address, /24 subnetPrefix, and default gateway IP.
+ * - Detects live IPv4 address, /24 subnetPrefix, default gateway IP, and IPv4 DNS hints.
  * - Prioritizes TRANSPORT_WIFI networks over Cellular (cm.activeNetwork) so that connecting to an
  *   unconfigured Belkin WeMo Setup AP (WeMo.Light.xxx / 10.22.22.x) with no Internet access is
  *   reliably detected and routed over Wi-Fi even when mobile data is active.
+ * - Excludes VPN transports and ChromeOS ARCVM's `arc0` management bridge (`100.115.92.2`) when
+ *   a shill-backed physical Wi-Fi or Ethernet network is available.
  */
 class NetworkMonitor(
     private val context: Context?,
@@ -59,9 +70,11 @@ class NetworkMonitor(
 
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
-                lastCallbackWifiNetwork = network
+                if (isEligibleLanNetwork(cm, network)) {
+                    lastCallbackWifiNetwork = network
+                }
                 val prevSubnet = _networkState.value.subnetPrefix
-                val next = computeSnapshot(network)
+                val next = computeSnapshot(if (isEligibleLanNetwork(cm, network)) network else null)
                 _networkState.value = next
                 if (next.subnetPrefix != prevSubnet) {
                     onSubnetChanged?.invoke(next)
@@ -69,7 +82,11 @@ class NetworkMonitor(
             }
 
             override fun onLinkPropertiesChanged(network: Network, linkProperties: LinkProperties) {
-                lastCallbackWifiNetwork = network
+                if (isEligibleLanNetwork(cm, network, linkProperties)) {
+                    lastCallbackWifiNetwork = network
+                } else {
+                    return
+                }
                 val prevSubnet = _networkState.value.subnetPrefix
                 val next = computeSnapshotFromLinkProperties(linkProperties, isBound = true) ?: computeSnapshot(network)
                 _networkState.value = next
@@ -121,10 +138,7 @@ class NetworkMonitor(
     }
 
     private fun computeSnapshotFromLinkProperties(lp: LinkProperties, isBound: Boolean = true): LanNetworkSnapshot? {
-        val ipv4 = lp.linkAddresses
-            .mapNotNull { it.address as? Inet4Address }
-            .firstOrNull { !it.isLoopbackAddress && !(it.hostAddress ?: "").startsWith("169.254.") }
-            ?.hostAddress ?: return null
+        val ipv4 = extractUsableIpv4(lp) ?: return null
 
         val prefix = ipv4.substringBeforeLast('.', "192.168.1")
         val gateway = lp.routes
@@ -132,6 +146,7 @@ class NetworkMonitor(
             .firstOrNull { !it.isLoopbackAddress && (it.hostAddress ?: "0.0.0.0") != "0.0.0.0" }
             ?.hostAddress ?: "$prefix.1"
         val ifName = lp.interfaceName?.takeIf { it.isNotBlank() } ?: "wlan0"
+        val dnsServers = extractIpv4DnsServers(lp)
 
         return LanNetworkSnapshot(
             isConnected = true,
@@ -140,7 +155,9 @@ class NetworkMonitor(
             gatewayIp = gateway,
             isWemoSetupApSubnet = prefix == "10.22.22",
             interfaceName = ifName,
-            isWifiSocketBound = isBound
+            isWifiSocketBound = isBound,
+            dnsServersIpv4 = dnsServers,
+            isArcVmNatSubnet = LanRuntimeUtils.isCarrierGradeNatIpv4(ipv4)
         )
     }
 
@@ -156,7 +173,8 @@ class NetworkMonitor(
             gatewayIp = "$prefix.1",
             isWemoSetupApSubnet = prefix == "10.22.22",
             interfaceName = resolvedIfName,
-            isWifiSocketBound = boundNet != null
+            isWifiSocketBound = boundNet != null,
+            isArcVmNatSubnet = LanRuntimeUtils.isCarrierGradeNatIpv4(ip)
         )
     }
 
@@ -164,41 +182,101 @@ class NetworkMonitor(
         @Volatile
         private var lastCallbackWifiNetwork: Network? = null
 
+        private fun extractUsableIpv4(lp: LinkProperties?): String? =
+            lp?.linkAddresses
+                ?.mapNotNull { it.address as? Inet4Address }
+                ?.firstOrNull { !it.isLoopbackAddress && !(it.hostAddress ?: "").startsWith("169.254.") }
+                ?.hostAddress
+
+        private fun extractIpv4DnsServers(lp: LinkProperties?): List<String> =
+            lp?.dnsServers
+                ?.mapNotNull { (it as? Inet4Address)?.takeIf { addr -> !addr.isLoopbackAddress }?.hostAddress }
+                .orEmpty()
+
+        private fun isEligibleLanNetwork(
+            cm: ConnectivityManager,
+            network: Network,
+            knownLinkProps: LinkProperties? = null,
+            allowArcManagement: Boolean = false
+        ): Boolean {
+            val caps = runCatching { cm.getNetworkCapabilities(network) }.getOrNull() ?: return false
+            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return false
+            val isWifiOrEthernet = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+            if (!isWifiOrEthernet) return false
+            if (!allowArcManagement) {
+                val lp = knownLinkProps ?: runCatching { cm.getLinkProperties(network) }.getOrNull()
+                if (LanRuntimeUtils.isArcVmManagementIpv4(extractUsableIpv4(lp))) return false
+            }
+            return true
+        }
+
         /**
          * Finds the active Wi-Fi or Ethernet [Network] even when Android has not marked it as the
          * default Internet network (e.g. when connected to a Belkin WeMo Setup AP at 10.22.22.1
-         * while mobile data is active).
+         * while mobile data is active), while skipping VPNs and ChromeOS ARCVM's `arc0`
+         * management bridge (`100.115.92.2`).
          */
         @Suppress("DEPRECATION")
         fun findPreferredWifiOrLanNetwork(cm: ConnectivityManager?): Network? {
             val cached = lastCallbackWifiNetwork
             if (cm == null) return cached
             return runCatching {
-                if (cached != null) {
-                    val caps = cm.getNetworkCapabilities(cached)
-                    if (caps != null && (caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
-                    ) {
-                        return@runCatching cached
-                    }
-                }
                 val networks = cm.allNetworks.orEmpty()
-                // Prefer a TRANSPORT_WIFI network on 10.22.22.x first, then any TRANSPORT_WIFI, then Ethernet
+                // 1. Highest priority for Phones: TRANSPORT_WIFI on 10.22.22.x Setup AP
                 networks.firstOrNull { net ->
                     val caps = cm.getNetworkCapabilities(net)
                     val lp = cm.getLinkProperties(net)
                     val hasSetupIp = lp?.linkAddresses?.any {
                         (it.address as? Inet4Address)?.hostAddress?.startsWith("10.22.22.") == true
                     } == true
-                    caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) && hasSetupIp
+                    caps != null && !caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN) &&
+                        caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) && hasSetupIp
+                }?.let { return@runCatching it }
+
+                // 2. Live callback-tracked Wi-Fi/Ethernet network (excluding VPN and arc0)
+                if (cached != null && isEligibleLanNetwork(cm, cached)) {
+                    return@runCatching cached
+                }
+
+                // 3. System activeNetwork when it is a physical Wi-Fi or Ethernet uplink
+                val active = runCatching { cm.activeNetwork }.getOrNull()
+                if (active != null && isEligibleLanNetwork(cm, active)) {
+                    return@runCatching active
+                }
+
+                // 4. Any eligible TRANSPORT_WIFI, then any eligible TRANSPORT_ETHERNET
+                networks.firstOrNull { net ->
+                    val caps = cm.getNetworkCapabilities(net)
+                    caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                        isEligibleLanNetwork(cm, net)
                 } ?: networks.firstOrNull { net ->
                     val caps = cm.getNetworkCapabilities(net)
-                    caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-                } ?: networks.firstOrNull { net ->
-                    val caps = cm.getNetworkCapabilities(net)
-                    caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+                    caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) &&
+                        isEligibleLanNetwork(cm, net)
                 }
             }.getOrNull() ?: cached
+        }
+
+        /**
+         * Resolves the active physical Wi-Fi/Ethernet [Network], interface name, IPv4 address, and
+         * IPv4 DNS servers directly from [ConnectivityManager] (skipping Robolectric tests so
+         * hermetic JVM suites never depend on host NIC state).
+         */
+        fun resolveActiveLanBinding(context: Context?): ActiveLanBinding? {
+            if (context == null || LanRuntimeUtils.isRunningInRobolectric()) return null
+            val cm = context.applicationContext?.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+                ?: return null
+            val targetNet = findPreferredWifiOrLanNetwork(cm) ?: return null
+            val lp = runCatching { cm.getLinkProperties(targetNet) }.getOrNull() ?: return null
+            val ipv4 = extractUsableIpv4(lp) ?: return null
+            val ifName = lp.interfaceName?.takeIf { it.isNotBlank() } ?: "wlan0"
+            return ActiveLanBinding(
+                network = targetNet,
+                interfaceName = ifName,
+                localIpv4 = ipv4,
+                dnsServersIpv4 = extractIpv4DnsServers(lp)
+            )
         }
 
         /**

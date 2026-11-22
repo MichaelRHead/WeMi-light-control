@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.SsdpScanReport
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenBottom
@@ -74,10 +75,16 @@ fun SsdpScannerModal(
     onRescan: () -> Unit,
     onAdoptDevice: (SsdpDiscoveredDevice) -> Unit,
     onAdoptAll: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onScanManualSubnet: ((String) -> Unit)? = null
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val discoveredList = scanReport?.discoveredDevices.orEmpty()
+    val showArcVmManualFallback = !isScanning &&
+        discoveredList.isEmpty() &&
+        onScanManualSubnet != null &&
+        (scanReport?.isArcVmEnvironment == true ||
+            LanRuntimeUtils.isCarrierGradeNatIpv4(scanReport?.localInterfaceIp))
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -105,6 +112,16 @@ fun SsdpScannerModal(
                     onAdoptAll = onAdoptAll,
                     onDismiss = onDismiss
                 )
+            }
+
+            if (showArcVmManualFallback) {
+                item(key = "arcvm_manual_subnet_fallback") {
+                    ArcVmManualSubnetFallbackCard(
+                        localInterfaceIp = scanReport?.localInterfaceIp.orEmpty(),
+                        scannedSubnets = scanReport?.scannedSubnets.orEmpty(),
+                        onScanManualSubnet = onScanManualSubnet
+                    )
+                }
             }
 
             items(discoveredList, key = { "${it.ipAddress}:${it.port}_${it.serialNumber}_${it.name}" }) { item ->
@@ -215,22 +232,33 @@ private fun SsdpScannerControlsHeader(
             modifier = Modifier.fillMaxWidth()
         ) {
             Column(modifier = Modifier.padding(10.dp)) {
+                val interfaceLabel = buildString {
+                    append("Local Interface: ")
+                    append(scanReport?.localInterfaceIp ?: "192.168.1.50")
+                    if (scanReport?.isArcVmEnvironment == true) append(" (ChromeOS VM)")
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Local Interface: ${scanReport?.localInterfaceIp ?: "192.168.1.50"}",
+                        text = interfaceLabel,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 11.sp,
-                        color = WemoGreenBottom
+                        color = WemoGreenBottom,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (isScanning) "Broadcasting M-SEARCH..." else "Scan Time: ${scanReport?.scanDurationMs ?: 18}ms",
                         fontFamily = FontFamily.Monospace,
                         fontSize = 11.sp,
-                        color = WemoGreenDark
+                        color = WemoGreenDark,
+                        maxLines = 1,
+                        softWrap = false
                     )
                 }
                 Spacer(modifier = Modifier.height(2.dp))
@@ -242,6 +270,17 @@ private fun SsdpScannerControlsHeader(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (scanReport?.scannedSubnets?.isNotEmpty() == true) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = "Unicast Subnet Sweep: ${scanReport.scannedSubnets.joinToString(", ") { "$it.0/24" }}",
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        color = WemoGreenDark,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
 

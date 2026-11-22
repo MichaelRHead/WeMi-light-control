@@ -365,6 +365,24 @@ internal class DeviceCrudAndRulesCoordinator(
                 }
             }
         }
+        if (!demoMode && LanRuntimeUtils.isPrivateRfc1918Ipv4(saved.ipAddress)) {
+            val prefix = LanRuntimeUtils.normalizeSubnetPrefixOrNull(saved.ipAddress)
+            val home = dao.getAllHomeNetworks().first().find { it.networkKey == saved.networkKey }
+            if (prefix != null && home != null &&
+                (home.subnetPrefix.isBlank() || LanRuntimeUtils.isCarrierGradeNatIpv4(home.subnetPrefix))
+            ) {
+                val updatedSsid = if (home.ssidLabel.equals("Local LAN", ignoreCase = true) ||
+                    home.ssidLabel.startsWith("LAN 100.", ignoreCase = true)
+                ) {
+                    "LAN $prefix.0/24"
+                } else {
+                    home.ssidLabel
+                }
+                dao.updateHomeNetwork(
+                    home.copy(subnetPrefix = prefix, gatewayIp = "$prefix.1", ssidLabel = updatedSsid)
+                )
+            }
+        }
         return saved
     }
 

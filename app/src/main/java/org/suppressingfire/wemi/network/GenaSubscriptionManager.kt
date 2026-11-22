@@ -319,6 +319,10 @@ class GenaSubscriptionManager(
         device: DeviceEntity,
         timeoutSeconds: Int = 300
     ): GenaSubscriptionRecord? = withContext(Dispatchers.IO) {
+        val localIp = if (device.ipAddress == "127.0.0.1") "127.0.0.1" else localIpProvider()
+        if (device.ipAddress != "127.0.0.1" && LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)) {
+            return@withContext null
+        }
         val listenPort = startServer()
         if (listenPort <= 0) return@withContext null
 
@@ -361,7 +365,6 @@ class GenaSubscriptionManager(
         }
 
         // Fresh SUBSCRIBE with CALLBACK and NT: upnp:event
-        val localIp = if (device.ipAddress == "127.0.0.1") "127.0.0.1" else localIpProvider()
         val callbackUrl = "<http://$localIp:$listenPort/gena/$deviceKey>"
         try {
             val resp = httpClient.execute(

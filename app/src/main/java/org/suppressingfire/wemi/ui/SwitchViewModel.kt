@@ -28,6 +28,7 @@ import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.network.LanNetworkSnapshot
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkMonitor
 import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
@@ -239,7 +240,8 @@ class SwitchViewModel internal constructor(
             viewModelScope.launch {
                 var tick = 0
                 while (isActive) {
-                    delay(30_000L)
+                    val pollIntervalMs = if (LanRuntimeUtils.isCarrierGradeNatIpv4(repository.detectCurrentLanIp())) 15_000L else 30_000L
+                    delay(pollIntervalMs)
                     if (!isDemoShowroomMode.value) {
                         val key = activeNetworkKey.value
                         repository.pollActiveHomeStates(key)
@@ -335,8 +337,10 @@ class SwitchViewModel internal constructor(
 
     fun pingDeviceLatency(device: DeviceEntity) = deviceActionsController.pingDeviceLatency(device)
 
-    fun openSsdpScannerAndScan(searchTarget: String = selectedSearchTarget.value) =
-        deviceActionsController.openSsdpScannerAndScan(searchTarget)
+    fun openSsdpScannerAndScan(searchTarget: String = selectedSearchTarget.value, manualSubnetOverride: String? = null) =
+        deviceActionsController.openSsdpScannerAndScan(searchTarget, manualSubnetOverride)
+
+    fun scanManualSubnet(subnetPrefix: String) = deviceActionsController.scanManualSubnet(subnetPrefix)
 
     fun closeSsdpScanner() = deviceActionsController.closeSsdpScanner()
 
