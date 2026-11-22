@@ -460,5 +460,36 @@ class DiscoveryAndGroupingIntegrationTest {
                 assertEquals("SER-FOREIGN-9", deduped.serialNumber)
                 assertEquals("Local LAN", deduped.wifiSsid)
             }
+
+            // 4. Unsolicited non-Belkin SSDP NOTIFY (NT header, no ST) must never be misclassified as a switch
+            ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")).use { routerHttp ->
+                java.net.DatagramSocket(0, InetAddress.getByName("127.0.0.1")).use { routerUdp ->
+                    val httpThread = kotlin.concurrent.thread(isDaemon = true) {
+                        runCatching {
+                            routerHttp.soTimeout = 1500
+                            routerHttp.accept().use { s ->
+                                val r = s.getInputStream().bufferedReader(); while (!r.readLine().isNullOrEmpty()) {}
+                                val body = "<root><device><friendlyName>Generic Home Router</friendlyName></device></root>".toByteArray()
+                                s.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: ${body.size}\r\nConnection: close\r\n\r\n".toByteArray() + body)
+                            }
+                        }
+                    }
+                    val udpThread = kotlin.concurrent.thread(isDaemon = true) {
+                        runCatching {
+                            routerUdp.soTimeout = 1500
+                            val pkt = java.net.DatagramPacket(ByteArray(1024), 1024); routerUdp.receive(pkt)
+                            val msg = "NOTIFY * HTTP/1.1\r\nLOCATION: http://127.0.0.1:${routerHttp.localPort}/rootDesc.xml\r\nNT: upnp:rootdevice\r\nNTS: ssdp:alive\r\nUSN: uuid:generic-router\r\n\r\n".toByteArray()
+                            routerUdp.send(java.net.DatagramPacket(msg, msg.size, pkt.address, pkt.port))
+                        }
+                    }
+                    NetworkClient.registerLoopbackSsdpPort(routerUdp.localPort)
+                    try {
+                        assertTrue(NetworkClient().performSsdpDiscoveryScan(includeDemoFallbacks = false, allowUnicastSubnetFallback = false).discoveredDevices.isEmpty())
+                    } finally {
+                        NetworkClient.unregisterLoopbackSsdpPort(routerUdp.localPort)
+                        udpThread.join(500); httpThread.join(500)
+                    }
+                }
+            }
         }
 }

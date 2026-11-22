@@ -239,7 +239,11 @@ class NetworkMonitor(
             if (!isWifiOrEthernet) return false
             if (!allowArcManagement) {
                 val lp = knownLinkProps ?: runCatching { cm.getLinkProperties(network) }.getOrNull()
-                if (LanRuntimeUtils.isArcVmManagementIpv4(extractUsableIpv4(lp))) return false
+                if (lp?.interfaceName.equals("arc0", ignoreCase = true) ||
+                    LanRuntimeUtils.isArcVmManagementIpv4(extractUsableIpv4(lp))
+                ) {
+                    return false
+                }
             }
             return true
         }
@@ -267,15 +271,15 @@ class NetworkMonitor(
                         caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) && hasSetupIp
                 }?.let { return@runCatching it }
 
-                // 2. Live callback-tracked Wi-Fi/Ethernet network (excluding VPN and arc0)
-                if (cached != null && isEligibleLanNetwork(cm, cached)) {
-                    return@runCatching cached
-                }
-
-                // 3. System activeNetwork when it is a physical Wi-Fi or Ethernet uplink
+                // 2. System activeNetwork when it is an eligible physical Wi-Fi or Ethernet uplink
                 val active = runCatching { cm.activeNetwork }.getOrNull()
                 if (active != null && isEligibleLanNetwork(cm, active)) {
                     return@runCatching active
+                }
+
+                // 3. Live callback-tracked Wi-Fi/Ethernet network (excluding VPN and arc0)
+                if (cached != null && isEligibleLanNetwork(cm, cached)) {
+                    return@runCatching cached
                 }
 
                 // 4. Any eligible TRANSPORT_WIFI, then any eligible TRANSPORT_ETHERNET
@@ -288,7 +292,7 @@ class NetworkMonitor(
                     caps != null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) &&
                         isEligibleLanNetwork(cm, net)
                 }
-            }.getOrNull() ?: cached
+            }.getOrElse { cached }
         }
 
         /**

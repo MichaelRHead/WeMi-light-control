@@ -210,9 +210,11 @@ class ChromeOsArcVmDiscoveryTest {
             )
         )
 
-        // scanSubnetUnicast must immediately refuse CGNAT 100.115.92 sweeps
+        // scanSubnetUnicast must immediately refuse CGNAT, public, and malformed prefixes
         val client = NetworkClient()
         assertTrue(client.scanSubnetUnicast("100.115.92").isEmpty())
+        assertTrue(client.scanSubnetUnicast("8.8.8").isEmpty())
+        assertTrue(client.scanSubnetUnicast("not-an-ip").isEmpty())
     }
 
     @Test
@@ -244,6 +246,23 @@ class ChromeOsArcVmDiscoveryTest {
             assertEquals("Local LAN", createdHome.ssidLabel)
             assertEquals("", createdHome.subnetPrefix)
 
+            // 2b. Provisioning on a blank-subnet ChromeOS home must never write a malformed ".120" IP
+            FakeUpnpServer(
+                initialFriendlyName = "Porch Setup Switch",
+                serialNumber = "SNCHROPROV1",
+                macAddress = "EC1A59112233",
+                isRtos = true
+            ).use { setupAp ->
+                val provRes = repo.provisionSetupApDevice(
+                    apHost = "127.0.0.1", apPort = setupAp.port, ssid = "Home-WiFi",
+                    plainPassword = "ValidPassword123", activeNetworkKey = initialKey,
+                    maxStatusPolls = 2, statusPollDelayMs = 10L
+                )
+                assertTrue(provRes.success)
+                val provDev = db.switchDao().getAllDevices().first().single { it.serialNumber == "SNCHROPROV1" }
+                assertTrue("Expected valid RFC 1918 placeholder IP, got ${provDev.ipAddress}", provDev.ipAddress.startsWith("192.168.1."))
+            }
+
             // 3. Adopting a discovered switch on 192.168.86.42 automatically backfills physical /24 subnet
             repo.adoptDiscoveredDevice(
                 discovered = SsdpDiscoveredDevice(
@@ -261,16 +280,21 @@ class ChromeOsArcVmDiscoveryTest {
             assertEquals("192.168.86", healedHome.subnetPrefix)
             assertEquals("192.168.86.1", healedHome.gatewayIp)
 
-            // 4. Phone / TV RFC 1918 subnet matching still works normally
+            // 4. Phone / TV RFC 1918 subnet matching & saveOrUpdateHomeNetwork normalization/CGNAT guard
             val secondHome = repo.resolveOrCreateHomeForSubnet("192.168.99", "192.168.99.1")
             assertNotNull(secondHome)
             assertEquals("192.168.99", secondHome!!.subnetPrefix)
+            val normHome = repo.saveOrUpdateHomeNetwork(null, "Beach", "Beach-5G", "192.168.77.42")
+            assertEquals("192.168.77", normHome.subnetPrefix)
+            assertEquals("192.168.77.1", normHome.gatewayIp)
+            val cgnatGuardedHome = repo.saveOrUpdateHomeNetwork(null, "Guest", "Guest-5G", "100.115.92")
+            assertEquals("192.168.1", cgnatGuardedHome.subnetPrefix)
 
-            // 5. Startup sanitization repairs a legacy polluted 100.115.92 home from its saved device IP
+            // 5. Startup sanitization repairs legacy polluted 100.115.92 home name, subnet, and device SSID
             db.switchDao().insertHomeNetwork(
                 HomeNetworkEntity(
                     networkKey = "wifi_lan_100_115_92",
-                    homeName = "Legacy ChromeOS",
+                    homeName = "Home (100.115.92.x)",
                     ssidLabel = "LAN 100.115.92.0/24",
                     subnetPrefix = "100.115.92",
                     gatewayIp = "100.115.92.5"
@@ -281,6 +305,7 @@ class ChromeOsArcVmDiscoveryTest {
                     name = "Office Lamp",
                     roomName = "Office",
                     networkKey = "wifi_lan_100_115_92",
+                    wifiSsid = "LAN 100.115.92.0/24",
                     ipAddress = "192.168.50.12",
                     port = 49153,
                     serialNumber = "SN5012"
@@ -289,9 +314,12 @@ class ChromeOsArcVmDiscoveryTest {
             sanitizer.sanitizeAndResolveInitialLanHome("100.115.92.6")
             val repairedLegacy = db.switchDao().getAllHomeNetworks().first()
                 .single { it.networkKey == "wifi_lan_100_115_92" }
+            assertEquals("Home (192.168.50.x)", repairedLegacy.homeName)
             assertEquals("192.168.50", repairedLegacy.subnetPrefix)
             assertEquals("192.168.50.1", repairedLegacy.gatewayIp)
             assertEquals("LAN 192.168.50.0/24", repairedLegacy.ssidLabel)
+            val repairedDev = db.switchDao().getAllDevices().first().single { it.serialNumber == "SN5012" }
+            assertEquals("LAN 192.168.50.0/24", repairedDev.wifiSsid)
         } finally {
             repo.close()
             db.close()

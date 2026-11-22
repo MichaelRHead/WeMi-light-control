@@ -254,6 +254,10 @@ internal class HomeProfileSanitizer(
      * room assignments, or recorded with a ChromeOS ARCVM CGNAT prefix (`100.64.0.0/10`), and
      * resolves (or creates) the active Real LAN Home profile.
      */
+    private fun isCgnatLanLabel(label: String): Boolean =
+        label.startsWith("LAN ", ignoreCase = true) &&
+            LanRuntimeUtils.isCarrierGradeNatIpv4(label.substring(4).trim())
+
     suspend fun sanitizeAndResolveInitialLanHome(localIp: String): String {
         val isCgnatLocal = LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)
         val subnetPrefix = localIp.substringBeforeLast('.', "192.168.1")
@@ -261,10 +265,13 @@ internal class HomeProfileSanitizer(
         val rawHomes = dao.getAllHomeNetworks().first()
         val rawDevices = dao.getAllDevices().first()
         val existingHomes = rawHomes.mapIndexed { idx, home ->
-            val pollutedName = XmlAndSkuParser.isWemoDeviceSetupSsid(home.homeName) ||
-                home.homeName.startsWith("Home Wi-Fi (", ignoreCase = true)
-            val pollutedSsid = XmlAndSkuParser.isWemoDeviceSetupSsid(home.ssidLabel)
             val isCgnatHome = LanRuntimeUtils.isCarrierGradeNatIpv4(home.subnetPrefix)
+            val pollutedCgnatName = isCgnatHome && home.homeName.startsWith("Home (", ignoreCase = true) &&
+                LanRuntimeUtils.isCarrierGradeNatIpv4(home.homeName.substringAfter("Home (", "").substringBefore(')'))
+            val pollutedName = XmlAndSkuParser.isWemoDeviceSetupSsid(home.homeName) ||
+                home.homeName.startsWith("Home Wi-Fi (", ignoreCase = true) ||
+                pollutedCgnatName
+            val pollutedSsid = XmlAndSkuParser.isWemoDeviceSetupSsid(home.ssidLabel) || isCgnatLanLabel(home.ssidLabel)
             if (!pollutedName && !pollutedSsid && !isCgnatHome) {
                 home
             } else {
@@ -280,14 +287,13 @@ internal class HomeProfileSanitizer(
                 val repairedSubnet = if (isCgnatHome) inferredPrefix.orEmpty() else home.subnetPrefix
                 val repairedGateway = if (isCgnatHome) inferredPrefix?.let { "$it.1" }.orEmpty() else home.gatewayIp
                 val genericLanLabel = if (repairedSubnet.isNotBlank()) "LAN $repairedSubnet.0/24" else "Local LAN"
-                val repairedSsid = if (pollutedSsid || (isCgnatHome && home.ssidLabel.startsWith("LAN 100.", true))) {
-                    genericLanLabel
-                } else {
-                    home.ssidLabel
+                val repairedSsid = if (pollutedSsid) genericLanLabel else home.ssidLabel
+                val hasOtherMyHome = rawHomes.any {
+                    it.networkKey != home.networkKey && it.homeName.equals("My Home", ignoreCase = true)
                 }
                 val repairedName = when {
                     !pollutedName -> home.homeName
-                    idx == 0 || repairedSubnet.isBlank() -> "My Home"
+                    repairedSubnet.isBlank() || (idx == 0 && !hasOtherMyHome) -> "My Home"
                     else -> "Home ($repairedSubnet.x)"
                 }
                 home.copy(
@@ -301,9 +307,9 @@ internal class HomeProfileSanitizer(
 
         val homeByKey = existingHomes.associateBy { it.networkKey }
         rawDevices.forEach { dev ->
-            val cleanSsid = if (XmlAndSkuParser.isWemoDeviceSetupSsid(dev.wifiSsid)) {
+            val cleanSsid = if (XmlAndSkuParser.isWemoDeviceSetupSsid(dev.wifiSsid) || isCgnatLanLabel(dev.wifiSsid)) {
                 val homeSsid = homeByKey[dev.networkKey]?.ssidLabel?.takeIf {
-                    it.isNotBlank() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it)
+                    it.isNotBlank() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it) && !isCgnatLanLabel(it)
                 }
                 val deviceSubnet = LanRuntimeUtils.normalizeSubnetPrefixOrNull(dev.ipAddress)
                     ?.takeIf { LanRuntimeUtils.isPrivateRfc1918Ipv4(it) }
@@ -414,7 +420,7 @@ internal class HomeProfileSanitizer(
         val home = dao.getAllHomeNetworks().first().find { it.networkKey == networkKey } ?: return
         if (home.subnetPrefix.isNotBlank() && !LanRuntimeUtils.isCarrierGradeNatIpv4(home.subnetPrefix)) return
         val updatedSsid = if (home.ssidLabel.equals("Local LAN", ignoreCase = true) ||
-            home.ssidLabel.startsWith("LAN 100.", ignoreCase = true)
+            isCgnatLanLabel(home.ssidLabel)
         ) {
             "LAN $prefix.0/24"
         } else {

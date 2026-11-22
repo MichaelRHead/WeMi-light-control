@@ -39,10 +39,14 @@ internal class DeviceCrudAndRulesCoordinator(
     ): HomeNetworkEntity {
         val cleanHome = homeName.trim().ifEmpty { "My Home Wi-Fi" }
         val cleanSsid = ssidLabel.trim().ifEmpty { "Home-WiFi-5G" }
-        val cleanSubnet = subnetPrefix.trim()
+        val rawCleanSubnet = subnetPrefix.trim()
             .removeSuffix(".0/24")
             .removeSuffix(".x")
-            .ifEmpty { "192.168.1" }
+            .removeSuffix(".X")
+        val normalizedSubnet = LanRuntimeUtils.normalizeSubnetPrefixOrNull(rawCleanSubnet) ?: rawCleanSubnet
+        val cleanSubnet = normalizedSubnet
+            .takeUnless { it.isEmpty() || LanRuntimeUtils.isCarrierGradeNatIpv4(it) }
+            ?: "192.168.1"
         val key = existingKey ?: "wifi_custom_${cleanSubnet.replace('.', '_')}_${System.currentTimeMillis() % 10000}"
         val currentNetworks = dao.getAllHomeNetworks().first()
         val existingHome = existingKey?.let { targetKey ->
@@ -371,9 +375,9 @@ internal class DeviceCrudAndRulesCoordinator(
             if (prefix != null && home != null &&
                 (home.subnetPrefix.isBlank() || LanRuntimeUtils.isCarrierGradeNatIpv4(home.subnetPrefix))
             ) {
-                val updatedSsid = if (home.ssidLabel.equals("Local LAN", ignoreCase = true) ||
-                    home.ssidLabel.startsWith("LAN 100.", ignoreCase = true)
-                ) {
+                val isCgnatSsid = home.ssidLabel.startsWith("LAN ", ignoreCase = true) &&
+                    LanRuntimeUtils.isCarrierGradeNatIpv4(home.ssidLabel.substring(4).trim())
+                val updatedSsid = if (home.ssidLabel.equals("Local LAN", ignoreCase = true) || isCgnatSsid) {
                     "LAN $prefix.0/24"
                 } else {
                     home.ssidLabel

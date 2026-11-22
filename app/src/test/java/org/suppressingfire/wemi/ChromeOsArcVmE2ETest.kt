@@ -388,7 +388,7 @@ class ChromeOsArcVmE2ETest {
         shadowCm.clearAllNetworks()
 
         val arc0Net = registerShadowNetwork(
-            shadowCm, 101, NetworkCapabilities.TRANSPORT_ETHERNET, ConnectivityManager.TYPE_ETHERNET,
+            shadowCm, 101, NetworkCapabilities.TRANSPORT_ETHERNET, ConnectivityManager.TYPE_DUMMY,
             "arc0", "100.115.92.2", emptyList()
         )
         val vpnNet = registerShadowNetwork(
@@ -411,12 +411,29 @@ class ChromeOsArcVmE2ETest {
         assertEquals("100.115.92.6", binding?.localIpv4)
         assertEquals(listOf("192.168.86.1"), binding?.dnsServersIpv4)
 
+        // Active Ethernet uplink overrides non-active Wi-Fi when switched on Chromebook dock
+        val eth2Net = registerShadowNetwork(
+            shadowCm, ConnectivityManager.TYPE_ETHERNET, NetworkCapabilities.TRANSPORT_ETHERNET, ConnectivityManager.TYPE_ETHERNET,
+            "eth2", "100.115.92.10", listOf("192.168.86.1"), makeActive = true
+        )
+        assertEquals(eth2Net, cm.activeNetwork)
+        assertEquals(eth2Net, NetworkMonitor.findPreferredWifiOrLanNetwork(cm))
+
         // Non-regression for Phone 10.22.22.x Setup AP: Setup AP Wi-Fi still takes highest priority
         val setupApNet = registerShadowNetwork(
             shadowCm, 104, NetworkCapabilities.TRANSPORT_WIFI, ConnectivityManager.TYPE_WIFI,
             "wlan0", "10.22.22.10", listOf("10.22.22.1")
         )
         assertEquals(setupApNet, NetworkMonitor.findPreferredWifiOrLanNetwork(cm))
+
+        // When only arc0 remains, findPreferredWifiOrLanNetwork returns null (never leaks stale cache)
+        shadowCm.clearAllNetworks()
+        shadowCm.setActiveNetworkInfo(null)
+        registerShadowNetwork(
+            shadowCm, ConnectivityManager.TYPE_DUMMY, NetworkCapabilities.TRANSPORT_ETHERNET, ConnectivityManager.TYPE_DUMMY,
+            "arc0", "100.115.92.2", emptyList(), makeActive = true
+        )
+        assertNull(NetworkMonitor.findPreferredWifiOrLanNetwork(cm))
     }
 
     @Suppress("DEPRECATION")

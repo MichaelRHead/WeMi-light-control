@@ -304,7 +304,11 @@ internal class ProvisioningCoordinator(
             val homeNetworks = dao.getAllHomeNetworks().first()
             val matchedHomeBySsid = homeNetworks.find { it.ssidLabel.equals(ssid, ignoreCase = true) }
             val targetNetworkKey = matchedHomeBySsid?.networkKey ?: activeNetworkKey
-            val homePrefix = homeNetworks.find { it.networkKey == targetNetworkKey }?.subnetPrefix ?: "192.168.1"
+            val homePrefix = homeNetworks.find { it.networkKey == targetNetworkKey }
+                ?.subnetPrefix
+                ?.let { LanRuntimeUtils.normalizeSubnetPrefixOrNull(it) }
+                ?.takeIf { LanRuntimeUtils.isPrivateRfc1918Ipv4(it) }
+                ?: "192.168.1"
 
             val demoMode = isDemoShowroomMode()
             val serial = desc?.serialNumber?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) }

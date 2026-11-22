@@ -55,15 +55,9 @@ internal class SsdpDiscoveryEngine(
         searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
         skipIps: Set<String> = emptySet()
     ): List<SsdpDiscoveredDevice> = coroutineScope {
-        val cleanPrefix = subnetPrefix.trim().removeSuffix(".x").removeSuffix(".0/24")
-        if (cleanPrefix.isBlank() ||
-            cleanPrefix.startsWith("10.0.2") ||
-            cleanPrefix.startsWith("10.22.22") ||
-            cleanPrefix.startsWith("127.") ||
-            LanRuntimeUtils.isCarrierGradeNatIpv4(cleanPrefix)
-        ) {
-            return@coroutineScope emptyList()
-        }
+        val cleanPrefix = LanRuntimeUtils.normalizeSubnetPrefixOrNull(subnetPrefix)
+            ?.takeIf { LanRuntimeUtils.isPrivateRfc1918Ipv4(it) }
+            ?: return@coroutineScope emptyList()
         val sweepSemaphore = Semaphore(24)
         val fastPorts = listOf(49153, 49152, 49154, 49151)
         (1..254).mapNotNull { hostOctet ->
@@ -149,7 +143,7 @@ internal class SsdpDiscoveryEngine(
             isArcVm -> 700
             else -> 550
         }
-        val retransmitAfterMs = if (!fastMode && isArcVm) 750L else receiveTimeoutMs.toLong()
+        val retransmitAfterMs = receiveTimeoutMs.toLong()
         val receiveWindowMs = when {
             hasLoopbackTargets -> 1000L
             fastMode -> 220L
@@ -212,6 +206,7 @@ internal class SsdpDiscoveryEngine(
                         val elapsed = (System.currentTimeMillis() - burstStartMs).coerceAtLeast(1L)
                         val rawText = String(respPacket.data, 0, respPacket.length, Charsets.UTF_8)
                         val headers = XmlAndSkuParser.parseSsdpHeaders(rawText)
+                        if (headers["NTS"].equals("ssdp:byebye", ignoreCase = true)) continue
                         val loc = headers["LOCATION"]
                         if (!loc.isNullOrEmpty()) {
                             LanSubnetHintResolver.extractRfc1918HostIp(loc)?.let { observedSsdpPeerIps.add(it) }
@@ -250,7 +245,7 @@ internal class SsdpDiscoveryEngine(
                                 fetchLiveDeviceDescriptor(
                                     locUrl,
                                     headers["USN"].orEmpty(),
-                                    headers["ST"].orEmpty().ifEmpty { searchTarget },
+                                    headers["ST"].orEmpty().ifEmpty { headers["NT"].orEmpty() },
                                     latencyMs,
                                     true
                                 )
@@ -277,7 +272,9 @@ internal class SsdpDiscoveryEngine(
         }
 
         val unseenKnown = knownLocalDevices.filter { known ->
-            liveDiscovered.none {
+            known.ipAddress.isNotBlank() &&
+                !LanRuntimeUtils.isCarrierGradeNatIpv4(known.ipAddress) &&
+                liveDiscovered.none {
                 (it.ipAddress == known.ipAddress && it.port == known.port) ||
                     (!LanRuntimeUtils.isPlaceholderSerial(known.serialNumber) &&
                         !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
@@ -286,7 +283,7 @@ internal class SsdpDiscoveryEngine(
                         cleanKnownUdn.isNotEmpty() &&
                             cleanKnownUdn.equals(LanRuntimeUtils.canonicalHardwareUdn(it.usn), ignoreCase = true)
                     })
-            }
+                }
         }
         val stageBDescriptors = coroutineScope {
             unseenKnown.map { known ->
@@ -326,7 +323,9 @@ internal class SsdpDiscoveryEngine(
         }
 
         val scannedSubnets = mutableListOf<String>()
-        val hasManualOverride = !LanRuntimeUtils.normalizeSubnetPrefixOrNull(manualSubnetOverride).isNullOrBlank()
+        val normalizedManualOverride = LanRuntimeUtils.normalizeSubnetPrefixOrNull(manualSubnetOverride)
+            ?.takeIf { LanRuntimeUtils.isPrivateRfc1918Ipv4(it) }
+        val hasManualOverride = normalizedManualOverride != null
         if (shouldRunUnicastSubnetFallback(
                 liveDiscovered = liveDiscovered,
                 knownLocalDevices = knownLocalDevices,
@@ -340,11 +339,12 @@ internal class SsdpDiscoveryEngine(
             val candidateSubnets = LanSubnetHintResolver.resolveCandidateSubnets(
                 localIp = localIp,
                 isArcVm = isArcVm,
-                manualSubnetOverride = manualSubnetOverride,
+                manualSubnetOverride = normalizedManualOverride,
                 activeHomeSubnetPrefix = activeHomeSubnetPrefix,
                 rememberedDeviceIps = knownLocalDevices.map { it.ipAddress },
                 observedSsdpPeerIps = observedSsdpPeerIps,
-                dnsServerIps = activeBinding?.dnsServersIpv4.orEmpty()
+                dnsServerIps = activeBinding?.dnsServersIpv4.orEmpty(),
+                maxCandidates = if (hasManualOverride) 1 else 2
             )
             for (prefix in candidateSubnets) {
                 scannedSubnets.add(prefix)
