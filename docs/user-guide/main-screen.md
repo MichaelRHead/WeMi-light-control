@@ -2,101 +2,113 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-The **Main Screen** (**Devices** tab) is your primary control center in **WeMi Light Control**. It displays your active Wi-Fi Home, network discovery status, room filters, and every switch, dimmer, motion sensor, and smart plug from Belkin's discontinued smart switch platform configured for your home.
+The **Main Screen** (**Devices** tab) is your home lighting dashboard in **WeMi Light Control** (installed as **WeMi Switch Control**). From here you can switch Wi-Fi Homes, filter by room, see whether each switch is ON, OFF, or offline, dim lights, pin Home Screen widgets, and check connection health at a glance.
 
 ---
 
-## 1. Top Header Bar
+## 1. Top Header Bar & Bottom Navigation
 
-At the top of the screen, the compact single-row WeMi header provides quick access to core actions:
+At the top of the screen, the compact single-row **Ocean Teal & Deep Sapphire** header bar gives you one-tap access to everyday actions:
 
 | Control | Location | What It Does |
 | :--- | :--- | :--- |
-| **`wemi` Wordmark & Version Pill** | Top-left | Displays the static **`wemi`** brand wordmark alongside a subtle low-contrast version pill (`app_version_button`, e.g. `v33.0`) that opens the scrollable in-app **Release History** dialog without disrupting top-bar alignment. |
-| **`All Off` Button** | Next to Refresh | Turns **OFF** all reachable switches and dimmers on your active Wi-Fi Home in one tap (`all_off_devices_button`). |
-| **Refresh Icon** | Top-right | Opens the live **SSDP Network Discovery Scanner** and starts an immediate local Wi-Fi scan (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
-| **`Edit` / `Done` Button** | Top-right | Toggles **Edit Mode** so you can reorder, rename, reconfigure, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
-| **`+` (Add) Button** | Far top-right | On the **Devices** tab, opens the **Add Device** dialog. On the **Rules** tab, opens the **New Rule** dialog. |
+| **`wemi` Wordmark & Version Pill (`v34.0`)** | Top-left | Displays the **`wemi`** logo alongside a subtle version badge (such as **`v34.0`**). Tap the version badge anytime to open the scrollable **Release History** dialog (with an **`Installed`** tag on your current version) to see what's new across releases. |
+| **`All Off` Button** | Right cluster | Turns **OFF** every reachable switch and dimmer on your active Wi-Fi Home in a single tap. |
+| **Refresh Icon** | Right cluster | Opens the live **SSDP Network Discovery Scan** sheet and scans your local Wi-Fi for switches (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
+| **`Edit` / `Done` Button** | Right cluster | Switches to **Edit Mode** (switching to the **Devices** tab first if needed) so you can reorder, rename, edit, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
+| **`+` (Add) Button** | Far top-right | On the **Devices** or **More** tab, opens **Add Smart Switch Device**. On the **Rules** tab, opens **New Smart Switch Rule**. |
+
+Along the bottom of the screen, the three navigation tabs switch between **Devices** (your lights and rooms), **Rules** (local schedules and auto-off timers), and **More** (whole-home controls, Demo Mode, packet log, and open-source notices).
+
+> [!TIP]
+> **Predictable Back Button**: Pressing your device's **Back** button steps cleanly out of open dialogs, the discovery scanner, Edit Mode, or a single-room filter, and returns from **Rules** or **More** back to **Devices** before exiting the app.
 
 ---
 
-## 2. Startup State Detection & Three-State Visual Icons
+## 2. Three Unmistakable Hardware States (`ON`, `OFF`, `Offline`)
 
-Whenever you launch the app, pull down to refresh, or switch Wi-Fi Homes, **WeMi Light Control** immediately queries each remembered switch on your local network (`GetBinaryState`) and displays one of **three unmistakable visual states**:
+Whenever you open the app, pull down to refresh, or switch Wi-Fi Homes, WeMi immediately checks each remembered switch on your local network so you can tell the difference between a switch that is simply turned **OFF** versus a switch that has lost Wi-Fi or power:
 
 ```mermaid
 flowchart LR
-    Startup["App Startup / Pull-to-Refresh"] --> Probe["Local SOAP Probe\n(GetBinaryState)"]
-    Probe -->|Switch Relay = 1| StateOn["1. Accessible & ON\n• Glowing Icon & Aura\n• Emerald 'I/O' Power Badge\n• Glowing Cyan Power Ring"]
-    Probe -->|Switch Relay = 0| StateOff["2. Accessible & OFF (Standby)\n• Crisp Slate-Gray Housing\n• Dark-Gray 'I/O' Power Badge\n• Dark-Gray 'I/O' Power Ring"]
-    Probe -->|Unreachable / Timeout| StateOffline["3. Disconnected / Offline\n• Muted Gray + Dashed Red Outline\n• Red Disconnected Corner Badge\n• Red Disconnected Ring Button"]
+    Startup["App Open / Pull-to-Refresh"] --> Probe["Check Switch Over Local Wi-Fi"]
+    Probe -->|Switch is ON| StateOn["1. Reachable & ON\n• Lit Illustration & Glow\n• Emerald 'I/O' Corner Badge\n• Glowing Ocean Teal Power Ring"]
+    Probe -->|Switch is OFF| StateOff["2. Reachable & OFF (Standby)\n• Crisp Dark-Slate Illustration\n• Dark Charcoal 'I/O' Corner Badge\n• Dark Charcoal 'I/O' Power Ring"]
+    Probe -->|No Response| StateOffline["3. Offline / Not Detected\n• Muted Icon + Dashed Red Outline\n• Red Broken-Link Corner Badge\n• Red Reconnect Ring Button"]
 ```
 
-| Device State | Hardware Illustration | Corner Badge | Status Pill | Right-Side Action |
+| Device State | Hardware Illustration | Corner Badge | Status Label | Right-Side Button |
 | :--- | :--- | :--- | :--- | :--- |
-| **1. Accessible & ON** | Lit hardware bezel, glowing LEDs, spinning fan blades, or glowing multi-color tree lights | Emerald circle with white IEC **`I/O`** power symbol | Green **`ON`** pill (or **`ON • 75%`** for dimmers) | Glowing cyan-green **Power Ring (`I/O`)** |
-| **2. Accessible & OFF (Standby)** | Full-contrast dark slate housing with unlit slate indicators/filaments/bulbs | Very dark gray (`#23272F`) circle with white IEC **`I/O`** power symbol | Crisp light-gray & dark-gray **`OFF`** pill (or **`OFF • 75%`**) | Very dark gray (`#23272F`) **Power Ring (`I/O`)** — ready to turn ON |
-| **3. Disconnected / Offline** | Faded silhouette surrounded by a **dashed red outline** | Red circle with white **broken-link slash** icon | **`Not Detected`** label | Red **Disconnected Ring Button** to trigger self-healing reconnection |
+| **1. Reachable & ON** | Lit bezel, glowing bulb or multi-color tree lights, or smoothly spinning fan blades | Emerald circle with white **`I/O`** power symbol | Soft-cyan **`ON`** pill (or **`ON • 75%`** for dimmers) | Glowing **Ocean Teal / Electric Cyan Power Ring (`I/O`)** |
+| **2. Reachable & OFF (Standby)** | High-contrast dark-slate housing with unlit bulbs, stationary blades, or unlit filament | Dark charcoal (`#23272F`) circle with white **`I/O`** power symbol | Crisp gray **`OFF`** pill (or **`OFF • 75%`**) | Dark charcoal **`I/O` Power Ring** — ready to turn ON |
+| **3. Offline / Not Detected** | Faded silhouette with a **dashed red outline** | Red circle with white **broken-link slash** | **`Not Detected`** label + red **`Offline • Timeout`** badge | Red **Disconnected Ring Button** — tap to reconnect |
 
 ---
 
-## 3. Automatic Switch-Name Icon Classification
+## 3. Automatic Appliance Icons Based on Switch Name
 
-Every switch row automatically displays a custom illustration and category badge based on the switch's name (and hardware type):
+Every switch automatically picks a matching illustration and category badge from its name (and hardware type). Keyword matching is smart about word boundaries, so names like *"Front Street Light"* won't trigger a Christmas Tree icon and *"Tiffany Lamp"* won't trigger a Fan icon:
 
-| Category Badge | Trigger Keywords in Switch Name | Custom Visual Icon Behavior |
+| Category Badge | Example Keywords in Switch Name | Visual Behavior |
 | :--- | :--- | :--- |
-| **`Tree Lights`** | `tree`, `christmas`, `xmas`, `holiday`, `evergreen`, `spruce`, `fir`, `garland`, `wreath`, `tinsel`, `noel` | **3-Tiered Evergreen Christmas Tree**: Glowing gold star topper and 9 multi-color string lights when **ON**; dark pine canopy with unlit frosted bulbs and a warm amber standby base LED when **OFF**. |
-| **`Fan`** | `fan`, `blower`, `vent`, `exhaust`, `ventilat`, `circulator`, `ceiling fan`, `box fan`, `attic fan` | **4-Blade Air Circulator Fan**: Smoothly **animated 360° spinning blades** with cyan airflow glow when **ON**; stationary brushed-steel blades with a warm amber center hub LED when **OFF**. |
-| **`Light`** | `light`, `lights`, `lamp`, `bulb`, `chandelier`, `sconce`, `lantern`, `pendant`, `flood`, `spot`, `dimmer`, `led`, `candle`, `strip`, `fixture` (or any **Dimmer** hardware) | **Smart LED Lightbulb**: Luminous cyan-white globe scaled to dimmer brightness when **ON**; smoke-slate glass dome showing the unlit internal filament coil and warm amber neck collar when **OFF**. |
-| **`Motion`** | `motion`, `sensor` (or **Motion Sensor** hardware) | **Smart Motion Sensor Dome**: Glowing green radial wave arcs when motion is sensed. |
-| **`Switch`** | All other switch or outlet names (e.g., `Coffee Maker`, `Space Heater`, `Dehumidifier`) | **Belkin In-Wall Switch / Smart Plug**: Tactile wall plate with glowing status bar and power indicator. |
+| **`Tree Lights`** | `tree`, `christmas` *(except candle/lamp/sconce/lantern)*, `xmas`, `evergreen`, `spruce`, `fir`, `garland`, `wreath`, `tinsel`, `noel` | **3-Tiered Evergreen Christmas Tree**: Glowing gold star topper and 9 multi-color fairy lights when **ON**; deep pine canopy with unlit frosted bulbs on a dark-slate stand when **OFF**. |
+| **`Fan`** | `fan`, `blower`, `vent`, `exhaust`, `ventilat`, `circulator` | **4-Blade Air Circulator Fan**: Smoothly **spinning blades** with a cyan airflow glow when **ON**; stationary brushed-steel blades inside a dark-slate grille when **OFF**. |
+| **`Light`** | `light`, `lamp`, `bulb`, `candle`, `sconce`, `chandelier`, `lantern`, `pendant`, `flood`, `spot`, `downlight`, `uplight`, `strip`, `neon`, `torch`, `dimmer`, `led`, `fixture` *(or any Dimmer hardware)* | **Smart LED Lightbulb**: Glowing cyan-white dome scaled to your dimmer brightness when **ON**; frosted slate dome showing the unlit internal filament coil and dark charcoal collar when **OFF**. |
+| **`Motion`** | `motion`, `sensor` *(or Motion Sensor hardware)* | **Motion Radar Sensor**: Deep sapphire-and-teal dome lens with electric cyan concentric radar rings when reachable. |
+| **`Switch`** | Everything else (for example, `Coffee Maker`, `Space Heater`, `Dehumidifier`) | **In-Wall Switch / Smart Plug**: Tactile wall plate with glowing status indicator when **ON** and crisp slate housing when **OFF**. |
 
 ---
 
-## 4. Full-Width Switch Name & Secondary Status Badges
+## 4. Reading Switch Names & Connection Health Badges
 
-Each switch card displays its **friendly name across the full width of the top line** (reactively reducing the font size if a long switch name needs more room so the full name is always visible), without repeating the room name already shown on the room group header.
+Each switch card places the **full switch name across its own top line**, automatically scaling the text slightly if a name is very long so it stays readable without cutting off mid-word.
 
-On the line below each switch's name, the **Connection Status, Power State & Category Badges** show real-time local Wi-Fi health and classification:
-- **Pulsing Status Dot & 4-Bar Signal Meter**:
-  - **4 Bars (Emerald — `Active • <= 28ms`)**: Fast local LAN response.
-  - **3 Bars (Teal — `Active • 29–65ms`)**: Normal Wi-Fi response.
-  - **2 Bars (Amber — `Slow • > 65ms`)**: Congested Wi-Fi or distant 2.4 GHz signal.
-  - **0 Bars (Red — `Offline`)**: Switch did not respond on the local network.
-- **IP Address / Auto-Off Countdown & Category Pill**:
-  - Displays the switch's local IPv4 address (e.g., `192.168.1.104`) or a live countdown (`Auto-Off 14:52`) alongside the semantic category pill (`Tree Lights`, `Fan`, `Light`, `Motion`, `Switch`).
-
----
-
-## 5. Expandable Device Drawer (Dimming, Night Mode & Telemetry)
-
-Tap the body of any reachable switch or dimmer row to expand its **Inline Control & Telemetry Drawer**:
-
-1. **Connection & Latency Telemetry Banner**:
-   - Displays exact round-trip SOAP latency (`Connection: Active (11ms SOAP Round-Trip)`), last checked timestamp, and `<ip>:<port>` endpoint.
-   - Tap **`Ping RTT`** to send an immediate `GetBinaryState` probe and measure live round-trip time.
-2. **Brightness Slider & Presets (Dimmers Only)**:
-   - Drag the **Brightness Level** slider (`1%–100%`) or tap a quick preset chip (**`21%`**, **`50%`**, **`75%`**, **`100%`**).
-   - Adjusting brightness on an `OFF` dimmer automatically turns the dimmer `ON` to that level.
-3. **Night Mode (`20%`) Chip (Dimmers Only)**:
-   - Toggles hardware **Night Mode** on Belkin `F7C059` / `WDS060` Smart Dimmers (`ConfigureNightMode`), capping late-night brightness at a soft `20%`.
-4. **Hardware Metadata & Quick Actions**:
-   - Displays the UPnP endpoint URL (`http://192.168.1.104:49153`), hardware Serial Number (`SN`), and firmware version.
-   - Tap **`Configure IP`** to open the Edit dialog for that switch.
+Below the name, you'll see live status indicators:
+- **Live Signal & Response-Time Badge** (pulsing dot + 4-bar wireless meter):
+  - **4 Bars — Emerald (`Active • <= 28ms`)**: Fast local Wi-Fi response.
+  - **3 Bars — Teal (`Active • 29–65ms`)**: Normal local Wi-Fi response.
+  - **2 Bars — Amber (`Slow • > 65ms`)**: Busy Wi-Fi or weaker 2.4 GHz signal.
+  - **0 Bars — Red (`Offline • Timeout`)**: Switch did not respond on the local network.
+- **Power State & Details**:
+  - **Switches & Plugs**: Shows the **`ON`** / **`OFF`** pill, the switch's local IP address (or a live **`Auto-Off M:SS`** countdown when an Auto-Off timer is running), and the category badge (`Tree Lights`, `Fan`, `Light`, `Switch`).
+  - **Dimmers**: Shows the **`ON • 75%`** / **`OFF • 75%`** pill, optional **`Auto-Off M:SS`** countdown, an expand arrow (`v` / `^`), and the category badge.
+  - **Motion Sensors**: Shows **`Motion sensed: <time>`** and the **`Motion`** badge.
 
 ---
 
-## 6. Real-Time Physical Switch Sync & Pull-to-Refresh
+## 5. Expanding a Switch Row (Dimming, Night Mode, Widgets & Diagnostics)
 
-- **Instant Wall-Switch Push Updates (`<100ms`)**: When someone physically presses a smart wall paddle, 3-way rocker, or mini plug button, the switch sends a local UPnP GENA `NOTIFY` event directly to the app so the icon and power ring update immediately.
-- **Pull-to-Refresh**: Swipe down anywhere on the **Devices** list to re-probe all saved switches and run a background SSDP discovery pass.
+What happens when you tap the body of a row (outside the right-side power ring):
+- **Reachable switch, dimmer, or plug**: Expands its **Inline Controls & Telemetry Drawer**.
+- **Offline switch**: Runs a self-healing reconnection check right away. *(To edit an offline switch's IP or settings, tap **`Edit`** in the top header first.)*
+- **Motion Sensor**: Updates motion status (**`Refresh Motion`** in Real LAN Mode, or **`Simulate Motion`** in Demo Showroom Mode to test your motion rules).
+
+Inside an expanded drawer, controls appear in this order:
+
+1. **Brightness Slider, Quick Presets & Night Mode (Dimmers Only)**:
+   - Drag the **Brightness Level** slider (`1%–100%`) or tap a quick preset chip (**`21%`**, **`50%`**, **`75%`**, **`100%`**). Adjusting brightness on an `OFF` dimmer automatically turns it **ON** to that level.
+   - Tap **`Night Mode (20%)`** to toggle hardware Night Mode on `F7C059` / `WDS060` Smart Dimmers, capping late-night brightness at a gentle `20%`.
+2. **Connection & Latency Banner**:
+   - Shows live round-trip speed (`Connection: Active (11ms SOAP Round-Trip)`), last checked time, and `<ip>:<port>`.
+   - Tap **`Ping RTT`** to test the switch's response time immediately.
+3. **Hardware Info & Quick Actions**:
+   - Shows the local UPnP endpoint (`http://192.168.1.104:49153`), Serial Number (`SN`), and firmware version.
+   - Tap **`Add Widget`** to pin a one-tap Home Screen toggle widget for this light (see [Home Screen Light & Room Widgets](home-screen-widgets.md)).
+   - Tap **`Configure IP`** to open the **Edit** dialog for renaming, changing rooms, or updating the IP address.
+
+---
+
+## 6. Real-Time Wall-Switch Sync & Pull-to-Refresh
+
+- **Instant Wall-Switch Push Updates (Phones, Tablets & Android TV)**: When someone presses a physical wall paddle, 3-way rocker, or mini plug button, the switch pushes a local UPnP event straight to WeMi so the screen and Home Screen widgets update in under a second (paired with automatic 30-second health checks).
+- **Automatic Polling on Chromebooks (ChromeOS)**: Because ChromeOS's virtual Android network blocks inbound callbacks from physical switches, WeMi automatically refreshes switch states every **15 seconds** while the app is open on Chromebooks.
+- **Pull-to-Refresh**: Swipe down anywhere on the **Devices** list to re-check every switch and scan for newly added switches on your Wi-Fi.
 
 ---
 
 ## 7. Empty Wi-Fi Home Onboarding Card
 
-When a Wi-Fi Home has `0` saved switches (such as on first launch in **Real LAN Mode** before scanning your network), the **Devices** tab displays an onboarding card with a 4-icon category showcase (**Switch**, **Lightbulb**, **Christmas Tree**, and **Fan** in standby) and three quick-start actions:
-- **`Scan Local Network (SSDP)`**: Broadcasts a live UPnP SSDP scan (`239.255.255.250:1900`) and automatically adopts discovered smart switches onto the current Wi-Fi Home.
-- **`Setup Factory-Reset Switch AP (10.22.22.1)`**: Opens the zero-cloud `WiFiSetup1` provisioning wizard.
-- **`Add Switch Manually`**: Opens the manual IP/Port entry dialog (which automatically probes all 9 UPnP ports `49151–49159` at that IP).
+When a Wi-Fi Home has no saved switches yet (for example, on first launch in **Real LAN Mode**), the **Devices** tab displays a welcome card with three quick ways to get started:
+- **`Scan Local Network (SSDP)`**: Scans your Wi-Fi and automatically adds any switches it finds.
+- **`Setup Factory-Reset Switch AP (10.22.22.1)`**: Opens the zero-cloud Wi-Fi setup wizard for brand-new or factory-reset switches.
+- **`Add Switch Manually`**: Lets you enter a switch's IP address directly (automatically detecting its port, name, and live state).

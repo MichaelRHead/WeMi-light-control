@@ -1,7 +1,7 @@
 # WeMi Light Control — ChromeOS VM (ARCVM) Local-LAN Discovery Design (`CHROMEOS_ARCVM_DISCOVERY_DESIGN.md`)
 
-**Status**: **Implemented** (Post-`v33.0` — Phases 1–3 landed with `7` hermetic unit/integration/UI tests in [`ChromeOsArcVmDiscoveryTest.kt`](app/src/test/java/org/suppressingfire/wemi/ChromeOsArcVmDiscoveryTest.kt))  
-**Target Baseline**: `v33.0+` (`org.suppressingfire.wemi`, `compileSdk = 36`, `targetSdk = 36`, `minSdk = 24`)  
+**Status**: **Implemented & Shipped (`v34.0`)** — Phases 1–3 landed with `7` unit/component tests in [`ChromeOsArcVmDiscoveryTest.kt`](app/src/test/java/org/suppressingfire/wemi/ChromeOsArcVmDiscoveryTest.kt), `4` full-stack desktop ChromeOS E2E tests in [`ChromeOsArcVmE2ETest.kt`](app/src/test/java/org/suppressingfire/wemi/ChromeOsArcVmE2ETest.kt), and ChromeOS diagnostic coverage in [`TelemetryDiagnosticsTest.kt`](app/src/test/java/org/suppressingfire/wemi/TelemetryDiagnosticsTest.kt)  
+**Target Baseline**: `v34.0` (`org.suppressingfire.wemi`, `compileSdk = 36`, `targetSdk = 36`, `minSdk = 24`)  
 **New Permissions Required**: **Zero** (uses existing 4 install-time LAN permissions: `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`)  
 **New Third-Party Dependencies**: **Zero** (pure JDK `java.net.*` + Android SDK `ConnectivityManager` / `WifiManager` / optional `NsdManager`)  
 **Related Specs**: [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) *(read-only reference for non-owners)*, [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) *(read-only reference for non-owners)*, [`ARCHITECTURE.md`](ARCHITECTURE.md), [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md)
@@ -256,11 +256,11 @@ When `scanReport.isArcVmEnvironment` is `true` (or `localIp` is RFC 6598) and `d
 
 ---
 
-## 6. Verification & Test Plan (For Future Implementation)
+## 6. Automated Verification & Manual Test Checklist
 
-### 6.1 Automated Hermetic JVM / Robolectric Tests (Zero Hardware Required)
+### 6.1 Automated Hermetic JVM / Robolectric Tests (Zero Hardware Required — Implemented)
 
-Add a dedicated test suite (e.g., `ChromeOsArcVmDiscoveryTest.kt`, `< 500` lines) plus targeted additions to existing suites:
+Verified by [`ChromeOsArcVmDiscoveryTest.kt`](app/src/test/java/org/suppressingfire/wemi/ChromeOsArcVmDiscoveryTest.kt), [`ChromeOsArcVmE2ETest.kt`](app/src/test/java/org/suppressingfire/wemi/ChromeOsArcVmE2ETest.kt), and [`TelemetryDiagnosticsTest.kt`](app/src/test/java/org/suppressingfire/wemi/TelemetryDiagnosticsTest.kt):
 
 1. **RFC 6598 & ARCVM Classifiers (`LanRuntimeUtils`)**:
    - Verify `isCarrierGradeNatIpv4` returns `true` for `100.64.0.1`, `100.115.92.2`, `100.115.92.6`, `100.127.255.254` and `false` for `100.63.255.254`, `100.128.0.1`, `192.168.1.50`, `10.0.0.5`, `172.16.0.1`.
@@ -287,11 +287,11 @@ Add a dedicated test suite (e.g., `ChromeOsArcVmDiscoveryTest.kt`, `< 500` lines
      - **Total AP Isolation + Public DNS**: Clean `"0/0 Active • Local LAN"` cold start → `SsdpScannerModal` displays `arcvm_manual_subnet_card`, disables scanning `100.115.92`, runs real Stage C sweep on `192.168.86`, auto-adopts switches, hides the fallback card, backfills `192.168.86.0/24`, verifies `AddWifiHomeNetworkDialog` omits `100.115.92`, and blocks CGNAT subnet callbacks from creating phantom homes.
      - **Multi-NIC `ShadowConnectivityManager`**: Populates `arc0` (`100.115.92.2`), `tun0` VPN (`10.8.0.2`), and `eth1` (`100.115.92.6`, DNS `192.168.86.1`), verifying `NetworkMonitor` selects `eth1` while preserving Phone `10.22.22.x` Setup AP top priority.
 7. **Mandatory Pre-Push Gate**:
-   - `sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`119/119` tests across `23` suites including `LicenseAndBrandGovernanceTest`, `0` new permissions, `0` trademark leaks, and `98/98` `.kt` files `< 500` lines).
+   - `sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug` (`120/120` tests across `23` suites including `LicenseAndBrandGovernanceTest`, `0` new permissions, `0` trademark leaks, and `98/98` `.kt` files `< 500` lines).
 
 ### 6.2 Physical Chromebook Manual Validation Checklist
 
-Once implemented, verify on a real Chromebook running ARCVM on the same Wi-Fi/Ethernet LAN as at least one physical smart switch:
+To verify on a real Chromebook running ARCVM on the same Wi-Fi/Ethernet LAN as at least one physical smart switch:
 1. Check `adb shell ip addr` inside ARCVM to confirm `eth0` (`100.115.92.2`) vs. active `eth1` (`100.115.92.6`).
 2. Launch WeMi Light Control on a clean install (`Real LAN Mode`) and tap **Scan Network**:
    - Confirm Stage A SSDP receives live UDP `200 OK` replies (`isLiveUdpResponse = true`) without manually typing an IP.

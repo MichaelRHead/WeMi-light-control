@@ -25,7 +25,7 @@ Use this skill when acting as the **Antigravity App Promoter Agent (`app_promote
 
 ## 2. Canonical `play_store_assets/` → Google Play API Mapping
 
-[`scripts/sync_play_assets.py`](../../scripts/sync_play_assets.py) maps repository files to `androidpublisher/v3` endpoints (`en-US` by default):
+[`scripts/sync_play_assets.py`](../../../scripts/sync_play_assets.py) maps repository files to `androidpublisher/v3` endpoints (`en-US` by default):
 
 | Repository Source | Google Play Developer API v3 Target | Sync Policy |
 | :--- | :--- | :--- |

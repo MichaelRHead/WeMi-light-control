@@ -20,16 +20,16 @@ Use this skill whenever multiple agent conversations or external tools (such as 
 3. **Keep Code, Tests, User Guides, Change Log, and Skills Coherent**:
    - After integrating incoming commits, verify that version numbers (`versionCode` / `versionName` in `app/build.gradle.kts`), file line counts, `Modifier.testTag(...)` identifiers, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`, `AGENTS.md`, `ARCHITECTURE.md`, and `.agents/skills/*/SKILL.md` all agree with each other.
 4. **Respect Exclusive Ownership of `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md` & `wemi-ux-design-and-experience`**:
-   - [`UX_DESIGN.md`](../../UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](../../UX_DESIGN_AND_EXPERIENCE.md), and [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md) are **owned exclusively by the Google AI Studio Agent**.
+   - [`UX_DESIGN.md`](../../../UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md), and [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md) are **owned exclusively by the Google AI Studio Agent**.
    - Other agents must read and follow those files to understand the app's UX guidelines, navigation patterns, accessibility standards, behavioral modeling, layout invariants, and CUJs, **but must never edit, overwrite, or reformat them**.
 5. **Respect Exclusive Ownership of `DEBUGGING_AND_SUPPORT.md`, `wemi-device-telemetry-debug` & `docs/user-guide/telemetry-and-troubleshooting.md`**:
-   - [`DEBUGGING_AND_SUPPORT.md`](../../DEBUGGING_AND_SUPPORT.md), [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md), and [`docs/user-guide/telemetry-and-troubleshooting.md`](../../docs/user-guide/telemetry-and-troubleshooting.md) are **owned exclusively by the Antigravity Debugging & Support Agent**.
+   - [`DEBUGGING_AND_SUPPORT.md`](../../../DEBUGGING_AND_SUPPORT.md), [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md), and [`docs/user-guide/telemetry-and-troubleshooting.md`](../../../docs/user-guide/telemetry-and-troubleshooting.md) are **owned exclusively by the Antigravity Debugging & Support Agent**.
    - Other agents must read and follow those files to preserve the `10.22.22.1` provisioning diagnostics, screenshot debug panel, and `wemi-telemetry-latest.txt` exporter invariants, **but must never edit, overwrite, or delete them**.
 6. **Respect Exclusive Ownership of `DISCOVERY_AND_ROOM_GROUPING.md` & `wemi-discovery-and-room-grouping`**:
-   - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../DISCOVERY_AND_ROOM_GROUPING.md) and [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md) are **owned exclusively by the Antigravity Device Discovery & Room Grouping Agent**.
+   - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../../DISCOVERY_AND_ROOM_GROUPING.md) and [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md) are **owned exclusively by the Antigravity Device Discovery & Room Grouping Agent**.
    - Other agents must read and follow those files to preserve the SSDP/unicast discovery orchestration, 3-tier hardware identity resolution (`matchesDiscoveredDevice`), and automatic room inference/migration (`inferRoomFromName` & `resolveDeviceRoomAssignment`) invariants, **but must never edit, overwrite, or delete them**.
 7. **Respect Exclusive Ownership of `LICENSE_GOVERNANCE.md`, `wemi-license-governance` & `LicenseAndBrandGovernanceTest.kt`**:
-   - [`LICENSE_GOVERNANCE.md`](../../LICENSE_GOVERNANCE.md), [`.agents/skills/wemi-license-governance/SKILL.md`](../wemi-license-governance/SKILL.md), and [`LicenseAndBrandGovernanceTest.kt`](../../app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt) are **owned exclusively by the Antigravity License & Brand Governance Agent**.
+   - [`LICENSE_GOVERNANCE.md`](../../../LICENSE_GOVERNANCE.md), [`.agents/skills/wemi-license-governance/SKILL.md`](../wemi-license-governance/SKILL.md), and [`LicenseAndBrandGovernanceTest.kt`](../../../app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt) are **owned exclusively by the Antigravity License & Brand Governance Agent**.
    - Other agents must read and follow those files to preserve MIT license parity, the permissive dependency allowlist, `org.suppressingfire.wemi` namespace/filename hygiene, and Play Store trademark boundaries, **but must never edit, overwrite, or delete them**.
 8. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
    - All `ALL_CAPS.md` files (`AGENTS.md`, `ARCHITECTURE.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `LICENSE_GOVERNANCE.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) live **exclusively at the repository root (`/`)**.
@@ -69,7 +69,7 @@ Check specifically for:
    - Update every link in your plans, docs, and skills to point to the new file path.
 3. **Version & Metric Drift**:
    - Check `app/build.gradle.kts` (`versionCode` / `versionName`) and `wc -l $(find app/src -name "*.kt" | sort)`.
-   - If another agent bumped the version (e.g., `v20.0` → `v21.0`) or added UI/network code, update your documentation and plans to reflect the new version and any new components or `testTag`s.
+   - If another agent bumped the version (e.g., `v33.0` → `v34.0`) or added UI/network code, update your documentation and plans to reflect the new version and any new components or `testTag`s.
 
 ### Step 3: Rebase & Resolve Conflicts Additively
 Integrate incoming commits using rebase so history stays linear and readable:
@@ -95,7 +95,7 @@ Before committing or pushing your integrated changes:
 ### Step 5: Mandatory Pre-Push Verification, Agent Commit Attribution & Atomic Push
 1. If any Kotlin source, resource, or test files were modified, run the mandatory build & test gate:
    ```bash
-   sh gradlew testDebugUnitTest --rerun-tasks assembleDebug
+   sh gradlew testDebugUnitTest --rerun-tasks lintDebug assembleDebug
    ```
 2. Stage, commit **with a concise, human-readable plain-English message and mandatory trailer attribution** per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md) (plain-English `<= 72`-char Conventional Commits subject with no `[...Agent]` tag; short reflowable plain-text body explaining what changed and why without symbol dumps, semicolon chains, nested parentheses, or raw `**bold**`/`` `backticks` ``; brief `Verified:` trailer `<= 120` chars; and mandatory `Agent: <Canonical Agent Name> (<role_id>)` trailer), and push atomically:
    ```bash
@@ -104,6 +104,6 @@ Before committing or pushing your integrated changes:
      <your_role_id> \
      "<type>(<scope>): <plain-English summary <= 72 chars>" \
      "- Explain what changed and why in plain English." \
-     --verified "<brief checks, e.g. 73/73 tests passing, lint clean>"
+     --verified "<brief checks, e.g. 120/120 tests passing, lint clean>"
    git pull --rebase origin main && git push origin main
    ```

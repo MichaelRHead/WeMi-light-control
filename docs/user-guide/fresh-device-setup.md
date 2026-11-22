@@ -2,97 +2,94 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-**WeMi Light Control** includes a built-in, zero-cloud **Wi-Fi Setup Provisioner** (`WiFiSetup1`). You can configure brand-new or factory-reset switches, dimmers, and mini plugs from Belkin's discontinued smart switch platform onto your 2.4 GHz home Wi-Fi without needing the discontinued Belkin cloud service or an account.
+**WeMi Light Control** includes a built-in, 100% local **Wi-Fi Setup Provisioner**. You can connect brand-new or factory-reset switches, 3-way switches, dimmers, and mini plugs from Belkin's discontinued smart switch platform onto your **2.4 GHz** home Wi-Fi without the discontinued Belkin cloud service or an account.
+
+> [!IMPORTANT]
+> **2.4 GHz Wi-Fi Required**: Belkin's smart switch hardware only supports **2.4 GHz** Wi-Fi (802.11 b/g/n). Make sure you select a 2.4 GHz or dual-band home Wi-Fi network—5 GHz-only networks will not work.
 
 ---
 
-## 1. Preparing Your Smart Switch for Setup
+## 1. Put Your Switch into Setup Mode & Join Its Wi-Fi Hotspot
 
 1. Power on your smart switch, dimmer, or mini plug.
-2. Verify the LED indicator is blinking **Setup Mode**:
-   - **1st Gen In-Wall Switch (`F7C030`) / Mini Plug (`F7C063`)**: Blinking **amber and green** (or blinking **white and amber** on newer models).
+2. Confirm its status LED is blinking in **Setup Mode**:
+   - **1st-Gen In-Wall Switch (`F7C030`) / Mini Plug (`F7C063` / `WSP080`)**: Blinking **amber and green** (or **white and amber** on newer models).
+   - **2nd-Gen 3-Way Switch (`WLS040` / `WLS0403`)**: Blinking setup LED ready for pairing.
    - **In-Wall Smart Dimmer (`F7C059` / `WDS060`)**: Blinking light bar ready for pairing.
-   - *Tip*: To factory-reset a switch into Setup Mode, hold down the reset/bar button for 5–10 seconds until the status LED blinks amber.
-3. Open your Android device's **Wi-Fi Settings** and connect to the switch's open setup network (for example, `WeMo.Light.xxx`, `WeMo.Switch.xxx`, `WeMo.Mini.xxx`, or `WeMo.Dimmer.xxx`).
-   - If Android prompts *"This network has no internet access — Stay connected?"*, tap **Yes / Always Connect**.
-   - **WeMi Light Control** automatically binds its setup sockets directly to your Wi-Fi interface even while cellular mobile data remains active.
+   - *Tip*: To factory-reset an older switch into Setup Mode, hold its reset button or bar for 5–10 seconds until the LED blinks amber.
+3. Open your phone or tablet's **Wi-Fi Settings** and connect to the switch's open temporary hotspot—for example, `WeMo.Light.xxx`, `WeMo.Switch.xxx`, `Wemo.LS3W.xxx`, `WeMo.Mini.xxx`, or `WeMo.Dimmer.xxx`.
+   - If Android asks *"This network has no internet access — Stay connected?"*, choose **Yes / Stay connected**.
+   - You do **not** need to turn off mobile cellular data—WeMi automatically routes setup traffic directly over Wi-Fi.
 
 ---
 
-## 2. Opening the Provisioning Wizard
+## 2. Open the Provisioning Wizard
 
-Once connected to the `WeMo.*` setup Wi-Fi network (which uses the `10.22.22.x` subnet):
+Once connected to the switch's setup hotspot (`10.22.22.x`):
 
-- **Automatic Setup Banner (Fastest)**:
-  A banner automatically appears at the top of the **Devices** tab:
+- **Automatic Setup Banner (Phones & Tablets — Fastest)**:
+  Switch back to WeMi and tap the teal banner at the top of the **Devices** tab:
   > **Smart Switch Setup AP Detected (`10.22.22.x`)**
-  > *Tap here to provision this factory-reset smart switch (`10.22.22.1`) onto your 2.4 GHz Home Wi-Fi.*
-  Tap this banner to open the **Provision New Switch AP (`10.22.22.1`)** dialog.
-- **Manual Launch**:
-  You can also open the wizard anytime from:
-  - **Top Header `+` Button** → **`Provision New Switch AP (10.22.22.1)`**
+  > *Tap here to provision this factory-reset smart switch (10.22.22.1) onto your 2.4 GHz Home Wi-Fi.*
+- **Manual Launch (Anytime, Including Chromebooks)**:
+  On Chromebooks, ChromeOS masks the `10.22.22.x` subnet inside its virtual network so the automatic banner will not appear—connect your Chromebook's Wi-Fi to the switch hotspot and open the wizard directly from:
   - **`More` Tab** → **`Provision New Switch AP (10.22.22.1)`**
+  - **Top Header `+` Button** → **`Provision New Switch AP (10.22.22.1)`**
+  - **Empty Home Card** → **`Setup Factory-Reset Switch AP (10.22.22.1)`**
 
 ---
 
-## 3. Step-by-Step Provisioning Workflow
+## 3. Step-by-Step Setup Workflow
 
 ```mermaid
 sequenceDiagram
-    participant User as User (Android)
-    participant App as WeMi Light Control
-    participant Switch as Unconfigured Switch (10.22.22.1)
+    participant User as You (WeMi App)
+    participant Switch as Factory-Reset Switch (10.22.22.1)
 
-    User->>App: Opens Provision New Switch AP Dialog
-    App->>Switch: 1. Probe ports 49152..49159 (/setup.xml + GetMetaInfo)
-    Switch-->>App: Model, MAC, Serial, Firmware & Encryption Type
-    App->>Switch: 2. SOAP WiFiSetup1#GetApList
-    Switch-->>App: List of nearby 2.4 GHz Wi-Fi SSIDs & Channels
-    User->>App: 3. Tap Home 2.4 GHz SSID, enter Password, Name & Room
-    App->>Switch: 4. Encrypt Password (AES-128-CBC Method 1/2/3)\n& double-send ConnectHomeNetwork
-    App->>Switch: 5. Poll GetNetworkStatus + CloseSetup + SetSetupDoneStatus
-    App-->>User: Switch joins Home Wi-Fi & is saved to your Room list!
+    User->>Switch: 1. Open dialog -> auto-probe ports 49151–49159
+    Switch-->>User: Hardware model, MAC, Serial & recommended encryption
+    User->>Switch: 2. Scan nearby 2.4 GHz Wi-Fi networks (Scan APs)
+    Switch-->>User: List of visible 2.4 GHz networks & channels
+    User->>Switch: 3. Pick Home Wi-Fi, enter Password, Name & Room
+    User->>Switch: 4. Encrypt password locally & send ConnectHomeNetwork
+    Switch-->>User: Switch joins Home Wi-Fi & closes setup hotspot
 ```
 
 Inside the **Provision New Switch AP (`10.22.22.1`)** dialog:
 
-1. **Detected Hardware & Connection Status Banner**:
-   - The dialog automatically probes `10.22.22.1` across ports `49151–49159` and displays a detected hardware banner (e.g., `Detected: Light Switch`, `Port 49152 • MAC EC1A59XXXXXX • SN 2213... • Auto Method 1`).
-   - If the switch is unreachable (for example, if your phone is not yet connected to the `WeMo.*` Setup AP) or rejects a short/invalid password, the status box highlights the error in soft red (`#FEF2F2`) with a clear diagnostic message.
-2. **Select Your 2.4 GHz Home Wi-Fi (`Scan APs`)**:
-   - Tap **`Scan APs`** to query the switch for visible 2.4 GHz Wi-Fi networks (`GetApList` / `GetNetworkList`).
-   - Tap your home Wi-Fi network chip from the **`Discovered 2.4 GHz Networks`** list. This automatically fills in the **Home 2.4 GHz SSID**, **Channel**, **Authentication Mode** (`WPA2PSK`), and **Encryption** (`AES`).
-3. **Name Your Switch & Choose Its Room**:
-   - Enter a **Switch Name** (e.g., `Christmas Tree`, `Bedroom Fan`, `Porch Light`).
-   - Watch the **live icon preview** update automatically as you type (`Tree Lights`, `Fan`, `Light`, `Switch`).
-   - Type a custom **Room / Group** or tap one of the **Room Preset Chips** (`Living Room`, `Bedroom`, `Kitchen`, `Dining Room`, `Hallway & Landing`, `Ensuite`, `Outdoor`, `Garage`, `Office`) directly below the preview.
-4. **Enter Your 2.4 GHz Wi-Fi Password**:
-   - Type your home Wi-Fi password in **Home Wi-Fi Password**.
-5. **Password Encryption Method & Password Length Suffix (Auto-Detected)**:
-   - Leave **Password Encryption Method** set to **`Auto-Detect`** and **Password Length Suffix (`xxyy` hex)** set to **`Auto (Rec.)`**. The app inspects `/setup.xml` (`<rtos>`, `<iot>`, `<binaryOption>`, `<new_algo>`) and `GetMetaInfo` to automatically select:
-     - **Method 1 (Gen 1 OpenWrt)**: `F7C030` Light Switch, `F7C059` Dimmer, `F7C063` Mini Plug.
-     - **Method 2 (Gen 2 RTOS)**: `WLS040` / `WLS0403` 3-Way Switch, `WDS060` Dimmer, `WSP080` Mini Plug.
-     - **Method 3 (Symmetric `<binaryOption>1</binaryOption>`)**: Newer symmetric-key firmware builds.
-   - If your switch rejects the password (`NetworkStatus=0` or `2`), you can manually test any of the 6 hardware encryption permutations by combining **`Gen 1 (OpenWrt)`** / **`Gen 2 (RTOS)`** / **`Method 3 (Sym)`** with **`Append xxyy`** or **`No Suffix`**.
+1. **Check the Detected Hardware Banner**:
+   - As soon as the dialog opens, WeMi automatically probes `10.22.22.1` across ports `49151–49159` and displays **`Detected Hardware: <name> (<model> • Port <port>)`** along with the switch's MAC address, serial number, and recommended encryption mode.
+   - If the switch cannot be reached (for example, your phone switched away from the setup hotspot), the status box turns soft red with a clear warning.
+2. **Choose Your 2.4 GHz Home Wi-Fi (`Scan APs`)**:
+   - Leave **`Setup AP IP`** set to **`10.22.22.1`** and tap **`Scan APs`** to ask the switch which 2.4 GHz networks it sees.
+   - Tap your home Wi-Fi chip under **`Discovered 2.4 GHz Networks`**. WeMi automatically fills in **`Target 2.4 GHz Wi-Fi SSID`**, **`2.4G Ch`**, **`Auth Mode`** (usually `WPA2PSK`), and **`Encrypt`** (usually `AES`).
+   - If your network is hidden or didn't show up, you can type the SSID manually.
+3. **Enter Your Home Wi-Fi Password**:
+   - Type your 2.4 GHz Wi-Fi password into **`Wi-Fi Password`**. *(Your password is encrypted locally on your device and never leaves your local network or appears in diagnostic logs.)*
+4. **Name Your Switch & Pick a Room**:
+   - Optionally enter a **`Switch Name (Optional)`** (such as `Porch Christmas Tree` or `Bedroom Ceiling Fan`).
+   - Watch the live **Icon Category** preview and **Assigned Room** update automatically as you type, or tap any of the **11 Room Preset Chips** (`Living Room`, `Bedroom`, `Kitchen`, `Dining Room`, `Hallway & Landing`, `Ensuite`, `Outdoor`, `Garage`, `Basement`, `Office`, `Unassigned`). *(Need a custom room name outside those 11 presets? You can type any custom room name afterward via **Edit Device**.)*
+5. **Encryption Options (Leave on Auto Unless Troubleshooting)**:
+   - Leave **`Hardware AES-128-CBC Key Derivation`** on **`Auto-Detect from /setup.xml`** and **`Password Length Suffix (xxyy hex)`** on **`Auto (M1/M3=Yes, M2=No)`**. WeMi inspects your switch's firmware automatically to pick the right encryption:
+     - **`Method 1: Gen 1 OpenWrt (F7C030/059/063)`** — 1st-Gen Switches, Dimmers, and Mini Plugs.
+     - **`Method 2: Gen 2 RTOS (WLS040/0403/WDS060)`** — 2nd-Gen 3-Way Switches, Dimmers, and Mini Plugs.
+     - **`Method 3: BinaryOption Symmetric`** — Newer symmetric-key firmware builds.
+   - If a switch ever rejects a valid password, you can manually test other combinations using the method chips and **`Append +4 Hex Lengths`** / **`No Length Suffix`** without resetting the switch.
 6. **Tap `Provision Switch`**:
-   - The app sets your custom `<FriendlyName>` on the hardware, encrypts your Wi-Fi password using Belkin's exact OpenSSL AES-128-CBC key derivation, double-sends `ConnectHomeNetwork`, polls `GetNetworkStatus` for up to 20 seconds while the switch joins your 2.4 GHz router, closes the setup AP (`CloseSetup` + `SetSetupDoneStatus`) only when connection succeeds (`NetworkStatus = 1` or `3`), and saves the switch into your Wi-Fi Home.
-   - If connection fails (`NetworkStatus = 0` or `2`), the app **does not** call `CloseSetup`, keeping the switch's `10.22.22.1` Setup AP open and keeping the dialog on screen so you can inspect the debug trace and retry immediately.
+   - WeMi sends your custom switch name, encrypts your Wi-Fi password, instructs the switch to join your home Wi-Fi, and waits up to 20 seconds for confirmation.
+   - **On Success**: WeMi closes the switch's temporary hotspot, adds the switch to your room list, and closes the dialog automatically.
+   - **On Failure**: WeMi intentionally **leaves the switch's `10.22.22.1` setup hotspot open** and keeps the dialog on screen so you can fix a typo or try another encryption chip immediately—no factory reset required!
 7. **Reconnect to Your Home Wi-Fi**:
-   - Once the setup AP closes, your phone automatically reconnects to your regular Home Wi-Fi and **WeMi Light Control** discovers the switch at its new LAN IP address.
+   - Once the setup hotspot closes, your device reconnects to your regular home Wi-Fi and WeMi automatically picks up the switch at its new home IP address.
 
 ---
 
-## 4. On-Screen Setup Diagnostics (`SETUP DIAGNOSTICS`) & Telemetry Export
+## 4. Built-In Setup Diagnostics (`SETUP DIAGNOSTICS`)
 
-Inside the **Provision New Switch AP (`10.22.22.1`)** dialog, a high-contrast dark terminal card (**`SETUP DIAGNOSTICS`**) stays compact while idle (tap **`Details`** / **`Hide`** to toggle) and automatically expands on live provisioning traces or setup errors so you can take a single screenshot, tap **`Copy`** (`copy_provision_debug_button`), or tap **`Save/Share`** (`share_provision_debug_button`) to save `wemi-telemetry-latest.txt` and open Android's share sheet:
+Inside the provisioning dialog, a dark **`SETUP DIAGNOSTICS`** card stays compact while you fill in the form (tap **`Details`** / **`Hide`** to expand or collapse it) and **automatically expands** whenever provisioning runs or an error occurs:
 
-- **`[NET]`**: Your phone's active Wi-Fi interface (`wlan0`), IP address (`10.22.22.x`), `setupSubnet=true/false`, and whether sockets are bound directly to the unvalidated Wi-Fi network (`wifiBound=true/false`).
-- **`[PROBE]`**: The exact port (`49151..49159`) and XML path (`/setup.xml` or `/Lightsetup.xml`) that responded on `10.22.22.1`, plus per-port status codes.
-- **`[XML]` & `[FLAGS]`**: Hardware `<modelName>`, `<friendlyName>`, `<firmwareVersion>`, and raw encryption flags (`rtos`, `iot`, `binaryOption`, `new_algo`, `autoMethod`, `autoLen`).
-- **`[ID]`**: Hardware MAC address, Serial Number, which UPnP service provided them (`GetMetaInfo`, `setup.xml`, or `GetMacAddr/GetSerialNo`), and the raw pipe-delimited `GetMetaInfo` string.
-- **`[SCAN]` & `[TARGET AP]`**: The switch's `WiFiSetup1#GetApList` site survey count and the matched 2.4 GHz channel, auth mode (`WPA2PSK`), and cipher (`AES`) for your selected SSID.
-- **Live `[STEP 1..6]` Provisioning Trace**: Each step of `ChangeFriendlyName`, AES-128-CBC encryption (`Method 1/2/3`, `addLengths`, ciphertext length — **never** your plaintext password), `ConnectHomeNetwork` (`PairingStatus`), `GetNetworkStatus` polls (`1..18`), and `CloseSetup` (`kept_open_for_retry` on failure).
-- **`Keep Dialog Open on Success` Chip**: Tap **`Details`** inside `SETUP DIAGNOSTICS` and toggle this chip ON before tapping **`Provision Switch`** if you want the dialog to remain open after a successful setup so you can screenshot or export the final trace.
+- **One-Tap Sharing**: Tap **`Copy`** to copy the diagnostic trace to your clipboard, or **`Save/Share`** to save `wemi-telemetry-latest.txt` and open Android's share sheet. Your Wi-Fi password is **never** shown or saved.
+- **Keep Dialog Open After Success**: Tap **`Details`** and toggle **`Keep Dialog Open on Success`** ON before tapping **`Provision Switch`** if you want to review or share the full trace even after setup succeeds.
+- **What's Inside**: Shows your Wi-Fi interface & binding (`[NET]`), setup port probe results (`[PROBE]`), hardware model & encryption flags (`[XML]`, `[FLAGS]`, `[ID]`), 2.4 GHz scan results (`[SCAN]`, `[TARGET AP]`), and step-by-step setup status (`[STEP 1..6]`).
 
-For a complete line-by-line guide to capturing screenshots, exporting `wemi-telemetry-latest.txt`, and interpreting setup status codes, see **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)**.
-
+For a full line-by-line guide to reading diagnostics or sharing a support report, see **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)**.

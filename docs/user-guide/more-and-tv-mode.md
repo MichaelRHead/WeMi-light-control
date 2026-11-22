@@ -2,15 +2,15 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-The **More** tab and the **10-Foot Android TV Dashboard (`wemi TV`)** provide whole-home master switch actions, a live UPnP/SOAP packet inspector, a showcase Demo Mode, in-app open-source license and third-party notices, and native TV remote (D-Pad) support on Android TV devices.
+The **More** tab and the **10-Foot Android TV Dashboard (`wemi TV`)** give you whole-home master switch actions, a Demo Mode for exploring without hardware, a live local packet inspector, open-source license notices, and full TV remote (D-Pad) control from your couch.
 
 ---
 
 ## 1. Master Switch Control (`More` Tab)
 
-At the top of the **More** tab, the **Master Switch Control** card shows how many reachable switches are currently **ON** across your home and provides two one-tap master buttons:
-- **`All Switches ON`**: Turns every reachable switch and dimmer in your home **ON** concurrently (throttled safely for RTOS switches).
-- **`All Switches OFF`**: Turns every reachable switch and dimmer in your home **OFF** with a single tap — ideal at bedtime or when leaving the house.
+At the top of the **More** tab, the **Master Switch Control** card shows how many reachable switches are currently **ON** on your active Wi-Fi Home and gives you two whole-home buttons:
+- **`All Switches ON`**: Turns every reachable switch and dimmer in your active home **ON** concurrently (paced safely for 2nd-Gen RTOS switches).
+- **`All Switches OFF`**: Turns every reachable switch and dimmer **OFF** in one tap — handy at bedtime or when heading out.
 
 ---
 
@@ -18,60 +18,69 @@ At the top of the **More** tab, the **Master Switch Control** card shows how man
 
 Inside the **Offline Local UPnP / SOAP Engine** card on the **More** tab:
 
-- **Real LAN Mode (Default on Physical Hardware — `Demo Showroom Mode = OFF`)**:
-  - Starts with a clean slate on your local `/24` Wi-Fi subnet and only displays real physical smart switches that you discover via SSDP, provision via `10.22.22.1`, or add by IP.
-  - If a physical switch is unplugged or unreachable on Wi-Fi, toggling it performs a 2-stage self-healing reconnect attempt and accurately marks the device **`Offline`** if it cannot be reached.
-- **Demo Showroom Mode (`Demo Showroom Mode = ON`)**:
-  - Populates **14 showcase switches, dimmers, fans, Christmas tree lights, and motion sensors** across 3 sample Wi-Fi Homes (`Main Home`, `Lake Cabin`, `Studio Office`) so you can explore room grouping, dimming, rules, and the interface without physical hardware on your LAN.
-  - While Demo Showroom Mode is enabled, tapping **`Reset Preset`** restores the 14 classic showcase switches at any time (this button is hidden in Real LAN Mode).
+- **Real LAN Mode (Default on Physical Devices — `Demo Showroom Mode` OFF)**:
+  - Starts clean on your local Wi-Fi and shows only real switches you discover via SSDP, set up via `10.22.22.1`, or add by IP.
+  - If a switch is unplugged or unreachable, toggling it runs an automatic self-healing reconnection check and marks it **Offline** if it cannot be reached.
+- **Demo Showroom Mode (`Demo Showroom Mode` ON)**:
+  - Loads **14 sample switches, dimmers, fans, holiday trees, and motion sensors** across 3 sample Wi-Fi Homes (*Main Home*, *Lake Cabin*, *Studio Office*) so you can explore room grouping, dimming, widgets, rules, and TV mode without physical hardware nearby.
+  - While Demo Showroom Mode is enabled, a **`Reset Preset`** button appears next to **`Scan LAN (SSDP)`** so you can restore the 14 sample devices anytime.
 
-Other quick settings in this card:
-- **`Scan LAN (SSDP)`**: Opens the SSDP network discovery sheet.
-- **`Reset Homes, Discovered Switches & Rooms`**: Opens a confirmation dialog offering **`Reset & Rescan LAN`** or **`Reset Empty`** to clear all remembered Wi-Fi Homes, discovered switches, and room assignments into a clean **`My Home`**.
-- **`Provision New Switch AP (10.22.22.1)`**: Opens the zero-cloud Wi-Fi setup wizard.
+Other quick actions in this card:
+- **`Scan LAN (SSDP)`**: Opens the live local network discovery scanner.
+- **`Reset Homes, Discovered Switches & Rooms`**: Opens a confirmation prompt (**`Reset & Rescan LAN`**, **`Reset Empty`**, or **`Cancel`**) to wipe saved Wi-Fi Homes, switches, and room assignments back to a clean **`My Home`**.
+- **`Provision New Switch AP (10.22.22.1)`**: Opens the zero-cloud setup wizard for brand-new or factory-reset switches.
 
 ---
 
 ## 3. Live UPnP / SOAP Packet Log Inspector
 
-Near the bottom of the **More** tab, the **UPnP / SOAP Packet Log** card records the most recent HTTP SOAP commands and GENA events exchanged with your switches:
-- Each log entry displays:
-  - **Device Name & SOAP Action** (e.g., `Front Porch Light • SetBinaryState (ON)` or `SSDP M-SEARCH • urn:Belkin:service:basicevent:1`)
-  - **Timestamp** (`HH:mm:ss.SSS`)
-  - **Target UPnP Endpoint** (`POST http://192.168.1.104:49153/upnp/control/basicevent1`)
-  - **Response Status & Round-Trip Latency** (`HTTP/1.1 200 OK • <BinaryState>1</BinaryState> (12ms)`)
-- Tap **`Save/Share Log`** (`export_telemetry_file_button`) to save a complete telemetry report (`files/wemi-telemetry-latest.txt` combining your latest `10.22.22.1` setup snapshot, device inventory, and SOAP packet log), copy it to the clipboard, and open Android's share sheet (see **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)** for full details).
-- Tap **`Clear`** to reset the packet log buffer.
+Below the engine card on the **More** tab, **UPnP / SOAP Packet Log** shows the **10 most recent** local commands and events on screen (out of the latest 50 kept in memory—including background Home Screen widget taps and Chromebook polling notices):
+- Each entry displays:
+  - **Device Name & Action** (for example, `Front Porch Light • SetBinaryState (ON)` or `Widget#Toggle`)
+  - **Timestamp** (`h:mm:ss a`, such as `8:15:42 PM`)
+  - **Target Local URL** (`POST http://192.168.1.104:49153/upnp/control/basicevent1`)
+  - **Result & Response Speed** (`HTTP/1.1 200 OK • <BinaryState>1</BinaryState> (12ms)`)
+- Tap **`Save/Share Log`** to export a full 5-section diagnostic report (`wemi-telemetry-latest.txt` combining your latest `10.22.22.1` setup trace, Wi-Fi Homes, device list, packet log, and Home Screen widgets—never including Wi-Fi passwords), copy it to your clipboard, and open Android's share sheet. See **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)** for details.
+- Tap **`Clear`** to clear the log list.
 
 ---
 
 ## 4. Open Source License & Third-Party Notices (`More` Tab)
 
-At the bottom of the **More** tab, the **Open Source License** card (`open_source_licenses_card`) summarizes **WeMi Light Control**'s open-source licensing (**`MIT License • Copyright (c) 2026 Michael R. Head & Contributors`**):
-- Tap **`View License`** (`toggle_license_details_button`) to expand:
-  1. **Full MIT License Text** (`mit_license_text_surface`), matching the root [`LICENSE`](../../LICENSE) file (`Copyright (c) 2026 Michael R. Head and WeMi Light Control Contributors`).
-  2. **Third-Party Open Source Notices** (`third_party_notices_surface`), listing the shipped permissive runtime libraries (**AndroidX, Jetpack Compose & Room** under `Apache-2.0` and **Kotlin & Kotlinx Coroutines** under `Apache-2.0`) and the Belkin non-affiliation trademark notice.
+At the bottom of the **More** tab, the **Open Source License** card displays **`MIT License • Copyright (c) 2026 Michael R. Head & Contributors`**:
+- Tap **`View License`** (or **`Hide`**) to expand:
+  1. **Full MIT License Text**, matching the repository's [`LICENSE`](../../LICENSE) file.
+  2. **Third-Party Open Source Notices**, listing the shipped permissive runtime libraries (**AndroidX, Jetpack Compose & Room** under `Apache License 2.0` and **Kotlin & Kotlinx Coroutines** under `Apache License 2.0`) and the Belkin non-affiliation trademark notice.
 
 ---
 
 ## 5. Android TV 10-Foot Dashboard (`wemi TV`)
 
-**WeMi Light Control** automatically launches in **Android TV Mode** when running on an Android TV / Google TV device (`UI_MODE_TYPE_TELEVISION`).
+When installed on an **Android TV** or **Google TV** device, WeMi automatically launches its dedicated 10-foot remote-friendly dashboard (**`wemi TV`**)—no mode switch required.
 
-### Key Features of `wemi TV`:
-1. **Full-Height 3-Column Room-Grouped Switch Grid**:
-   - A single compact top bar (`wemi TV`, active switch count, focused switch status pill, quick scenes, and `Rescan`) dedicates over 90% of vertical screen height to your switches.
-   - Switches are grouped under full-width **Room Section Headers** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `Unassigned` last) inside a 3-column grid (`GridCells.Fixed(3)`). Moving **`Up`** or **`Down`** through a Room Bar from any column (including the leftmost switch widget) selects the Room Bar next while remembering your column (`Col 1`, `Col 2`, or `Col 3`), pressing **`OK / Select`** toggles all switches in that room ON or OFF, and pressing **`Left`** / **`Right`** on a Room Bar with reachable dimmers steps all dimmers in that room `-10%` / `+10%`.
-2. **Unmistakable 10-Foot Cursor Focus (Including Empty-Home `Rescan` Focus)**:
-   - On launch, the first switch card automatically receives D-Pad focus — or, when a newly reset LAN home has zero switches yet, D-Pad focus lands directly on **`Rescan`** so a single **`OK / Select`** press discovers your switches immediately.
-   - The focused card stands out across the living room with a `3.5.dp` Electric Cyan border (`#22D3EE`), bright illuminated card surface (`#133B66`), subtle scale lift (`1.022x`), and a **`FOCUSED • OK`** badge in the top-right corner.
-3. **Google TV Remote-Friendly Focusable Dimmer Slider & 3-Column Navigation**:
-   - **On/Off Toggle**: Navigating down into a switch or dimmer card focuses its **On/Off Toggle**. Pressing **D-Pad `Left` / `Right`** moves across the switch cards to the left and right, and pressing **`OK / Select`** immediately toggles power **ON** or **OFF** (or triggers a 9-port reconnect if offline).
-   - **Focusable Dimmer Slider**: Navigating **`Down` once more** from a dimmer card's On/Off Toggle focuses the **Dimmer Slider** inside the card (highlighted with a glowing Gold `#FBBF24` border and **`◄ -10% • +10% ►`** badge) — no Play or Menu button required. While the Dimmer Slider is focused, press **`Left`** / **`Right`** to lower (`-10%`) or raise (`+10%`) the dimmer brightness, press **`Up`** or **`Back`** to return to the On/Off Toggle, or press **`Down`** to move to the widget below.
-4. **1-Click TV Lighting Scenes & Non-Blocking LAN Rescan**:
-   - **`Movie 20%`**: Dims Living Room lights to a soft `20%` glow and turns off bright overhead switches concurrently.
-   - **`Holiday ON`** *(shown automatically when your active home includes holiday/festive switches such as Christmas tree, holiday lights, Diwali/Dewali, Hanukkah, Halloween, or fairy/string lights)*: Turns matching holiday switches **ON** concurrently without toggling regular switches or ones that are already ON.
-   - **`All OFF`**: Turns every active switch in the home **OFF** concurrently.
-   - **`Rescan`**: Runs a background SSDP + state refresh with a bottom status toast—never popping up modal dialogs over the TV screen.
+### Navigating `wemi TV` with Your TV Remote (D-Pad)
 
-
+1. **Compact Single-Row Top Bar**:
+   - Shows the **`wemi TV`** badge, active count (`X/Y ON`), a status pill for whichever switch is currently highlighted, a **`Dimmer X%` / `Done Dimming`** indicator whenever a dimmer is focused, your **Quick Scenes**, and **`Rescan`**.
+   - Over 90% of the screen stays dedicated to your rooms and switch cards.
+2. **3-Column Room-Grouped Switch Grid & Room Bars**:
+   - Switches are grouped under full-width **Room Bars** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `UNASSIGNED` last) in a 3-column grid.
+   - Moving **Up** or **Down** between rooms from any column focuses the Room Bar while remembering which column you were in.
+   - While a **Room Bar** is focused (**`FOCUSED • OK TOGGLE ROOM`** or **`FOCUSED • OK TOGGLE • L/R DIM`**):
+     - Press **`OK / Select`** to toggle every switch in that room ON or OFF at once.
+     - Press **`Left`** / **`Right`** (on rooms with reachable dimmers) to dim or brighten every dimmer in that room by **`-10%` / `+10%`**.
+3. **Clear 10-Foot Cursor Focus (Including Empty-Home Start)**:
+   - On launch, focus lands automatically on your first switch card—or directly on **`Rescan`** if your home has zero switches yet so a single **`OK`** press discovers your switches.
+   - Focused switch cards stand out across the room with a bright **Electric Cyan** border, illuminated card surface, slight scale lift, and a **`FOCUSED • OK`** badge in the top-right corner.
+4. **Google TV Remote-Friendly Inline Dimmer Slider**:
+   - **Toggling Power**: On any switch or dimmer card, press **`OK / Select`** to toggle power ON or OFF (or reconnect if offline), and press **`Left` / `Right`** to move across the 3 columns.
+   - **Adjusting Brightness (No Special Remote Keys Needed)**: On a reachable dimmer card, press **`Down`** once from the On/Off Toggle to focus the **Inline Dimmer Slider** right underneath it *(you can also press **`Play/Pause`**, **`Menu`**, **`Info`**, or long-press **`OK`**)*.
+   - The card highlights in **Gold** with a **`DIM -/+`** badge in the corner, **`Done Dimming`** in the top bar, and the inline guide **`Left: -10%  •  Right: +10%   (Up: Toggle • Down: Next)`**:
+     - Press **`Left`** / **`Right`** to step brightness down or up by **`10%`** (`10%–100%`).
+     - Press **`Up`**, **`OK`**, **`Back`**, **`Play/Pause`**, or **`Menu`** to return to the On/Off Toggle.
+     - Press **`Down`** to move smoothly to the switch or room below.
+5. **One-Click TV Quick Scenes & Non-Blocking LAN Rescan**:
+   - **`Movie 20%`**: Dims **all reachable smart dimmers/bulbs** on your active Wi-Fi Home to **`20%`** concurrently (leaving regular ON/OFF switches untouched).
+   - **`Holiday ON`** *(shown automatically only when your active home includes matching holiday or festive switches—such as Christmas tree, holiday, Diwali/Dewali, Hanukkah, Halloween, or fairy/string lights)*: Turns matching holiday switches **ON** concurrently without touching everyday switches or holiday lights that are already ON.
+   - **`All OFF`**: Turns every reachable switch and dimmer across all rooms **OFF** concurrently.
+   - **`Rescan`**: Runs a background local Wi-Fi scan and refresh with a non-blocking status bar at the bottom of the screen—never popping up blocking dialogs over your TV.

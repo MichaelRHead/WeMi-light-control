@@ -28,11 +28,11 @@ This document details the local LAN wire protocol used by Belkin's discontinued 
 ## 2. SSDP Multicast Discovery (`SsdpDiscoveryEngine.kt`)
 
 ### Android & Socket Requirements
-- Acquire `WifiManager.MulticastLock` (`wifiManager.createMulticastLock("wemi_ssdp").apply { setReferenceCounted(false); acquire() }`) before scanning and release it in `finally`.
-- Bind the UDP `DatagramSocket` to the local IPv4 LAN interface address (`InetAddress.getByName(localIp)`) on an ephemeral port (`0`) so multicast packets route out the Wi-Fi interface rather than cellular/VPN.
+- Acquire `WifiManager.MulticastLock` (`wifiManager.createMulticastLock("wemi_ssdp").apply { setReferenceCounted(false); acquire() }`) before scanning and release it in `finally` (with a `100 ms` post-lock settle pause on ChromeOS ARCVM).
+- Open `MulticastSocket(null)` on an ephemeral port (`0`), set `timeToLive = 4`, bind to the active physical Wi-Fi/Ethernet handle via `activeNetwork.bindSocket(socket)` and `networkInterface` so multicast packets route across both direct LANs and ChromeOS `patchpanel` rather than cellular/VPN/`arc0`.
 - **Periodic Retransmission During Scan Window**:
   - UDP multicast packets are unacknowledged and frequently dropped on Wi-Fi.
-  - Set a `1000 ms` receive poll interval inside a `5000 ms` total discovery window: whenever a `1000 ms` slice finishes without exhausting the total timeout, re-send the `M-SEARCH` datagram to `239.255.255.250:1900`.
+  - Measure retransmit intervals from post-burst `burstStartMs`: re-send the `M-SEARCH` burst at `550 ms` inside a `1250 ms` total window on Phones/Tablets/TVs (`700 ms` inside a `2000 ms` window on ChromeOS ARCVM).
 - **Deduplication Key**: Deduplicate SSDP responses by `(udn, location)` where `udn = usn.substringBefore("::")`.
 - **Follow `LOCATION` Path Literally**: Always fetch the exact URL in the `LOCATION:` header (some `F7C030` firmwares return `http://<ip>:<port>/Lightsetup.xml` rather than `/setup.xml`).
 
@@ -186,5 +186,5 @@ Unconfigured or factory-reset switches broadcast an open 2.4 GHz setup AP (`WeMo
    - Derive 16-byte AES key: `MD5(keydata + keydata[0..7])`, IV = `keydata[0..15]`, encrypt UTF-8 password with `AES-128-CBC` (PKCS7 padding), Base64-encode, and append hex length suffix if applicable.
 4. **Join Home Network**:
    - Call `WiFiSetup1#ConnectHomeNetwork(ssid, auth, password, encrypt, channel)` **twice** with a `100 ms` pause between calls.
-   - Poll `WiFiSetup1#GetNetworkStatus` until `<NetworkStatus>` is `1` (connected; `3` = handshake in progress, `2` = password too short).
-   - Finalize with `WiFiSetup1#CloseSetup` and `basicevent1#SetSetupDoneStatus`.
+   - Poll `WiFiSetup1#GetNetworkStatus` until `<NetworkStatus>` is `1` or `3` (`1` = connected, `3` = connected/handshake complete; `0` = connecting/handshake failed, `2` = rejected password or encryption method mismatch).
+   - Finalize with `WiFiSetup1#CloseSetup` and `basicevent1#SetSetupDoneStatus` only on `1` or `3` (keep setup AP open for retry on `0` or `2`).

@@ -34,7 +34,7 @@
 
 ### B. App Content & Permissions
 - **Ads:** No, my app does not contain ads.
-- **App Access:** All functionality is available without special access or login credentials (pre-populated with demo/default devices and includes a live local SSDP scanner).
+- **App Access:** All functionality is available without special access or login credentials (starts in Real LAN Mode with a live local SSDP scanner and includes an optional Demo Showroom Mode toggle on the More tab for exploring without hardware).
 - **Target Audience:** 13+ / Everyone (General utility app).
 - **Permissions Used (Install-time normal permissions only):**
   - `android.permission.INTERNET` (Local HTTP SOAP calls to switches)
