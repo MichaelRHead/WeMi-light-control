@@ -62,6 +62,7 @@ Whenever you implement a feature, fix a bug, or adjust existing behavior:
 1. If the change adds or modifies any user-visible screen, button, icon, badge, dialog, or workflow:
    - Update the corresponding detailed feature guide in [`docs/user-guide/`](../../../docs/user-guide/) (or create a new guide in `docs/user-guide/` if introducing a major new feature area).
    - Update the summary table in [`USER_GUIDE.md`](../../../USER_GUIDE.md).
+2. During **Stage 3 (`telemetry_and_debugging`)** of every release candidate (or on demand), run the full code-to-docs accuracy, readability, and link audit defined in [`wemi-doc-audit-and-review`](../wemi-doc-audit-and-review/SKILL.md).
 
 ### Step 4: Run Pre-Push Build & Test Gate and Commit with Agent Attribution
 Never push code or documentation to `origin/main` unless the full Gradle build and unit/Robolectric test suite succeed, and always write human-readable plain-English commits (`<= 72`-char tag-free subject, brief reflowable plain-text bullets explaining what changed and why without symbol dumps or semicolon chains, brief `Verified:` trailer `<= 120` chars, and `Agent:` trailer) per [`agent-commit-attribution`](../agent-commit-attribution/SKILL.md):
