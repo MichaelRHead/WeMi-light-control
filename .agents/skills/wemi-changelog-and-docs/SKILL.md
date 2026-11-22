@@ -72,5 +72,5 @@ bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
   <your_role_id> \
   "<type>(<scope>): <plain-English summary <= 72 chars>" \
   "- Explain what changed and why in plain English." \
-  --verified "<brief checks, e.g. 120/120 tests passing, lint clean>"
+  --verified "<brief checks, e.g. 127/127 tests passing, lint clean>"
 ```

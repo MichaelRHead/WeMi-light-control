@@ -115,6 +115,19 @@ When a SOAP request to a known device fails:
 - **`GetMetaInfo`**:
   - Returns `<MetaInfo>MAC|SerialNumber|DeviceSKU|FirmwareVersion|AccessPointSSID|ModelName</MetaInfo>`.
 
+### 5.3 `rules1` & `timesync1` — On-Device Rules & Switch Clock (`HardwareRulesClient.kt` & `HardwareRulesSafetyValidator.kt`)
+- **Capability Probing (`/rulesservice.xml` + `/upnp/control/rules1`, `urn:Belkin:service:rules:1`)**:
+  - Tier-1 zero-RTT hints are inferred directly from `/setup.xml` (`<serviceList>` + firmware/UDN), noting that late OpenWrt builds (`PVT-OWRT-SNS`) may emit `<rtos>1</rtos>` while still running `rules.db`.
+  - Tier-2 lazy verification fetches `/rulesservice.xml` and checks for `<name>FetchRules</name>` (fast-rejecting RTOS models like `WDS060`/`WSP080` that omit it) before invoking `rules1#FetchRules`.
+- **`FetchRules` & Binary `rules.db` Archive**:
+  - Returns `<ruleDbPath>` (e.g. `http://<ip>:<port>/rules.db`) and `<ruleDbVersion>`.
+  - Downloading `<ruleDbPath>` returns a ZIP archive containing an embedded SQLite database (typically `temppluginRules.db`, decoded in `HardwareRulesDbCodec.kt`) holding `RULES`, `RULEDEVICES` (Belkin `DayID` `1..7` or `-1`; fixed times `seconds % 10 == 0`; native Sunrise `% 10 == 1` & Sunset `% 10 == 2` + offset), `TARGETDEVICES` (Long Press targets), and `LOCATIONINFO`.
+  - HTTP `404` on `/rules.db` on a switch whose `/rulesservice.xml` exposes `FetchRules` indicates an empty initial rules DB (still `VERIFIED_SUPPORTED`).
+- **`StoreRules` Anti-Brick Guardrails (`HardwareRulesSafetyValidator.kt`)**:
+  - Enforce `<= 512 KiB` SQLite / `<= 128 KiB` ZIP, `PRAGMA integrity_check`, SQL-literal character safety against firmware C `snprintf` queries, valid `DayID` (`1..7` or `-1`) and non-zero durations, rotating raw-ZIP backups (5 newest per switch), `<errorInfo> == "Successful"`, and post-store `FetchRules` read-back confirmation.
+- **`timesync1` (`/upnp/control/timesync1`, `urn:Belkin:service:timesync:1`)**:
+  - `GetDeviceTime` reads the switch's UTC clock to flag drift (`Switch clock needs sync` when NTP failed after cloud shutdown); `TimeSync` pushes local UTC + timezone offset.
+
 ---
 
 ## 6. Local Push Event Subscriptions (`GenaSubscriptionManager.kt` — UPnP GENA)

@@ -8,17 +8,26 @@ The **Rules** tab lets you inspect **On-Device Switch Rules** stored inside supp
 
 ## 1. Inspecting On-Device Switch Rules (Read-Only)
 
-Supported 1st-Gen and 2nd-Gen OpenWrt wall switches, dimmers, and plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`) run their own built-in rule engine inside the switch hardware so rules keep firing even when your phone leaves the house. Newer RTOS models (`WDS060` Dimmer V2, `WSP080` Mini V2) do not expose on-device rule storage (though Dimmer V2 still stores hardware **Night Mode** on-device).
+Many classic switches, dimmers, and smart plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`) store automation rules directly inside the physical switch so they keep running even when your phone leaves the house. Newer models (`WDS060` Dimmer V2, `WSP080` Mini V2) do not support on-device rule storage—though **Dimmer V2** still stores hardware **Night Mode** on-device.
 
-### How WeMi Detects Capability Without Slowing Down Scans
-- **Instant Discovery Hints**: When WeMi discovers or adds a switch, it reads the device descriptor you already fetched with zero extra network calls to label switches as **`Likely Supported`** or **`Likely Unsupported (RTOS)`**.
-- **Verified Read-Only Inspection**: When you tap **`Read Rules`** on the **Rules** tab (or **`Inspect Rules`** inside any switch's expanded drawer on the **Devices** tab), WeMi verifies the switch's exact rule service actions and caches the result against its firmware version so unsupported switches are never re-probed unnecessarily.
+> [!NOTE]
+> **Safe Read-Only Inspection**: WeMi currently inspects on-device rules in **read-only mode** so you can see what is already stored inside your switches without risking changes to switch firmware. You can also try it right away in **Demo Showroom Mode** using sample on-device rules.
 
-### What You Can See on Each Switch
-- **Capability Badges**: **`On-Device Ready`** (plus **`• Long Press`** on wall switches and 1st-Gen dimmers that support 2-second wall-paddle holds) or **`No On-Device Rules`** on RTOS firmware.
-- **Stored On-Device Rules**: Displays existing **`Long Press`** rules (resolving target switch names automatically), **`Auto-Off Delay`** timers, **`Schedule`** intervals (including on-device **`Sunrise`** / **`Sunset`** offsets and stored solar location), **`Away Mode`** occupancy rules, and **`Motion / Sensor`** triggers, along with the switch's rules database version (`DB v...`).
-- **Switch Clock Warning**: If a switch lost power and its internal clock drifted or reset (for example, back to the year 2000 without cloud NTP), WeMi flags **`Switch clock needs sync`**.
-- **Automatic Local Backup**: Every time WeMi reads a valid rules archive from a switch, it keeps a rotating local backup of the untouched raw archive on your device in preparation for full on-device rule editing.
+### How to Check Your Switches
+- **At-a-Glance Header**: At the top of the **Rules** tab, **On-Device Switch Rules** shows how many controllable switches are ready vs. unsupported (`<N> ready • <M> unsupported • <Total> switches`). *(Motion Sensors are omitted because they do not store switch rules.)*
+- **Read Every Switch at Once**: Tap **`Read Rules`** to expand your switch list and read stored rules from all reachable switches on the active Wi-Fi Home.
+- **Inspect One Switch at a Time**: Tap **`Show Switches (<count>)`** to expand the list without scanning everything, then tap **`Read`** (or **`Refresh`** after reading) on any reachable switch. You can also expand any switch on the **Devices** tab and tap **`Inspect Rules`** to preview up to 4 rules inline (with the full list shown on the **Rules** tab).
+- **Zero Extra Scan Delay**: During normal Wi-Fi discovery, WeMi inspects the switch details it already downloaded—adding zero extra network requests—and caches verified results per firmware version so unsupported switches aren't re-checked unnecessarily.
+
+### Capability Badges & Decoded Details
+- **Capability Badges**:
+  - **`Likely Supported`** / **`Likely Ready • Long Press`** or **`Likely Unsupported (RTOS)`**: Initial estimate from discovery before reading the switch directly.
+  - **`Not Checked`**: Shown for manually added switches until you tap **`Read`** or **`Inspect Rules`**.
+  - **`On-Device Ready`** (plus **`• Long Press`** on wall switches and 1st-Gen dimmers that support 2-second wall-paddle holds): Verified on-device rules storage.
+  - **`No On-Device Rules`**: Verified unsupported firmware (for `WDS060`, WeMi reminds you that **Dimmer Night Mode** is still stored on-device).
+- **Stored On-Device Rules**: Displays decoded **`Long Press`** rules (automatically turning hardware IDs into your friendly switch names), **`Auto-Off Delay`** timers, **`Schedule`** intervals (including on-device **`Sunrise`** / **`Sunset`** offsets and the switch's stored **`Solar location on switch`**), **`Timed Action`** rules, **`Away Mode`** occupancy rules, and **`Motion / Sensor`** triggers—marking disabled rules as **`• Paused`** and showing the database version (`DB v...`).
+- **Switch Clock Warning**: If a switch lost power and its internal clock drifted or reset (for example, back to the year 2000 after Belkin's cloud shutdown), WeMi highlights **`Switch clock needs sync`**.
+- **Automatic Local Backup**: Each time WeMi reads a valid rules archive from a switch, it keeps a rotating local backup of the untouched original file on your Android device ahead of future on-device rule editing.
 
 ---
 

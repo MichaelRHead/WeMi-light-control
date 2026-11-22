@@ -22,6 +22,7 @@ Related documents in this repository:
 - [`.agents/skills/wemi-license-governance/SKILL.md`](.agents/skills/wemi-license-governance/SKILL.md) — Open-Source MIT License Parity, Minimal Permissive Dependency Policy & Trademark Governance Skill *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`.agents/skills/wemi-light-control/SKILL.md`](.agents/skills/wemi-light-control/SKILL.md) — Core Domain & Protocol Agent Skill
 - [`.agents/skills/wemi-changelog-and-docs/SKILL.md`](.agents/skills/wemi-changelog-and-docs/SKILL.md) — Change Log & Documentation Maintenance Skill
+- [`.agents/skills/wemi-doc-audit-and-review/SKILL.md`](.agents/skills/wemi-doc-audit-and-review/SKILL.md) — Stage 3 (`telemetry_and_debugging`) Documentation Audit & User-Guide Review Skill
 - [`.agents/skills/multi-agent-git-sync/SKILL.md`](.agents/skills/multi-agent-git-sync/SKILL.md) — Multi-Agent Git Sync, Anti-Stomp Audit & Conflict-Free Integration Skill
 - [`.agents/skills/agent-commit-attribution/SKILL.md`](.agents/skills/agent-commit-attribution/SKILL.md) — Mandatory Agent Commit Description Attribution Skill
 - [`.agents/skills/android-code-modularization/SKILL.md`](.agents/skills/android-code-modularization/SKILL.md) — Android Code Modularization & Human Readability Skill

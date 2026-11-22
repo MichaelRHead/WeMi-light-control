@@ -18,7 +18,7 @@ At the top of the screen, the compact single-row **Ocean Teal & Deep Sapphire** 
 | **`Edit` / `Done` Button** | Right cluster | Switches to **Edit Mode** (switching to the **Devices** tab first if needed) so you can reorder, rename, edit, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
 | **`+` (Add) Button** | Far top-right | On the **Devices** or **More** tab, opens **Add Smart Switch Device**. On the **Rules** tab, opens **New Smart Switch Rule**. |
 
-Along the bottom of the screen, the three navigation tabs switch between **Devices** (your lights and rooms), **Rules** (local schedules and auto-off timers), and **More** (whole-home controls, Demo Mode, packet log, and open-source notices).
+Along the bottom of the screen, the three navigation tabs switch between **Devices** (your lights and rooms), **Rules** (on-device switch rules plus local schedules and auto-off timers), and **More** (whole-home controls, Demo Mode, packet log, and open-source notices).
 
 > [!TIP]
 > **Predictable Back Button**: Pressing your device's **Back** button steps cleanly out of open dialogs, the discovery scanner, Edit Mode, or a single-room filter, and returns from **Rules** or **More** back to **Devices** before exiting the app.
@@ -95,6 +95,9 @@ Inside an expanded drawer, controls appear in this order:
    - Shows the local UPnP endpoint (`http://192.168.1.104:49153`), Serial Number (`SN`), and firmware version.
    - Tap **`Add Widget`** to pin a one-tap Home Screen toggle widget for this light (see [Home Screen Light & Room Widgets](home-screen-widgets.md)).
    - Tap **`Configure IP`** to open the **Edit** dialog for renaming, changing rooms, or updating the IP address.
+4. **On-Device Rules (Switches, Dimmers & Plugs)**:
+   - Displays whether the switch supports built-in hardware rules (**`On-Device Rules: ...`**, plus **`• Long Press`** on compatible wall switches and 1st-Gen dimmers).
+   - Tap **`Inspect Rules`** (when the switch is reachable) to verify capability in read-only mode and preview up to 4 stored on-device rules right inside the drawer (`DB v...`). See [Rules, Schedules & Auto-Off Timers](rules-and-timers.md) for the full **Rules** tab view.
 
 ---
 
