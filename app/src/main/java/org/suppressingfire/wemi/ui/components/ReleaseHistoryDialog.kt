@@ -133,7 +133,8 @@ fun ReleaseHistoryDialog(
                                         color = Color.White,
                                         fontFamily = FontFamily.SansSerif,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 18.sp
+                                        fontSize = 18.sp,
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
                                     Surface(
                                         shape = RoundedCornerShape(10.dp),
@@ -145,6 +146,8 @@ fun ReleaseHistoryDialog(
                                             fontFamily = FontFamily.SansSerif,
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 11.sp,
+                                            maxLines = 1,
+                                            softWrap = false,
                                             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
                                         )
                                     }
@@ -248,12 +251,13 @@ private fun ReleaseHistoryRowCard(
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.weight(1f)
                 ) {
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -265,6 +269,8 @@ private fun ReleaseHistoryRowCard(
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                         )
                     }
@@ -279,6 +285,8 @@ private fun ReleaseHistoryRowCard(
                                 fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 10.5.sp,
+                                maxLines = 1,
+                                softWrap = false,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -290,7 +298,9 @@ private fun ReleaseHistoryRowCard(
                     color = WemoTextSecondary,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Medium,
-                    fontSize = 11.5.sp
+                    fontSize = 11.5.sp,
+                    maxLines = 1,
+                    softWrap = false
                 )
             }
 

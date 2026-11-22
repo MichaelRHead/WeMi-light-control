@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -115,7 +116,7 @@ fun WeMiSwitchApp(
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
     val isDemoShowroomMode by viewModel.isDemoShowroomMode.collectAsStateWithLifecycle()
     val setupDebugSnapshot by viewModel.setupDebugSnapshot.collectAsStateWithLifecycle()
-    var showReleaseHistoryDialog by remember { mutableStateOf(false) }
+    var showReleaseHistoryDialog by rememberSaveable { mutableStateOf(false) }
 
     val homeDevices = remember(devices, activeNetworkKey) {
         devices.filter { it.networkKey == activeNetworkKey }

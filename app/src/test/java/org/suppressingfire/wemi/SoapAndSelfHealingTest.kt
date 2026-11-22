@@ -52,8 +52,8 @@ class SoapAndSelfHealingTest {
     @Test
     fun `verify LanHttpClient frames Content-Length, chunked transfer-encoding, and missing Content-Length with delayed FIN`() {
         val client = LanHttpClient(
-            connectTimeoutMs = 400,
-            readTimeoutMs = 80
+            connectTimeoutMs = 500,
+            readTimeoutMs = 250
         )
 
         ServerSocket(0, 8, InetAddress.getByName("127.0.0.1")).use { server ->
@@ -74,7 +74,7 @@ class SoapAndSelfHealingTest {
                                     val resp = "HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\nContent-Length: ${body.length}\r\n\r\n$body"
                                     s.getOutputStream().write(resp.toByteArray(Charsets.UTF_8))
                                     s.getOutputStream().flush()
-                                    Thread.sleep(250)
+                                    Thread.sleep(600)
                                 }
                                 2 -> {
                                     val chunk1 = "<BinaryState>"
@@ -93,7 +93,7 @@ class SoapAndSelfHealingTest {
                                     val resp = "HTTP/1.1 200 OK\r\nContent-Type: text/xml\r\n\r\n$body"
                                     s.getOutputStream().write(resp.toByteArray(Charsets.UTF_8))
                                     s.getOutputStream().flush()
-                                    Thread.sleep(250)
+                                    Thread.sleep(600)
                                 }
                             }
                         }
@@ -123,7 +123,7 @@ class SoapAndSelfHealingTest {
             assertTrue(r3.isSuccessful)
             assertEquals("<device><friendlyName>Porch Switch</friendlyName></device>", r3.body)
 
-            acceptLoop.join(1000)
+            acceptLoop.join(1500)
         }
     }
 

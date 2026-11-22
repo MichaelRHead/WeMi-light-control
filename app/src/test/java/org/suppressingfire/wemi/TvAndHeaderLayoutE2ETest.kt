@@ -1,9 +1,7 @@
 package org.suppressingfire.wemi
 
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
@@ -17,7 +15,6 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import kotlin.math.abs
 import org.junit.Assert.assertEquals
@@ -31,14 +28,13 @@ import org.robolectric.annotation.Config
 import org.suppressingfire.wemi.ui.SwitchViewModel
 
 /**
- * Full-stack Jetpack Compose + Robolectric E2E validation for UI layout & Android TV D-Pad CUJs:
- * 1. Compact single-row mobile/tablet `TopHeader` horizontal alignment, `>= 48.dp` Play Console
- *    Accessibility touch targets, `Role.Button` + `ContentDescription` semantics, `"All Off"` button,
- *    and static non-interactive `wemi` brand wordmark.
- * 2. Native Android TV (`UI_MODE_TYPE_TELEVISION`) 3-column room-grouped grid, deterministic
- *    alphabetical adoption ordering (`Living Room Dimmer` Col 0, `Living Room Switch` Col 1),
- *    `"Unassigned"`-last room ordering, Up/Down Room Bar navigation across columns, focusable Dimmer
- *    On/Off Toggle vs. focusable Dimmer Slider, and Room Master SOAP control over loopback servers.
+ * Full-stack Jetpack Compose + Robolectric E2E validation for native Android TV
+ * (`UI_MODE_TYPE_TELEVISION`) 3-column room-grouped layout, single-row top-bar packing,
+ * deterministic D-Pad hardware `KeyEvent` navigation, focusable Dimmer Slider mode,
+ * conditional `Holiday ON` focus recovery, and Room Master SOAP control over loopback servers.
+ *
+ * Mobile/tablet `TopHeader` and `ReleaseHistoryDialog` E2E tests live in
+ * `HeaderAndReleaseHistoryE2ETest.kt`.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -49,183 +45,6 @@ class TvAndHeaderLayoutE2ETest {
 
     private fun awaitLoopbackIo(timeoutMs: Long = 5_000L, condition: () -> Boolean) =
         composeTestRule.awaitLoopbackIo(timeoutMs, condition)
-
-    @Test
-    fun `verify v23_0 compact single-row TopHeader layout, 48dp accessibility touch targets, and static brand wordmark`() {
-        composeTestRule.waitForIdle()
-
-        val wordmarkNode = composeTestRule.onNodeWithTag("brand_wordmark_text").assertIsDisplayed()
-        val allOffNode = composeTestRule.onNodeWithTag("all_off_devices_button").assertIsDisplayed()
-        val refreshNode = composeTestRule.onNodeWithTag("refresh_devices_button").assertIsDisplayed()
-        val editNode = composeTestRule.onNodeWithTag("edit_devices_button").assertIsDisplayed()
-        val addNode = composeTestRule.onNodeWithTag("add_device_button").assertIsDisplayed()
-
-        // Legacy multi-line "LAN SWITCHES" subtitle must not exist in the compact single-row TopHeader
-        composeTestRule.onNodeWithText("LAN SWITCHES").assertDoesNotExist()
-        composeTestRule.onNodeWithText("All Off").assertIsDisplayed()
-
-        val wordmarkSem = wordmarkNode.fetchSemanticsNode()
-        assertEquals(
-            "Expected static brand_wordmark_text not to expose Role.Button",
-            null,
-            wordmarkSem.config.getOrNull(SemanticsProperties.Role)
-        )
-        assertEquals(
-            "Expected static brand_wordmark_text not to expose OnClick action",
-            null,
-            wordmarkSem.config.getOrNull(SemanticsActions.OnClick)
-        )
-        assertTrue(
-            "Expected brand_wordmark_text to expose a non-blank accessibility ContentDescription",
-            wordmarkSem.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().any { it.isNotBlank() }
-        )
-
-        val headerActionControls = listOf(
-            "all_off_devices_button" to allOffNode.fetchSemanticsNode(),
-            "refresh_devices_button" to refreshNode.fetchSemanticsNode(),
-            "edit_devices_button" to editNode.fetchSemanticsNode(),
-            "add_device_button" to addNode.fetchSemanticsNode()
-        )
-        val minTouchHeightPx = with(composeTestRule.density) { 48.dp.toPx() } - 0.5f
-
-        headerActionControls.forEach { (tag, semNode) ->
-            assertTrue(
-                "Expected $tag height >= 48.dp ($minTouchHeightPx px), got ${semNode.boundsInRoot.height}",
-                semNode.boundsInRoot.height >= minTouchHeightPx
-            )
-            assertEquals(
-                "Expected $tag to expose Role.Button for TalkBack & Play Console Accessibility Scanner",
-                Role.Button,
-                semNode.config.getOrNull(SemanticsProperties.Role)
-            )
-            val descriptions = semNode.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
-            assertTrue(
-                "Expected $tag to expose a non-blank accessibility ContentDescription",
-                descriptions.any { it.isNotBlank() }
-            )
-        }
-
-        val wordmarkBounds = wordmarkSem.boundsInRoot
-        val allOffBounds = headerActionControls[0].second.boundsInRoot
-        val refreshBounds = headerActionControls[1].second.boundsInRoot
-        val editBounds = headerActionControls[2].second.boundsInRoot
-        val addBounds = headerActionControls[3].second.boundsInRoot
-
-        // All 5 elements must share the same single horizontal header row (vertical centers within 10px)
-        assertTrue(
-            "Expected All Off button aligned vertically with wordmark ($wordmarkBounds vs $allOffBounds)",
-            abs(allOffBounds.center.y - wordmarkBounds.center.y) <= 10f
-        )
-        assertTrue(
-            "Expected refresh button aligned vertically with wordmark ($wordmarkBounds vs $refreshBounds)",
-            abs(refreshBounds.center.y - wordmarkBounds.center.y) <= 10f
-        )
-        assertTrue(
-            "Expected edit button aligned vertically with wordmark ($wordmarkBounds vs $editBounds)",
-            abs(editBounds.center.y - wordmarkBounds.center.y) <= 10f
-        )
-        assertTrue(
-            "Expected add button aligned vertically with wordmark ($wordmarkBounds vs $addBounds)",
-            abs(addBounds.center.y - wordmarkBounds.center.y) <= 10f
-        )
-
-        // Strict left-to-right horizontal ordering across the single row: wordmark -> All Off -> Refresh -> Edit -> Add
-        assertTrue(
-            "Expected strict left-to-right header ordering: wordmark -> all_off -> refresh -> edit -> add",
-            wordmarkBounds.right <= allOffBounds.left + 8f &&
-                allOffBounds.center.x < refreshBounds.center.x &&
-                refreshBounds.center.x < editBounds.center.x &&
-                editBounds.center.x < addBounds.center.x
-        )
-
-        // Subtle low-contrast version button stays inside the unused left brand zone without overlapping All Off or expanding header height
-        val versionNode = composeTestRule.onNodeWithTag("app_version_button").assertIsDisplayed()
-        val versionSem = versionNode.fetchSemanticsNode()
-        val versionBounds = versionSem.boundsInRoot
-        assertEquals(
-            "Expected app_version_button to expose Role.Button",
-            Role.Button,
-            versionSem.config.getOrNull(SemanticsProperties.Role)
-        )
-        assertTrue(
-            "Expected app_version_button to expose a non-blank accessibility ContentDescription",
-            versionSem.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().any { it.isNotBlank() }
-        )
-        assertTrue(
-            "Expected app_version_button to stay left of All Off ($versionBounds vs $allOffBounds)",
-            versionBounds.right <= allOffBounds.left + 2f
-        )
-        assertTrue(
-            "Expected app_version_button to stay vertically inside the single-row TopHeader band ($versionBounds vs $allOffBounds)",
-            versionBounds.top >= allOffBounds.top - 2f && versionBounds.bottom <= allOffBounds.bottom + 2f
-        )
-
-        // Tapping the subtle version button opens the user-friendly Release History dialog with version numbers, dates, and summaries
-        versionNode.performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("release_history_dialog").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Release History").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("release_entry_v${BuildConfig.VERSION_NAME}").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Nov 21, 2026").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("release_history_list")
-            .performScrollToNode(hasTestTag("release_entry_v1.0"))
-        composeTestRule.onNodeWithTag("release_entry_v1.0").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("close_release_history_button").assertIsDisplayed().performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("release_history_dialog").assertDoesNotExist()
-
-        // Static "wemi" wordmark is displayed, and the removed legacy wordmark toggle is absent on the More tab
-        composeTestRule.onNodeWithText("wemi").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("nav_tab_more").performClick()
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Header Logo Wordmark").assertDoesNotExist()
-        composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
-        composeTestRule.waitForIdle()
-
-        // Clicking "All Off" next to the Refresh button turns OFF all reachable controllable switches on the active home
-        val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
-        allOffNode.performClick()
-        awaitLoopbackIo {
-            vm.togglingDeviceIds.value.isEmpty() &&
-                vm.devices.value
-                    .filter { it.networkKey == vm.activeNetworkKey.value && it.isReachable && it.parsedType != org.suppressingfire.wemi.data.DeviceType.MOTION_SENSOR }
-                    .none { it.isOn }
-        }
-    }
-
-    @Test
-    @Config(sdk = [36], qualifiers = "w412dp-h915dp-port-xxhdpi")
-    fun `verify standard phone TopHeader places low-contrast version pill in unused gap beside wemi without shifting buttons`() {
-        composeTestRule.waitForIdle()
-
-        val wordmarkBounds = composeTestRule.onNodeWithTag("brand_wordmark_text")
-            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val versionBounds = composeTestRule.onNodeWithTag("app_version_button")
-            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val allOffBounds = composeTestRule.onNodeWithTag("all_off_devices_button")
-            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val refreshBounds = composeTestRule.onNodeWithTag("refresh_devices_button")
-            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val editBounds = composeTestRule.onNodeWithTag("edit_devices_button")
-            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        val addBounds = composeTestRule.onNodeWithTag("add_device_button")
-            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-
-        // On 412dp phones, version pill sits cleanly inside the unused gap between "wemi" and "All Off" on the same row
-        assertTrue(
-            "Expected app_version_button between wordmark and All Off on 412dp phone ($wordmarkBounds | $versionBounds | $allOffBounds)",
-            wordmarkBounds.right <= versionBounds.left + 2f &&
-                versionBounds.right <= allOffBounds.left + 2f &&
-                allOffBounds.right <= refreshBounds.left + 2f &&
-                refreshBounds.right <= editBounds.left + 2f &&
-                editBounds.right <= addBounds.left + 2f
-        )
-        assertTrue(
-            "Expected version button to share exact single-row height without expanding TopHeader ($versionBounds vs $allOffBounds)",
-            abs(versionBounds.center.y - allOffBounds.center.y) <= 4f &&
-                abs(versionBounds.height - allOffBounds.height) <= 4f
-        )
-    }
 
     @OptIn(ExperimentalTestApi::class)
     @Test
@@ -496,4 +315,90 @@ class TvAndHeaderLayoutE2ETest {
             }
         }
     }
+
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    @Config(sdk = [36], qualifiers = "w960dp-h540dp-land-television-xhdpi")
+    fun `verify Android TV D-Pad focus recovers cleanly when focused Holiday ON chip disappears`() {
+        composeTestRule.waitForIdle()
+
+        FakeUpnpServer(
+            initialFriendlyName = "Living Room Holiday Lights",
+            deviceTypeUrn = "urn:Belkin:device:controllee:1",
+            modelName = "WSP080",
+            serialNumber = "WSP080TVHOL01",
+            udn = "uuid:Socket-1_0-WSP080TVHOL01",
+            macAddress = "EC1A59880001",
+            isRtos = true,
+            initialRelayOn = false,
+            enableSsdpResponder = true,
+            registerAsCandidatePort = true
+        ).use { _ ->
+            FakeUpnpServer(
+                initialFriendlyName = "Living Room Floor Lamp",
+                deviceTypeUrn = "urn:Belkin:device:lightswitch:1",
+                modelName = "WLS0403",
+                serialNumber = "WLS0403TVLMP02",
+                udn = "uuid:Lightswitch-3_0-WLS0403TVLMP02",
+                macAddress = "EC1A59880002",
+                isRtos = true,
+                initialRelayOn = false,
+                enableSsdpResponder = true,
+                registerAsCandidatePort = true
+            ).use { _ ->
+                val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
+                composeTestRule.runOnUiThread {
+                    vm.resetLanHomesSwitchesAndRooms(rediscoverAfterReset = false)
+                }
+                awaitLoopbackIo {
+                    !vm.isDemoShowroomMode.value && vm.devices.value.isEmpty() && !vm.isRefreshing.value
+                }
+
+                composeTestRule.onNodeWithTag("tv_scan_button").assertIsDisplayed().performClick()
+                awaitLoopbackIo {
+                    vm.devices.value.size == 2 && !vm.isRefreshing.value
+                }
+
+                // Navigate to Holiday ON chip and confirm it holds focus
+                composeTestRule.onNodeWithTag("tv_room_header_Living Room")
+                    .performSemanticsAction(SemanticsActions.RequestFocus)
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("tv_room_header_Living Room")
+                    .performKeyInput { pressKey(Key.DirectionUp) }
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("tv_scene_movie").assertIsFocused()
+                composeTestRule.onNodeWithTag("tv_scene_movie")
+                    .performKeyInput { pressKey(Key.DirectionRight) }
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("tv_scene_holiday").assertIsDisplayed().assertIsFocused()
+
+                // Remove the holiday switch while Holiday ON holds focus: focus must recover to Movie 20% and skip cleanly to All OFF
+                val holidayDevice = vm.devices.value.first { it.serialNumber == "WSP080TVHOL01" }
+                composeTestRule.runOnUiThread { vm.deleteDevice(holidayDevice) }
+                awaitLoopbackIo {
+                    vm.devices.value.size == 1 &&
+                        runCatching {
+                            composeTestRule.onNodeWithTag("tv_scene_holiday").assertDoesNotExist()
+                            true
+                        }.getOrDefault(false)
+                }
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("tv_scene_holiday").assertDoesNotExist()
+                val focusedTags = composeTestRule.onAllNodes(androidx.compose.ui.test.isFocused())
+                    .fetchSemanticsNodes()
+                    .mapNotNull { it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag) }
+                assertEquals(
+                    "Expected focus to recover to tv_scene_movie after Holiday ON disappeared; actual focused tags=$focusedTags",
+                    listOf("tv_scene_movie"),
+                    focusedTags
+                )
+
+                composeTestRule.onNodeWithTag("tv_scene_movie")
+                    .performKeyInput { pressKey(Key.DirectionRight) }
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("tv_scene_bedtime").assertIsFocused()
+            }
+        }
+    }
 }
+

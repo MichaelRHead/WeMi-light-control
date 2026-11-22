@@ -1,8 +1,6 @@
 package org.suppressingfire.wemi.ui.components
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -55,8 +52,6 @@ import org.suppressingfire.wemi.data.DEFAULT_CABIN_HOME_KEY
 import org.suppressingfire.wemi.data.DEFAULT_OFFICE_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.HomeNetworkEntity
-import org.suppressingfire.wemi.ui.theme.WemoDividerGray
-import org.suppressingfire.wemi.ui.theme.WemoGreenBottom
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
@@ -195,7 +190,7 @@ fun WifiHomeBar(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Bottom Row: Remembered Wi-Fi Network Home Chips + Add Home + Reset
+            // Bottom Row: Remembered Wi-Fi Network Home Chips + Add Home
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

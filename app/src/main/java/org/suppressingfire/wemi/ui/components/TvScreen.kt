@@ -98,6 +98,9 @@ fun TvDashboardScreen(
     val orderedDevices: List<DeviceEntity> = remember(groupedByRoom) {
         groupedByRoom.flatMap { it.second }
     }
+    val hasHolidayDevices = remember(devices) {
+        devices.any { org.suppressingfire.wemi.data.isHolidayLightDevice(it) }
+    }
     val firstDeviceId = orderedDevices.firstOrNull()?.id
 
     val gridState = rememberLazyGridState()
@@ -137,6 +140,10 @@ fun TvDashboardScreen(
     }
     var lastFocusedColumn by remember { mutableIntStateOf(0) }
     var didRequestInitialGridFocus by remember { mutableStateOf(false) }
+    var previousHasHolidayDevices by remember { mutableStateOf(hasHolidayDevices) }
+    // Capture synchronously during composition before BoxWithConstraints detaches the Holiday ON chip
+    val holidayChipVanishedWhileFocused =
+        previousHasHolidayDevices && !hasHolidayDevices && activeFocusTarget == TvFocusTarget.TopAction(1)
 
     val navigateTo: (TvFocusTarget?) -> Boolean = { target ->
         if (target != null) {
@@ -163,14 +170,28 @@ fun TvDashboardScreen(
         true
     }
 
-    // Stabilize hardware D-Pad focus across initial launch, empty-home Rescan, room filter changes, and offline dimmer transitions
-    LaunchedEffect(orderedDevices, selectedRoomFilter) {
+    // Stabilize hardware D-Pad focus across initial launch, empty-home Rescan, room filter changes, holiday chip changes, and offline dimmer transitions
+    LaunchedEffect(orderedDevices, selectedRoomFilter, hasHolidayDevices) {
+        previousHasHolidayDevices = hasHolidayDevices
         if (orderedDevices.isEmpty()) {
             didRequestInitialGridFocus = false
             lastFocusedDeviceId = null
             val scanTarget = TvFocusTarget.TopAction(3)
             activeFocusTarget = scanTarget
             runCatching { requesterFor(scanTarget).requestFocus() }
+            return@LaunchedEffect
+        }
+
+        if (holidayChipVanishedWhileFocused ||
+            (!hasHolidayDevices && activeFocusTarget == TvFocusTarget.TopAction(1))
+        ) {
+            if (lastFocusedDeviceId == null || orderedDevices.none { it.id == lastFocusedDeviceId }) {
+                lastFocusedDeviceId = orderedDevices.first().id
+            }
+            val fallback = TvFocusTarget.TopAction(0)
+            activeFocusTarget = fallback
+            withFrameNanos { }
+            runCatching { requesterFor(fallback).requestFocus() }
             return@LaunchedEffect
         }
 
@@ -196,12 +217,19 @@ fun TvDashboardScreen(
             lastFocusedDeviceId == null ||
             orderedDevices.none { it.id == lastFocusedDeviceId }
         ) {
+            val wasAlreadyInitialized = didRequestInitialGridFocus
             didRequestInitialGridFocus = true
             val initialId = orderedDevices.first().id
             lastFocusedDeviceId = initialId
-            val initialTarget = TvFocusTarget.DeviceToggle(initialId)
-            activeFocusTarget = initialTarget
-            runCatching { requesterFor(initialTarget).requestFocus() }
+            val currentFocus = activeFocusTarget
+            val keepTopBarFocus = wasAlreadyInitialized &&
+                currentFocus is TvFocusTarget.TopAction &&
+                (hasHolidayDevices || currentFocus.index != 1)
+            if (!keepTopBarFocus) {
+                val initialTarget = TvFocusTarget.DeviceToggle(initialId)
+                activeFocusTarget = initialTarget
+                runCatching { requesterFor(initialTarget).requestFocus() }
+            }
         }
     }
 
@@ -228,9 +256,6 @@ fun TvDashboardScreen(
     val controllableDevices = devices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
     val activeSwitchCount = controllableDevices.count { it.isOn && it.isReachable }
     val totalSwitchCount = controllableDevices.size
-    val hasHolidayDevices = remember(devices) {
-        devices.any { org.suppressingfire.wemi.data.isHolidayLightDevice(it) }
-    }
 
     Column(
         modifier = Modifier
