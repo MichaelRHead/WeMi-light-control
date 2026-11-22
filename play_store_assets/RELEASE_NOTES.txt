@@ -1,4 +1,4 @@
-WeMi Switch Control v33.0:
-• In-App Release History: Tap the subtle version pill in the top bar to browse release summaries and dates.
-• Cleaner Everyday UI: Streamlined the top bar, More tab, and dialogs, gated Demo presets to Demo Mode, added a reset confirmation prompt, and fixed long SOAP log timestamps.
-• Smarter TV & Discovery: Conditional Android TV Holiday ON scene with D-Pad focus recovery, word-bounded room/icon matching, and collapsible setup diagnostics.
+WeMi Switch Control v34.0:
+• Chromebook (ChromeOS) LAN Support: Automatic local Wi-Fi switch discovery and control on Chromebooks with network-bound multicast and physical-subnet fallback.
+• Guided Manual Subnet Fallback: Easily scan your home router's /24 subnet from the SSDP scanner if a mesh router blocks multicast on ChromeOS.
+• Reliable Polling & Visuals: Safe virtual-subnet home hygiene, smooth 15-second Chromebook state syncing, and refreshed Play Store & Android TV graphics.

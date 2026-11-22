@@ -1,6 +1,6 @@
 # WeMi Light Control — Android & Android TV UX Design, Behavioral Model & Critical User Journeys (`UX_DESIGN_AND_EXPERIENCE.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v33.0`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v34.0`)  
 **Document & Skill Owner**: **Google AI Studio Agent (`AI Studio Build`) — EXCLUSIVE OWNER**  
 **Companion Agent Skill**: [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](.agents/skills/wemi-ux-design-and-experience/SKILL.md)
 
@@ -16,7 +16,7 @@ Related documentation:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — read-only for the Google AI Studio Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent — read-only for the Google AI Studio Agent)*
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
-- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v33.0`)
+- [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v34.0`)
 - [`UPCOMING_FEATURES.md`](UPCOMING_FEATURES.md) — Upcoming Features & Next-Iteration Roadmap
 - [`USER_GUIDE.md`](USER_GUIDE.md) — Modular User Guide Index & Feature Guides ([`docs/user-guide/`](docs/user-guide/))
 
@@ -132,7 +132,7 @@ Every screen and component in **WeMi Light Control** must obey these five layout
 1. **Context**: User installs the app on a physical Android phone or opens **`More`** → **`Reset Homes, Discovered Switches & Rooms`** (`more_reset_lan_homes_switches_button`) → **`Reset & Rescan LAN`** (or **`Reset Empty`**).
 2. **Experience**:
    - When `0` switches are saved in the active Wi-Fi Home, `EmptyDevicesState` (`empty_devices_state_card`) presents a visual showcase of the 4 hardware categories (`Switch`, `Light`, `Tree Lights`, `Fan`) and 3 real-LAN onboarding actions: **`Scan Local Network (SSDP)`**, **`Setup Factory-Reset Switch AP (10.22.22.1)`**, and **`Add Switch Manually (By IP)`** (Demo Showroom presets stay gated behind `Demo Showroom Mode` on the `More` tab).
-   - Tapping **`Scan Local Network (SSDP)`** (`empty_state_scan_ssdp_button`) broadcasts UDP `M-SEARCH` bursts (`239.255.255.250:1900`) + a `/24` unicast sweep, displays live progress inside `SsdpScannerModal`, and **automatically adopts** all discovered switches into `My Home` when starting from an empty home (or lets the user tap **`Adopt`** / **`Adopt All`** when adding to an existing home).
+   - Tapping **`Scan Local Network (SSDP)`** (`empty_state_scan_ssdp_button`) broadcasts UDP `M-SEARCH` bursts (`239.255.255.250:1900`) + a `/24` unicast sweep, displays live progress inside `SsdpScannerModal`, and **automatically adopts** all discovered switches into `My Home` when starting from an empty home (or lets the user tap **`Adopt`** / **`Adopt All`** when adding to an existing home). On Chromebooks (ChromeOS ARCVM `100.115.92.x`), if a strict router blocks multicast and automatic physical-subnet fallback finds zero switches, `ArcVmManualSubnetFallbackCard` (`arcvm_manual_subnet_card`) provides a clean RFC 1918 `/24` prefix prompt right inside the scanner modal without leaking CGNAT addresses into saved Wi-Fi Homes.
 
 ### CUJ 2: Everyday Single-Tap Switch Toggle & `<100ms` Physical Wall-Switch Sync
 1. **Context**: User taps a switch's 64dp `PowerRingButton` (`power_button_${id}`) on their phone, or someone physically presses the wall switch paddle in the room.

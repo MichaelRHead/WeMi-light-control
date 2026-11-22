@@ -9,6 +9,12 @@ data class ReleaseHistoryEntry(
 
 val WEMI_RELEASE_HISTORY: List<ReleaseHistoryEntry> = listOf(
     ReleaseHistoryEntry(
+        version = "v34.0",
+        releaseDate = "Nov 21, 2026",
+        headline = "Chromebook (ChromeOS) Local-LAN Discovery & Refreshed Visuals",
+        summary = "Added full ChromeOS (ARCVM) local Wi-Fi switch discovery and control with network-bound multicast, automatic physical-subnet fallback when routers block multicast, a guided manual subnet scanner, safe virtual-subnet home hygiene, and refreshed Play Store & TV visuals."
+    ),
+    ReleaseHistoryEntry(
         version = "v33.0",
         releaseDate = "Nov 21, 2026",
         headline = "In-App Release History, Cleaner UI & Smarter TV Scenes",

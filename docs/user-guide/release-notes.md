@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v33.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v34.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v33.0`)
+## Quick Release Summary (`v1.0` → `v34.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v34.0`](#version-340-versioncode--34--november-21-2026)** | `34` | Nov 21, 2026 | **Chromebook (ChromeOS ARCVM) Local-LAN Discovery & Control + Refreshed Play Store Visuals**: Network-bound multicast SSDP & automatic physical-subnet fallback on Chromebooks, guided manual `/24` subnet scanner fallback when routers block multicast, clean CGNAT home profile hygiene, 15s Chromebook foreground sync, and refreshed Store/TV graphics |
 | **[`v33.0`](#version-330-versioncode--33--november-21-2026)** | `33` | Nov 21, 2026 | **In-App Release History, UX Hygiene Cleanup, Conditional TV Holiday Scene & Discovery/Diagnostics Polish**: Subtle top-bar version pill + scrollable `Release History` dialog, streamlined top bar/More/dialogs with Demo-only preset gating and reset confirmation, conditional Android TV `Holiday ON` with D-Pad focus recovery, word-bounded icon/room classification, and collapsible `SETUP DIAGNOSTICS` auto-expansion |
 | **[`v32.0`](#version-320-versioncode--32--november-21-2026)** | `32` | Nov 21, 2026 | **Discovery, Rules, GENA Push & Widget Diagnostics Hardening**: 4-pass hardware identity & widget UDN self-healing, decoded XML switch names, unified case-insensitive room grouping across phone/TV/widgets, isolated GENA push handlers, cross-home rule isolation & Auto-Off OFF default, and headless widget SOAP telemetry |
 | **[`v31.0`](#version-310-versioncode--31--november-1920-2026)** | `31` | Nov 19–20, 2026 | **Home Screen Light & Room Toggle Widgets** (zero-app-launch local Wi-Fi toggles, one-tap pinning, multi-home isolation & rapid-tap protection), plus motion-trigger dimmer brightness & Wi-Fi Home isolation fix and instant SSDP search-target switching |
@@ -48,6 +49,14 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 34.0 (`versionCode = 34`) — November 21, 2026
+- **Chromebook (ChromeOS ARCVM) Local-LAN Discovery & Control**: Run WeMi Switch Control directly on Chromebooks with zero extra permissions. Network-bound multicast SSDP discovery, non-Belkin Router IGD subnet harvesting, and a 5-tier physical `/24` subnet fallback automatically discover switches across ChromeOS's virtual Android network (`100.115.92.x`) while preserving full phone and Android TV discovery behavior.
+- **Guided Manual `/24` Subnet Scanner Fallback**: When a strict mesh router or isolated Wi-Fi access point blocks multicast on ChromeOS, the SSDP Scanner displays a clean card letting you enter your router's IPv4 prefix (e.g., `192.168.1` or `192.168.86`) to scan and adopt local switches in one tap.
+- **Clean Virtual-Subnet Home Hygiene & Smooth Chromebook Sync**: Phantom ChromeOS CGNAT addresses (`100.115.92.0/24`) are excluded from saved Wi-Fi Homes and `Add Home` pre-fills, unreachable GENA push subscriptions are skipped safely on virtual NAT interfaces to protect 2nd-Gen RTOS switches, and Chromebooks automatically refresh switch states every 15 seconds while in the foreground.
+- **Refreshed Google Play Store & Android TV Graphics**: Updated all phone, tablet, Android TV screenshots, feature graphic, and TV banners to reflect the live single-row top bar, subtle version pill, Home Screen Widget pinning, collapsible setup diagnostics, and room-header TV dimming.
+
+---
 
 ### Version 33.0 (`versionCode = 33`) — November 21, 2026
 - **Subtle Top-Bar Version Pill & In-App Release History**: Tap the low-contrast **`v33.0`** pill tucked neatly into the unused space beside the **`wemi`** wordmark to browse user-friendly release summaries and dates (`v33.0` → `v1.0`) without changing the top bar's height or shifting any action buttons.

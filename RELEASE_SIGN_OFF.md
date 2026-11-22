@@ -11,39 +11,39 @@ This file is the live synchronization state machine for the **6-Agent / 7-Stage 
 ## 1. Live Release State Machine Header (Machine & Human Readable)
 
 <!-- RELEASE_STATE_BEGIN -->
-RELEASE_VERSION: v33.0
-VERSION_CODE: 33
+RELEASE_VERSION: v34.0
+VERSION_CODE: 34
 ROUND_NUMBER: 1
-RELEASE_STATUS: PROMOTED_TO_CLOSED_TESTING
-CURRENT_TURN: NONE
-CANDIDATE_BASE_SHA: v33.0-rc
-SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (v33.0-rc @ 2026-11-21 16:45 PST)
-SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (360e591 @ 2026-11-21 17:17 PST)
-SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (78532ba @ 2026-11-21 17:26 PST)
-SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (64d44b4 @ 2026-11-21 17:35 PST)
-SIGN_OFF_LICENSE_GOVERNANCE: SIGNED_OFF (6078287 @ 2026-11-21 17:43 PST)
-SIGN_OFF_APP_PROMOTER: PROMOTED (vc=33 internal -> alpha @ 2026-11-21 18:14 PST)
-FINAL_RELEASE_SHA: v33.0-rc
-CONCLUDED_AT: 2026-11-21 18:12 PST
-PROMOTED_VERSION_CODE: 33
-PROMOTED_TRACK: alpha
-PROMOTED_AT: 2026-11-21 18:14 PST
+RELEASE_STATUS: IN_REVIEW
+CURRENT_TURN: discovery_and_grouping
+CANDIDATE_BASE_SHA: v34.0-rc
+SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (v34.0-rc @ 2026-11-21 21:10 PST)
+SIGN_OFF_DISCOVERY_AND_GROUPING: PENDING
+SIGN_OFF_TELEMETRY_AND_DEBUGGING: PENDING
+SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
+SIGN_OFF_LICENSE_GOVERNANCE: PENDING
+SIGN_OFF_APP_PROMOTER: PENDING
+FINAL_RELEASE_SHA: NONE
+CONCLUDED_AT: NONE
+PROMOTED_VERSION_CODE: NONE
+PROMOTED_TRACK: NONE
+PROMOTED_AT: NONE
 <!-- RELEASE_STATE_END -->
 
 ---
 
-## 2. Current Release Candidate Sign-Off Status (`v33.0` / `versionCode = 33`)
+## 2. Current Release Candidate Sign-Off Status (`v34.0` / `versionCode = 34`)
 
 <!-- SIGN_OFF_TABLE_BEGIN -->
 | Stage | Role ID | Agent | Status | Verified Commit SHA | Timestamp (PST) | Verification Summary |
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
-| **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `v33.0-rc` | `2026-11-21 16:45 PST` | Initiated v33.0 (versionCode=33, org.suppressingfire.wemi) 6-agent release review: completed Stage 1 Obsolete UI & UX Cleanup Audit, verified subtle top-bar version pill & rememberSaveable ReleaseHistoryDialog (v33.0->v1.0), conditional Android TV Holiday ON with D-Pad focus recovery, 5 Compose layout invariants, 48dp+ accessibility targets, TalkBack semantics, CUJs 1-8, UX_DESIGN.md / UX_DESIGN_AND_EXPERIENCE.md / wemi-ux-design-and-experience SKILL.md / release-notes.md / main-screen.md / RELEASE_NOTES.txt (470/500) / STORE_LISTING.md (3149/4000) / IMPLEMENTED.md sync, same-day date matcher fix in HeaderAndReleaseHistoryE2ETest, 94/94 .kt files <500L, 108/108 Kotlin tests across 21 suites (--rerun-tasks), 23/23 Python Play tests, and clean Android build. |
-| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `360e591` | `2026-11-21 17:17 PST` | Audited v33.0 SSDP/unicast discovery, 4-pass hardware identity matching, word-bounded room and icon inference, canonical room grouping across mobile/TV/widgets, and soft-AP SSID shielding; fixed SSDP post-burst retransmit timing (360e591) and synced owned discovery docs to v33.0. |
-| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `SIGNED_OFF` | `78532ba` | `2026-11-21 17:26 PST` | Verified v33.0 setup diagnostics, BuildConfig version stamps, password redaction, cloud-backup exclusions, widget UDN telemetry, and full 21-suite test gate. |
-| **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `SIGNED_OFF` | `64d44b4` | `2026-11-21 17:35 PST` | Verified v33.0 code modularity across all 94 Kotlin files under 500 lines, 100644 script modes, widget and Room E2E flake hardening, zero lint errors, debug APK build, and all 108 Kotlin and 23 Python tests. |
-| **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `SIGNED_OFF` | `6078287` | `2026-11-21 17:43 PST` | Verified v33.0 MIT license parity, Apache-2.0 dependency and plugin allowlists, pure Kotlin/DEX APK, 4-permission Data Safety parity, Play listing limits, and zero WeMo trademark leaks across all 94 files. |
-| **6 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `SIGNED_OFF` | `v33.0-rc` | `2026-11-21 18:12 PST` | All 5 review agents signed off Round 1 for v33.0 (versionCode=33, org.suppressingfire.wemi): ai_studio_ux_cuj, discovery_and_grouping (360e591 SSDP post-burst timing hardening), telemetry_and_debugging (78532ba), code_quality_and_testing (64d44b4 widget/Room E2E stability), and license_governance (6078287); synced UPCOMING_FEATURES.md & release-notes.md, verified 108/108 Kotlin (21 suites) + 23/23 Python Play tests, 94/94 .kt <500L, 100644 script modes, Play listing (3149/4000) & RELEASE_NOTES.txt (470/500), and clean Android build. Approved for Google Play Store release. |
-| **7 (Promote)** | `app_promoter` | **Antigravity App Promoter Agent (Closed Testing)** | `PROMOTED` | `6abd835` | `2026-11-21 18:14 PST` | Promoted Play build 33 release 0.0.0.33 from internal to alpha via GitHub Actions run 44975117521. |
+| **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `v34.0-rc` | `2026-11-21 21:10 PST` | Initiated v34.0 (versionCode=34, org.suppressingfire.wemi) 6-agent release review: completed Stage 1 Obsolete UI & UX Cleanup Audit (verified brand-neutral ArcVmManualSubnetFallbackCard with >=48dp touch target, CGNAT-safe WifiHomeBar & AddWifiHomeNetworkDialog, and zero dead/dev controls), bumped app/build.gradle.kts to 34.0 (vc=34), prepended v34.0 to ReleaseHistoryCatalog.kt, regenerated all 20 Play Store & TV graphics with v34.0 top-bar pill, synced UX_DESIGN.md / UX_DESIGN_AND_EXPERIENCE.md / wemi-ux-design-and-experience SKILL.md / release-notes.md / RELEASE_NOTES.txt (488/500) / STORE_LISTING.md (3208/4000) / IMPLEMENTED.md, and verified 119/119 Kotlin tests across 23 suites (--rerun-tasks), 23/23 Python Play tests, validate-local (14 PNGs), and clean Android build. |
+| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `PENDING` | `-` | `-` | Awaiting Discovery & Room Grouping Agent review. |
+| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `PENDING` | `-` | `-` | Awaiting Telemetry & Debugging Agent review. |
+| **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
+| **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
+| **6 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `PENDING` | `-` | `-` | Awaiting Stages 1-5 sign-off. |
+| **7 (Promote)** | `app_promoter` | **Antigravity App Promoter Agent (Closed Testing)** | `PENDING` | `-` | `-` | Awaiting Stage 6 approval and AI Studio internal testing upload. |
 <!-- SIGN_OFF_TABLE_END -->
 
 ---
@@ -118,4 +118,5 @@ PROMOTED_AT: 2026-11-21 18:14 PST
 | 2026-11-21 17:43 PST | `1` | `license_governance` | `SIGNED_OFF` | `ai_studio_ux_cuj` | `6078287` | Verified v33.0 MIT license parity, Apache-2.0 dependency and plugin allowlists, pure Kotlin/DEX APK, 4-permission Data Safety parity, Play listing limits, and zero WeMo trademark leaks across all 94 files. |
 | 2026-11-21 18:12 PST | `1` | `ai_studio_ux_cuj` | `APPROVED_FOR_PLAY_STORE` | `NONE` | `v33.0-rc` | All 5 review agents signed off Round 1 for v33.0 (versionCode=33, org.suppressingfire.wemi): ai_studio_ux_cuj, discovery_and_grouping (360e591 SSDP post-burst timing hardening), telemetry_and_debugging (78532ba), code_quality_and_testing (64d44b4 widget/Room E2E stability), and license_governance (6078287); synced UPCOMING_FEATURES.md & release-notes.md, verified 108/108 Kotlin (21 suites) + 23/23 Python Play tests, 94/94 .kt <500L, 100644 script modes, Play listing (3149/4000) & RELEASE_NOTES.txt (470/500), and clean Android build. Approved for Google Play Store release. |
 | 2026-11-21 18:14 PST | `1` | `app_promoter` | `PROMOTED_TO_CLOSED_TESTING` | `NONE` | `6abd835` | Promoted Play build 33 release 0.0.0.33 from internal to alpha via GitHub Actions run 44975117521. |
+| 2026-11-21 21:10 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `v34.0-rc` | Initiated v34.0 (versionCode=34, org.suppressingfire.wemi) 6-agent release review: completed Stage 1 Obsolete UI & UX Cleanup Audit (verified brand-neutral ArcVmManualSubnetFallbackCard with >=48dp touch target, CGNAT-safe WifiHomeBar & AddWifiHomeNetworkDialog, and zero dead/dev controls), bumped app/build.gradle.kts to 34.0 (vc=34), prepended v34.0 to ReleaseHistoryCatalog.kt, regenerated all 20 Play Store & TV graphics with v34.0 top-bar pill, synced UX_DESIGN.md / UX_DESIGN_AND_EXPERIENCE.md / wemi-ux-design-and-experience SKILL.md / release-notes.md / RELEASE_NOTES.txt (488/500) / STORE_LISTING.md (3208/4000) / IMPLEMENTED.md, and verified 119/119 Kotlin tests across 23 suites (--rerun-tasks), 23/23 Python Play tests, validate-local (14 PNGs), and clean Android build. |
 <!-- AUDIT_LOG_END -->

@@ -1,10 +1,10 @@
-# Google Play Store Listing — WeMi Switch Control (v33.0 — Phone, Tablet, Widgets & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v34.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `33.0` (`versionCode = 33`)
-- **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Android Home Screen Widgets**, and **Android TV (Leanback)**
+- **Version:** `34.0` (`versionCode = 34`)
+- **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Chromebooks (ChromeOS)**, **Android Home Screen Widgets**, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
 - **Content Rating:** Everyone
@@ -13,15 +13,15 @@
 Local Wi-Fi widgets, phone & TV control for Belkin's discontinued switches.
 
 ## Full Description
-WeMi Switch Control brings fast, reliable local-network control back to Belkin's discontinued smart switch platform—including in-wall light switches, 3-way switches, smart dimmers, mini smart plugs, and motion sensors—across your Android phone, tablet, **Home Screen Widgets**, and **Android TV**, styled with an Ocean Teal, Electric Cyan, and Deep Sapphire interface.
+WeMi Switch Control brings fast, reliable local-network control back to Belkin's discontinued smart switch platform—including in-wall light switches, 3-way switches, smart dimmers, mini smart plugs, and motion sensors—across your Android phone, tablet, **Chromebook**, **Home Screen Widgets**, and **Android TV**, styled with an Ocean Teal, Electric Cyan, and Deep Sapphire interface.
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery, local SOAP HTTP commands, and `<100ms` UPnP GENA push updates—with no cloud account, external server, or subscription required.
 
-### What's New in Version 33.0
-- **In-App Release History & Cleaner Top Bar:** Tap the subtle version badge in the top bar anytime to browse short, user-friendly release summaries and dates without disrupting your single-row header layout.
-- **Streamlined Everyday UI & Safer Resets:** Removed obsolete toggles and internal cards from the More tab and dialogs, strictly gated Demo presets behind Demo Showroom Mode, added a confirmation prompt before resetting saved homes, and fixed long SOAP log timestamps.
-- **Smarter Android TV Holiday Scene & D-Pad Focus:** The `Holiday ON` TV scene now appears only when your home has matching holiday lights (Christmas tree, holiday, Diwali, Hanukkah, Halloween, fairy/string lights) with automatic focus recovery when switches change.
-- **Sharper Room/Icon Classification & Setup Diagnostics:** Word-bounded icon matching prevents false matches on names like "Front Street Light", bath-before-bed room icons keep rooms accurate, and collapsible `SETUP DIAGNOSTICS` auto-expands cleanly on new errors.
+### What's New in Version 34.0
+- **Chromebook (ChromeOS) Local-LAN Discovery & Control:** Full support for running WeMi Switch Control on Chromebooks using network-bound multicast SSDP discovery, automatic physical-subnet fallback when routers block multicast, and smooth 15-second state syncing—all with zero new permissions.
+- **Guided Manual Subnet Scanner & Clean Home Profiles:** On ChromeOS networks where multicast is isolated, enter your home router's `/24` prefix right inside the SSDP scanner to locate switches cleanly, while virtual subnet addresses stay hidden from your saved Wi-Fi Homes.
+- **Refreshed Play Store & Android TV Graphics:** Updated app screenshots, feature graphic, and TV banners to showcase the latest single-row header, subtle version pill, Home Screen Widget pinning, and room-header TV dimming.
+- **In-App Release History & Cleaner Everyday UI:** Tap the subtle version badge in the top bar anytime to browse release summaries, enjoy conditional Android TV `Holiday ON` scenes with D-Pad focus recovery, and troubleshoot with collapsible `SETUP DIAGNOSTICS`.
 - **Zero-Cloud `10.22.22.1` Setup, Widgets & Pure Kotlin/DEX (`minSdk 24+`):** Provision factory-reset switches directly over local Wi-Fi with Home Screen Light & Room Widgets, MIT open-source transparency, and local diagnostics excluded from cloud backup.
 
 ### Key Features
