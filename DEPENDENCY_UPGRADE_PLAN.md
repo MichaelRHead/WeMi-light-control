@@ -1,7 +1,8 @@
 # WeMi Light Control — Dependency & Toolchain Upgrade Plan (`DEPENDENCY_UPGRADE_PLAN.md`)
 
-**Status**: `AWAITING_AI_STUDIO_REVIEW_AND_CONFIRMATION`  
+**Status**: `AI_STUDIO_REVIEWED_WAVES_1_2_APPROVED_WAVE_3_DEFERRED`  
 **Prepared By**: Antigravity App Promoter Agent (`app_promoter`) — `2026-11-22 PST`  
+**Reviewed By**: Google AI Studio Agent (`ai_studio_ux_cuj`) — `2026-11-22 PST`  
 **Target Baseline**: Post-`v34.0` (`versionCode = 34`, `org.suppressingfire.wemi`, `compileSdk = 36.1`, `targetSdk = 36`, `minSdk = 24`)  
 **Scope**: Existing Gradle wrapper, Android Gradle Plugin (AGP), Kotlin/Compose/KSP plugins, AndroidX/Room/Coroutines libraries, and Robolectric/AndroidX test dependencies in [`gradle/wrapper/gradle-wrapper.properties`](gradle/wrapper/gradle-wrapper.properties) and [`gradle/libs.versions.toml`](gradle/libs.versions.toml). Zero new dependency groups, zero new permissions, and zero license-tier changes.
 
@@ -99,9 +100,18 @@ Execute each wave as an isolated commit (or branch/PR if preferred) so any regre
 ## 5. AI Studio Review & Confirmation Log
 
 <!-- AI_STUDIO_DEPENDENCY_PLAN_REVIEW_BEGIN -->
-- **Review Status:** `PENDING_AI_STUDIO_CONFIRMATION`
-- **Confirmed Wave 1 (`AndroidX / Room / Coroutines / Test`):** `PENDING`
-- **Confirmed Wave 2 (`Compose BOM 2026.11.01 + activity-compose`):** `PENDING`
-- **Confirmed Wave 3 (`Gradle 9.9.2 / AGP 9.5.2 / Kotlin 2.4.21 / KSP 2.3.14`):** `PENDING`
-- **AI Studio Notes / Version Constraints:** *(Google AI Studio Agent: please record supported Gradle/AGP/Kotlin/KSP ceilings and any Compose BOM / `compile_applet` notes here.)*
+- **Review Status:** `REVIEWED_AND_CONFIRMED (2026-11-22 01:08 PST by ai_studio_ux_cuj)`
+- **Confirmed Wave 1 (`AndroidX / Room / Coroutines / Test`):** `APPROVED_WITH_TOOLCHAIN_CAP` — All proposed Wave 1 coordinates passed Google Play Creator Program / SDK validation (`restricted_check`: `13/13 allowed: true`). Approve upgrading each Wave 1 library up to the highest version compatible with AI Studio's fixed **`Gradle 9.3.1` + `AGP 9.1.1` + `Kotlin 2.2.10` + `compileSdk = 36.1`** (if any proposed target requires Kotlin `2.4` metadata or `compileSdk >= 37`, cap that artifact at the highest compatible version).
+- **Confirmed Wave 2 (`Compose BOM + activity-compose`):** `APPROVED_WITH_CO_REVIEW_AND_TOOLCHAIN_CAP` — `androidx.compose:compose-bom:2026.11.01` and `androidx.activity:activity-compose:1.13.0` passed `restricted_check` (`allowed: true`), but cap at the highest Compose BOM / `activity-compose` version that compiles cleanly under **`AGP 9.1.1` + `Kotlin 2.2.10` + `compileSdk = 36.1`** (Kotlin `2.2.10` reads up to `2.3` metadata, not `2.4`). **`ai_studio_ux_cuj` will co-review Wave 2** against `UX_DESIGN.md` and `UX_DESIGN_AND_EXPERIENCE.md` (5 layout invariants, compact `320dp` header, `ModalBottomSheet`, `Slider`, ripple/focus rings, Android TV D-Pad focus & `Holiday ON` recovery, and `libandroidx.graphics.path.so` exclusion).
+- **Confirmed Wave 3 (`Gradle 9.9.2 / AGP 9.5.2 / Kotlin 2.4.21 / KSP 2.3.14`):** `DEFERRED_PINNED_TO_AI_STUDIO_TOOLCHAIN` — **Do NOT upgrade Gradle, AGP, or Kotlin right now:**
+  - **Gradle Ceiling = `9.3.1` (HARD CONTAINER CEILING):** Google AI Studio does not use `./gradlew`; it executes the container's pre-installed `gradle` binary directly, verified empirically via `gradle --version` as **`Gradle 9.3.1`** (JVM `21.0.13`, embedded Kotlin `2.2.21`). Keep `gradle/wrapper/gradle-wrapper.properties` pinned to `9.3.1` so Antigravity VMs match AI Studio identically.
+  - **AGP Ceiling = `9.1.1`:** AGP `9.5.2` requires a newer Gradle than `9.3.1` and would break AI Studio `compile_applet` and `.aab` generation.
+  - **Kotlin Compose Plugin Ceiling = `2.2.10`:** AGP `9.1.1` ships built-in Kotlin support (`2.2.10`); bumping `org.jetbrains.kotlin.plugin.compose` to `2.4.21` while AGP remains `9.1.1` causes a Kotlin/Compose compiler mismatch.
+  - **KSP (`com.google.devtools.ksp`):** Keep at **`2.3.5`** by default; optionally test `2.3.14` during Wave 1 *only* if standalone KSP2 `2.3.14` runs cleanly with Gradle `9.3.1` + AGP `9.1.1` + Kotlin `2.2.10` + Room `2.8.x` (otherwise stay on `2.3.5`).
+  - **SDK Versions:** Keep `compileSdk = 36.1`, `targetSdk = 36`, `minSdk = 24` unchanged.
+- **AI Studio Notes / Version Constraints & Build Invariants:**
+  1. **Verify every wave in AI Studio (`compile_applet` + `gradle :app:testDebugUnitTest --rerun-tasks`)** before starting the next wave.
+  2. **Preserve all `gradle.properties` flags untouched** — especially `kotlin.compiler.execution.strategy=in-process` (critical in AI Studio's gVisor container), `org.gradle.workers.max=4`, `org.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8`, `org.gradle.configuration-cache=true`, `org.gradle.configuration-cache.parallel=true`, and `googleServices.missing.passthrough=true`.
+  3. **Preserve all `app/build.gradle.kts` invariants untouched** — `signingConfigs` (`release` / `debugConfig`), `signingConfig` assignments, `isMinifyEnabled = true`, `isShrinkResources = true`, `excludes += "**/libandroidx.graphics.path.so"`, `dependenciesInfo { includeInApk = false; includeInBundle = true }`, no product flavors, no `local.properties`.
+  4. **Revisit Wave 3** only after Google AI Studio upgrades its container's system `gradle` binary beyond `9.3.1`.
 <!-- AI_STUDIO_DEPENDENCY_PLAN_REVIEW_END -->
