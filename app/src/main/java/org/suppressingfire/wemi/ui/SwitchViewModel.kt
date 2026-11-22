@@ -240,8 +240,8 @@ class SwitchViewModel internal constructor(
             viewModelScope.launch {
                 var tick = 0
                 while (isActive) {
-                    val pollIntervalMs = if (LanRuntimeUtils.isCarrierGradeNatIpv4(repository.detectCurrentLanIp())) 15_000L else 30_000L
-                    delay(pollIntervalMs)
+                    val localIp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repository.detectCurrentLanIp() }
+                    delay(if (LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)) 15_000L else 30_000L)
                     if (!isDemoShowroomMode.value) {
                         val key = activeNetworkKey.value
                         repository.pollActiveHomeStates(key)

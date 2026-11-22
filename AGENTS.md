@@ -11,14 +11,14 @@
 > **CRITICAL RULE**: **Only push to `origin/main` after verifying the full build, lint, and all automated tests pass with zero errors.**
 
 ```bash
-# Run all 119 unit, protocol, widget, telemetry, governance, ChromeOS & Compose E2E tests (23 suites) + Lint
+# Run all 120 unit, protocol, widget, telemetry, governance, ChromeOS & Compose E2E tests (23 suites) + Lint
 sh gradlew testDebugUnitTest --rerun-tasks lintDebug
 
 # Assemble debug APK
 sh gradlew assembleDebug
 ```
 
-- **Cloud VM Environment Setup ([`.agents/environment.json`](.agents/environment.json) & [`scripts/setup_dev_env.sh`](scripts/setup_dev_env.sh))**: Fresh VMs automatically run `bash scripts/setup_dev_env.sh`, which reuses preinstalled JDK 21 and writable `/opt/android-sdk` (guaranteeing accepted SDK licenses and deferring missing `platforms;android-36.1` / `build-tools;36.0.0` deltas to AGP's built-in on-demand auto-download in `~0.2s`), restores optional persistent `~/.gemini/caches/wemi-android-v1/` archives when present, and configures fast proxy/TLS truststore hooks in `~/.bashrc`. Pass `--install-sdk` to eagerly pre-install SDK packages or `--save-caches` after dependency upgrades.
+- **Cloud VM Environment Setup ([`.agents/environment.json`](.agents/environment.json) & [`scripts/setup_dev_env.sh`](scripts/setup_dev_env.sh))**: Fresh VMs automatically run `bash scripts/setup_dev_env.sh`, which reuses preinstalled JDK 21 and writable `/opt/android-sdk` (guaranteeing accepted SDK licenses and deferring missing `platforms;android-36.1` / `build-tools;36.0.0` deltas to AGP's built-in on-demand auto-download in `~0.2s`), restores optional persistent `~/.gemini/caches/wemi-android-v1/` archives when present, and configures fast proxy/TLS truststore and Maven Central GCS mirror hooks in `~/.bashrc` and `~/.gradle/init.d/`. Pass `--install-sdk` to eagerly pre-install SDK packages or `--save-caches` after dependency upgrades.
 
 ---
 

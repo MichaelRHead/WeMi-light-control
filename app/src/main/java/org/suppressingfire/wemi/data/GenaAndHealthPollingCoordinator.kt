@@ -89,7 +89,9 @@ internal class GenaAndHealthPollingCoordinator(
             it.networkKey == networkKey && it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR
         }
         if (devices.isEmpty()) return@coroutineScope 0
-        val localIp = networkClient.resolveLocalIpv4Address()
+        val localIp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            networkClient.resolveLocalIpv4Address()
+        }
         if (devices.any { it.ipAddress != "127.0.0.1" } && LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)) {
             if (lastLoggedCgnatGenaSkipIp.getAndSet(localIp) != localIp) {
                 appendLog(

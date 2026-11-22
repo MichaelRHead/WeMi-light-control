@@ -2,6 +2,7 @@ package org.suppressingfire.wemi.ui.components
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.HomeNetworkEntity
@@ -27,8 +28,9 @@ internal fun WeMiModalDialogs(
     val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
 
     if (showAddHomeDialog) {
+        val detectedLocalIp = remember { viewModel.detectCurrentLanIp() }
         AddWifiHomeNetworkDialog(
-            detectedLocalIp = viewModel.detectCurrentLanIp(),
+            detectedLocalIp = detectedLocalIp,
             onDismiss = { viewModel.closeAddHomeDialog() },
             onSaveHome = { homeName, ssidLabel, subnetPrefix ->
                 viewModel.addWifiHomeNetwork(homeName, ssidLabel, subnetPrefix)

@@ -576,12 +576,33 @@ else
   mv -f "$TMP_SYNC" "$SYNC_HELPER"
 fi
 
-# Ensure forked Gradle Test JVMs (e.g., Robolectric on a cache miss) inherit proxy & trustStore props
+# Ensure forked Gradle Test JVMs (e.g., Robolectric on a cache miss) inherit proxy & trustStore props,
+# and prefer Google's Maven Central GCS mirror ahead of repo.maven.apache.org to avoid HTTP 429 rate limits on cloud VMs.
 GRADLE_INIT_DIR="$GRADLE_DIR/init.d"
 GRADLE_INIT_SCRIPT="$GRADLE_INIT_DIR/00-proxy-and-certs.gradle"
 mkdir -p "$GRADLE_INIT_DIR"
 TMP_INIT="${GRADLE_INIT_SCRIPT}.tmp.$$"
 cat <<'EOF' > "$TMP_INIT"
+settingsEvaluated { settings ->
+    def mirrorUrl = "https://maven-central.storage-download.googleapis.com/maven2/"
+    [settings.pluginManagement.repositories, settings.dependencyResolutionManagement.repositories].each { repos ->
+        def hasMirror = repos.any { it instanceof MavenArtifactRepository && it.url.toString().startsWith(mirrorUrl) }
+        if (!hasMirror) {
+            def idx = repos.findIndexOf {
+                it instanceof MavenArtifactRepository && it.url.toString().startsWith("https://repo.maven.apache.org/maven2")
+            }
+            if (idx >= 0) {
+                def mirror = repos.maven {
+                    name = "GoogleMavenCentralMirror"
+                    url = uri(mirrorUrl)
+                }
+                repos.remove(mirror)
+                repos.add(idx, mirror)
+            }
+        }
+    }
+}
+
 allprojects {
     tasks.withType(Test).configureEach {
         [

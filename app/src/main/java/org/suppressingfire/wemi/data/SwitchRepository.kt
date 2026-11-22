@@ -176,7 +176,8 @@ class SwitchRepository(
             initialSeedDone.value = true
             DEFAULT_MAIN_HOME_KEY
         } else {
-            val activeKey = discoveryCoordinator.sanitizeAndResolveInitialLanHome(detectCurrentLanIp())
+            val localIp = kotlinx.coroutines.withContext(Dispatchers.IO) { detectCurrentLanIp() }
+            val activeKey = discoveryCoordinator.sanitizeAndResolveInitialLanHome(localIp)
             initialSeedDone.value = true
             activeKey
         }
@@ -202,7 +203,8 @@ class SwitchRepository(
             dao.deleteAllDevices()
             dao.deleteAllRules()
             dao.deleteAllHomeNetworks()
-            val activeKey = discoveryCoordinator.sanitizeAndResolveInitialLanHome(detectCurrentLanIp())
+            val localIp = kotlinx.coroutines.withContext(Dispatchers.IO) { detectCurrentLanIp() }
+            val activeKey = discoveryCoordinator.sanitizeAndResolveInitialLanHome(localIp)
             initialSeedDone.value = true
             onActiveKeyResolved?.invoke(activeKey)
             _isDemoShowroomMode.value = false
