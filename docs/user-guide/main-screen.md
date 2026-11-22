@@ -12,7 +12,7 @@ At the top of the screen, the compact single-row **Ocean Teal & Deep Sapphire** 
 
 | Control | Location | What It Does |
 | :--- | :--- | :--- |
-| **`wemi` Wordmark & Version Pill (`v34.0`)** | Top-left | Displays the **`wemi`** logo alongside a subtle version badge (such as **`v34.0`**). Tap the version badge anytime to open the scrollable **Release History** dialog (with an **`Installed`** tag on your current version) to see what's new across releases. |
+| **`wemi` Wordmark & Version Pill (`v35.0`)** | Top-left | Displays the **`wemi`** logo alongside a subtle version badge (such as **`v35.0`**). Tap the version badge anytime to open the scrollable **Release History** dialog (with an **`Installed`** tag on your current version) to see what's new across releases. |
 | **`All Off` Button** | Right cluster | Turns **OFF** every reachable switch and dimmer on your active Wi-Fi Home in a single tap. |
 | **Refresh Icon** | Right cluster | Opens the live **SSDP Network Discovery Scan** sheet and scans your local Wi-Fi for switches (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
 | **`Edit` / `Done` Button** | Right cluster | Switches to **Edit Mode** (switching to the **Devices** tab first if needed) so you can reorder, rename, edit, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
@@ -97,7 +97,7 @@ Inside an expanded drawer, controls appear in this order:
    - Tap **`Configure IP`** to open the **Edit** dialog for renaming, changing rooms, or updating the IP address.
 4. **On-Device Rules (Switches, Dimmers & Plugs)**:
    - Displays whether the switch supports built-in hardware rules (**`On-Device Rules: ...`**, plus **`• Long Press`** on compatible wall switches and 1st-Gen dimmers).
-   - Tap **`Inspect Rules`** (when the switch is reachable) to verify capability in read-only mode and preview up to 4 stored on-device rules right inside the drawer (`DB v...`). See [Rules, Schedules & Auto-Off Timers](rules-and-timers.md) for the full **Rules** tab view.
+   - Tap **`Inspect Rules`** (which changes to **`Refresh`** once read) on any reachable switch to verify capability in read-only mode, see the stored database version (`DB v...`) and any **`Switch clock needs sync`** alert, and preview up to 4 structured `trigger → action` rule cards right inside the drawer (showing **`• Paused`** for disabled rules and a **`+N more rule(s) in Rules tab`** cue when more rules exist). See [Rules, Schedules & Auto-Off Timers](rules-and-timers.md) for the full **Rules** tab view.
 
 ---
 

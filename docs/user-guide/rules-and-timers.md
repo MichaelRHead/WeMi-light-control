@@ -2,21 +2,24 @@
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-The **Rules** tab lets you inspect **On-Device Switch Rules** stored inside supported switches and manage local schedules, auto-off timers, and motion triggers over your home Wi-Fi — with no cloud account or external server required.
+The **Rules** tab separates automation into two clear tiers—all running over your home Wi-Fi with no cloud account or external server required:
+1. **On-Device Switch Rules (`Read-Only`)** — *"Stored in switch memory • runs even when your phone is off"*
+2. **Local Switch Rules & Timers (`App-Run`)** — *"Runs from this device over local Wi-Fi • create & edit rules here"*
 
 ---
 
-## 1. Inspecting On-Device Switch Rules (Read-Only)
+## 1. Inspecting On-Device Switch Rules (`Read-Only`)
 
-Many classic switches, dimmers, and smart plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`) store automation rules directly inside the physical switch so they keep running even when your phone leaves the house. Newer models (`WDS060` Dimmer V2, `WSP080` Mini V2) do not support on-device rule storage—though **Dimmer V2** still stores hardware **Night Mode** on-device.
+Many classic switches, dimmers, and smart plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`) store automation rules directly inside the physical switch so they keep running even when your phone leaves the house or is turned off. Newer models (`WDS060` Dimmer V2, `WSP080` Mini V2) do not support on-device rule storage—though **Dimmer V2** still stores hardware **Night Mode** on-device.
 
 > [!NOTE]
-> **Safe Read-Only Inspection**: WeMi currently inspects on-device rules in **read-only mode** so you can see what is already stored inside your switches without risking changes to switch firmware. You can also try it right away in **Demo Showroom Mode** using sample on-device rules.
+> **Safe Read-Only Inspection**: WeMi currently inspects on-device rules in **`Read-Only`** mode so you can see what is already stored inside your switches without risking changes to switch firmware. You can also try it right away in **Demo Showroom Mode** using sample on-device rules.
 
 ### How to Check Your Switches
-- **At-a-Glance Header**: At the top of the **Rules** tab, **On-Device Switch Rules** shows how many controllable switches are ready vs. unsupported (`<N> ready • <M> unsupported • <Total> switches`). *(Motion Sensors are omitted because they do not store switch rules.)*
+- **At-a-Glance Header**: At the top of the **Rules** tab, **On-Device Switch Rules** (marked **`Read-Only`** with *"Stored in switch memory • runs even when your phone is off"*) shows `<N> ready • <M> unsupported • <Total> switches` before scanning, and updates to **`<R> rule(s) read • <N> ready • <M> unsupported`** once you read any switch. *(Motion Sensors are omitted because they do not store switch rules.)*
 - **Read Every Switch at Once**: Tap **`Read Rules`** to expand your switch list and read stored rules from all reachable switches on the active Wi-Fi Home.
-- **Inspect One Switch at a Time**: Tap **`Show Switches (<count>)`** to expand the list without scanning everything, then tap **`Read`** (or **`Refresh`** after reading) on any reachable switch. You can also expand any switch on the **Devices** tab and tap **`Inspect Rules`** to preview up to 4 rules inline (with the full list shown on the **Rules** tab).
+- **Expand or Collapse the Switch List Anytime**: Tap **`Show Switches (<count>)`** to browse individual switches without scanning everything, or tap **`Hide Switches`** to collapse the list while keeping your cached rule snapshots intact (showing `<R> on-device rule(s) read across <K> switch(es)`). Inside the expanded list, switches are automatically sorted by priority—switches with stored rules first, followed by reachable ready, unchecked, and unsupported switches, with **`Offline`**-badged switches last—and you can tap **`Read`** (or **`Refresh`** after reading) on any reachable switch.
+- **Quick Preview from the Devices Tab**: You can also tap the body of any reachable switch on the **Devices** tab and tap **`Inspect Rules`** (or **`Refresh`**) to preview `DB v...`, any clock-sync warning, and up to 4 structured `trigger → action` rule cards inline (with **`• Paused`** badges and a **`+N more rule(s) in Rules tab`** overflow cue).
 - **Zero Extra Scan Delay**: During normal Wi-Fi discovery, WeMi inspects the switch details it already downloaded—adding zero extra network requests—and caches verified results per firmware version so unsupported switches aren't re-checked unnecessarily.
 
 ### Capability Badges & Decoded Details
@@ -25,18 +28,19 @@ Many classic switches, dimmers, and smart plugs (`F7C030`, `WLS040` / `WLS0403`,
   - **`Not Checked`**: Shown for manually added switches until you tap **`Read`** or **`Inspect Rules`**.
   - **`On-Device Ready`** (plus **`• Long Press`** on wall switches and 1st-Gen dimmers that support 2-second wall-paddle holds): Verified on-device rules storage.
   - **`No On-Device Rules`**: Verified unsupported firmware (for `WDS060`, WeMi reminds you that **Dimmer Night Mode** is still stored on-device).
+  - **`Offline`**: Shown on switches that are currently unreachable on your local Wi-Fi (sorted at the bottom of the switch list).
 - **Stored On-Device Rules**: Displays decoded **`Long Press`** rules (automatically turning hardware IDs into your friendly switch names), **`Auto-Off Delay`** timers, **`Schedule`** intervals (including on-device **`Sunrise`** / **`Sunset`** offsets and the switch's stored **`Solar location on switch`**), **`Timed Action`** rules, **`Away Mode`** occupancy rules, and **`Motion / Sensor`** triggers—marking disabled rules as **`• Paused`** and showing the database version (`DB v...`).
 - **Switch Clock Warning**: If a switch lost power and its internal clock drifted or reset (for example, back to the year 2000 after Belkin's cloud shutdown), WeMi highlights **`Switch clock needs sync`**.
 - **Automatic Local Backup**: Each time WeMi reads a valid rules archive from a switch, it keeps a rotating local backup of the untouched original file on your Android device ahead of future on-device rule editing.
 
 ---
 
-## 2. Local App Rules & Timers
+## 2. Local Switch Rules & Timers (`App-Run`)
 
 > [!NOTE]
-> **How Local App Rules Run**: The **Local Switch Rules & Timers** section below the on-device inspector executes directly from your Android device over your home Wi-Fi while WeMi is running. Each rule stays isolated to the Wi-Fi Home where its switch lives, so two switches with the same name in different homes never interfere with each other.
+> **How `App-Run` Rules Work**: Separated below the on-device inspector, **Local Switch Rules & Timers** (marked **`App-Run`** with *"Runs from this device over local Wi-Fi • create & edit rules here"*) executes directly from your Android device over your home Wi-Fi while WeMi is running. Each rule stays isolated to the Wi-Fi Home where its switch lives, so two switches with the same name in different homes never interfere with each other.
 
-**WeMi Light Control** currently supports three kinds of local app automation rules:
+**WeMi Light Control** currently supports three kinds of **`App-Run`** local automation rules:
 
 | Rule Type | Icon | How It Works | Example Trigger |
 | :--- | :--- | :--- | :--- |

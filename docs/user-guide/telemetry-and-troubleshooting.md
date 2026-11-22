@@ -20,7 +20,7 @@ Whenever you need help troubleshooting `10.22.22.1` Wi-Fi setup, switch discover
 You can take a standard Android screenshot (**Power + Volume Down**) of any of the three diagnostic views below and share the image directly:
 
 ### A1. During `10.22.22.1` Switch Setup (`SETUP DIAGNOSTICS`)
-1. Open the **Provision New Switch AP (`10.22.22.1`)** dialog (by tapping the green **Switch Setup AP Detected (`10.22.22.1`)** banner at the top of the **Devices** tab on Android phones/tablets, or directly via **`More` → `Provision New Switch AP (10.22.22.1)`** — on Chromebooks, Android runs in a virtual `100.115.92.x` network so open it via **`More`** after connecting ChromeOS Wi-Fi to the switch's setup hotspot).
+1. Open the **Provision New Switch AP (`10.22.22.1`)** dialog (by tapping the Deep Teal **Smart Switch Setup AP Detected (`10.22.22.x`)** banner at the top of the **Devices** tab on Android phones/tablets, or directly via **`More` → `Provision New Switch AP (10.22.22.1)`** — on Chromebooks, Android runs in a virtual `100.115.92.x` network so open it via **`More`** after connecting ChromeOS Wi-Fi to the switch's setup hotspot).
 2. Look for the **`SETUP DIAGNOSTICS`** dark terminal card inside the dialog:
    - **Compact While Idle, Auto-Expands on Errors or Traces**: While waiting for input, the card stays compact — tap **`Details`** to inspect the live `[NET]` / `[PROBE]` lines or **`Hide`** to collapse them. Whenever provisioning starts or fails (`NetworkStatus = 0` or `2`, or unreachable), the card automatically expands so the full trace is immediately visible.
    - **Automatic Hold on Failure**: If the switch fails to join your home Wi-Fi (`NetworkStatus = 0` or `2`) or cannot be reached on `10.22.22.1`, the app **automatically keeps the switch's `10.22.22.1` setup AP open** (`[STEP 6 HOLD] ... Skipping CloseSetup so 10.22.22.1 AP stays open for retry`) and keeps the dialog on screen so you can screenshot the full trace immediately.
@@ -30,13 +30,14 @@ You can take a standard Android screenshot (**Power + Volume Down**) of any of t
 ### A2. Live UPnP / SOAP Packet Log (`More` Tab)
 1. Tap the **`More`** tab in the bottom navigation bar.
 2. Scroll down to the **`UPnP / SOAP Packet Log`** card at the bottom of the screen.
-3. Each entry displays the timestamp (`h:mm:ss a`), switch or widget name, SOAP/widget action (e.g., `SetBinaryState`, `GetBinaryState`, `GetMetaInfo`, `WiFiSetup1#ConnectHomeNetwork`, `GENA PropChange`, `GENA#SUBSCRIBE (Skipped)` on ChromeOS VMs using `15s` SOAP polling, or headless Home Screen `Widget#Toggle`), target `http://<ip>:<port>/upnp/control/...` URL, and HTTP status / exact offline failure reason / round-trip latency in milliseconds.
-4. Take a screenshot of the packet log card to share recent network traffic (including background Home Screen widget taps).
+3. Each entry displays the timestamp (`h:mm:ss a`), switch or widget name, SOAP/HTTP action (e.g., `SetBinaryState`, `GetBinaryState`, `GetMetaInfo`, `WiFiSetup1#ConnectHomeNetwork`, `GET rulesservice.xml`, `rules1#FetchRules`, `GET /rules.db`, `GENA PropChange`, `GENA#SUBSCRIBE (Skipped)` on ChromeOS VMs using `15s` SOAP polling, or headless Home Screen `Widget#Toggle`), target `http://<ip>:<port>/upnp/control/...` URL, and HTTP status / exact offline failure reason / round-trip latency in milliseconds.
+4. Take a screenshot of the packet log card to share recent network traffic (including background Home Screen widget taps and read-only on-device rule inspections).
 
-### A3. Per-Switch Hardware & Latency Drawer (`Devices` Tab)
-1. On the **`Devices`** tab, tap the info icon (`ⓘ`) or body of any switch row to expand its inline diagnostics drawer.
+### A3. Per-Switch Hardware, Latency & On-Device Rules Drawer (`Devices` Tab)
+1. On the **`Devices`** tab, tap the body of any reachable switch row (outside the right-side power ring) to expand its inline diagnostics drawer.
 2. Tap **`Ping RTT`** to run a live `GetBinaryState` + `GetMetaInfo` check.
-3. Take a screenshot showing the switch's `Endpoint (IP:Port)`, `SN`, `Firmware`, and live SOAP round-trip latency badge.
+3. For switches, dimmers, and plugs, you can also check the **`On-Device Rules`** section at the bottom of the drawer and tap **`Inspect Rules`** (or **`Refresh`** once inspected) to preview the switch's stored database version (`DB v...`), any **`Switch clock needs sync`** warning, and up to 4 decoded `trigger → action` rule cards (with **`• Paused`** badges and a `+N more rule(s) in Rules tab` overflow note).
+4. Take a screenshot showing the switch's `Endpoint (IP:Port)`, `SN`, `Firmware`, live SOAP round-trip latency badge, and **`On-Device Rules`** card.
 
 ---
 
@@ -51,17 +52,17 @@ Inside the **`SETUP DIAGNOSTICS`** header bar in the **Provision New Switch AP (
   2. Copies the entire report to your Android clipboard.
   3. Opens Android's **Share Sheet (`Save or Share WeMi Telemetry`)** so you can save `wemi-telemetry-latest.txt` to **Files / Google Drive**, email it, or send it directly to chat.
 - **Tap `Copy`**:
-  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v34.0 [34] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
+  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v35.0 [35] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
   2. Paste the copied text directly into your chat message or issue report.
 
 ### B2. Exporting from the `More` Tab (`Save/Share Log`)
 In the header of the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
 - **Tap `Save/Share Log`**:
-  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v34.0 (versionCode=34, com.aistudio.wemiswitch.kxpqzr)`) containing:
+  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v35.0 (versionCode=35, com.aistudio.wemiswitch.kxpqzr)`) containing:
      - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt (keeping `[NET]` subnet/Wi-Fi-binding/ChromeOS VM flags consistent with the captured session).
      - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet — or `subnet=unset gw=none` on a fresh Chromebook before the first switch is discovered — and gateway IP).
      - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its normalized room, Wi-Fi Home (`home=<networkKey>`), IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), dimmer brightness/Night Mode (`dim=<n>%`, `night=1`), latency (`ms`), hardware SKU, firmware, serial number, MAC, and canonical UPnP `UDN`.
-     - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries — including ChromeOS VM discovery/swept subnets, `GENA#SUBSCRIBE (Skipped)` polling notices, Top-Header **`All Off`**, Room Master toggles, Android TV D-Pad switch/dimmer commands, and **headless Home Screen widget taps/timeouts** — with timestamps, endpoints, HTTP statuses, exact offline failure causes, and password-redacted single-line `xml:` payload summaries.
+     - **`--- [4. UPNP / SOAP PACKET LOG] ---`**: Recent UPnP/SOAP/GENA/SSDP log entries — including ChromeOS VM discovery/swept subnets, `GENA#SUBSCRIBE (Skipped)` polling notices, read-only on-device rule inspections (`GET rulesservice.xml`, `rules1#FetchRules`, `GET /rules.db`), Top-Header **`All Off`**, Room Master toggles, Android TV D-Pad switch/dimmer commands, and **headless Home Screen widget taps/timeouts** — with timestamps, endpoints, HTTP statuses, exact offline failure causes, and password-redacted single-line `xml:` payload summaries.
      - **`--- [5. HOME SCREEN WIDGETS] ---`**: Every configured Home Screen light or room widget with its `appWidgetId`, bound serial/UDN/room/Wi-Fi Home, and whether it resolves to active switches or is `ORPHANED` (needs reconfiguring).
   2. Copies the full report to your clipboard and opens the Android **Share Sheet**.
 
