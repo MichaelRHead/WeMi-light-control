@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
@@ -59,6 +61,8 @@ import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 
 private val CapabilityUnsupportedBg = Color(0xFFF3F4F6)
 private val CapabilityUnsupportedText = Color(0xFF4B5563)
+private val ReadOnlyBadgeBg = Color(0xFFE0F2FE)
+private val ReadOnlyBadgeText = Color(0xFF0369A1)
 private val ClockWarningBg = Color(0xFFFEF3C7)
 private val ClockWarningText = Color(0xFF92400E)
 
@@ -80,6 +84,7 @@ fun buildUdnToFriendlyNameMap(devices: List<DeviceEntity>): Map<String, String> 
     return map
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun HardwareRulesHeaderCard(
     devices: List<DeviceEntity>,
@@ -97,6 +102,10 @@ fun HardwareRulesHeaderCard(
         val cap = snapshotsByDeviceId[dev.id]?.capability ?: dev.parsedHardwareRulesCapability
         cap.isUnsupportedOrLikely
     }
+    val totalRulesRead = controllable.sumOf { dev ->
+        snapshotsByDeviceId[dev.id]?.rules?.count { it.appliesToInspectedSwitch } ?: 0
+    }
+    val hasSnapshots = controllable.any { it.id in snapshotsByDeviceId }
 
     Surface(
         color = WemoRowSurface,
@@ -113,23 +122,48 @@ fun HardwareRulesHeaderCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "On-Device Switch Rules",
+                            color = WemoTextPrimary,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 18.sp
+                        )
+                        Surface(
+                            color = ReadOnlyBadgeBg,
+                            shape = RoundedCornerShape(999.dp)
+                        ) {
+                            Text(
+                                text = "Read-Only",
+                                color = ReadOnlyBadgeText,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                maxLines = 1,
+                                softWrap = false,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = "On-Device Switch Rules",
-                        color = WemoTextPrimary,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 18.sp
-                    )
-                    Text(
-                        text = "Stored inside your switches • run with no phone or cloud",
+                        text = "Stored in switch memory • runs even when your phone is off",
                         color = WemoTextSecondary,
                         fontFamily = FontFamily.SansSerif,
-                        fontSize = 13.sp
+                        fontSize = 12.5.sp
                     )
                     if (controllable.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(4.dp))
+                        val statusSummary = if (hasSnapshots) {
+                            "$totalRulesRead rule(s) read • $readyCount ready • $unsupportedCount unsupported"
+                        } else {
+                            "$readyCount ready • $unsupportedCount unsupported • ${controllable.size} switches"
+                        }
                         Text(
-                            text = "$readyCount ready • $unsupportedCount unsupported • ${controllable.size} switches",
+                            text = statusSummary,
                             color = WemoGreenDark,
                             fontFamily = FontFamily.SansSerif,
                             fontWeight = FontWeight.Medium,
@@ -142,7 +176,9 @@ fun HardwareRulesHeaderCard(
                     onClick = onScanAllClick,
                     enabled = !isScanningAll && controllable.isNotEmpty(),
                     colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
-                    modifier = Modifier.testTag("scan_hardware_rules_button")
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("scan_hardware_rules_button")
                 ) {
                     if (isScanningAll) {
                         CircularProgressIndicator(
@@ -209,15 +245,20 @@ fun HardwareRulesDeviceCard(
                         color = WemoTextPrimary,
                         fontFamily = FontFamily.SansSerif,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 15.sp
+                        fontSize = 15.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = "${device.normalizedRoomName} • ${device.hardwareModel}",
                         color = WemoTextSecondary,
                         fontFamily = FontFamily.SansSerif,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
 
                 AssistChip(
                     onClick = { onReadDeviceRules(snapshot != null) },
@@ -229,7 +270,9 @@ fun HardwareRulesDeviceCard(
                                 snapshot != null -> "Refresh"
                                 else -> "Read"
                             },
-                            fontSize = 12.sp
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            softWrap = false
                         )
                     },
                     leadingIcon = {
@@ -273,41 +316,32 @@ fun HardwareRulesDeviceCard(
                         "Likely Ready • Long Press"
                     else -> effectiveCap.displayLabel
                 }
-                Surface(
-                    color = badgeBg,
-                    shape = RoundedCornerShape(999.dp),
+                HardwareRuleBadgePill(
+                    text = badgeLabel,
+                    bgColor = badgeBg,
+                    textColor = badgeTextColor,
                     modifier = Modifier.testTag("hardware_rules_capability_badge_${device.id}")
-                ) {
-                    Text(
-                        text = badgeLabel,
-                        color = badgeTextColor,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
+                )
+                if (snapshot != null && effectiveCap == HardwareRulesCapability.VERIFIED_SUPPORTED) {
+                    HardwareRuleBadgePill(
+                        text = "DB v${snapshot.dbVersion} • ${deviceRules.size} rule(s)",
+                        bgColor = Color(0xFFF1F5F9),
+                        textColor = WemoTextSecondary
                     )
                 }
-
-                if (snapshot != null && effectiveCap == HardwareRulesCapability.VERIFIED_SUPPORTED) {
-                    Surface(color = Color(0xFFF1F5F9), shape = RoundedCornerShape(999.dp)) {
-                        Text(
-                            text = "DB v${snapshot.dbVersion} • ${deviceRules.size} rule(s)",
-                            color = WemoTextSecondary,
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
-                        )
-                    }
+                if (!device.isReachable) {
+                    HardwareRuleBadgePill(
+                        text = "Offline",
+                        bgColor = StatusOfflineSoftBg,
+                        textColor = StatusOfflineRed
+                    )
                 }
-
                 if (snapshot?.deviceTimeInfo?.needsTimeSync == true) {
-                    Surface(color = ClockWarningBg, shape = RoundedCornerShape(999.dp)) {
-                        Text(
-                            text = "Switch clock needs sync",
-                            color = ClockWarningText,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp)
-                        )
-                    }
+                    HardwareRuleBadgePill(
+                        text = "Switch clock needs sync",
+                        bgColor = ClockWarningBg,
+                        textColor = ClockWarningText
+                    )
                 }
             }
 
@@ -366,7 +400,7 @@ private fun HardwareRuleSummaryRow(
 ) {
     val (triggerText, actionText) = rule.formatTriggerAndAction(udnToName)
     Surface(
-        color = Color(0xFFF8FAFC),
+        color = if (rule.isEnabled) Color(0xFFF8FAFC) else Color(0xFFF3F4F6),
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(1.dp, WemoDividerGray),
         modifier = Modifier
@@ -402,23 +436,21 @@ private fun HardwareRuleSummaryRow(
                 ) {
                     Text(
                         text = rule.name,
-                        color = WemoTextPrimary,
+                        color = if (rule.isEnabled) WemoTextPrimary else WemoTextSecondary,
                         fontWeight = FontWeight.Medium,
                         fontSize = 14.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    Text(
+                    Spacer(modifier = Modifier.width(8.dp))
+                    HardwareRuleBadgePill(
                         text = if (rule.isEnabled) rule.type.displayLabel else "${rule.type.displayLabel} • Paused",
-                        color = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary,
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 11.sp
+                        bgColor = if (rule.isEnabled) WemoGreenSoft else Color(0xFFE5E7EB),
+                        textColor = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary
                     )
                 }
-                Text(
-                    text = triggerText,
-                    color = WemoTextSecondary,
-                    fontSize = 12.sp
-                )
+                Text(text = triggerText, color = WemoTextSecondary, fontSize = 12.sp)
                 Text(
                     text = actionText,
                     color = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary,
@@ -427,6 +459,26 @@ private fun HardwareRuleSummaryRow(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun HardwareRuleBadgePill(
+    text: String,
+    bgColor: Color,
+    textColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Surface(color = bgColor, shape = RoundedCornerShape(999.dp), modifier = modifier) {
+        Text(
+            text = text,
+            color = textColor,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
+        )
     }
 }
 

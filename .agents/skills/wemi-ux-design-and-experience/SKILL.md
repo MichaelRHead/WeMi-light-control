@@ -40,6 +40,11 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
    - Supports one-tap in-app pinning (`room_pin_widget_button_<Room>` in `RoomGroupCard.kt`, `pin_device_widget_<id>` in `DeviceDiagnosticsDrawer.kt` via API 26+ `requestPinAppWidget`) and launcher drawer configuration (`SwitchWidgetConfigureActivity.kt` + `WidgetPickerCards.kt` with Rooms/Lights tabs, Wi-Fi Home filters, and `>= 48.dp` touch targets).
    - Mirrors WeMi's 3-state hardware language in `RemoteViews` (`widget_bg_on` Ocean Teal, `widget_bg_off` dark charcoal standby, `widget_bg_offline` red dashed) and toggles lights/rooms directly over local-LAN UPnP SOAP via `WidgetActionExecutor` without launching `MainActivity`.
 
+6. **Two-Tier Rules Clarity: On-Device Switch Rules (`Read-Only`) vs. Local App-Run Rules (`App-Run`) — CUJ 9**:
+   - On `RulesScreen.kt` + `HardwareRulesSection.kt`, visually separate **On-Device Switch Rules** (`Read-Only` pill, switch-memory rules that run when the phone is off) from **Local Switch Rules & Timers** (`App-Run` pill, local Wi-Fi rules created via `+ New Rule`).
+   - Always keep the per-switch hardware rules list collapsible via `toggle_hardware_rules_device_list_button` (`Hide Switches` / `Show Switches (N)`), even after snapshots are loaded, so large homes never trap users behind 15+ switch cards; sort expanded switch cards by UX priority (stored rules first -> ready -> unknown -> unsupported -> `Offline`).
+   - Inside `DeviceDiagnosticsDrawer.kt`, keep `ExpandedDrawerHardwareRulesSection` below Brightness and Telemetry (Invariant 4), display `trigger → action` + Paused indicators, warn on clock drift, and show `"+N more rule(s) in Rules tab"` when more than 4 rules exist.
+
 ---
 
 ## 2. Five Mandatory Layout & Interaction Invariants
@@ -77,9 +82,9 @@ Before initiating any release review (`Stage 1: ai_studio_ux_cuj` in [`RELEASE_P
 
 ---
 
-## 4. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `HeaderAndReleaseHistoryE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt`, `TvNavigationAndScenesE2ETest.kt`, `HomeScreenWidgetTest.kt`, `HomeScreenWidgetUiE2ETest.kt`, `AppFlowsAndManagementE2ETest.kt`, `TelemetryDiagnosticsTest.kt` & `ChromeOsArcVmE2ETest.kt` — `120/120` Tests Across `23` Suites)
+## 4. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `HeaderAndReleaseHistoryE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt`, `TvNavigationAndScenesE2ETest.kt`, `HomeScreenWidgetTest.kt`, `HomeScreenWidgetUiE2ETest.kt`, `AppFlowsAndManagementE2ETest.kt`, `TelemetryDiagnosticsTest.kt`, `ChromeOsArcVmE2ETest.kt` & `HardwareRulesE2ETest.kt` — `127/127` Tests Across `25` Suites)
 
-Whenever UI components, widgets, ViewModel flows, or repository methods are touched, verify all 8 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
+Whenever UI components, widgets, ViewModel flows, or repository methods are touched, verify all 9 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
 
 ```bash
 sh gradlew testDebugUnitTest --rerun-tasks

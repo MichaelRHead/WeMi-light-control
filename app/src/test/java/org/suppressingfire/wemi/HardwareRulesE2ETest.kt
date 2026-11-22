@@ -96,6 +96,8 @@ class HardwareRulesE2ETest {
                 composeTestRule.waitForIdle()
                 composeTestRule.onNodeWithTag("hardware_rules_header_card").assertIsDisplayed()
                 composeTestRule.onNodeWithTag("scan_hardware_rules_button").assertIsDisplayed()
+                composeTestRule.onNodeWithText("Read-Only").assertExists()
+                composeTestRule.onNodeWithText("App-Run").assertExists()
                 composeTestRule.onNodeWithTag("add_rule_button").assertIsDisplayed()
 
                 // 3. Tap "Read Rules" to trigger Tier-2 verification + read-only rules.db download across the home
@@ -133,6 +135,33 @@ class HardwareRulesE2ETest {
                     "Firmware does not expose on-device rules storage. Dimmer Night Mode is still stored on-device."
                 ).assertExists()
 
+                // 5b. Verify user can collapse the switch cards after reading rules so Local App Rules stay immediately reachable
+                composeTestRule.onNodeWithTag("rules_list")
+                    .performScrollToNode(hasTestTag("toggle_hardware_rules_device_list_button"))
+                composeTestRule.onNodeWithText("Hide Switches").assertExists()
+                composeTestRule.onNodeWithTag("toggle_hardware_rules_device_list_button").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("rules_list")
+                    .performScrollToNode(hasTestTag("toggle_hardware_rules_device_list_button"))
+                composeTestRule.onNodeWithTag("toggle_hardware_rules_device_list_button").assertIsDisplayed()
+                composeTestRule.onNodeWithText("Show Switches (", substring = true).assertExists()
+                composeTestRule.onNodeWithText("on-device rule(s) read across", substring = true).assertExists()
+                composeTestRule.onNodeWithTag("rules_list")
+                    .performScrollToNode(hasTestTag("add_rule_button"))
+                composeTestRule.onNodeWithTag("add_rule_button").assertIsDisplayed()
+
+                // Re-expand without triggering extra downloads and confirm cached rules reappear immediately
+                val downloadsBeforeReexpand = openWrtServer.rulesDbDownloads.get()
+                composeTestRule.onNodeWithTag("rules_list")
+                    .performScrollToNode(hasTestTag("toggle_hardware_rules_device_list_button"))
+                composeTestRule.onNodeWithTag("toggle_hardware_rules_device_list_button").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithText("Hide Switches").assertExists()
+                assertTrue(
+                    "Re-expanding should reuse cached snapshots without re-downloading",
+                    openWrtServer.rulesDbDownloads.get() == downloadsBeforeReexpand
+                )
+
                 // 6. Switch back to Devices tab, expand Porch Entry Switch drawer, and verify per-switch readout
                 composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
                 composeTestRule.waitForIdle()
@@ -143,6 +172,8 @@ class HardwareRulesE2ETest {
 
                 composeTestRule.onNodeWithText("4 rule(s) stored on switch (DB v3)").assertExists()
                 composeTestRule.onNodeWithText("On-Device Rules: On-Device Ready • Long Press").assertExists()
+                composeTestRule.onNodeWithText("Switch clock needs sync", substring = true).assertExists()
+                composeTestRule.onNodeWithText("Toggle: Master Dimmer V2", substring = true).assertExists()
             }
         }
     }

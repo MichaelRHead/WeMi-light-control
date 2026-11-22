@@ -610,7 +610,7 @@ public class GeneratePlayStoreAssets {
         boolean expanded, boolean nightMode, String serial, String sku, double s
     ) {
         int baseH = (int) (66 * s);
-        int expH = expanded ? (int) (162 * s) : 0;
+        int expH = expanded ? (int) (218 * s) : 0;
         int totalH = baseH + expH;
 
         Color borderCol = !isReachable
@@ -768,6 +768,21 @@ public class GeneratePlayStoreAssets {
 
             fillRoundRect(g, cfgX0, byMeta - 8 * s, cfgW, cfgH, 7 * s, C_WHITE, C_DIVIDER, 1.0 * s);
             drawFittedString(g, "Configure IP", cfgX0 + 8 * s, byMeta + 7 * s, cfgW - 12 * s, 9.5 * s, Font.BOLD, C_TEXT_PRIMARY);
+
+            // Compact On-Device Switch Rules section inside ExpandedDrawer
+            double hwY0 = byMeta + 20 * s;
+            double hwH = 52 * s;
+            fillRoundRect(g, sx0, hwY0, sx1 - sx0, hwH, 8 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+            double refW = 66 * s;
+            double refH = 20 * s;
+            double refX0 = sx1 - 8 * s - refW;
+            double maxHwW = refX0 - (sx0 + 9 * s) - 6 * s;
+            drawFittedString(g, "On-Device Rules: On-Device Ready • Long Press", sx0 + 9 * s, hwY0 + 14 * s, maxHwW, 9.4 * s, Font.BOLD, C_TEAL_DARK);
+            drawFittedString(g, "2 rule(s) stored on switch (DB v3)", sx0 + 9 * s, hwY0 + 25.5 * s, maxHwW, 8.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+            fillRoundRect(g, refX0, hwY0 + 6 * s, refW, refH, 6 * s, C_CYAN_SOFT, C_TEAL_PRIMARY, 0.9 * s);
+            drawFittedString(g, "Refresh", refX0 + 14 * s, hwY0 + 19.2 * s, refW - 18 * s, 9.0 * s, Font.BOLD, C_TEAL_DARK);
+            fillRoundRect(g, sx0 + 8 * s, hwY0 + 30.5 * s, (sx1 - sx0) - 16 * s, 16.5 * s, 5 * s, new Color(0xF8, 0xFA, 0xFC), C_DIVIDER, 0.8 * s);
+            drawFittedString(g, "Goodnight Long Press  •  Hold paddle 2s → Toggle: Porch Entry Switch", sx0 + 13 * s, hwY0 + 41.5 * s, (sx1 - sx0) - 26 * s, 8.4 * s, Font.PLAIN, C_TEXT_PRIMARY);
         }
 
         return y0 + totalH + (int) (3.5 * s);
@@ -901,7 +916,7 @@ public class GeneratePlayStoreAssets {
             g, pad + (int) (8 * s), y, w - pad,
             "Lightbulb Landing", "Lightbulb", true, true,
             12, "192.168.1.105", 75,
-            true, true, "231844K1200455", "WDS060 (Dimmer)", s
+            true, true, "231844K1200455", "F7C059 (Dimmer)", s
         );
         y = drawDeviceRow(
             g, pad + (int) (8 * s), y, w - pad,
@@ -922,92 +937,154 @@ public class GeneratePlayStoreAssets {
         g.setColor(C_BG_GRAY);
         g.fillRect(0, 0, w, h);
 
-        int y = drawTopHeader(g, w, s, false) + (int) (8 * s);
-        int pad = (int) (12 * s);
+        int y = drawTopHeader(g, w, s, false);
+        int pad = (int) (10 * s);
 
-        // 1. Local Switch Rules & Timers Card
-        int rH = (int) (182 * s);
-        fillRoundRect(g, pad, y, w - pad * 2, rH, 12 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+        // 1. On-Device Switch Rules Header Card (Read-Only)
+        int hdrH = (int) (66 * s);
+        fillRoundRect(g, 0, y, w, hdrH, 0, C_WHITE, null, 0);
+        double readBtnW = 82 * s;
+        double readBtnX = w - 12 * s - readBtnW;
+        double maxHdrW = readBtnX - 14 * s - 8 * s;
 
-        double newRuleW = 84 * s;
-        double newRuleX = w - pad - 12 * s - newRuleW;
-        double maxHeaderW = newRuleX - (pad + 14 * s) - 8 * s;
-        drawFittedString(g, "Local Switch Rules & Timers", pad + 14 * s, y + 23 * s, maxHeaderW, 16.0 * s, Font.BOLD, C_TEXT_PRIMARY);
-        drawFittedString(g, "Executes directly over LAN • No cloud", pad + 14 * s, y + 40 * s, maxHeaderW, 11.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        g.setFont(fUi(13.6 * s, Font.BOLD));
+        String hwTitle = "On-Device Switch Rules";
+        g.setColor(C_TEXT_PRIMARY);
+        g.drawString(hwTitle, (int) (14 * s), (int) (y + 22 * s));
+        int hwTitleW = g.getFontMetrics().stringWidth(hwTitle);
+        double roX = 14 * s + hwTitleW + 6 * s;
+        double roW = 54 * s;
+        if (roX + roW < readBtnX - 4 * s) {
+            fillRoundRect(g, roX, y + 10.5 * s, roW, 14.5 * s, 7.2 * s, new Color(0xE0, 0xF2, 0xFE), null, 0);
+            drawFittedString(g, "Read-Only", roX + 5.5 * s, y + 20.5 * s, roW - 10 * s, 8.6 * s, Font.BOLD, new Color(0x03, 0x69, 0xA1));
+        }
+        drawFittedString(g, "Stored in switch memory • runs even when phone is off", 14 * s, y + 38 * s, maxHdrW, 10.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        drawFittedString(g, "3 rule(s) read • 2 ready • 1 unsupported", 14 * s, y + 54 * s, maxHdrW, 10.2 * s, Font.BOLD, C_TEAL_DARK);
 
-        fillRoundRect(g, newRuleX, y + 12 * s, newRuleW, 28 * s, 8 * s, C_TEAL_PRIMARY, null, 0);
-        drawFittedString(g, "+ New Rule", newRuleX + 11 * s, y + 30 * s, newRuleW - 16 * s, 11.0 * s, Font.BOLD, C_WHITE);
+        fillRoundRect(g, readBtnX, y + 17 * s, readBtnW, 32 * s, 16 * s, C_TEAL_PRIMARY, null, 0);
+        drawFittedString(g, "Read Rules", readBtnX + 11 * s, y + 36.5 * s, readBtnW - 18 * s, 10.6 * s, Font.BOLD, C_WHITE);
+        y += hdrH;
+        g.setColor(C_DIVIDER);
+        g.drawLine(0, y, w, y);
 
-        String[][] rules = {
-            {"Evening Holiday Lights", "Daily at 5:30 PM • Sunset", "Turn ON Living Room Tree & Candle"},
-            {"Bedroom Motion Nightlight", "Motion Sensed • Hallway Sensor", "Set Lightbulb Landing to 21% (Night Mode)"}
+        // Collapsible Show/Hide Switches Toggle Bar
+        int togH = (int) (25 * s);
+        fillRoundRect(g, 0, y, w, togH, 0, C_WHITE, null, 0);
+        drawFittedString(g, "Sorted by stored rules & support • tap Refresh per switch", 14 * s, y + 16 * s, w - 115 * s, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        drawFittedString(g, "Hide Switches ▲", w - 98 * s, y + 16 * s, 86 * s, 9.8 * s, Font.BOLD, C_TEAL_DARK);
+        y += togH;
+        g.setColor(C_DIVIDER);
+        g.drawLine(0, y, w, y);
+        y += (int) (5 * s);
+
+        // 2. Expanded OpenWrt Switch Card (Porch Entry Switch — 3 decoded on-device rules)
+        int card1H = (int) (212 * s);
+        fillRoundRect(g, pad, y, w - pad * 2, card1H, 11 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+        double chipW = 60 * s;
+        double chipX = w - pad - 10 * s - chipW;
+        drawFittedString(g, "Porch Entry Switch", pad + 12 * s, y + 18 * s, chipX - (pad + 12 * s) - 6 * s, 13.5 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "Porch • WLS0403 (2nd-Gen 3-Way)", pad + 12 * s, y + 32 * s, chipX - (pad + 12 * s) - 6 * s, 10.2 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        fillRoundRect(g, chipX, y + 9 * s, chipW, 22 * s, 7 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+        drawFittedString(g, "Refresh", chipX + 10 * s, y + 23.5 * s, chipW - 16 * s, 9.8 * s, Font.BOLD, C_TEAL_DARK);
+
+        // Capability & DB badges
+        double bY = y + 39 * s;
+        fillRoundRect(g, pad + 12 * s, bY, 136 * s, 16.5 * s, 8.2 * s, C_CYAN_SOFT, null, 0);
+        drawFittedString(g, "On-Device Ready • Long Press", pad + 19 * s, bY + 11.5 * s, 126 * s, 9.0 * s, Font.BOLD, C_TEAL_DARK);
+        fillRoundRect(g, pad + 153 * s, bY, 76 * s, 16.5 * s, 8.2 * s, new Color(0xF1, 0xF5, 0xF9), null, 0);
+        drawFittedString(g, "DB v3 • 3 rule(s)", pad + 160 * s, bY + 11.5 * s, 66 * s, 9.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
+
+        // Decoded On-Device Rule Rows
+        String[][] hwRules = {
+            {"Goodnight Long Press", "Long Press", "Hold wall paddle for 2s", "Toggle: Master Dimmer V2"},
+            {"Evening Sunset Porch", "Schedule", "Sunset → 11:00 PM • Daily", "Turn ON Porch Entry Switch"},
+            {"Porch Auto-Off Delay", "Auto-Off", "Auto-Off after 30 min ON", "Turn OFF automatically"}
         };
-        int ry = y + (int) (52 * s);
-        for (String[] rl : rules) {
-            g.setColor(C_DIVIDER);
-            g.drawLine((int) (pad + 10 * s), ry, (int) (w - pad - 10 * s), ry);
-            double ibX = pad + 12 * s;
-            double ibY = ry + 11 * s;
-            double ibSz = 36 * s;
-            fillRoundRect(g, ibX, ibY, ibSz, ibSz, 10 * s, C_CYAN_SOFT, null, 0);
-            // Clock icon inside rule box
+        double hRy = y + 61 * s;
+        for (String[] hr : hwRules) {
+            double hRh = 41 * s;
+            fillRoundRect(g, pad + 10 * s, hRy, w - pad * 2 - 20 * s, hRh, 8.5 * s, new Color(0xF8, 0xFA, 0xFC), C_DIVIDER, 0.9 * s);
+            fillRoundRect(g, pad + 17 * s, hRy + 6.5 * s, 28 * s, 28 * s, 7 * s, C_CYAN_SOFT, null, 0);
             g.setColor(C_TEAL_DARK);
-            g.setStroke(new BasicStroke((float) (1.8 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            double rClock = 9 * s;
-            double ccx = ibX + ibSz / 2.0, ccy = ibY + ibSz / 2.0;
-            g.draw(new Ellipse2D.Double(ccx - rClock, ccy - rClock, rClock * 2, rClock * 2));
-            g.draw(new Line2D.Double(ccx, ccy - 5 * s, ccx, ccy));
-            g.draw(new Line2D.Double(ccx, ccy, ccx + 4 * s, ccy + 2 * s));
+            g.setStroke(new BasicStroke((float) (1.6 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+            double icx = pad + 31 * s, icy = hRy + 20.5 * s;
+            g.draw(new Ellipse2D.Double(icx - 6.5 * s, icy - 6.5 * s, 13 * s, 13 * s));
+            g.draw(new Line2D.Double(icx, icy - 3.5 * s, icx, icy));
+            g.draw(new Line2D.Double(icx, icy, icx + 3 * s, icy + 1.5 * s));
 
-            double swX0 = w - pad - 56 * s;
-            double tx = pad + 56 * s;
-            double maxRuleW = swX0 - tx - 8 * s;
-            drawFittedString(g, rl[0], tx, ry + 21 * s, maxRuleW, 13.8 * s, Font.BOLD, C_TEXT_PRIMARY);
-            drawFittedString(g, rl[1], tx, ry + 37 * s, maxRuleW, 11.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
-            drawFittedString(g, rl[2], tx, ry + 52 * s, maxRuleW, 10.5 * s, Font.BOLD, C_TEAL_DARK);
-
-            fillRoundRect(g, swX0, ry + 18 * s, 44 * s, 24 * s, 12 * s, C_TEAL_PRIMARY, null, 0);
-            g.setColor(C_WHITE);
-            g.fill(new Ellipse2D.Double(w - pad - 33 * s, ry + 21 * s, 18 * s, 18 * s));
-            ry += (int) (62 * s);
+            double pillW = 54 * s;
+            double pillX = w - pad - 17 * s - pillW;
+            double rtx = pad + 52 * s;
+            double rMaxW = pillX - rtx - 6 * s;
+            drawFittedString(g, hr[0], rtx, hRy + 14 * s, rMaxW, 11.2 * s, Font.BOLD, C_TEXT_PRIMARY);
+            fillRoundRect(g, pillX, hRy + 4.5 * s, pillW, 13.5 * s, 6.7 * s, C_CYAN_SOFT, null, 0);
+            drawFittedString(g, hr[1], pillX + 6 * s, hRy + 13.8 * s, pillW - 10 * s, 8.4 * s, Font.BOLD, C_TEAL_DARK);
+            drawFittedString(g, hr[2], rtx, hRy + 26 * s, w - pad - 18 * s - rtx, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+            drawFittedString(g, hr[3], rtx, hRy + 37 * s, w - pad - 18 * s - rtx, 9.6 * s, Font.BOLD, C_TEAL_DARK);
+            hRy += hRh + 4.5 * s;
         }
-        y += rH + (int) (8 * s);
+        drawFittedString(g, "Solar location on switch: Mountain View, CA, United States", pad + 12 * s, y + card1H - 7 * s, w - pad * 2 - 24 * s, 9.2 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        y += card1H + (int) (6 * s);
 
-        // 2. UPnP / SOAP Packet Log & Telemetry Exporter Card
-        int logH = (int) (170 * s);
-        fillRoundRect(g, pad, y, w - pad * 2, logH, 12 * s, C_WHITE, C_DIVIDER, 1.0 * s);
-        double clearBtnX = w - pad - 38 * s;
-        double saveBtnX = clearBtnX - 88 * s;
-        drawFittedString(g, "UPnP / SOAP Packet Log (24)", pad + 14 * s, y + 24 * s, saveBtnX - (pad + 14 * s) - 6 * s, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
-        drawFittedString(g, "Save/Share Log", saveBtnX, y + 24 * s, 82 * s, 10.5 * s, Font.BOLD, C_TEAL_DARK);
-        drawFittedString(g, "Clear", clearBtnX, y + 24 * s, 32 * s, 10.5 * s, Font.BOLD, C_RED_OFFLINE);
+        // 3. Expanded RTOS Switch Card (Honest No On-Device Rules + Dimmer Night Mode note)
+        int card2H = (int) (78 * s);
+        fillRoundRect(g, pad, y, w - pad * 2, card2H, 11 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+        drawFittedString(g, "Master Dimmer V2", pad + 12 * s, y + 18 * s, chipX - (pad + 12 * s) - 6 * s, 13.5 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "Bedroom • WDS060 (RTOS Dimmer)", pad + 12 * s, y + 32 * s, chipX - (pad + 12 * s) - 6 * s, 10.2 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        fillRoundRect(g, chipX, y + 9 * s, chipW, 22 * s, 7 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+        drawFittedString(g, "Refresh", chipX + 10 * s, y + 23.5 * s, chipW - 16 * s, 9.8 * s, Font.BOLD, C_TEAL_DARK);
+        fillRoundRect(g, pad + 12 * s, y + 38 * s, 96 * s, 16 * s, 8 * s, new Color(0xF3, 0xF4, 0xF6), null, 0);
+        drawFittedString(g, "No On-Device Rules", pad + 19 * s, y + 49 * s, 86 * s, 9.0 * s, Font.BOLD, new Color(0x4B, 0x55, 0x63));
+        drawFittedString(g, "Firmware does not expose on-device rules storage. Dimmer Night Mode is still stored on-device.", pad + 12 * s, y + 68 * s, w - pad * 2 - 24 * s, 9.2 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        y += card2H + (int) (9 * s);
 
-        String[][] logs = {
-            {"Christmas Tree Living • SetBinaryState (1)", "http://192.168.1.101:49153/upnp/control/basicevent1", "HTTP 200 OK (11ms) • GENA Push Subscribed", "10:42:18"},
-            {"Widget#Toggle(ROOM) • Living Room (ON)", "http://192.168.1.103:49153/upnp/control/basicevent1", "HTTP 200 OK (12ms) • Home Screen Widget Sync", "10:42:15"}
-        };
-        int ly = y + (int) (35 * s);
-        for (String[] lgEntry : logs) {
-            int lh = (int) (59 * s);
-            fillRoundRect(g, pad + 10 * s, ly, w - pad * 2 - 20 * s, lh, 8 * s, new Color(0xF3, 0xF6, 0xF8), null, 0);
-            double tsX = w - pad - 62 * s;
-            drawFittedString(g, lgEntry[0], pad + 18 * s, ly + 17 * s, tsX - (pad + 18 * s) - 6 * s, 11.0 * s, Font.BOLD, C_TEXT_PRIMARY);
-            drawFittedString(g, lgEntry[3], tsX, ly + 17 * s, 48 * s, 10.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
-            drawFittedString(g, lgEntry[1], pad + 18 * s, ly + 34 * s, w - pad * 2 - 36 * s, 9.8 * s, Font.BOLD, C_TEAL_DARK);
-            drawFittedString(g, lgEntry[2], pad + 18 * s, ly + 49 * s, w - pad * 2 - 36 * s, 9.8 * s, Font.PLAIN, C_TEXT_SECONDARY);
-            ly += lh + (int) (6 * s);
+        // 4. Local Switch Rules & Timers (App-Run Section)
+        g.setColor(C_DIVIDER);
+        g.drawLine(0, y, w, y);
+        int localH = (int) (106 * s);
+        fillRoundRect(g, 0, y, w, localH, 0, C_WHITE, null, 0);
+
+        double newRuleW = 82 * s;
+        double newRuleX = w - 12 * s - newRuleW;
+        double maxLocalW = newRuleX - 14 * s - 8 * s;
+
+        g.setFont(fUi(12.6 * s, Font.BOLD));
+        String appTitle = "Local Switch Rules & Timers";
+        g.setColor(C_TEXT_PRIMARY);
+        g.drawString(appTitle, (int) (14 * s), (int) (y + 21 * s));
+        int appTitleW = g.getFontMetrics().stringWidth(appTitle);
+        double arX = 14 * s + appTitleW + 6 * s;
+        double arW = 46 * s;
+        if (arX + arW < newRuleX - 4 * s) {
+            fillRoundRect(g, arX, y + 10 * s, arW, 14.5 * s, 7.2 * s, C_CYAN_SOFT, null, 0);
+            drawFittedString(g, "App-Run", arX + 5.5 * s, y + 20 * s, arW - 9 * s, 8.5 * s, Font.BOLD, C_TEAL_DARK);
         }
-        y += logH + (int) (8 * s);
+        drawFittedString(g, "Runs from this device over local Wi-Fi • create & edit here", 14 * s, y + 36 * s, maxLocalW, 10.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        fillRoundRect(g, newRuleX, y + 10 * s, newRuleW, 28 * s, 14 * s, C_TEAL_PRIMARY, null, 0);
+        drawFittedString(g, "+ New Rule", newRuleX + 11 * s, y + 27.5 * s, newRuleW - 16 * s, 10.8 * s, Font.BOLD, C_WHITE);
 
-        // 3. Open Source License (MIT License & Third-Party Notices) Card
-        int licH = (int) (72 * s);
-        fillRoundRect(g, pad, y, w - pad * 2, licH, 12 * s, C_WHITE, C_DIVIDER, 1.0 * s);
-        double viewLicX = w - pad - 88 * s;
-        drawFittedString(g, "Open Source License (MIT)", pad + 14 * s, y + 26 * s, viewLicX - (pad + 14 * s) - 8 * s, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
-        drawFittedString(g, "MIT License • Copyright (c) 2026 Michael R. Head", pad + 14 * s, y + 46 * s, viewLicX - (pad + 14 * s) - 8 * s, 10.5 * s, Font.PLAIN, C_TEXT_SECONDARY);
-        drawFittedString(g, "View License", viewLicX, y + 36 * s, 78 * s, 11.0 * s, Font.BOLD, C_TEAL_DARK);
+        int ry = y + (int) (46 * s);
+        g.setColor(C_DIVIDER);
+        g.drawLine(0, ry, w, ry);
+        fillRoundRect(g, 14 * s, ry + 11 * s, 36 * s, 36 * s, 10 * s, C_CYAN_SOFT, null, 0);
+        g.setColor(C_TEAL_DARK);
+        g.setStroke(new BasicStroke((float) (1.8 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        double ccx = 32 * s, ccy = ry + 29 * s, rClock = 9 * s;
+        g.draw(new Ellipse2D.Double(ccx - rClock, ccy - rClock, rClock * 2, rClock * 2));
+        g.draw(new Line2D.Double(ccx, ccy - 5 * s, ccx, ccy));
+        g.draw(new Line2D.Double(ccx, ccy, ccx + 4 * s, ccy + 2 * s));
 
-        drawBottomNav(g, w, h, "More", s);
+        double swX0 = w - 58 * s;
+        double tx = 58 * s;
+        double maxRuleW = swX0 - tx - 8 * s;
+        drawFittedString(g, "Bedroom Motion Nightlight", tx, ry + 21 * s, maxRuleW, 13.0 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "Motion Sensed • Hallway Sensor", tx, ry + 36 * s, maxRuleW, 10.4 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        drawFittedString(g, "Set Lightbulb Landing to 21% (Night Mode)", tx, ry + 50 * s, maxRuleW, 10.2 * s, Font.BOLD, C_TEAL_DARK);
+        fillRoundRect(g, swX0, ry + 17 * s, 44 * s, 24 * s, 12 * s, C_TEAL_PRIMARY, null, 0);
+        g.setColor(C_WHITE);
+        g.fill(new Ellipse2D.Double(w - 35 * s, ry + 20 * s, 18 * s, 18 * s));
+
+        drawBottomNav(g, w, h, "Rules", s);
         g.dispose();
         return img;
     }
@@ -1034,7 +1111,7 @@ public class GeneratePlayStoreAssets {
         yl = drawRoomGroupHeader(g, lx0, yl, lx1, "Living Room", 3, 3, "3/3 Active • Avg 12ms", true, false, 80, s * 0.88);
         yl = drawDeviceRow(g, lx0 + (int) (6 * s), yl, lx1, "Christmas Tree Living", "Tree Lights", true, true, 11, "192.168.1.101", null, false, false, "", "", s * 0.88);
         yl = drawDeviceRow(g, lx0 + (int) (6 * s), yl, lx1, "Christmas Candle", "Lightbulb", true, true, 13, "192.168.1.102", null, false, false, "", "", s * 0.88);
-        yl = drawDeviceRow(g, lx0 + (int) (6 * s), yl, lx1, "Living Room Floor Lamp", "Lightbulb", true, true, 14, "192.168.1.103", 80, true, true, "231844K1200455", "WDS060 (Dimmer)", s * 0.88);
+        yl = drawDeviceRow(g, lx0 + (int) (6 * s), yl, lx1, "Living Room Floor Lamp", "Lightbulb", true, true, 14, "192.168.1.103", 80, true, true, "231844K1200455", "F7C059 (Dimmer)", s * 0.88);
         yl = drawRoomGroupHeader(g, lx0, yl, lx1, "Porch", 1, 1, "1/1 Active • Avg 13ms", true, false, 100, s * 0.88);
         yl = drawDeviceRow(g, lx0 + (int) (6 * s), yl, lx1, "Front Porch Switch", "Smart Switch", true, true, 13, "192.168.1.119", null, false, false, "", "", s * 0.88);
 
@@ -1126,42 +1203,67 @@ public class GeneratePlayStoreAssets {
         fillRoundRect(g, lx0 + 22 * s, dyDbg - 5 * s, innerW - 18 * s, 23 * s, 7 * s, new Color(0x1E, 0x29, 0x3B), new Color(0x33, 0x41, 0x55), 0.9 * s);
         drawFittedString(g, "Keep Dialog Open on Success: OFF (stays open on errors)", lx0 + 29 * s, dyDbg + 10 * s, innerW - 32 * s, 8.8 * s, Font.PLAIN, new Color(0xCB, 0xD5, 0xE1));
 
-        // Right Pane: Local Rules + Open Source MIT License + Live SOAP Log
+        // Right Pane: On-Device Switch Rules (Read-Only) + Local App-Run Rules + SOAP/MIT Log
         int ry = y;
-        fillRoundRect(g, rx0, ry, rx1 - rx0, 290 * s, 14 * s, C_WHITE, C_DIVIDER, 1.0 * s);
-        drawFittedString(g, "Local Switch Rules & Schedules", rx0 + 14 * s, ry + 26 * s, innerW, 15.5 * s, Font.BOLD, C_TEXT_PRIMARY);
-        String[][] rItems = {
-            {"Evening Holiday Lights", "5:30 PM Daily • Living Room ON"},
-            {"Bedroom Motion Nightlight", "Motion Sensed • Landing 21%"},
-            {"Candle Auto-Off Timer", "120m Countdown • Christmas Candle"}
-        };
-        int riy = ry + (int) (42 * s);
-        for (String[] ri : rItems) {
-            fillRoundRect(g, rx0 + 12 * s, riy, rx1 - rx0 - 24 * s, 68 * s, 10 * s, new Color(0xF8, 0xFA, 0xFC), C_DIVIDER, 1.0 * s);
-            drawFittedString(g, ri[0], rx0 + 20 * s, riy + 25 * s, innerW - 16 * s, 13.0 * s, Font.BOLD, C_TEXT_PRIMARY);
-            drawFittedString(g, ri[1], rx0 + 20 * s, riy + 47 * s, innerW - 16 * s, 10.8 * s, Font.BOLD, C_TEAL_DARK);
-            riy += (int) (76 * s);
-        }
+        fillRoundRect(g, rx0, ry, rx1 - rx0, 356 * s, 14 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+        double readBtnTW = 72 * s;
+        double readBtnTX = rx1 - 12 * s - readBtnTW;
+        drawFittedString(g, "On-Device Switch Rules", rx0 + 14 * s, ry + 24 * s, readBtnTX - (rx0 + 14 * s) - 8 * s, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "Read-Only • Runs inside switch memory without phone", rx0 + 14 * s, ry + 40 * s, readBtnTX - (rx0 + 14 * s) - 8 * s, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        fillRoundRect(g, readBtnTX, ry + 13 * s, readBtnTW, 24 * s, 12 * s, C_TEAL_PRIMARY, null, 0);
+        drawFittedString(g, "Read Rules", readBtnTX + 10 * s, ry + 28 * s, readBtnTW - 14 * s, 9.8 * s, Font.BOLD, C_WHITE);
 
-        ry += (int) (304 * s);
-        fillRoundRect(g, rx0, ry, rx1 - rx0, 376 * s, 14 * s, C_WHITE, C_DIVIDER, 1.0 * s);
-        drawFittedString(g, "UPnP / SOAP Log & Open Source License", rx0 + 14 * s, ry + 25 * s, innerW, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
-        drawFittedString(g, "MIT License • Copyright (c) 2026 Michael R. Head", rx0 + 14 * s, ry + 43 * s, innerW, 10.5 * s, Font.BOLD, C_TEAL_DARK);
+        // Decoded Switch Box
+        int riy = ry + (int) (50 * s);
+        fillRoundRect(g, rx0 + 12 * s, riy, rx1 - rx0 - 24 * s, 212 * s, 10 * s, new Color(0xF8, 0xFA, 0xFC), C_DIVIDER, 1.0 * s);
+        drawFittedString(g, "Porch Entry Switch • WLS0403", rx0 + 20 * s, riy + 18 * s, innerW - 16 * s, 12.0 * s, Font.BOLD, C_TEXT_PRIMARY);
+        fillRoundRect(g, rx0 + 20 * s, riy + 24 * s, 130 * s, 16 * s, 8 * s, C_CYAN_SOFT, null, 0);
+        drawFittedString(g, "On-Device Ready • Long Press", rx0 + 26 * s, riy + 35 * s, 120 * s, 8.8 * s, Font.BOLD, C_TEAL_DARK);
+        fillRoundRect(g, rx0 + 154 * s, riy + 24 * s, 68 * s, 16 * s, 8 * s, new Color(0xE2, 0xE8, 0xF0), null, 0);
+        drawFittedString(g, "DB v3 • 3 rules", rx0 + 160 * s, riy + 35 * s, 60 * s, 8.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+
+        String[][] tHwRules = {
+            {"Goodnight Long Press (Long Press)", "Hold paddle 2s → Toggle: Master Dimmer V2"},
+            {"Evening Sunset Porch (Schedule)", "Sunset → 11:00 PM • Daily • Turn ON"},
+            {"Porch Auto-Off Delay (Auto-Off)", "Auto-Off after 30 min ON • Turn OFF"}
+        };
+        int tryY = riy + (int) (46 * s);
+        for (String[] tri : tHwRules) {
+            fillRoundRect(g, rx0 + 20 * s, tryY, rx1 - rx0 - 40 * s, 44 * s, 8 * s, C_WHITE, C_DIVIDER, 0.9 * s);
+            drawFittedString(g, tri[0], rx0 + 27 * s, tryY + 17 * s, innerW - 30 * s, 10.6 * s, Font.BOLD, C_TEXT_PRIMARY);
+            drawFittedString(g, tri[1], rx0 + 27 * s, tryY + 34 * s, innerW - 30 * s, 9.6 * s, Font.BOLD, C_TEAL_DARK);
+            tryY += (int) (49 * s);
+        }
+        drawFittedString(g, "Solar location: Mountain View, CA, United States", rx0 + 20 * s, riy + 204 * s, innerW - 16 * s, 8.8 * s, Font.PLAIN, C_TEXT_SECONDARY);
+
+        // RTOS Unsupported capability readout card
+        int rtosY = riy + (int) (220 * s);
+        fillRoundRect(g, rx0 + 12 * s, rtosY, rx1 - rx0 - 24 * s, 74 * s, 10 * s, new Color(0xF8, 0xFA, 0xFC), C_DIVIDER, 1.0 * s);
+        drawFittedString(g, "Master Dimmer V2 • WDS060 (RTOS)", rx0 + 20 * s, rtosY + 18 * s, innerW - 16 * s, 11.4 * s, Font.BOLD, C_TEXT_PRIMARY);
+        fillRoundRect(g, rx0 + 20 * s, rtosY + 24 * s, 94 * s, 15.5 * s, 7.8 * s, new Color(0xE5, 0xE7, 0xEB), null, 0);
+        drawFittedString(g, "No On-Device Rules", rx0 + 27 * s, rtosY + 35 * s, 84 * s, 8.6 * s, Font.BOLD, new Color(0x4B, 0x55, 0x63));
+        drawFittedString(g, "Firmware does not expose rules DB. Dimmer Night Mode stays on-device.", rx0 + 20 * s, rtosY + 57 * s, innerW - 18 * s, 9.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
+
+        // Bottom Right Card: Local App-Run Rules + Live UPnP/SOAP Log & MIT License
+        ry += (int) (368 * s);
+        fillRoundRect(g, rx0, ry, rx1 - rx0, 312 * s, 14 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+        drawFittedString(g, "App-Run Rules, SOAP Log & MIT License", rx0 + 14 * s, ry + 24 * s, innerW, 14.0 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "MIT License • Local Wi-Fi Rules & Headless Widgets", rx0 + 14 * s, ry + 41 * s, innerW, 10.0 * s, Font.BOLD, C_TEAL_DARK);
         String[][] lItems = {
-            {"SetBinaryState (1) • Christmas Tree Living", "POST /upnp/control/basicevent1 -> 200 OK (11ms)"},
+            {"Bedroom Motion Nightlight (App-Run Rule)", "Motion Sensed → Set Lightbulb Landing to 21%"},
+            {"FetchRules • Porch Entry Switch (rules.db)", "POST /upnp/control/rules1 -> DB v3 (3 rules read)"},
             {"Widget#Toggle(ROOM) • Living Room (ON)", "Home Screen Widget -> 3 switches synced (12ms)"},
-            {"SUBSCRIBE • GENA Push Eventing", "CALLBACK: <http://192.168.1.50:39412/upnp/event>"},
             {"Open Source Notices: AndroidX, Compose, Room", "Kotlin & Coroutines (Apache-2.0) • MIT License"}
         };
-        int liy = ry + (int) (58 * s);
+        int liy = ry + (int) (54 * s);
         for (String[] li : lItems) {
-            fillRoundRect(g, rx0 + 12 * s, liy, rx1 - rx0 - 24 * s, 68 * s, 8 * s, new Color(0xF1, 0xF5, 0xF9), null, 0);
-            drawFittedString(g, li[0], rx0 + 20 * s, liy + 24 * s, innerW - 16 * s, 11.0 * s, Font.BOLD, C_TEXT_PRIMARY);
-            drawFittedString(g, li[1], rx0 + 20 * s, liy + 46 * s, innerW - 16 * s, 10.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
-            liy += (int) (75 * s);
+            fillRoundRect(g, rx0 + 12 * s, liy, rx1 - rx0 - 24 * s, 57 * s, 8 * s, new Color(0xF1, 0xF5, 0xF9), null, 0);
+            drawFittedString(g, li[0], rx0 + 20 * s, liy + 21 * s, innerW - 16 * s, 10.6 * s, Font.BOLD, C_TEXT_PRIMARY);
+            drawFittedString(g, li[1], rx0 + 20 * s, liy + 41 * s, innerW - 16 * s, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+            liy += (int) (63 * s);
         }
 
-        drawBottomNav(g, w, h, "More", s);
+        drawBottomNav(g, w, h, "Rules", s);
         g.dispose();
         return img;
     }

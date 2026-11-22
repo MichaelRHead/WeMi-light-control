@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
@@ -42,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.R
@@ -381,10 +383,22 @@ private fun ExpandedDrawerHardwareRulesSection(
                         fontSize = 11.sp
                     )
                 }
+                Spacer(modifier = Modifier.width(8.dp))
                 AssistChip(
                     onClick = onInspectHardwareRules,
                     enabled = !isInspecting && device.isReachable,
-                    label = { Text(if (isInspecting) "Reading..." else "Inspect Rules", fontSize = 11.sp) },
+                    label = {
+                        Text(
+                            text = when {
+                                isInspecting -> "Reading..."
+                                snapshot != null -> "Refresh"
+                                else -> "Inspect Rules"
+                            },
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Memory,
@@ -399,14 +413,70 @@ private fun ExpandedDrawerHardwareRulesSection(
                     modifier = Modifier.testTag("inspect_device_rules_${device.id}")
                 )
             }
+            if (snapshot?.deviceTimeInfo?.needsTimeSync == true) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Switch clock needs sync — schedules may run off-time",
+                    color = Color(0xFF92400E),
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 11.sp
+                )
+            }
             if (rules.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     rules.take(4).forEach { rule ->
-                        val (_, actionText) = rule.formatTriggerAndAction(udnToName)
+                        val (triggerText, actionText) = rule.formatTriggerAndAction(udnToName)
+                        Surface(
+                            color = if (rule.isEnabled) Color(0xFFF8FAFC) else Color(0xFFF3F4F6),
+                            shape = RoundedCornerShape(7.dp),
+                            border = BorderStroke(1.dp, WemoDividerGray),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = rule.name,
+                                        color = if (rule.isEnabled) WemoTextPrimary else WemoTextSecondary,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 11.5.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = if (rule.isEnabled) rule.type.displayLabel else "${rule.type.displayLabel} • Paused",
+                                        color = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary,
+                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 10.sp,
+                                        maxLines = 1,
+                                        softWrap = false
+                                    )
+                                }
+                                Text(
+                                    text = "$triggerText → $actionText",
+                                    color = WemoTextSecondary,
+                                    fontSize = 10.5.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    if (rules.size > 4) {
                         Text(
-                            text = "• ${rule.name} (${rule.type.displayLabel}): $actionText",
-                            color = WemoTextPrimary,
+                            text = "+${rules.size - 4} more rule(s) in Rules tab",
+                            color = WemoGreenDark,
+                            fontWeight = FontWeight.Medium,
                             fontSize = 11.sp
                         )
                     }
