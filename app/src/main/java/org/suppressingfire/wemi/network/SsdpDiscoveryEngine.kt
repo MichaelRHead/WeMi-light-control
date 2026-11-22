@@ -125,7 +125,8 @@ internal class SsdpDiscoveryEngine(
         val loopbackPorts = loopbackSsdpUdpPorts.toList()
         val hasLoopbackTargets = loopbackPorts.isNotEmpty()
         val fastMode = hasLoopbackTargets || isRobolectric
-        val activeBinding = if (fastMode) null else NetworkMonitor.resolveActiveLanBinding(appContext)
+        val activeBinding = NetworkMonitor.activeLanBindingOverrideForTests?.invoke()
+            ?: if (fastMode) null else NetworkMonitor.resolveActiveLanBinding(appContext)
         val localIp = activeBinding?.localIpv4 ?: resolveLocalIpv4Address()
         val isArcVm = LanRuntimeUtils.isArcVmRuntime(appContext, localIp)
         val liveDiscovered = mutableListOf<SsdpDiscoveredDevice>()
@@ -330,7 +331,7 @@ internal class SsdpDiscoveryEngine(
                 liveDiscovered = liveDiscovered,
                 knownLocalDevices = knownLocalDevices,
                 allowUnicastSubnetFallback = allowUnicastSubnetFallback,
-                fastMode = fastMode,
+                fastMode = if (allowUnicastFallbackInRobolectricForTests) false else fastMode,
                 includeDemoFallbacks = includeDemoFallbacks,
                 onlyWhenKnownMissing = onlySweepWhenKnownMissing,
                 hasManualSubnetOverride = hasManualOverride
@@ -407,6 +408,9 @@ internal class SsdpDiscoveryEngine(
 
     companion object {
         private val loopbackSsdpUdpPorts = CopyOnWriteArraySet<Int>()
+
+        @Volatile
+        internal var allowUnicastFallbackInRobolectricForTests: Boolean = false
 
         fun registerLoopbackSsdpPort(udpPort: Int) { loopbackSsdpUdpPorts.add(udpPort) }
 
