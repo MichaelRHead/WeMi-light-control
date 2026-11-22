@@ -3,6 +3,7 @@ package org.suppressingfire.wemi.data
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import org.suppressingfire.wemi.network.HardwareRulesCapability
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.XmlAndSkuParser
 
@@ -193,8 +194,7 @@ internal class HomeProfileSanitizer(
                 isDemoMode = isDemoShowroomMode()
             )
             val nextFw = discovered.firmwareVersion.ifBlank { existing.firmwareVersion }
-            val keepVerified = existing.parsedHardwareRulesCapability.isVerified &&
-                existing.hardwareRulesVerifiedFirmware.equals(nextFw.trim(), ignoreCase = true)
+            val (nextCap, nextLp, nextVerifiedFw) = resolveMergedHardwareRulesState(existing, discovered, nextFw)
             val updated = existing.copy(
                 name = resolvedName,
                 roomName = resolvedRoom,
@@ -213,9 +213,9 @@ internal class HomeProfileSanitizer(
                 macAddress = discovered.macAddress.ifBlank { existing.macAddress },
                 udn = cleanDiscoveredUdn.ifBlank { LanRuntimeUtils.canonicalHardwareUdn(existing.udn) },
                 signalStrengthPercent = discovered.signalStrengthPercent,
-                hardwareRulesCapability = if (keepVerified) existing.hardwareRulesCapability else discovered.rulesCapabilityHint.name,
-                hardwareRulesLongPressCapable = if (keepVerified) existing.hardwareRulesLongPressCapable else discovered.longPressCapableHint,
-                hardwareRulesVerifiedFirmware = if (keepVerified) existing.hardwareRulesVerifiedFirmware else ""
+                hardwareRulesCapability = nextCap,
+                hardwareRulesLongPressCapable = nextLp,
+                hardwareRulesVerifiedFirmware = nextVerifiedFw
             )
             dao.updateDevice(updated)
             syncHomeSubnetFromIp(activeNetworkKey, discovered.ipAddress)
@@ -459,15 +459,7 @@ internal class HomeProfileSanitizer(
             ?: base.wifiSsid.takeUnless { XmlAndSkuParser.isWemoDeviceSetupSsid(it) } ?: "Local LAN"
         val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(discovered?.usn).ifBlank { LanRuntimeUtils.canonicalHardwareUdn(base.udn) }
         val nextFw = discovered?.firmwareVersion?.ifBlank { base.firmwareVersion } ?: base.firmwareVersion
-        val keepVerified = base.parsedHardwareRulesCapability.isVerified &&
-            base.hardwareRulesVerifiedFirmware.equals(nextFw.trim(), ignoreCase = true)
-        val nextCap = when {
-            keepVerified -> base.hardwareRulesCapability
-            discovered != null && discovered.rulesCapabilityHint != org.suppressingfire.wemi.network.HardwareRulesCapability.UNKNOWN ->
-                discovered.rulesCapabilityHint.name
-            else -> base.hardwareRulesCapability
-        }
-        val nextLp = if (keepVerified || discovered == null) base.hardwareRulesLongPressCapable else discovered.longPressCapableHint
+        val (nextCap, nextLp, nextVerifiedFw) = resolveMergedHardwareRulesState(base, discovered, nextFw)
         return base.copy(
             name = resolvedName, roomName = resolvedRoom, ipAddress = ipAddress, port = port,
             isReachable = true, isOn = isOn, brightness = brightness, latencyMs = latencyMs,
@@ -476,7 +468,25 @@ internal class HomeProfileSanitizer(
             macAddress = discovered?.macAddress?.ifBlank { base.macAddress } ?: base.macAddress,
             udn = cleanUdn, wifiSsid = cleanSsid, hardwareRulesCapability = nextCap,
             hardwareRulesLongPressCapable = nextLp,
-            hardwareRulesVerifiedFirmware = if (keepVerified) base.hardwareRulesVerifiedFirmware else ""
+            hardwareRulesVerifiedFirmware = nextVerifiedFw
         )
+    }
+
+    private fun resolveMergedHardwareRulesState(
+        base: DeviceEntity,
+        discovered: SsdpDiscoveredDevice?,
+        nextFw: String
+    ): Triple<String, Boolean, String> {
+        val keepVerified = base.parsedHardwareRulesCapability.isVerified &&
+            base.hardwareRulesVerifiedFirmware.isNotBlank() &&
+            base.hardwareRulesVerifiedFirmware.equals(nextFw.trim(), ignoreCase = true)
+        return when {
+            keepVerified -> Triple(base.hardwareRulesCapability, base.hardwareRulesLongPressCapable, base.hardwareRulesVerifiedFirmware)
+            discovered != null && discovered.rulesCapabilityHint != HardwareRulesCapability.UNKNOWN ->
+                Triple(discovered.rulesCapabilityHint.name, discovered.longPressCapableHint, "")
+            base.parsedHardwareRulesCapability.isVerified ->
+                Triple(HardwareRulesCapability.UNKNOWN.name, base.hardwareRulesLongPressCapable, "")
+            else -> Triple(base.hardwareRulesCapability, base.hardwareRulesLongPressCapable, "")
+        }
     }
 }

@@ -425,6 +425,42 @@ class HardwareRulesTest {
             // Explicit forceRecheck=true re-probes the switch
             coordinator.inspectDeviceHardwareRules(persisted, forceRecheck = true)
             assertEquals(2, rtosServer.scpdFetches.get())
+
+            // HomeProfileSanitizer preserves verified verdicts on unchanged firmware, preserves Tier-1 hints on UNKNOWN, and invalidates on firmware change
+            val sanitizer = org.suppressingfire.wemi.data.HomeProfileSanitizer(dao, { false }, { "12:00:00 PM" })
+            val sameFwUnknownHint = org.suppressingfire.wemi.data.SsdpDiscoveredDevice(
+                name = "RTOS Dimmer", ipAddress = "127.0.0.1", port = rtosServer.port,
+                deviceType = DeviceType.LIGHTBULB_DIMMER, modelName = "WDS060", serialNumber = "",
+                firmwareVersion = rtosServer.firmwareVersion, usn = rtosServer.udn,
+                searchTarget = "urn:Belkin:service:basicevent:1", locationUrl = "http://127.0.0.1:${rtosServer.port}/setup.xml",
+                responseTimeMs = 5L, rulesCapabilityHint = HardwareRulesCapability.UNKNOWN, longPressCapableHint = false
+            )
+            val keptVerified = sanitizer.adoptDiscoveredDevice(sameFwUnknownHint, persisted.networkKey, "HomeWiFi")
+            assertEquals(HardwareRulesCapability.VERIFIED_UNSUPPORTED, keptVerified.parsedHardwareRulesCapability)
+            assertTrue(keptVerified.isHardwareRulesCapabilityFresh)
+
+            val upgradedFw = sanitizer.mergeDiscoveredMetadata(
+                base = keptVerified,
+                discovered = sameFwUnknownHint.copy(firmwareVersion = "WeMo_WW_3.00.99999.PVT"),
+                ipAddress = "127.0.0.1", port = rtosServer.port, isOn = false, brightness = 100,
+                latencyMs = 5, checkedAt = "12:01:00 PM", demoMode = false
+            )
+            assertEquals(HardwareRulesCapability.UNKNOWN, upgradedFw.parsedHardwareRulesCapability)
+            assertEquals("", upgradedFw.hardwareRulesVerifiedFirmware)
+
+            val tier1Base = persisted.copy(
+                hardwareRulesCapability = HardwareRulesCapability.LIKELY_SUPPORTED.name,
+                hardwareRulesLongPressCapable = true,
+                hardwareRulesVerifiedFirmware = ""
+            )
+            val keptTier1 = sanitizer.mergeDiscoveredMetadata(
+                base = tier1Base, discovered = sameFwUnknownHint,
+                ipAddress = "127.0.0.1", port = rtosServer.port, isOn = false, brightness = 100,
+                latencyMs = 5, checkedAt = "12:02:00 PM", demoMode = false
+            )
+            assertEquals(HardwareRulesCapability.LIKELY_SUPPORTED, keptTier1.parsedHardwareRulesCapability)
+            assertTrue(keptTier1.hardwareRulesLongPressCapable)
+
             SwitchDatabase.closeCurrentInstance()
         }
     }
