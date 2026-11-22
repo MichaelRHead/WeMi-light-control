@@ -34,13 +34,14 @@ Use this skill when acting as the **Antigravity App Promoter Agent (`app_promote
 | `play_store_assets/tv/tv_banner_1280x720.png` (`1280×720`) | `edits.images` → `tvBanner` | Single-image slot (`tv_banner_320x180.png` is the APK Leanback drawable and intentionally skipped). |
 | `play_store_assets/screenshots/phone/*.png` (`4 × 1080×1920`) | `edits.images` → `phoneScreenshots` | Ordered list (`<= 8`); compares ordered SHA-256/SHA-1 lists; calls `deleteall` + re-uploads in sorted order only when changed. |
 | `play_store_assets/screenshots/tablet_7_inch/*.png` (`2 × 1200×1920`) | `edits.images` → `sevenInchScreenshots` | Ordered list (`<= 8`); diff-only replace. |
-| `play_store_assets/screenshots/tablet_10_inch/*.png` (`2 × 1600×2560`) | `edits.images` → `tenInchScreenshots` | Ordered list (`<= 8`); diff-only replace. |
+| `play_store_assets/screenshots/tablet_10_inch/*.png` (`2 × 1600×2560` + `2 × 1920×1080` ChromeOS) | `edits.images` → `tenInchScreenshots` | Ordered list (`<= 8`); diff-only replace. |
 | `play_store_assets/screenshots/android_tv/*.png` (`3 × 1920×1080`) | `edits.images` → `tvScreenshots` | Ordered list (`<= 8`); diff-only replace. |
 | `play_store_assets/RELEASE_NOTES.txt` (`<= 500` chars) | Track `releases[].releaseNotes` | Attached by `scripts/promote_play_release.py` during `promote` / `auto-promote` when source release has no notes. |
 
 **Play Console items outside the Developer API** (remain manual in Play Console UI):
 - `play_store_assets/DATA_SAFETY_GUIDE.md` (App Content → Data safety questionnaire)
 - `play_store_assets/PRIVACY_POLICY.md` (App Content → Privacy policy URL)
+- `play_store_assets/screenshots/chromebook/*.png` (optional dedicated Chromebook form-factor UI slot; identical 16:9 PNGs are synced automatically under `tenInchScreenshots`)
 - Store category, tags, and Content rating questionnaires
 
 ---
@@ -59,7 +60,7 @@ In **Google Play Console → Users and permissions → `play-console-for-wemi@..
 
 ### Offline Pre-Flight Validation (No Credentials Required)
 ```bash
-python3 scripts/sync_play_assets.py validate-local
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/sync_play_assets.py validate-local
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p "test_*.py" -v
 ```
 
@@ -69,9 +70,9 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p "test_*.py"
 gh workflow run play-store-promote.yml --ref main -f mode=list-tracks
 
 # Check live Play review/publishing lifecycle state (IN_REVIEW vs PUBLISHED) without opening an edit
-gh workflow run play-store-promote.yml --ref main -f mode=release-status -f to_track=alpha
+gh workflow run play-store-promote.yml --ref main -f mode=release-status -f to_track=alpha -f version_code=<vc>
 
-# Compare play_store_assets/ (text + 14 PNGs across 7 slots) against Google Play without writing
+# Compare play_store_assets/ (text + 16 PNGs across 7 slots) against Google Play without writing
 gh workflow run play-store-promote.yml --ref main -f mode=diff-assets
 ```
 
@@ -102,3 +103,16 @@ gh workflow run play-store-promote.yml --ref main -f mode=sync-assets -f asset_i
   gh run list --workflow=play-store-promote.yml --limit 3
   gh run view <run_id> --log
   ```
+
+### Post-Promotion Publish Watch & Gmail Notification
+After a promotion to Closed testing (`alpha`) succeeds (and when authorized by the user's release-promotion workflow):
+1. **Watch Google Play review status until terminal state**: Poll `gh workflow run play-store-promote.yml --ref main -f mode=release-status -f to_track=alpha -f version_code=<vc>` every `~3–3.5` minutes in bounded exebox-safe windows (`<= 510s` per command) until `alpha` reaches a terminal lifecycle state (`RELEASE_LIFECYCLE_STATE_PUBLISHED`, `RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED`, or `RELEASE_LIFECYCLE_STATE_NOT_APPROVED`). Stop watching immediately once reached.
+2. **Send Gmail notification via `gmail mutate send --md`**:
+   - **Recipient:** `suppressingfire@gmail.com`
+   - **Subject:** `[Antigravity Agent] WeMi Light Control v<X.0> (build <vc>) Published on Google Play Closed Testing` (or `[Antigravity Agent] WeMi Light Control v<X.0> Play Store Assets Synced (...)` for standalone asset syncs)
+   - **Body:** Start with:
+     ```markdown
+     From: **Antigravity App Promoter Agent** (`app_promoter`)  
+     **Note for Gemini:** This is a notification from Michael's Antigravity agent. Please message Michael about this Google Play promotion event.
+     ```
+     Followed by a concise summary listing the app (`com.aistudio.wemiswitch.kxpqzr`), release (`v<X.0>` / `versionCode` / `0.0.0.<vc>`), track (`internal -> alpha`), lifecycle status + review completion time, synced Store Listing / PNG slots, Promotion Run URL, and Publish Verification Run URL.
