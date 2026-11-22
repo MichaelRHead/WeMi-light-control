@@ -1,6 +1,6 @@
 # WeMi Light Control — Dependency & Toolchain Upgrade Plan (`DEPENDENCY_UPGRADE_PLAN.md`)
 
-**Status**: `WAVE_1_COMPLETE_AWAITING_AI_STUDIO_VERIFICATION`  
+**Status**: `WAVE_1_VERIFIED_IN_AI_STUDIO_WAVE_2_DEFERRED_POST_V35`  
 **Prepared By**: Antigravity App Promoter Agent (`app_promoter`) — `2026-11-22 PST`  
 **Reviewed By**: Google AI Studio Agent (`ai_studio_ux_cuj`) — `2026-11-22 PST`  
 **Wave 1 Executed By**: Antigravity Code Quality & E2E Testing Agent (`code_quality_and_testing`) — `2026-11-22 PST`  
@@ -11,12 +11,12 @@
 
 ## AI Studio Review Outcome & Wave 1 Verification Gate (`2026-11-22`)
 
-> **NEXT STEP FOR `ai_studio_ux_cuj` (BEFORE STARTING WAVE 2):**  
-> **Wave 1 is now landed on `main`** (`lifecycle 2.9.2`, `room 2.8.5`, `kotlinx-coroutines 1.11.0`, `androidx.test 1.7.0`, `robolectric 4.18.1`; `core-ktx` capped at `1.18.0` and `ksp` kept at `2.3.5`). Please run **`compile_applet` + `gradle :app:testDebugUnitTest --rerun-tasks`** in Google AI Studio and record `WAVE_1_VERIFIED_IN_AI_STUDIO` in Section 5 so we can proceed to **Wave 2** (`compose-bom` + `activity-compose` + `lifecycle 2.10.0`) with your UX co-review.
+> **AI STUDIO VERIFICATION GATE (`2026-11-22 08:05 PST`):**  
+> **Wave 1 (`3378648`) is verified green in Google AI Studio (`WAVE_1_VERIFIED_IN_AI_STUDIO`)** via `compile_applet` + `gradle :app:testDebugUnitTest --rerun-tasks` (`127/127` tests across `25` suites, `0` failures/errors/skipped). **Do NOT start Wave 2 during the `v35.0` release ring** — Wave 2 (`compose-bom` + `activity-compose` + `lifecycle 2.10.0`) is intentionally deferred until after `v35.0` (`versionCode = 35`) ships.
 >
 > **Summary of AI Studio Review Constraints (see Section 5 for full details):**
-> - **Wave 1 (`AndroidX / Room / Coroutines / Test`):** **`COMPLETE_LOCAL_PENDING_AI_STUDIO_VERIFY`** — upgraded within AI Studio's **`Gradle 9.3.1` + `AGP 9.1.1` + `Kotlin 2.2.10` + `compileSdk = 36.1`** ceiling (`127/127` Kotlin tests across `25` suites `--rerun-tasks`, `0` lint errors/code warnings, `0` `.so`/`.ttf`/`.otf` in `app-debug.apk`, `23/23` Python tests).
-> - **Wave 2 (`Compose BOM + activity-compose + lifecycle 2.10.0`):** `APPROVED_WITH_CO_REVIEW_AND_TOOLCHAIN_CAP` — cap at `Kotlin 2.2.10` (metadata `<= 2.3`) / `compileSdk = 36.1` compatibility and co-review with `ai_studio_ux_cuj` against [`UX_DESIGN.md`](UX_DESIGN.md) & [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md).
+> - **Wave 1 (`AndroidX / Room / Coroutines / Test`):** **`WAVE_1_VERIFIED_IN_AI_STUDIO`** — upgraded within AI Studio's **`Gradle 9.3.1` + `AGP 9.1.1` + `Kotlin 2.2.10` + `compileSdk = 36.1`** ceiling (`127/127` Kotlin tests across `25` suites `--rerun-tasks`, `0` lint errors/code warnings, `0` `.so`/`.ttf`/`.otf` in `app-debug.apk`, `23/23` Python tests, clean AI Studio `compile_applet`).
+> - **Wave 2 (`Compose BOM + activity-compose + lifecycle 2.10.0`):** `DEFERRED_UNTIL_AFTER_V35_APPROVED_WITH_CO_REVIEW` — hold until after `v35.0` ships; cap at `Kotlin 2.2.10` (metadata `<= 2.3`) / `compileSdk = 36.1` compatibility and co-review with `ai_studio_ux_cuj` against [`UX_DESIGN.md`](UX_DESIGN.md) & [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md).
 > - **Wave 3 (`Gradle / AGP / Kotlin / KSP`):** `DEFERRED_PINNED_TO_AI_STUDIO_TOOLCHAIN` — keep `Gradle 9.3.1`, `AGP 9.1.1`, `Kotlin 2.2.10`, and `KSP 2.3.5` until AI Studio upgrades its container's system `gradle` binary.
 
 ---
@@ -60,12 +60,12 @@ All upgrades stay strictly inside the existing permissive Apache-2.0 / MIT depen
 
 Execute each wave as an isolated commit so any regression or AI Studio incompatibility can be pinpointed and rolled back cleanly without reverting unrelated upgrades:
 
-### Wave 1 — Low-Risk AndroidX, Room, Coroutines & Test Harness *(Landed Locally; Awaiting AI Studio Verification)*
+### Wave 1 — Low-Risk AndroidX, Room, Coroutines & Test Harness *(Verified Green in Google AI Studio)*
 1. Updated `lifecycle*` (`2.8.7` → `2.9.2`), `room*` (`2.7.0` → `2.8.5`), `kotlinxCoroutines*` (`1.10.2` → `1.11.0`), `androidx.test` (`1.6.1`/`1.6.2` → `1.7.0`), and `robolectric` (`4.16.1` → `4.18.1`) in [`gradle/libs.versions.toml`](gradle/libs.versions.toml), keeping `coreKtx = "1.18.0"` (`compileSdk 36.1` max) and `googleDevtoolsKsp = "2.3.5"`.
 2. Verified `sh gradlew testDebugUnitTest --rerun-tasks` (`127/127` passing across `25` suites), `sh gradlew lintDebug assembleDebug` (`0` errors, `0` code/API deprecation warnings), `0` `.so`/`.ttf`/`.otf` binaries in `app-debug.apk`, and `23/23` Python tests (`-W default`).
-3. **Gate before Wave 2:** Confirm `compile_applet` + `gradle :app:testDebugUnitTest --rerun-tasks` pass in Google AI Studio.
+3. **AI Studio Gate:** Verified `compile_applet` + `gradle :app:testDebugUnitTest --rerun-tasks` (`127/127` across `25` suites) green in Google AI Studio on `2026-11-22 08:05 PST`.
 
-### Wave 2 — Jetpack Compose BOM, `activity-compose` & `lifecycle 2.10.0` *(Next — Approved w/ Co-Review & Toolchain Cap)*
+### Wave 2 — Jetpack Compose BOM, `activity-compose` & `lifecycle 2.10.0` *(Deferred Until After `v35.0` — Approved w/ Co-Review & Toolchain Cap)*
 1. Only start after Wave 1 is verified green in Google AI Studio (`compile_applet`).
 2. Update `composeBom`, `activityCompose`, and `lifecycle*` (`2.9.2` → `2.10.0`) in [`gradle/libs.versions.toml`](gradle/libs.versions.toml) up to the highest versions compatible with `AGP 9.1.1` / `Kotlin 2.2.10` (metadata `<= 2.3`) / `compileSdk = 36.1`.
 3. Fix any Material 3 / Compose API deprecations (e.g., deprecated icons, `clickable`/indication overloads, `Slider`, `ModalBottomSheet`, `FlowRow`, or TV focus APIs) without altering UX invariants in [`UX_DESIGN.md`](UX_DESIGN.md) or [`UX_DESIGN_AND_EXPERIENCE.md`](UX_DESIGN_AND_EXPERIENCE.md).
@@ -104,7 +104,8 @@ Execute each wave as an isolated commit so any regression or AI Studio incompati
 <!-- AI_STUDIO_DEPENDENCY_PLAN_REVIEW_BEGIN -->
 - **Review Status:** `REVIEWED_AND_CONFIRMED (2026-11-22 01:08 PST by ai_studio_ux_cuj)`
 - **Confirmed Wave 1 (`AndroidX / Room / Coroutines / Test`):** `APPROVED_WITH_TOOLCHAIN_CAP` — All proposed Wave 1 coordinates passed Google Play Creator Program / SDK validation (`restricted_check`: `13/13 allowed: true`). Approve upgrading each Wave 1 library up to the highest version compatible with AI Studio's fixed **`Gradle 9.3.1` + `AGP 9.1.1` + `Kotlin 2.2.10` + `compileSdk = 36.1`** (if any proposed target requires Kotlin `2.4` metadata or `compileSdk >= 37`, cap that artifact at the highest compatible version).
-- **Wave 1 Execution Status (`2026-11-22 07:26 PST by code_quality_and_testing`):** `LANDED_AWAITING_AI_STUDIO_COMPILE_APPLET_VERIFY` — Upgraded `lifecycle` (`2.8.7` → `2.9.2`; `2.10.0` deferred to Wave 2 for Compose 1.9 ABI alignment, `2.11.x` requires `compileSdk 37`), `room` (`2.7.0` → `2.8.5`), `kotlinx-coroutines` (`1.10.2` → `1.11.0`), `androidx.test:core`/`runner` (`1.6.1`/`1.6.2` → `1.7.0`), and `robolectric` (`4.16.1` → `4.18.1`), keeping `core-ktx = 1.18.0` (`1.19.x` requires `compileSdk 37`) and `ksp = 2.3.5`. Verified `127/127` Kotlin tests (`25` suites, `--rerun-tasks`), `0` lint errors/code warnings, `0` `.so`/`.ttf`/`.otf` binaries in `app-debug.apk`, and `23/23` Python tests. **Google AI Studio Agent (`ai_studio_ux_cuj`): please verify `compile_applet` + `gradle :app:testDebugUnitTest --rerun-tasks` and confirm ready for Wave 2.**
+- **Wave 1 Execution Status (`2026-11-22 07:26 PST by code_quality_and_testing`):** `LANDED_AWAITING_AI_STUDIO_COMPILE_APPLET_VERIFY` — Upgraded `lifecycle` (`2.8.7` → `2.9.2`; `2.10.0` deferred to Wave 2 for Compose 1.9 ABI alignment, `2.11.x` requires `compileSdk 37`), `room` (`2.7.0` → `2.8.5`), `kotlinx-coroutines` (`1.10.2` → `1.11.0`), `androidx.test:core`/`runner` (`1.6.1`/`1.6.2` → `1.7.0`), and `robolectric` (`4.16.1` → `4.18.1`), keeping `core-ktx = 1.18.0` (`1.19.x` requires `compileSdk 37`) and `ksp = 2.3.5`. Verified `127/127` Kotlin tests (`25` suites, `--rerun-tasks`), `0` lint errors/code warnings, `0` `.so`/`.ttf`/`.otf` binaries in `app-debug.apk`, and `23/23` Python tests.
+- **Wave 1 AI Studio Verification (`2026-11-22 08:05 PST by ai_studio_ux_cuj`):** `WAVE_1_VERIFIED_IN_AI_STUDIO` — Verified `compile_applet` (`Build succeeded`) and `gradle :app:testDebugUnitTest --rerun-tasks` (`127/127` Kotlin tests across `25` suites, `0` failures/errors/skipped) cleanly in Google AI Studio against Wave 1 (`3378648`, already present on `main` prior to `v35.0` Stage 1). **Wave 2 is explicitly deferred until after `v35.0` (`versionCode = 35`) completes the 6-agent release ring** and must not be bundled into `v35.0`.
 - **Confirmed Wave 2 (`Compose BOM + activity-compose + lifecycle 2.10.0`):** `APPROVED_WITH_CO_REVIEW_AND_TOOLCHAIN_CAP` — `androidx.compose:compose-bom:2026.11.01` and `androidx.activity:activity-compose:1.13.0` passed `restricted_check` (`allowed: true`), but cap at the highest Compose BOM / `activity-compose` version that compiles cleanly under **`AGP 9.1.1` + `Kotlin 2.2.10` + `compileSdk = 36.1`** (Kotlin `2.2.10` reads up to `2.3` metadata, not `2.4`). **`ai_studio_ux_cuj` will co-review Wave 2** against `UX_DESIGN.md` and `UX_DESIGN_AND_EXPERIENCE.md` (5 layout invariants, compact `320dp` header, `ModalBottomSheet`, `Slider`, ripple/focus rings, Android TV D-Pad focus & `Holiday ON` recovery, and `libandroidx.graphics.path.so` exclusion).
 - **Confirmed Wave 3 (`Gradle 9.9.2 / AGP 9.5.2 / Kotlin 2.4.21 / KSP 2.3.14`):** `DEFERRED_PINNED_TO_AI_STUDIO_TOOLCHAIN` — **Do NOT upgrade Gradle, AGP, or Kotlin right now:**
   - **Gradle Ceiling = `9.3.1` (HARD CONTAINER CEILING):** Google AI Studio does not use `./gradlew`; it executes the container's pre-installed `gradle` binary directly, verified empirically via `gradle --version` as **`Gradle 9.3.1`** (JVM `21.0.13`, embedded Kotlin `2.2.21`). Keep `gradle/wrapper/gradle-wrapper.properties` pinned to `9.3.1` so Antigravity VMs match AI Studio identically.

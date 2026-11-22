@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v34.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v35.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `34.0` (`versionCode = 34`)
+- **Version:** `35.0` (`versionCode = 35`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Chromebooks (ChromeOS)**, **Android Home Screen Widgets**, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,12 +17,11 @@ WeMi Switch Control brings fast, reliable local-network control back to Belkin's
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery, local SOAP HTTP commands, and `<100ms` UPnP GENA push updates—with no cloud account, external server, or subscription required.
 
-### What's New in Version 34.0
-- **Chromebook (ChromeOS) Local-LAN Discovery & Control:** Full support for running WeMi Switch Control on Chromebooks using network-bound multicast SSDP discovery, automatic physical-subnet fallback when routers block multicast, and smooth 15-second state syncing—all with zero new permissions.
-- **Guided Manual Subnet Scanner & Clean Home Profiles:** On ChromeOS networks where multicast is isolated, enter your home router's `/24` prefix right inside the SSDP scanner to locate switches cleanly, while virtual subnet addresses stay hidden from your saved Wi-Fi Homes.
-- **Refreshed Play Store & Android TV Graphics:** Updated app screenshots, feature graphic, and TV banners to showcase the latest single-row header, subtle version pill, Home Screen Widget pinning, and room-header TV dimming.
-- **In-App Release History & Cleaner Everyday UI:** Tap the subtle version badge in the top bar anytime to browse release summaries, enjoy conditional Android TV `Holiday ON` scenes with D-Pad focus recovery, and troubleshoot with collapsible `SETUP DIAGNOSTICS`.
-- **Zero-Cloud `10.22.22.1` Setup, Widgets & Pure Kotlin/DEX (`minSdk 24+`):** Provision factory-reset switches directly over local Wi-Fi with Home Screen Light & Room Widgets, MIT open-source transparency, and local diagnostics excluded from cloud backup.
+### What's New in Version 35.0
+- **On-Device Switch Rules Inspector (Read-Only):** Inspect schedules, Sunrise/Sunset timers, Auto-Off delays, Away Mode, and Long Press targets already stored inside compatible switches directly from the Rules tab or any switch's expanded drawer—resolving target switch names automatically and flagging drifted switch clocks.
+- **Zero-Delay Capability Detection & Clear Two-Tier Rules UX:** Instantly detects on-device rules support during normal scans with firmware-cached verification, clear RTOS disclosures (noting Dimmer Night Mode stays on-device), and a collapsible **`Read-Only`** vs. **`App-Run`** layout that keeps local rule creation one tap away.
+- **Refreshed User Guides & Home Screen Widgets Guide:** Expanded plain-English documentation covering Home Screen Light & Room Widgets, On-Device Switch Rules, and ChromeOS discovery.
+- **Chromebook (ChromeOS) LAN Support, Widgets & Android TV:** Network-bound multicast discovery with physical-subnet fallback on Chromebooks, one-tap Home Screen Widgets, 3-column Android TV controls, zero-cloud `10.22.22.1` setup, and pure Kotlin/DEX packaging (`minSdk 24+`).
 
 ### Key Features
 - **Home Screen Light & Room Widgets:** One-tap local Wi-Fi toggles for individual lights or whole rooms straight from your Android launcher without opening the app.

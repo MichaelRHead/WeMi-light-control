@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, Chromebooks (ChromeOS), and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v34.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v35.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v34.0`)
+## Quick Release Summary (`v1.0` → `v35.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v35.0`](#version-350-versioncode--35--november-22-2026)** | `35` | Nov 22, 2026 | **On-Device Switch Rules Inspector (Read-Only), Two-Tier Rules UX & Refreshed User Guides**: Zero-delay capability detection + firmware-cached verification, read-only inspection of stored switch rules (`Long Press`, `Auto-Off Delay`, `Schedule` / `Sunrise`-`Sunset`, `Away Mode`, clock-sync alerts) in the collapsible **Rules** tab and expanded switch drawer, plus refreshed User Guides & new Home Screen Widgets guide |
 | **[`v34.0`](#version-340-versioncode--34--november-21-2026)** | `34` | Nov 21, 2026 | **Chromebook (ChromeOS ARCVM) Local-LAN Discovery & Control + Refreshed Play Store Visuals**: Network-bound multicast SSDP & automatic physical-subnet fallback on Chromebooks, guided manual `/24` subnet scanner fallback when routers block multicast, clean CGNAT home profile hygiene, 15s Chromebook foreground sync, and refreshed Store/TV graphics |
 | **[`v33.0`](#version-330-versioncode--33--november-21-2026)** | `33` | Nov 21, 2026 | **In-App Release History, UX Hygiene Cleanup, Conditional TV Holiday Scene & Discovery/Diagnostics Polish**: Subtle top-bar version pill + scrollable `Release History` dialog, streamlined top bar/More/dialogs with Demo-only preset gating and reset confirmation, conditional Android TV `Holiday ON` with D-Pad focus recovery, word-bounded icon/room classification, and collapsible `SETUP DIAGNOSTICS` auto-expansion |
 | **[`v32.0`](#version-320-versioncode--32--november-21-2026)** | `32` | Nov 21, 2026 | **Discovery, Rules, GENA Push & Widget Diagnostics Hardening**: 4-pass hardware identity & widget UDN self-healing, decoded XML switch names, unified case-insensitive room grouping across phone/TV/widgets, isolated GENA push handlers, cross-home rule isolation & Auto-Off OFF default, and headless widget SOAP telemetry |
@@ -49,6 +50,14 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 35.0 (`versionCode = 35`) — November 22, 2026
+- **On-Device Switch Rules Inspector (Read-Only)**: View automation rules stored directly inside compatible wall switches, dimmers, and plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`)—including **Long Press** (resolving hardware target IDs into friendly switch names), **Auto-Off Delay** timers, **Schedules** with native **Sunrise/Sunset** offsets and stored solar location, **Away Mode**, and **Motion / Sensor** triggers—from both the **Rules** tab and each switch's expanded drawer on the **Devices** tab. *(Live on-device rule editing is intentionally planned for a future release; WeMi keeps a rotating local backup of each untouched archive it reads.)*
+- **Zero-Delay Capability Detection, Clock-Sync Alerts & RTOS Clarity**: Normal Wi-Fi discovery infers switch rules support with zero extra network calls and caches verified capability verdicts per firmware version (preserving saved homes, switches, and rules cleanly across the database upgrade). Newer RTOS models (`WDS060` Dimmer V2, `WSP080` Mini V2) display a clear **`No On-Device Rules`** badge (noting Dimmer Night Mode stays on-device), while switches whose internal clock drifted after cloud shutdown highlight **`Switch clock needs sync`**.
+- **Two-Tier Rules Tab UX & Expanded Drawer Readout**: Visually separates **On-Device Switch Rules (`Read-Only`)** from **Local Switch Rules & Timers (`App-Run`)** with a collapsible **`Hide Switches` / `Show Switches (N)`** toggle, priority switch ordering (stored rules first, offline switches last), accessible `48dp+` actions, and inline `trigger → action` rule cards in the expanded switch drawer.
+- **Refreshed User Guides, Home Screen Widgets Guide & Play Store Automation**: Added a dedicated **[Home Screen Light & Room Widgets](home-screen-widgets.md)** guide, refreshed all user guides in plain English, updated Play Store screenshots to showcase On-Device Switch Rules, and modernized Play promotion workflows to Node.js 24.
+
+---
 
 ### Version 34.0 (`versionCode = 34`) — November 21, 2026
 - **Chromebook (ChromeOS ARCVM) Local-LAN Discovery & Control**: Run WeMi Switch Control directly on Chromebooks with zero extra permissions. Network-bound multicast SSDP discovery, non-Belkin Router IGD subnet harvesting, and a 5-tier physical `/24` subnet fallback automatically discover switches across ChromeOS's virtual Android network (`100.115.92.x`) while preserving full phone and Android TV discovery behavior.

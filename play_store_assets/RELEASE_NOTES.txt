@@ -1,4 +1,4 @@
-WeMi Switch Control v34.0:
-• Chromebook (ChromeOS) LAN Support: Automatic local Wi-Fi switch discovery and control on Chromebooks with network-bound multicast and physical-subnet fallback.
-• Guided Manual Subnet Fallback: Easily scan your home router's /24 subnet from the SSDP scanner if a mesh router blocks multicast on ChromeOS.
-• Reliable Polling & Visuals: Safe virtual-subnet home hygiene, smooth 15-second Chromebook state syncing, and refreshed Play Store & Android TV graphics.
+WeMi Switch Control v35.0:
+• On-Device Switch Rules Inspector: Read schedules, Sunrise/Sunset timers, Auto-Off delays, Away Mode & Long Press targets stored inside compatible switches right from the Rules tab or any expanded switch drawer.
+• Smart Capability & Clock Alerts: Zero-delay capability hints, firmware-cached verification, clear RTOS disclosures, and switch clock-sync warnings.
+• Two-Tier Rules UX & Guides: Collapsible Read-Only vs. App-Run rules layout plus refreshed User Guides.

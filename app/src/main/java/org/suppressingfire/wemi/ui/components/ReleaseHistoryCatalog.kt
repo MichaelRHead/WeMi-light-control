@@ -9,6 +9,12 @@ data class ReleaseHistoryEntry(
 
 val WEMI_RELEASE_HISTORY: List<ReleaseHistoryEntry> = listOf(
     ReleaseHistoryEntry(
+        version = "v35.0",
+        releaseDate = "Nov 22, 2026",
+        headline = "On-Device Switch Rules Inspector & Refreshed Guides",
+        summary = "Inspect existing schedules, Auto-Off delays, Away Mode, and Long Press targets stored directly inside compatible switches from the collapsible Rules tab or any switch's expanded drawer—with zero-delay capability detection, clock-sync alerts, clear Read-Only vs. App-Run separation, and refreshed User Guides including Home Screen Widgets."
+    ),
+    ReleaseHistoryEntry(
         version = "v34.0",
         releaseDate = "Nov 21, 2026",
         headline = "Chromebook (ChromeOS) Local-LAN Discovery & Refreshed Visuals",
