@@ -375,8 +375,8 @@ class LicenseAndBrandGovernanceTest {
             .distinct()
             .toList()
         assertTrue(
-            "DATA_SAFETY_GUIDE.md must inventory at least 15 Play Store PNG assets (found ${declaredPlayAssets.size})",
-            declaredPlayAssets.size >= 15
+            "DATA_SAFETY_GUIDE.md must inventory at least 19 Play Store PNG assets (found ${declaredPlayAssets.size})",
+            declaredPlayAssets.size >= 19
         )
         val missingPlayAssets = declaredPlayAssets.filterNot { File(repoRoot, it).isFile }
         assertTrue(
