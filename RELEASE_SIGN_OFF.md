@@ -15,11 +15,11 @@ RELEASE_VERSION: v35.0
 VERSION_CODE: 35
 ROUND_NUMBER: 1
 RELEASE_STATUS: IN_REVIEW
-CURRENT_TURN: telemetry_and_debugging
+CURRENT_TURN: code_quality_and_testing
 CANDIDATE_BASE_SHA: v35.0-rc
 SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (v35.0-rc @ 2026-11-22 08:06 PST)
 SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (c486438 @ 2026-11-22 08:35 PST)
-SIGN_OFF_TELEMETRY_AND_DEBUGGING: PENDING
+SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (e7e2454 @ 2026-11-22 08:43 PST)
 SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
 SIGN_OFF_LICENSE_GOVERNANCE: PENDING
 SIGN_OFF_APP_PROMOTER: PENDING
@@ -39,7 +39,7 @@ PROMOTED_AT: NONE
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
 | **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `v35.0-rc` | `2026-11-22 08:06 PST` | Initiated v35.0 (versionCode=35, org.suppressingfire.wemi) 6-agent release review: completed Stage 1 Obsolete UI & UX Cleanup Audit across HardwareRulesSection (491L), RulesScreen (408L), DeviceDiagnosticsDrawer (487L), and all screens/widgets/TV views (verifying two-tier Read-Only vs App-Run Rules UX, collapsible switch list, UX-priority sorting, >=48dp touch targets, TalkBack labels, Layout Invariant 4 dimmer-first drawer ordering, trademark boundaries, 108/108 .kt files <500L, and zero dead/dev controls); bumped app/build.gradle.kts to 35.0 (vc=35); prepended v35.0 to ReleaseHistoryCatalog.kt; regenerated all 24 Play Store & TV graphics with v35.0 top-bar pill and dedicated On-Device Switch Rules screenshots; updated UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, release-notes.md, RELEASE_NOTES.txt (494/500), STORE_LISTING.md (3078/4000), IMPLEMENTED.md, and DEPENDENCY_UPGRADE_PLAN.md (Wave 1 verified green in AI Studio; Wave 2 deferred post-v35.0); verified 127/127 Kotlin tests across 25 suites (--rerun-tasks), 23/23 Python Play tests, validate-local (16 PNGs), and clean compile_applet build. |
 | **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `c486438` | `2026-11-22 08:35 PST` | Audited v35.0 SSDP/unicast and ChromeOS discovery, 4-pass hardware identity, room inference and migration, Room v6 migration on Room 2.8.5, Step 1 on-device switch rules detection/safety, and two-tier Rules UI preservation; unified capability merging across re-adoption and synced discovery docs and skill. |
-| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `PENDING` | `-` | `-` | Awaiting Telemetry & Debugging Agent review. |
+| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `SIGNED_OFF` | `e7e2454` | `2026-11-22 08:43 PST` | Verified zero telemetry or privacy regressions for v35.0, fixed 28 broken links in the telemetry skill, synced owned debugging docs and shared user guides to the two-tier Read-Only vs App-Run rules UX, and logged peer-owned drift notes. |
 | **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
 | **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
 | **6 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `PENDING` | `-` | `-` | Awaiting Stages 1-5 sign-off. |
@@ -127,4 +127,5 @@ PROMOTED_AT: NONE
 | 2026-11-21 23:35 PST | `1` | `app_promoter` | `PROMOTED_TO_CLOSED_TESTING` | `NONE` | `b56c103` | Promoted Play build 34 release 0.0.0.34 from internal to alpha via GitHub Actions run 44998926354. |
 | 2026-11-22 08:06 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `v35.0-rc` | Initiated v35.0 (versionCode=35, org.suppressingfire.wemi) 6-agent release review: completed Stage 1 Obsolete UI & UX Cleanup Audit across HardwareRulesSection (491L), RulesScreen (408L), DeviceDiagnosticsDrawer (487L), and all screens/widgets/TV views (verifying two-tier Read-Only vs App-Run Rules UX, collapsible switch list, UX-priority sorting, >=48dp touch targets, TalkBack labels, Layout Invariant 4 dimmer-first drawer ordering, trademark boundaries, 108/108 .kt files <500L, and zero dead/dev controls); bumped app/build.gradle.kts to 35.0 (vc=35); prepended v35.0 to ReleaseHistoryCatalog.kt; regenerated all 24 Play Store & TV graphics with v35.0 top-bar pill and dedicated On-Device Switch Rules screenshots; updated UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, release-notes.md, RELEASE_NOTES.txt (494/500), STORE_LISTING.md (3078/4000), IMPLEMENTED.md, and DEPENDENCY_UPGRADE_PLAN.md (Wave 1 verified green in AI Studio; Wave 2 deferred post-v35.0); verified 127/127 Kotlin tests across 25 suites (--rerun-tasks), 23/23 Python Play tests, validate-local (16 PNGs), and clean compile_applet build. |
 | 2026-11-22 08:35 PST | `1` | `discovery_and_grouping` | `SIGNED_OFF` | `telemetry_and_debugging` | `c486438` | Audited v35.0 SSDP/unicast and ChromeOS discovery, 4-pass hardware identity, room inference and migration, Room v6 migration on Room 2.8.5, Step 1 on-device switch rules detection/safety, and two-tier Rules UI preservation; unified capability merging across re-adoption and synced discovery docs and skill. |
+| 2026-11-22 08:43 PST | `1` | `telemetry_and_debugging` | `SIGNED_OFF` | `code_quality_and_testing` | `e7e2454` | Verified zero telemetry or privacy regressions for v35.0, fixed 28 broken links in the telemetry skill, synced owned debugging docs and shared user guides to the two-tier Read-Only vs App-Run rules UX, and logged peer-owned drift notes. |
 <!-- AUDIT_LOG_END -->
