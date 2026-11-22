@@ -11,6 +11,7 @@ Related documents in this repository:
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Minimal Permissive Dependency Policy (`Apache-2.0` AndroidX/Kotlin Only; Zero External HTTP/Font Bloat) & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
 - [`CHROMEOS_ARCVM_DISCOVERY_DESIGN.md`](CHROMEOS_ARCVM_DISCOVERY_DESIGN.md) — ChromeOS VM (ARCVM) Local-LAN SSDP Discovery, Physical-Subnet Stage C Fallback, Home Profile Hygiene & GENA Safety Architecture *(Implemented)*
+- [`DEPENDENCY_UPGRADE_PLAN.md`](DEPENDENCY_UPGRADE_PLAN.md) — Phased Gradle, AGP, Kotlin, KSP, Compose BOM, Room, Coroutines & Robolectric Upgrade Plan *(Awaiting Google AI Studio Agent `ai_studio_ux_cuj` Review & Confirmation)*
 - [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v34.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v34.0`)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
@@ -40,6 +41,7 @@ With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Re
 | **Track 4** | **One-Tap OS Wi-Fi Handoff (`WifiNetworkSpecifier`) & Hardware `ReSetup`** | Android 10+ `WifiNetworkSpecifier` in-app connection to `WeMo.Light.*` / `WeMo.Mini.*` APs without leaving the app to open Android Settings, plus a confirmation-protected `basicevent1#ReSetup` factory reset action. |
 | **Track 5** | **Offline Astronomical Solar Calculator & GENA Motion-Sensor Automation Chains** | Offline NOAA latitude/longitude solar calculator for exact daily Sunrise/Sunset times (`Sunset - 20m`, `Sunrise + 15m`) and sub-second GENA `Motion` (`F7C028`) → multi-switch trigger chains with configurable hold timers. |
 | **Track 6** | **Household Profile Sync (JSON / QR Export-Import) & Local Webhook / Home Assistant Bridge** | Export/import remembered Wi-Fi Homes, room names, custom ordering, and rules via JSON file or on-screen QR code (ideal for syncing a phone setup onto an Android TV), plus an optional local REST/Webhook endpoint on Android TV. |
+| **Track 7** | **Phased Dependency & Toolchain Modernization ([`DEPENDENCY_UPGRADE_PLAN.md`](DEPENDENCY_UPGRADE_PLAN.md))** | *(Awaiting Google AI Studio Agent `ai_studio_ux_cuj` review & confirmation)* Three-wave upgrade of AndroidX/Room/Coroutines/Robolectric, Compose BOM (`2024.09.00` → `2026.11.01`), and Gradle/AGP/Kotlin/KSP toolchain while preserving AI Studio build compatibility and permissive Apache-2.0/MIT governance. |
 
 ---
 
