@@ -2,7 +2,7 @@
 
 **Target Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`)  
 **Current Baseline**: `v32.0` (See [`IMPLEMENTED.md`](IMPLEMENTED.md) for the reverse-chronological Change Log of completed features)  
-**Target Platforms**: Android Phones, Tablets, Home Screen Widgets, Quick Settings, and Android TV (10-foot D-Pad Hub)
+**Target Platforms**: Android Phones, Tablets, Chromebooks (ChromeOS ARCVM), Home Screen Widgets, Quick Settings, and Android TV (10-foot D-Pad Hub)
 
 Related documents in this repository:
 - [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
@@ -10,6 +10,7 @@ Related documents in this repository:
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent)*
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Minimal Permissive Dependency Policy (`Apache-2.0` AndroidX/Kotlin Only; Zero External HTTP/Font Bloat) & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent)*
+- [`CHROMEOS_ARCVM_DISCOVERY_DESIGN.md`](CHROMEOS_ARCVM_DISCOVERY_DESIGN.md) — Proposed Design for ChromeOS VM (ARCVM) Local-LAN SSDP Discovery, Physical-Subnet Stage C Fallback, Home Profile Hygiene & GENA Safety *(Track 7 — Not Yet Implemented)*
 - [`docs/user-guide/release-notes.md`](docs/user-guide/release-notes.md) — User-Facing Google Play Store Release Notes (`v1.0` → `v32.0`)
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Feature Change Log (`v1.0` → `v32.0`)
 - [`USER_GUIDE.md`](USER_GUIDE.md) — User Guide Index & Detailed Feature Guides ([`docs/user-guide/`](docs/user-guide/))
@@ -39,6 +40,7 @@ With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Re
 | **Track 4** | **One-Tap OS Wi-Fi Handoff (`WifiNetworkSpecifier`) & Hardware `ReSetup`** | Android 10+ `WifiNetworkSpecifier` in-app connection to `WeMo.Light.*` / `WeMo.Mini.*` APs without leaving the app to open Android Settings, plus a confirmation-protected `basicevent1#ReSetup` factory reset action. |
 | **Track 5** | **Offline Astronomical Solar Calculator & GENA Motion-Sensor Automation Chains** | Offline NOAA latitude/longitude solar calculator for exact daily Sunrise/Sunset times (`Sunset - 20m`, `Sunrise + 15m`) and sub-second GENA `Motion` (`F7C028`) → multi-switch trigger chains with configurable hold timers. |
 | **Track 6** | **Household Profile Sync (JSON / QR Export-Import) & Local Webhook / Home Assistant Bridge** | Export/import remembered Wi-Fi Homes, room names, custom ordering, and rules via JSON file or on-screen QR code (ideal for syncing a phone setup onto an Android TV), plus an optional local REST/Webhook endpoint on Android TV. |
+| **Track 7** | **ChromeOS VM (ARCVM) Local-LAN Discovery & Networking Support** | Support reliable local-LAN switch discovery on Chromebooks running ARCVM (`100.115.92.x/30` via ChromiumOS `patchpanel`) with `ConnectivityManager`-bound `MulticastSocket` SSDP, physical-subnet-aware Stage C unicast fallback + manual `/24` override, RFC 6598 Home profile hygiene, and GENA callback safety — zero new permissions or dependencies (full spec in [`CHROMEOS_ARCVM_DISCOVERY_DESIGN.md`](CHROMEOS_ARCVM_DISCOVERY_DESIGN.md)). |
 
 ---
 
@@ -105,3 +107,19 @@ Currently, `RuleScheduler` executes schedules and auto-off timers from the Andro
    - On Android TV, display a **"Pair from Phone"** local HTTP receiver (`http://<tv-ip>:8990/sync`) so the user can push their entire phone configuration to their living room TV in one tap over the home LAN.
 2. **Optional Local REST / Webhook Endpoint**:
    - Allow local scripts, Tasker, or Home Assistant on the LAN to query or trigger WeMi scenes via simple local HTTP calls when Android TV Hub Mode is active.
+
+---
+
+### Track 7: ChromeOS VM (ARCVM) Local-LAN Discovery & Networking Support
+Full architectural analysis, verified ChromiumOS `patchpanel` packet flow, codebase gap audit, and verification plan are documented in [`CHROMEOS_ARCVM_DISCOVERY_DESIGN.md`](CHROMEOS_ARCVM_DISCOVERY_DESIGN.md) *(zero new Android permissions and zero third-party dependencies)*:
+1. **Phase 1 — ARCVM Detection, Active `Network` Selection & `MulticastSocket` Binding**:
+   - Add RFC 6598 (`100.64.0.0/10`), `arc0` (`100.115.92.2`), RFC 1918, and ChromeOS ARCVM classifiers in [`LanRuntimeUtils.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanRuntimeUtils.kt).
+   - Resolve the active shill-backed `TRANSPORT_WIFI`/`TRANSPORT_ETHERNET` `Network` via `ConnectivityManager` first (excluding VPN/`arc0`) in [`NetworkMonitor.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkMonitor.kt) and [`NetworkClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/NetworkClient.kt).
+   - Switch Stage A SSDP in [`SsdpDiscoveryEngine.kt`](app/src/main/java/org/suppressingfire/wemi/network/SsdpDiscoveryEngine.kt) to `MulticastSocket(null)` bound to wildcard `0.0.0.0:0` + `activeNetwork.bindSocket(socket)` + `networkInterface`, with a brief `MulticastLock` settle delay and `~2000ms` receive window so ChromeOS `patchpanel` SSDP forwarding and `apply_auto_dnat_to_arc` deliver unicast `200 OK` replies reliably.
+2. **Phase 2 — Physical-Subnet-Aware Stage C Unicast Fallback & Manual Override**:
+   - Block RFC 6598 (`100.64.0.0/10`) in `scanSubnetUnicast()` so Stage C never sweeps `100.115.92.1..254`.
+   - Introduce `LanSubnetHintResolver.kt` to prioritize real physical `/24` candidates (manual override → active Home `subnetPrefix` → remembered switch IPs → non-Belkin `upnp:rootdevice` SSDP `LOCATION` host IPs → private `LinkProperties.dnsServers`), plus an optional manual `/24` subnet scan fallback in [`SsdpScannerModal.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/SsdpScannerModal.kt) when multicast is blocked on a fresh Chromebook install.
+3. **Phase 3 — Home Profile Hygiene & GENA Safety**:
+   - Ignore `100.64.0.0/10` in [`HomeProfileSanitizer.kt`](app/src/main/java/org/suppressingfire/wemi/data/HomeProfileSanitizer.kt) (`resolveOrCreateHomeForSubnet` / `sanitizeAndResolveInitialLanHome`) and [`AddWifiHomeNetworkDialog`](app/src/main/java/org/suppressingfire/wemi/ui/components/WifiHomeBar.kt), backfilling the Home's physical `subnetPrefix` automatically once switches are discovered.
+   - Skip unroutable `CALLBACK: <http://100.115.92.x:8989/...>` GENA `SUBSCRIBE` calls in [`GenaSubscriptionManager.kt`](app/src/main/java/org/suppressingfire/wemi/network/GenaSubscriptionManager.kt) on ARCVM (preventing lwIP socket stalls on 2nd-Gen RTOS switches) and rely cleanly on `Semaphore(3)`-bounded SOAP `GetBinaryState` polling.
+
