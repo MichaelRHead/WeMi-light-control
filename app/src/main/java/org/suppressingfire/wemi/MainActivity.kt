@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -192,14 +193,29 @@ fun WeMiSwitchApp(
                     },
                     onAddClick = {
                         if (selectedTab == BottomTab.RULES) {
-                            viewModel.openAddHardwareRuleDialog()
+                            val hasCompatibleSwitch = homeDevices.any { dev ->
+                                val cap = hardwareRulesByDeviceId[dev.id]?.capability ?: dev.parsedHardwareRulesCapability
+                                dev.parsedType != org.suppressingfire.wemi.data.DeviceType.MOTION_SENSOR &&
+                                    dev.isReachable &&
+                                    cap != org.suppressingfire.wemi.network.HardwareRulesCapability.VERIFIED_UNSUPPORTED
+                            }
+                            if (hasCompatibleSwitch) {
+                                viewModel.openAddHardwareRuleDialog()
+                            } else {
+                                viewModel.showTransientStatus(
+                                    "No reachable on-device rules switch in this home — discover or reconnect a switch first"
+                                )
+                            }
                         } else {
                             viewModel.openAddDeviceDialog()
                         }
                     },
                     activeOnCount = activeOnCount,
                     onAllOffClick = { viewModel.turnAllSwitches(false) },
-                    onVersionClick = { showReleaseHistoryDialog = true }
+                    onVersionClick = { showReleaseHistoryDialog = true },
+                    addButtonContentDescription = stringResource(
+                        if (selectedTab == BottomTab.RULES) R.string.action_add_rule else R.string.action_add_device
+                    )
                 )
             }
         },
@@ -288,6 +304,9 @@ fun WeMiSwitchApp(
                         },
                         onSyncDeviceClock = { device ->
                             viewModel.syncDeviceClock(device)
+                        },
+                        onOpenRulesTab = {
+                            viewModel.selectTab(BottomTab.RULES)
                         }
                     )
                 }
@@ -349,7 +368,8 @@ fun WeMiSwitchApp(
                                 },
                                 onSyncDeviceClock = { device -> viewModel.syncDeviceClock(device) },
                                 onEditSolarLocation = { device -> viewModel.openSolarLocationDialog(device) },
-                                onOpenBackups = { device -> viewModel.openBackupRestoreDialog(device) }
+                                onOpenBackups = { device -> viewModel.openBackupRestoreDialog(device) },
+                                onOpenDevicesTab = { viewModel.selectTab(BottomTab.DEVICES) }
                             )
                         }
 

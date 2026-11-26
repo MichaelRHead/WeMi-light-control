@@ -69,6 +69,10 @@ internal class HardwareRulesUiController(
         val targetKey = activeNetworkKeyProvider()
         scope.launch {
             val results = repository.inspectAllHomeHardwareRules(targetKey, forceRecheck)
+            if (results.isEmpty()) {
+                onShowTransientStatus("No reachable switches to read — reconnect offline switches on the Devices tab")
+                return@launch
+            }
             val supportedCount = results.count { it.capability == HardwareRulesCapability.VERIFIED_SUPPORTED }
             val totalRules = results.sumOf { snap -> snap.rules.count { it.appliesToInspectedSwitch } }
             onShowTransientStatus(

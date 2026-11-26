@@ -115,7 +115,8 @@ data class DevicesTabActions(
     val onPinDeviceWidget: ((DeviceEntity) -> Unit)? = null,
     val onInspectDeviceHardwareRules: ((DeviceEntity) -> Unit)? = null,
     val onAddDeviceHardwareRule: ((DeviceEntity) -> Unit)? = null,
-    val onSyncDeviceClock: ((DeviceEntity) -> Unit)? = null
+    val onSyncDeviceClock: ((DeviceEntity) -> Unit)? = null,
+    val onOpenRulesTab: (() -> Unit)? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -302,6 +303,7 @@ private fun BoundDeviceRow(
         onInspectHardwareRules = actions.onInspectDeviceHardwareRules?.let { inspect -> { inspect(device) } },
         onAddHardwareRule = actions.onAddDeviceHardwareRule?.let { add -> { add(device) } },
         onSyncDeviceClock = actions.onSyncDeviceClock?.let { sync -> { sync(device) } },
+        onOpenRulesTab = actions.onOpenRulesTab,
         modifier = modifier
     )
 }

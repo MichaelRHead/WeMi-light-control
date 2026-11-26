@@ -1,6 +1,7 @@
 package org.suppressingfire.wemi.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -133,8 +135,10 @@ internal fun HardwareRuleSummaryRow(
                 HardwareRuleBadgePill(
                     text = if (rule.isEnabled) rule.type.displayLabel else "${rule.type.displayLabel} • Paused",
                     bgColor = if (rule.isEnabled) WemoGreenSoft else Color(0xFFE5E7EB),
-                    textColor = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary
+                    textColor = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
+                Spacer(modifier = Modifier.width(6.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (rule.isEditableInApp) {
@@ -193,7 +197,8 @@ internal fun ExpandedDrawerHardwareRulesSection(
     udnToName: Map<String, String>,
     onInspectHardwareRules: () -> Unit,
     onAddHardwareRule: (() -> Unit)? = null,
-    onSyncDeviceClock: (() -> Unit)? = null
+    onSyncDeviceClock: (() -> Unit)? = null,
+    onOpenRulesTab: (() -> Unit)? = null
 ) {
     val cap = snapshot?.capability ?: device.parsedHardwareRulesCapability
     val lp = snapshot?.longPressCapable ?: device.hardwareRulesLongPressCapable
@@ -270,7 +275,7 @@ internal fun ExpandedDrawerHardwareRulesSection(
                 )
             }
 
-            if (canAdd || (needsClockSync && onSyncDeviceClock != null)) {
+            if (canAdd || (needsClockSync && onSyncDeviceClock != null) || (rules.isNotEmpty() && onOpenRulesTab != null)) {
                 Spacer(modifier = Modifier.height(4.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (canAdd) {
@@ -302,6 +307,24 @@ internal fun ExpandedDrawerHardwareRulesSection(
                                 labelColor = Color(0xFF92400E)
                             ),
                             modifier = Modifier.testTag("drawer_sync_clock_${device.id}")
+                        )
+                    }
+                    if (rules.isNotEmpty() && onOpenRulesTab != null) {
+                        AssistChip(
+                            onClick = onOpenRulesTab,
+                            label = { Text("Manage Rules", fontSize = 11.sp, maxLines = 1, softWrap = false) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                    contentDescription = "Manage on-device rules in Rules tab",
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                leadingIconContentColor = WemoTextSecondary,
+                                labelColor = WemoTextSecondary
+                            ),
+                            modifier = Modifier.testTag("drawer_open_rules_tab_${device.id}")
                         )
                     }
                 }
@@ -372,7 +395,14 @@ internal fun ExpandedDrawerHardwareRulesSection(
                             text = "+${rules.size - 4} more rule(s) in Rules tab",
                             color = WemoGreenDark,
                             fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            modifier = if (onOpenRulesTab != null) {
+                                Modifier
+                                    .clickable(onClick = onOpenRulesTab)
+                                    .padding(vertical = 2.dp)
+                            } else {
+                                Modifier
+                            }
                         )
                     }
                 }
@@ -396,6 +426,7 @@ internal fun HardwareRuleBadgePill(
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             softWrap = false,
+            overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.5.dp)
         )
     }

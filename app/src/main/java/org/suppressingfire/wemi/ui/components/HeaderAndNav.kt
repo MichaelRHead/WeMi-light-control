@@ -67,6 +67,7 @@ fun TopHeader(
     onAllOffClick: () -> Unit = {},
     versionName: String = BuildConfig.VERSION_NAME,
     onVersionClick: () -> Unit = {},
+    addButtonContentDescription: String? = null,
     modifier: Modifier = Modifier
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -83,7 +84,7 @@ fun TopHeader(
     } else {
         stringResource(R.string.action_edit)
     }
-    val addDeviceLabel = stringResource(R.string.action_add_device)
+    val addDeviceLabel = addButtonContentDescription ?: stringResource(R.string.action_add_device)
 
     val infiniteTransition = rememberInfiniteTransition(label = "refreshSpin")
     val rotation by infiniteTransition.animateFloat(

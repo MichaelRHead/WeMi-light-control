@@ -7,9 +7,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +35,7 @@ import org.suppressingfire.wemi.ui.components.HardwareRulesHeaderCard
 import org.suppressingfire.wemi.ui.components.buildUdnToFriendlyNameMap
 import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
+import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
@@ -56,6 +60,7 @@ fun RulesScreen(
     onSyncDeviceClock: (DeviceEntity) -> Unit = {},
     onEditSolarLocation: (DeviceEntity) -> Unit = {},
     onOpenBackups: (DeviceEntity) -> Unit = {},
+    onOpenDevicesTab: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val controllableDevices = remember(homeDevices) {
@@ -113,6 +118,16 @@ fun RulesScreen(
                                 fontFamily = FontFamily.SansSerif,
                                 fontSize = 13.sp
                             )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = onOpenDevicesTab,
+                                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                                modifier = Modifier
+                                    .heightIn(min = 48.dp)
+                                    .testTag("rules_empty_go_to_devices_button")
+                            ) {
+                                Text("Go to Devices")
+                            }
                         }
                     }
                     HorizontalDivider(thickness = 1.dp, color = WemoDividerGray)

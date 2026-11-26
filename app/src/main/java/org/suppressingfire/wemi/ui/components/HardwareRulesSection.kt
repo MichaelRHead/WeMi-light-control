@@ -449,7 +449,23 @@ fun HardwareRulesDeviceCard(
                         fontSize = 12.sp
                     )
                 }
-                snapshot != null && deviceRules.isEmpty() -> {
+                !device.isReachable -> {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Switch is offline — reconnect on the Devices tab to manage its on-device rules.",
+                        color = WemoTextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+                snapshot == null -> {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Tap Read to inspect rules stored in this switch's memory, or Add Rule to create one.",
+                        color = WemoTextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+                deviceRules.isEmpty() -> {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = snapshot.diagnosticMessage.ifBlank { "No on-device rules stored on this switch yet." },

@@ -220,7 +220,7 @@ class HardwareRulesE2ETest {
                         vm.hardwareRulesByDeviceId.value[openWrtDeviceId]?.rules?.any { it.name == "Porch 30m Timer" } == true
                 }
 
-                // 11. Switch to Devices tab, expand Porch Entry Switch drawer, and verify live DB v9 + Add Rule action
+                // 11. Switch to Devices tab, expand Porch Entry Switch drawer, verify live DB v9 + Add Rule + Manage Rules bridge
                 composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
                 composeTestRule.waitForIdle()
                 composeTestRule.onNodeWithTag("devices_list")
@@ -231,7 +231,84 @@ class HardwareRulesE2ETest {
                 composeTestRule.onNodeWithText("5 rule(s) stored on switch (DB v9)").assertExists()
                 composeTestRule.onNodeWithText("On-Device Rules: On-Device Ready • Long Press").assertExists()
                 composeTestRule.onNodeWithTag("drawer_add_hardware_rule_$openWrtDeviceId").assertExists()
+                composeTestRule.onNodeWithTag("drawer_open_rules_tab_$openWrtDeviceId")
+                    .performScrollTo()
+                    .performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("hardware_rules_header_card").assertIsDisplayed()
             }
+        }
+    }
+
+    @Test
+    fun `E2E Rules UX guards empty home plus tap, Go to Devices bridge, schedule time steppers and negative coordinates`() {
+        composeTestRule.waitForIdle()
+        val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
+        vm.toggleDemoShowroomMode(false)
+        awaitLoopbackIo { !vm.isDemoShowroomMode.value && vm.devices.value.isEmpty() }
+
+        // 1. In fresh empty Real LAN home, Rules tab shows Go to Devices button and '+' guards against empty dialog
+        composeTestRule.onNodeWithTag("nav_tab_rules").performClick()
+        composeTestRule.waitForIdle()
+        awaitRulesListNode("hardware_rules_empty_state", isTag = true)
+        composeTestRule.onNodeWithTag("hardware_rules_empty_state").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("add_device_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("hardware_rule_name_input").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("status_feedback_banner").assertIsDisplayed()
+
+        // 2. Tap Go to Devices -> returns to Devices tab
+        awaitRulesListNode("rules_empty_go_to_devices_button", isTag = true)
+        composeTestRule.onNodeWithTag("rules_empty_go_to_devices_button").performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("devices_list").assertIsDisplayed()
+
+        // 3. Add a loopback switch, open New Rule -> Schedule -> test -15m/+5m steppers and negative coordinates
+        val openWrtUdn = "uuid:Lightswitch-3_0-WLS0403UX01"
+        FakeHardwareRulesServer(
+            initialFriendlyName = "Patio Entry Switch",
+            deviceTypeUrn = "urn:Belkin:device:lightswitch:1",
+            modelName = "WLS0403",
+            serialNumber = "WLS0403UX01",
+            firmwareVersion = "WeMo_WW_2.00.11573.PVT-OWRT-LIGHTV2",
+            udn = openWrtUdn,
+            macAddress = "EC1A59DD2201",
+            isRtos = false,
+            supportsRulesDb = true,
+            initialDbVersion = 1
+        ).use { server ->
+            addLoopbackSwitch(server.port)
+            awaitLoopbackIo { vm.devices.value.any { it.serialNumber == "WLS0403UX01" } }
+            val switchId = vm.devices.value.first { it.serialNumber == "WLS0403UX01" }.id
+
+            composeTestRule.onNodeWithTag("nav_tab_rules").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("scan_hardware_rules_button").performClick()
+            awaitLoopbackIo { vm.hardwareRulesByDeviceId.value[switchId] != null }
+            composeTestRule.waitForIdle()
+
+            // Verify negative longitude & latitude entry works in Solar Location dialog
+            awaitRulesListNode("edit_solar_location_$switchId", isTag = true)
+            composeTestRule.onNodeWithTag("edit_solar_location_$switchId").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("solar_lat_input").performScrollTo().performTextReplacement("-33.8688")
+            composeTestRule.onNodeWithTag("solar_lon_input").performScrollTo().performTextReplacement("-122.4194")
+            composeTestRule.onNodeWithTag("save_solar_location_button").performClick()
+            awaitLoopbackIo {
+                vm.hardwareRulesByDeviceId.value[switchId]?.locationInfo?.longitude == "-122.4194"
+            }
+
+            // Open Schedule editor and verify -15m/+5m steppers update time cleanly
+            awaitRulesListNode("add_hardware_rule_button", isTag = true)
+            composeTestRule.onNodeWithTag("add_hardware_rule_button").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("hardware_rule_type_schedule").performScrollTo().performClick()
+            composeTestRule.onNodeWithTag("start_step_-15").performScrollTo().performClick()
+            composeTestRule.onNodeWithText("6:15 PM").assertExists()
+            composeTestRule.onNodeWithTag("start_step_5").performScrollTo().performClick()
+            composeTestRule.onNodeWithText("6:20 PM").assertExists()
+            composeTestRule.onNodeWithText("Cancel").performClick()
+            composeTestRule.waitForIdle()
         }
     }
 

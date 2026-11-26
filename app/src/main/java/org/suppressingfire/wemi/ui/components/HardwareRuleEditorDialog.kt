@@ -4,10 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -22,8 +19,6 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -32,9 +27,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -76,11 +69,12 @@ fun HardwareRuleEditorDialog(
     val controllable = remember(homeDevices) {
         homeDevices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
     }
-    val eligibleOwners = remember(controllable, snapshotsByDeviceId) {
+    val eligibleOwners = remember(controllable, snapshotsByDeviceId, preselectedDeviceId, editingRule?.ruleId) {
         controllable.filter { dev ->
             val cap = snapshotsByDeviceId[dev.id]?.capability ?: dev.parsedHardwareRulesCapability
-            cap != HardwareRulesCapability.VERIFIED_UNSUPPORTED
-        }.ifEmpty { controllable }
+            val explicitlySelected = dev.id == preselectedDeviceId && editingRule != null
+            explicitlySelected || (dev.isReachable && cap != HardwareRulesCapability.VERIFIED_UNSUPPORTED)
+        }
     }
     val initialDraft = remember(editingRule) { editingRule?.let(HardwareRuleDraft::fromHardwareRule) }
     val initialOwnerIdx = remember(eligibleOwners, preselectedDeviceId) {
@@ -95,7 +89,7 @@ fun HardwareRuleEditorDialog(
         editingRule?.type == HardwareRuleType.LONG_PRESS
 
     var ruleName by remember(editingRule?.ruleId) { mutableStateOf(initialDraft?.name.orEmpty()) }
-    var ruleType by remember(editingRule?.ruleId, ownerLongPressCapable) {
+    var ruleType by remember(editingRule?.ruleId) {
         mutableStateOf(
             initialDraft?.type ?: if (ownerLongPressCapable) HardwareRuleType.LONG_PRESS else HardwareRuleType.COUNTDOWN_TIMER
         )
@@ -242,6 +236,8 @@ fun HardwareRuleEditorDialog(
                         }
 
                         Text("Target Switches", style = MaterialTheme.typography.labelMedium)
+                        val knownTargetUdns = controllable.map { canonicalOrSyntheticUdn(it) }.toSet()
+                        val extraSavedUdns = selectedTargetUdns.filterNot { it in knownTargetUdns }
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             controllable.forEach { dev ->
                                 val targetUdn = canonicalOrSyntheticUdn(dev)
@@ -249,16 +245,23 @@ fun HardwareRuleEditorDialog(
                                 FilterChip(
                                     selected = isSelected,
                                     onClick = {
-                                        selectedTargetUdns = if (isSelected) {
-                                            selectedTargetUdns - targetUdn
-                                        } else {
-                                            selectedTargetUdns + targetUdn
-                                        }
+                                        selectedTargetUdns = if (isSelected) selectedTargetUdns - targetUdn else selectedTargetUdns + targetUdn
                                         validationError = null
                                     },
                                     label = { Text(dev.name, fontSize = 12.sp) },
                                     colors = chipColors,
                                     modifier = Modifier.testTag("lp_target_chip_${dev.id}")
+                                )
+                            }
+                            extraSavedUdns.forEach { extraUdn ->
+                                FilterChip(
+                                    selected = true,
+                                    onClick = {
+                                        selectedTargetUdns = selectedTargetUdns - extraUdn
+                                        validationError = null
+                                    },
+                                    label = { Text(extraUdn.substringAfterLast('-').ifBlank { extraUdn }, fontSize = 12.sp) },
+                                    colors = chipColors
                                 )
                             }
                         }
@@ -323,30 +326,17 @@ fun HardwareRuleEditorDialog(
                             onTimeChange = { h, m -> endHour = h; endMinute = m },
                             onOffsetChange = { endOffsetMin = it }
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (startActionOn) "Mode: Turn ON → then OFF" else "Mode: Turn OFF → then ON",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Switch(
-                                checked = startActionOn,
-                                onCheckedChange = { startActionOn = it },
-                                colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary)
-                            )
-                        }
+                        RuleSwitchRow(
+                            label = if (startActionOn) "Mode: Turn ON → then OFF" else "Mode: Turn OFF → then ON",
+                            checked = startActionOn,
+                            contentDesc = "Toggle schedule start action between Turn ON and Turn OFF",
+                            testTagName = "schedule_action_switch",
+                            onCheckedChange = { startActionOn = it }
+                        )
                         if ((startAnchor != HardwareTimeAnchor.FIXED_TIME || endAnchor != HardwareTimeAnchor.FIXED_TIME) &&
                             ownerSnapshot?.locationInfo == null
                         ) {
-                            Text(
-                                text = "Tip: Set Solar Location on this switch so Sunrise/Sunset times match your city.",
-                                color = Color(0xFF92400E),
-                                fontSize = 11.5.sp
-                            )
+                            SolarLocationTipText()
                         }
                         DaysOfWeekPicker(
                             selectedDays = selectedDays,
@@ -366,22 +356,15 @@ fun HardwareRuleEditorDialog(
                             onTimeChange = { h, m -> startHour = h; startMinute = m },
                             onOffsetChange = { startOffsetMin = it }
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (startActionOn) "Action: Turn Switch ON" else "Action: Turn Switch OFF",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Switch(
-                                checked = startActionOn,
-                                onCheckedChange = { startActionOn = it },
-                                colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary),
-                                modifier = Modifier.testTag("simple_timer_action_switch")
-                            )
+                        RuleSwitchRow(
+                            label = if (startActionOn) "Action: Turn Switch ON" else "Action: Turn Switch OFF",
+                            checked = startActionOn,
+                            contentDesc = "Toggle timed action between Turn ON and Turn OFF",
+                            testTagName = "simple_timer_action_switch",
+                            onCheckedChange = { startActionOn = it }
+                        )
+                        if (startAnchor != HardwareTimeAnchor.FIXED_TIME && ownerSnapshot?.locationInfo == null) {
+                            SolarLocationTipText()
                         }
                         DaysOfWeekPicker(
                             selectedDays = selectedDays,
@@ -392,23 +375,13 @@ fun HardwareRuleEditorDialog(
                     else -> Unit
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (isEnabled) "Rule Active on Switch" else "Rule Paused",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Switch(
-                        checked = isEnabled,
-                        onCheckedChange = { isEnabled = it },
-                        colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary),
-                        modifier = Modifier.testTag("hardware_rule_enabled_switch")
-                    )
-                }
+                RuleSwitchRow(
+                    label = if (isEnabled) "Rule Active on Switch" else "Rule Paused",
+                    checked = isEnabled,
+                    contentDesc = "Enable or pause this on-device rule",
+                    testTagName = "hardware_rule_enabled_switch",
+                    onCheckedChange = { isEnabled = it }
+                )
 
                 validationError?.let { err ->
                     Text(text = err, color = MaterialTheme.colorScheme.error, fontSize = 12.sp)
@@ -443,6 +416,15 @@ fun HardwareRuleEditorDialog(
                     val parsedCountdown = countdownMinutesText.toIntOrNull()
                     if (ruleType == HardwareRuleType.COUNTDOWN_TIMER && (parsedCountdown == null || parsedCountdown !in 1..1440)) {
                         validationError = "Enter a delay between 1 and 1440 minutes"
+                        return@Button
+                    }
+                    if (ruleType == HardwareRuleType.SCHEDULE_INTERVAL &&
+                        startAnchor == HardwareTimeAnchor.FIXED_TIME &&
+                        endAnchor == HardwareTimeAnchor.FIXED_TIME &&
+                        startHour == endHour &&
+                        startMinute == endMinute
+                    ) {
+                        validationError = "Start time and end time must be different"
                         return@Button
                     }
                     onSave(

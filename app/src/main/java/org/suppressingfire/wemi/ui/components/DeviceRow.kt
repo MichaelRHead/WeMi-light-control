@@ -126,6 +126,7 @@ fun DeviceRow(
     onInspectHardwareRules: (() -> Unit)? = null,
     onAddHardwareRule: (() -> Unit)? = null,
     onSyncDeviceClock: (() -> Unit)? = null,
+    onOpenRulesTab: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val type = device.parsedType
@@ -394,7 +395,8 @@ fun DeviceRow(
                         udnToFriendlyName = udnToFriendlyName,
                         onInspectHardwareRules = onInspectHardwareRules,
                         onAddHardwareRule = onAddHardwareRule,
-                        onSyncDeviceClock = onSyncDeviceClock
+                        onSyncDeviceClock = onSyncDeviceClock,
+                        onOpenRulesTab = onOpenRulesTab
                     )
                 }
             }

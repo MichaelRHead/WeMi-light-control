@@ -6,6 +6,7 @@
     <string name="action_edit">Edit</string>
     <string name="action_done">Done</string>
     <string name="action_add_device">Add Device</string>
+    <string name="action_add_rule">Add On-Device Rule</string>
     <string name="tab_devices">Devices</string>
     <string name="tab_rules">Rules</string>
     <string name="tab_more">More</string>

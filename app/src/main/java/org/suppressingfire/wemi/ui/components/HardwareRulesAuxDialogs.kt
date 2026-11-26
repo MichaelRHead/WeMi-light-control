@@ -145,9 +145,12 @@ fun HardwareLocationDialog(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                     OutlinedTextField(
                         value = latitude,
-                        onValueChange = { latitude = it; errorText = null },
+                        onValueChange = { raw ->
+                            latitude = raw.filter { it.isDigit() || it == '.' || it == '-' }.take(12)
+                            errorText = null
+                        },
                         label = { Text("Latitude") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                         singleLine = true,
                         modifier = Modifier
                             .weight(1f)
@@ -155,9 +158,12 @@ fun HardwareLocationDialog(
                     )
                     OutlinedTextField(
                         value = longitude,
-                        onValueChange = { longitude = it; errorText = null },
+                        onValueChange = { raw ->
+                            longitude = raw.filter { it.isDigit() || it == '.' || it == '-' }.take(12)
+                            errorText = null
+                        },
                         label = { Text("Longitude") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                         singleLine = true,
                         modifier = Modifier
                             .weight(1f)
@@ -235,7 +241,7 @@ fun HardwareRulesBackupDialog(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "WeMi saves up to 5 untouched backups of your switch's rules archive before every write. Restoring validates SQLite integrity and increments DB version safely.",
+                    text = "WeMi saves up to 5 untouched backups of your switch's rules archive before every write. Restoring backs up your current rules first, validates SQLite integrity, and increments DB version safely.",
                     color = WemoTextSecondary,
                     fontSize = 12.sp
                 )

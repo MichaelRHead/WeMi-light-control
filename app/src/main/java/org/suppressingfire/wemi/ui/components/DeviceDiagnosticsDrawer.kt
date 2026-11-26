@@ -74,7 +74,8 @@ internal fun ExpandedDrawer(
     udnToFriendlyName: Map<String, String> = emptyMap(),
     onInspectHardwareRules: (() -> Unit)? = null,
     onAddHardwareRule: (() -> Unit)? = null,
-    onSyncDeviceClock: (() -> Unit)? = null
+    onSyncDeviceClock: (() -> Unit)? = null,
+    onOpenRulesTab: (() -> Unit)? = null
 ) {
     val type = device.parsedType
     var sliderVal by remember(device.brightness) {
@@ -320,7 +321,8 @@ internal fun ExpandedDrawer(
                 udnToName = udnToFriendlyName,
                 onInspectHardwareRules = onInspectHardwareRules,
                 onAddHardwareRule = onAddHardwareRule,
-                onSyncDeviceClock = onSyncDeviceClock
+                onSyncDeviceClock = onSyncDeviceClock,
+                onOpenRulesTab = onOpenRulesTab
             )
         }
     }
