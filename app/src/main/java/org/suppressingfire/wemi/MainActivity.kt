@@ -97,8 +97,6 @@ fun WeMiSwitchApp(
     val activeNetworkKey by viewModel.activeNetworkKey.collectAsStateWithLifecycle()
     val isReconnectingHome by viewModel.isReconnectingHome.collectAsStateWithLifecycle()
     val lanNetworkState by viewModel.lanNetworkState.collectAsStateWithLifecycle()
-    val activeAutoOffCountdownsSec by viewModel.activeAutoOffCountdownsSec.collectAsStateWithLifecycle()
-    val rules by viewModel.rules.collectAsStateWithLifecycle()
     val soapLogs by viewModel.soapLogs.collectAsStateWithLifecycle()
     val latestSsdpReport by viewModel.latestSsdpReport.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
@@ -111,6 +109,10 @@ fun WeMiSwitchApp(
     val showSsdpScannerSheet by viewModel.showSsdpScannerSheet.collectAsStateWithLifecycle()
     val showAddHomeDialog by viewModel.showAddHomeDialog.collectAsStateWithLifecycle()
     val showProvisionApDialog by viewModel.showProvisionApDialog.collectAsStateWithLifecycle()
+    val hardwareRuleEditorRequest by viewModel.hardwareRuleEditorRequest.collectAsStateWithLifecycle()
+    val solarLocationDialogDevice by viewModel.solarLocationDialogDevice.collectAsStateWithLifecycle()
+    val backupRestoreDialogDevice by viewModel.backupRestoreDialogDevice.collectAsStateWithLifecycle()
+    val pendingDeleteHardwareRule by viewModel.pendingDeleteHardwareRule.collectAsStateWithLifecycle()
     val expandedDeviceIds by viewModel.expandedDeviceIds.collectAsStateWithLifecycle()
     val togglingDeviceIds by viewModel.togglingDeviceIds.collectAsStateWithLifecycle()
     val statusBannerMessage by viewModel.statusBannerMessage.collectAsStateWithLifecycle()
@@ -143,8 +145,14 @@ fun WeMiSwitchApp(
         org.suppressingfire.wemi.data.groupDevicesByCanonicalRoom(filteredDevices)
     }
 
+    val hasHardwareRuleDialog = hardwareRuleEditorRequest != null ||
+        solarLocationDialogDevice != null ||
+        backupRestoreDialogDevice != null ||
+        pendingDeleteHardwareRule != null
+
     BackHandler(
         enabled = showReleaseHistoryDialog ||
+            hasHardwareRuleDialog ||
             showSsdpScannerSheet ||
             showAddHomeDialog ||
             showProvisionApDialog ||
@@ -154,6 +162,7 @@ fun WeMiSwitchApp(
     ) {
         when {
             showReleaseHistoryDialog -> showReleaseHistoryDialog = false
+            hasHardwareRuleDialog -> viewModel.dismissHardwareRuleDialogs()
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
             showAddHomeDialog -> viewModel.closeAddHomeDialog()
             showProvisionApDialog -> viewModel.closeProvisionApDialog()
@@ -183,7 +192,7 @@ fun WeMiSwitchApp(
                     },
                     onAddClick = {
                         if (selectedTab == BottomTab.RULES) {
-                            viewModel.openAddRuleDialog()
+                            viewModel.openAddHardwareRuleDialog()
                         } else {
                             viewModel.openAddDeviceDialog()
                         }
@@ -273,6 +282,12 @@ fun WeMiSwitchApp(
                         },
                         onInspectDeviceHardwareRules = { device ->
                             viewModel.inspectDeviceHardwareRules(device, forceRecheck = true)
+                        },
+                        onAddDeviceHardwareRule = { device ->
+                            viewModel.openAddHardwareRuleDialog(device)
+                        },
+                        onSyncDeviceClock = { device ->
+                            viewModel.syncDeviceClock(device)
                         }
                     )
                 }
@@ -305,7 +320,6 @@ fun WeMiSwitchApp(
                                     togglingDeviceIds = togglingDeviceIds,
                                     isEditMode = isEditMode,
                                     isDemoShowroomMode = isDemoShowroomMode,
-                                    activeAutoOffCountdownsSec = activeAutoOffCountdownsSec,
                                     hardwareRulesByDeviceId = hardwareRulesByDeviceId,
                                     inspectingRuleDeviceIds = inspectingRuleDeviceIds
                                 ),
@@ -315,19 +329,27 @@ fun WeMiSwitchApp(
 
                         BottomTab.RULES -> {
                             RulesScreen(
-                                rules = rules,
-                                onToggleRule = { viewModel.toggleRule(it) },
-                                onRunRuleNow = { viewModel.runRuleNow(it) },
-                                onDeleteRule = { viewModel.deleteRule(it) },
-                                onAddRuleClick = { viewModel.openAddRuleDialog() },
                                 homeDevices = homeDevices,
                                 hardwareRulesByDeviceId = hardwareRulesByDeviceId,
                                 inspectingRuleDeviceIds = inspectingRuleDeviceIds,
                                 isScanningAllDeviceRules = isScanningAllDeviceRules,
                                 onScanAllHardwareRules = { viewModel.inspectAllHomeHardwareRules() },
+                                onAddHardwareRule = { device -> viewModel.openAddHardwareRuleDialog(device) },
                                 onInspectDeviceHardwareRules = { device, force ->
                                     viewModel.inspectDeviceHardwareRules(device, forceRecheck = force)
-                                }
+                                },
+                                onToggleHardwareRule = { device, rule, enabled ->
+                                    viewModel.toggleHardwareRule(device, rule, enabled)
+                                },
+                                onEditHardwareRule = { device, rule ->
+                                    viewModel.openEditHardwareRuleDialog(device, rule)
+                                },
+                                onDeleteHardwareRule = { device, rule ->
+                                    viewModel.requestDeleteHardwareRule(device, rule)
+                                },
+                                onSyncDeviceClock = { device -> viewModel.syncDeviceClock(device) },
+                                onEditSolarLocation = { device -> viewModel.openSolarLocationDialog(device) },
+                                onOpenBackups = { device -> viewModel.openBackupRestoreDialog(device) }
                             )
                         }
 

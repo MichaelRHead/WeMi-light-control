@@ -17,19 +17,18 @@ import kotlinx.coroutines.sync.withPermit
 import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
 import org.suppressingfire.wemi.network.HardwareLocationInfo
 import org.suppressingfire.wemi.network.HardwareRule
-import org.suppressingfire.wemi.network.HardwareRuleTimePoint
-import org.suppressingfire.wemi.network.HardwareRuleType
+import org.suppressingfire.wemi.network.HardwareRuleDraft
 import org.suppressingfire.wemi.network.HardwareRulesCapability
 import org.suppressingfire.wemi.network.HardwareRulesClient
+import org.suppressingfire.wemi.network.HardwareRulesDbMutator
+import org.suppressingfire.wemi.network.HardwareRulesWriteResult
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 /**
  * Coordinates lazy, concurrency-bounded (`Semaphore(3)` + per-device `Mutex`) Tier-2 hardware
- * rules capability verification and read-only `rules.db` extraction across switches in the active
- * Wi-Fi Home.
- *
- * Caching verified capabilities against each switch's `firmwareVersion` ensures repeated scans
- * never waste TCP sockets re-probing RTOS devices (`WDS060`, `WSP080`, `WSP090`) that omit
- * `FetchRules` from `/rulesservice.xml`.
+ * rules capability verification, read-only inspection, and armored Step 2 writes (create/edit,
+ * enable/disable toggle, delete, `timesync1#TimeSync` clock sync, `LOCATIONINFO` solar updates,
+ * and raw-ZIP backup restore).
  */
 internal class HardwareRulesCoordinator(
     private val dao: SwitchDao,
@@ -40,6 +39,8 @@ internal class HardwareRulesCoordinator(
     private val appendLog: (SoapLogEntry) -> Unit,
     private val nowFormatted: () -> String
 ) {
+    private val demoStore = DemoHardwareRulesStore(nowFormatted)
+
     private val _hardwareRulesByDeviceId = MutableStateFlow<Map<Int, DeviceHardwareRulesSnapshot>>(emptyMap())
     val hardwareRulesByDeviceId: StateFlow<Map<Int, DeviceHardwareRulesSnapshot>> =
         _hardwareRulesByDeviceId.asStateFlow()
@@ -53,31 +54,29 @@ internal class HardwareRulesCoordinator(
     private fun mutexFor(device: DeviceEntity): Mutex =
         deviceMutexes.getOrPut(device.concurrencyKey()) { Mutex() }
 
+    private fun isSyntheticDemoEndpoint(device: DeviceEntity): Boolean =
+        isDemoShowroomMode() && device.ipAddress != "127.0.0.1" && device.ipAddress != "localhost"
+
     fun clearRuntimeState() {
+        demoStore.clear()
         _hardwareRulesByDeviceId.value = emptyMap()
         _inspectingDeviceIds.value = emptySet()
         _isScanningAll.value = false
     }
 
     fun evictDevice(deviceId: Int) {
+        demoStore.evictDevice(deviceId)
         _hardwareRulesByDeviceId.update { if (deviceId in it) it - deviceId else it }
         _inspectingDeviceIds.update { if (deviceId in it) it - deviceId else it }
     }
 
-    /**
-     * Reads existing on-device rules from [device] in strict read-only mode, updating Room's
-     * cached capability columns when Tier-2 verification returns an authoritative verdict.
-     */
     suspend fun inspectDeviceHardwareRules(
         device: DeviceEntity,
         forceRecheck: Boolean = false
     ): DeviceHardwareRulesSnapshot {
-        val demoMode = isDemoShowroomMode()
-        val isSyntheticDemoEndpoint =
-            demoMode && device.ipAddress != "127.0.0.1" && device.ipAddress != "localhost"
-        if (isSyntheticDemoEndpoint) {
+        if (isSyntheticDemoEndpoint(device)) {
             val allDevices = dao.getAllDevices().first()
-            val demoSnap = buildDemoSnapshot(device, allDevices)
+            val demoSnap = demoStore.getOrCreateSnapshot(device, allDevices)
             persistCapabilityVerdict(device.id, demoSnap.capability, demoSnap.longPressCapable)
             _hardwareRulesByDeviceId.update { it + (device.id to demoSnap) }
             return demoSnap
@@ -103,8 +102,7 @@ internal class HardwareRulesCoordinator(
 
         _inspectingDeviceIds.update { it + device.id }
         return try {
-            val lock = mutexFor(device)
-            lock.withLock {
+            mutexFor(device).withLock {
                 val fresh = dao.getDeviceById(device.id) ?: device
                 val (snapshot, logs) = lanSemaphore.withPermit {
                     hardwareRulesClient.fetchDeviceRulesSnapshot(fresh)
@@ -123,10 +121,6 @@ internal class HardwareRulesCoordinator(
         }
     }
 
-    /**
-     * Reads on-device rules across all reachable switches in [networkKey] bounded by `Semaphore(3)`.
-     * Skips already-verified unsupported switches for the same firmware unless [forceRecheck] is true.
-     */
     suspend fun inspectAllHomeHardwareRules(
         networkKey: String,
         forceRecheck: Boolean = false
@@ -142,6 +136,170 @@ internal class HardwareRulesCoordinator(
             }
         } finally {
             _isScanningAll.value = false
+        }
+    }
+
+    suspend fun saveHardwareRule(
+        device: DeviceEntity,
+        draft: HardwareRuleDraft
+    ): HardwareRulesWriteResult {
+        if (isSyntheticDemoEndpoint(device)) {
+            val res = demoStore.saveRule(device, dao.getAllDevices().first(), draft)
+            res.snapshot?.let { snap -> _hardwareRulesByDeviceId.update { it + (device.id to snap) } }
+            return res
+        }
+        return runArmoredDeviceMutation(device) { fresh ->
+            val ownerUdn = LanRuntimeUtils.canonicalHardwareUdn(fresh.udn)
+                .ifBlank { LanRuntimeUtils.canonicalHardwareUdn(_hardwareRulesByDeviceId.value[fresh.id]?.deviceUdn.orEmpty()) }
+                .ifBlank { fresh.udn.ifBlank { "uuid:Lightswitch-1_0-${fresh.serialNumber.ifBlank { fresh.id.toString() }}" } }
+            hardwareRulesClient.mutateAndStoreRulesDb(
+                device = fresh,
+                autoSyncClockIfNeeded = true
+            ) { sqliteFile ->
+                HardwareRulesDbMutator.upsertRule(sqliteFile, ownerUdn, draft)
+            }
+        }
+    }
+
+    suspend fun toggleHardwareRule(
+        device: DeviceEntity,
+        rule: HardwareRule,
+        enabled: Boolean
+    ): HardwareRulesWriteResult {
+        if (isSyntheticDemoEndpoint(device)) {
+            val res = demoStore.toggleRule(device, dao.getAllDevices().first(), rule.ruleId, enabled)
+            res.snapshot?.let { snap -> _hardwareRulesByDeviceId.update { it + (device.id to snap) } }
+            return res
+        }
+        return runArmoredDeviceMutation(device) { fresh ->
+            hardwareRulesClient.mutateAndStoreRulesDb(
+                device = fresh,
+                autoSyncClockIfNeeded = false
+            ) { sqliteFile ->
+                check(HardwareRulesDbMutator.toggleRuleEnabled(sqliteFile, rule.ruleId, enabled)) {
+                    "Rule #${rule.ruleId} was no longer present on ${fresh.name}"
+                }
+            }
+        }
+    }
+
+    suspend fun deleteHardwareRule(
+        device: DeviceEntity,
+        rule: HardwareRule
+    ): HardwareRulesWriteResult {
+        if (isSyntheticDemoEndpoint(device)) {
+            val res = demoStore.deleteRule(device, dao.getAllDevices().first(), rule.ruleId)
+            res.snapshot?.let { snap -> _hardwareRulesByDeviceId.update { it + (device.id to snap) } }
+            return res
+        }
+        return runArmoredDeviceMutation(device) { fresh ->
+            hardwareRulesClient.mutateAndStoreRulesDb(
+                device = fresh,
+                autoSyncClockIfNeeded = false
+            ) { sqliteFile ->
+                check(HardwareRulesDbMutator.deleteRule(sqliteFile, rule.ruleId)) {
+                    "Rule #${rule.ruleId} was no longer present on ${fresh.name}"
+                }
+            }
+        }
+    }
+
+    suspend fun syncDeviceClock(device: DeviceEntity): HardwareRulesWriteResult {
+        if (isSyntheticDemoEndpoint(device)) {
+            val res = demoStore.syncClock(device, dao.getAllDevices().first())
+            res.snapshot?.let { snap -> _hardwareRulesByDeviceId.update { it + (device.id to snap) } }
+            return res
+        }
+        _inspectingDeviceIds.update { it + device.id }
+        return try {
+            mutexFor(device).withLock {
+                val fresh = dao.getDeviceById(device.id) ?: device
+                val syncLog = lanSemaphore.withPermit { hardwareRulesClient.syncDeviceTime(fresh) }
+                appendLog(syncLog)
+                if (!syncLog.isLiveLanSuccess) {
+                    return@withLock HardwareRulesWriteResult(
+                        success = false,
+                        snapshot = _hardwareRulesByDeviceId.value[fresh.id],
+                        message = "Clock sync failed on ${fresh.name}: ${syncLog.statusText}"
+                    )
+                }
+                val (refreshedSnap, refreshLogs) = lanSemaphore.withPermit {
+                    hardwareRulesClient.fetchDeviceRulesSnapshot(fresh, saveRawBackup = false)
+                }
+                refreshLogs.forEach(appendLog)
+                if (refreshedSnap.capability.isVerified) {
+                    persistCapabilityVerdictLocked(fresh.id, refreshedSnap.capability, refreshedSnap.longPressCapable)
+                }
+                _hardwareRulesByDeviceId.update { it + (fresh.id to refreshedSnap) }
+                HardwareRulesWriteResult(
+                    success = true,
+                    snapshot = refreshedSnap,
+                    message = "Synced clock on ${fresh.name}",
+                    clockSynced = true
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } finally {
+            _inspectingDeviceIds.update { it - device.id }
+        }
+    }
+
+    suspend fun updateDeviceSolarLocation(
+        device: DeviceEntity,
+        location: HardwareLocationInfo
+    ): HardwareRulesWriteResult {
+        if (isSyntheticDemoEndpoint(device)) {
+            val res = demoStore.updateLocation(device, dao.getAllDevices().first(), location)
+            res.snapshot?.let { snap -> _hardwareRulesByDeviceId.update { it + (device.id to snap) } }
+            return res
+        }
+        return runArmoredDeviceMutation(device) { fresh ->
+            hardwareRulesClient.mutateAndStoreRulesDb(
+                device = fresh,
+                autoSyncClockIfNeeded = true
+            ) { sqliteFile ->
+                HardwareRulesDbMutator.updateLocationInfo(sqliteFile, location)
+            }
+        }
+    }
+
+    suspend fun restoreHardwareRulesBackup(
+        device: DeviceEntity,
+        backupFilePath: String
+    ): HardwareRulesWriteResult {
+        if (isSyntheticDemoEndpoint(device)) {
+            val res = demoStore.restoreBackup(device, dao.getAllDevices().first(), backupFilePath)
+            res.snapshot?.let { snap -> _hardwareRulesByDeviceId.update { it + (device.id to snap) } }
+            return res
+        }
+        return runArmoredDeviceMutation(device) { fresh ->
+            hardwareRulesClient.restoreRulesFromBackup(fresh, backupFilePath)
+        }
+    }
+
+    private suspend fun runArmoredDeviceMutation(
+        device: DeviceEntity,
+        action: suspend (DeviceEntity) -> Pair<HardwareRulesWriteResult, List<SoapLogEntry>>
+    ): HardwareRulesWriteResult {
+        _inspectingDeviceIds.update { it + device.id }
+        return try {
+            mutexFor(device).withLock {
+                val fresh = dao.getDeviceById(device.id) ?: device
+                val (result, logs) = lanSemaphore.withPermit { action(fresh) }
+                logs.forEach(appendLog)
+                result.snapshot?.let { snap ->
+                    if (snap.capability.isVerified) {
+                        persistCapabilityVerdictLocked(fresh.id, snap.capability, snap.longPressCapable)
+                    }
+                    _hardwareRulesByDeviceId.update { it + (fresh.id to snap) }
+                }
+                result
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } finally {
+            _inspectingDeviceIds.update { it - device.id }
         }
     }
 
@@ -175,110 +333,5 @@ internal class HardwareRulesCoordinator(
                 )
             )
         }
-    }
-
-    private fun buildDemoSnapshot(
-        device: DeviceEntity,
-        allDevices: List<DeviceEntity>
-    ): DeviceHardwareRulesSnapshot {
-        val isRtosDimmer = device.hardwareModel.contains("WDS060", ignoreCase = true) ||
-            device.firmwareVersion.contains("-RTOS-", ignoreCase = true)
-        if (isRtosDimmer) {
-            return DeviceHardwareRulesSnapshot(
-                deviceId = device.id,
-                deviceName = device.name,
-                deviceUdn = device.udn,
-                capability = HardwareRulesCapability.VERIFIED_UNSUPPORTED,
-                longPressCapable = false,
-                dbVersion = 0,
-                diagnosticMessage = "RTOS firmware does not expose FetchRules (Dimmer Night Mode still available)",
-                inspectedAt = nowFormatted()
-            )
-        }
-        val selfUdn = device.udn.ifBlank { "uuid:Lightswitch-1_0-${device.serialNumber}" }
-        val peerTargets = allDevices
-            .filter { it.networkKey == device.networkKey && it.id != device.id && it.parsedType != DeviceType.MOTION_SENSOR }
-            .take(2)
-            .map { it.udn.ifBlank { "uuid:Lightswitch-1_0-${it.serialNumber}" } }
-        val rules = buildList {
-            if (device.parsedType == DeviceType.SWITCH_PLUG || device.hardwareModel.contains("F7C059", ignoreCase = true)) {
-                add(
-                    HardwareRule(
-                        ruleId = device.id * 10 + 1,
-                        name = "Goodnight Long Press",
-                        type = HardwareRuleType.LONG_PRESS,
-                        rawFirmwareType = "Long Press",
-                        isEnabled = true,
-                        ruleOrder = 1,
-                        ownerDeviceUdn = selfUdn,
-                        daysOfWeek = listOf(-1),
-                        startTime = HardwareRuleTimePoint(60),
-                        endTime = HardwareRuleTimePoint(86400),
-                        ruleDurationSeconds = 86340,
-                        startAction = 0.0,
-                        endAction = -1.0,
-                        countdownSeconds = 0,
-                        sensorDurationSeconds = 0,
-                        targetDeviceUdns = peerTargets
-                    )
-                )
-            }
-            if (device.autoOffMinutes > 0 || device.id % 2 == 1) {
-                add(
-                    HardwareRule(
-                        ruleId = device.id * 10 + 2,
-                        name = "${device.name} Auto-Off",
-                        type = HardwareRuleType.COUNTDOWN_TIMER,
-                        rawFirmwareType = "Countdown Rule",
-                        isEnabled = true,
-                        ruleOrder = 2,
-                        ownerDeviceUdn = selfUdn,
-                        daysOfWeek = listOf(1, 2, 3, 4, 5, 6, 7),
-                        startTime = HardwareRuleTimePoint(0),
-                        endTime = HardwareRuleTimePoint(86340),
-                        ruleDurationSeconds = 86340,
-                        startAction = 0.0,
-                        endAction = -1.0,
-                        countdownSeconds = (device.autoOffMinutes.takeIf { it > 0 } ?: 30) * 60,
-                        sensorDurationSeconds = 0
-                    )
-                )
-            }
-            if (device.name.contains("Porch", ignoreCase = true) || device.name.contains("Living", ignoreCase = true)) {
-                add(
-                    HardwareRule(
-                        ruleId = device.id * 10 + 3,
-                        name = "Evening Sunset Schedule",
-                        type = HardwareRuleType.SCHEDULE_INTERVAL,
-                        rawFirmwareType = "Time Interval",
-                        isEnabled = true,
-                        ruleOrder = 3,
-                        ownerDeviceUdn = selfUdn,
-                        daysOfWeek = listOf(1, 2, 3, 4, 5, 6, 7),
-                        startTime = HardwareRuleTimePoint(rawSeconds = 64802, offsetSeconds = -900),
-                        endTime = HardwareRuleTimePoint(rawSeconds = 82800),
-                        ruleDurationSeconds = 18000,
-                        startAction = 1.0,
-                        endAction = 0.0,
-                        countdownSeconds = 0,
-                        sensorDurationSeconds = 0
-                    )
-                )
-            }
-        }
-        return DeviceHardwareRulesSnapshot(
-            deviceId = device.id,
-            deviceName = device.name,
-            deviceUdn = selfUdn,
-            capability = HardwareRulesCapability.VERIFIED_SUPPORTED,
-            longPressCapable = true,
-            dbVersion = 4,
-            rules = rules,
-            locationInfo = HardwareLocationInfo("Mountain View", "CA", "US", "37.3861", "-122.0839"),
-            existingTables = setOf("RULES", "RULEDEVICES", "TARGETDEVICES", "LOCATIONINFO"),
-            integrityOk = true,
-            diagnosticMessage = "Demo showcase snapshot (${rules.size} on-device rule(s))",
-            inspectedAt = nowFormatted()
-        )
     }
 }

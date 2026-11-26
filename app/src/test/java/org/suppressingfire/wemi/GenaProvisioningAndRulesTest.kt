@@ -3,13 +3,18 @@ package org.suppressingfire.wemi
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import java.io.File
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.DeviceCategory
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.SwitchRepository
-import org.suppressingfire.wemi.data.RuleScheduler
 import org.suppressingfire.wemi.network.GenaEventNotification
 import org.suppressingfire.wemi.network.GenaSubscriptionManager
+import org.suppressingfire.wemi.network.HardwareRuleDraft
+import org.suppressingfire.wemi.network.HardwareRuleType
+import org.suppressingfire.wemi.network.HardwareRulesDbCodec
+import org.suppressingfire.wemi.network.HardwareRulesDbMutator
+import org.suppressingfire.wemi.network.HardwareRulesSafetyValidator
 import org.suppressingfire.wemi.network.NetworkClient
 import org.suppressingfire.wemi.network.ProvisionerClient
 import kotlinx.coroutines.delay
@@ -25,7 +30,6 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 @RunWith(RobolectricTestRunner::class)
@@ -105,26 +109,39 @@ class GenaProvisioningAndRulesTest {
     }
 
     @Test
-    fun `verify Phase 5 RuleScheduler schedule time parsing and Auto-Off countdown timer`() = runBlocking {
-        assertEquals(Pair(19, 0), RuleScheduler.parseScheduleTime24h("Daily at 7:00 PM"))
-        assertEquals(Pair(17, 15), RuleScheduler.parseScheduleTime24h("Daily at Sunset (5:15 PM)"))
-        assertEquals(Pair(22, 0), RuleScheduler.parseScheduleTime24h("Every night at 10:00 PM"))
-        assertEquals(Pair(6, 30), RuleScheduler.parseScheduleTime24h("Daily at Sunrise (6:30 AM)"))
-        assertEquals(30, RuleScheduler.parseMinutesFromSummary("After 30 minutes ON"))
-
-        val expiredDeviceId = AtomicInteger(-1)
-        val scheduler = RuleScheduler(
-            onAutoOffExpired = { id -> expiredDeviceId.set(id) },
-            onScheduleRuleTriggered = {}
-        )
+    fun `verify on-device HardwareRulesDbMutator creates, toggles, updates, and deletes rules while passing anti-brick validation`() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val dbFile = File.createTempFile("mutator_unit_", ".db", context.cacheDir)
         try {
-            scheduler.startAutoOffCountdownSeconds(deviceId = 77, durationSeconds = 1)
-            assertTrue(scheduler.activeCountdownsSec.value.containsKey(77))
-            delay(1300L)
-            assertEquals(77, expiredDeviceId.get())
-            assertFalse(scheduler.activeCountdownsSec.value.containsKey(77))
+            HardwareRulesSafetyValidator.createEmptyBelkinSchemaDb(dbFile)
+            val ownerUdn = "uuid:Lightswitch-3_0-WLS0403MUT01"
+            val id = HardwareRulesDbMutator.upsertRule(
+                sqliteFile = dbFile,
+                ownerDeviceUdn = ownerUdn,
+                draft = HardwareRuleDraft(
+                    name = "Bath Auto-Off",
+                    type = HardwareRuleType.COUNTDOWN_TIMER,
+                    isEnabled = true,
+                    daysOfWeek = listOf(1, 2, 3, 4, 5, 6, 7),
+                    countdownMinutes = 25
+                )
+            )
+            assertTrue(id > 0)
+            assertTrue(HardwareRulesDbMutator.toggleRuleEnabled(dbFile, id, false))
+            val (b64, verdict) = HardwareRulesSafetyValidator.validateAndPackToBase64Zip(dbFile)
+            assertTrue(verdict.issues.joinToString(), verdict.isSafeToStore)
+            assertNotNull(b64)
+            val parsed = HardwareRulesDbCodec.parseSqliteFileReadOnly(dbFile, HardwareRulesDbCodec.DEFAULT_ZIP_ENTRY_NAME, ownerUdn)
+            assertEquals(1, parsed.rules.size)
+            assertFalse(parsed.rules.single().isEnabled)
+            assertEquals(1500, parsed.rules.single().countdownSeconds)
+            assertTrue(HardwareRulesDbMutator.deleteRule(dbFile, id))
+            assertTrue(
+                HardwareRulesDbCodec.parseSqliteFileReadOnly(dbFile, HardwareRulesDbCodec.DEFAULT_ZIP_ENTRY_NAME, ownerUdn).rules.isEmpty()
+            )
         } finally {
-            scheduler.stopAll()
+            runCatching { dbFile.delete() }
+            HardwareRulesDbMutator.cleanupSqliteSidecars(dbFile)
         }
     }
 
@@ -388,46 +405,7 @@ class GenaProvisioningAndRulesTest {
     }
 
     @Test
-    fun `verify RuleScheduler preserves active countdown across repeated state polls and triggerMotionEvent executes MOTION_TRIGGER rules`() = runBlocking {
-        // 1. Verify repeated onDeviceStateUpdated polls with identical duration do NOT reset remaining seconds
-        val expiredCount = AtomicInteger(0)
-        val scheduler = RuleScheduler(
-            onAutoOffExpired = { expiredCount.incrementAndGet() },
-            onScheduleRuleTriggered = {}
-        )
-        try {
-            val pantrySwitch = DeviceEntity(
-                id = 55,
-                name = "Pantry Light",
-                roomName = "Kitchen",
-                ipAddress = "127.0.0.1",
-                port = 49153,
-                isOn = true,
-                isReachable = true,
-                autoOffMinutes = 1
-            )
-            scheduler.onDeviceStateUpdated(pantrySwitch, emptyList())
-            assertEquals(60, scheduler.activeCountdownsSec.value[55])
-            delay(1150L)
-            val remainingAfterOneSec = scheduler.activeCountdownsSec.value[55] ?: 60
-            assertTrue("Expected countdown to tick below 60s, got $remainingAfterOneSec", remainingAfterOneSec < 60)
-
-            // Simulate 30s health poll emitting updated latencyMs while switch stays ON with same autoOffMinutes = 1
-            scheduler.onDeviceStateUpdated(pantrySwitch.copy(latencyMs = 19), emptyList())
-            val remainingAfterPoll = scheduler.activeCountdownsSec.value[55] ?: 60
-            assertTrue(
-                "Expected active countdown NOT to reset back to 60s on poll, got $remainingAfterPoll",
-                remainingAfterPoll <= remainingAfterOneSec
-            )
-
-            // Turning switch OFF cancels countdown immediately
-            scheduler.onDeviceStateUpdated(pantrySwitch.copy(isOn = false), emptyList())
-            assertFalse(scheduler.activeCountdownsSec.value.containsKey(55))
-        } finally {
-            scheduler.stopAll()
-        }
-
-        // 2. Verify triggerMotionEvent fires enabled MOTION_TRIGGER rules against live loopback switch
+    fun `verify triggerMotionEvent records live motion telemetry without affecting peer switches`() = runBlocking {
         FakeUpnpServer(
             initialFriendlyName = "Hallway Sconce",
             serialNumber = "WLS0403MOTION01",
@@ -439,49 +417,45 @@ class GenaProvisioningAndRulesTest {
                 networkClient = client,
                 initialDemoModeOverride = false
             )
-            repo.ensureSeeded()
+            try {
+                repo.ensureSeeded()
 
-            val sensorId = database.switchDao().insertDevice(
-                DeviceEntity(
-                    name = "Hallway Motion Sensor",
-                    roomName = "Hallway & Landing",
-                    deviceType = org.suppressingfire.wemi.data.DeviceType.MOTION_SENSOR.name,
-                    ipAddress = "127.0.0.1",
-                    port = targetServer.port,
-                    isOn = false,
-                    isReachable = true,
-                    serialNumber = "SENSOR001"
-                )
-            ).toInt()
-            val targetId = database.switchDao().insertDevice(
-                DeviceEntity(
-                    name = "Hallway Sconce",
-                    roomName = "Hallway & Landing",
-                    ipAddress = "127.0.0.1",
-                    port = targetServer.port,
-                    isOn = false,
-                    isReachable = true,
-                    serialNumber = "WLS0403MOTION01"
-                )
-            ).toInt()
-            database.switchDao().insertRule(
-                org.suppressingfire.wemi.data.RuleEntity(
-                    name = "Hallway Motion Light",
-                    ruleType = org.suppressingfire.wemi.data.RuleType.MOTION_TRIGGER.name,
-                    targetDeviceId = targetId,
-                    targetDeviceName = "Hallway Sconce",
-                    triggerSummary = "When Hallway Motion Sensor detects movement",
-                    actionSummary = "Turn ON Hallway Sconce",
-                    targetStateOn = true,
-                    isEnabled = true
-                )
-            )
+                val sensorId = database.switchDao().insertDevice(
+                    DeviceEntity(
+                        name = "Hallway Motion Sensor",
+                        roomName = "Hallway & Landing",
+                        deviceType = org.suppressingfire.wemi.data.DeviceType.MOTION_SENSOR.name,
+                        ipAddress = "127.0.0.1",
+                        port = targetServer.port,
+                        isOn = false,
+                        isReachable = true,
+                        serialNumber = "SENSOR001"
+                    )
+                ).toInt()
+                val targetId = database.switchDao().insertDevice(
+                    DeviceEntity(
+                        name = "Hallway Sconce",
+                        roomName = "Hallway & Landing",
+                        ipAddress = "127.0.0.1",
+                        port = targetServer.port,
+                        isOn = false,
+                        isReachable = true,
+                        serialNumber = "WLS0403MOTION01"
+                    )
+                ).toInt()
 
-            val sensorEntity = database.switchDao().getDeviceById(sensorId)!!
-            repo.triggerMotionEvent(sensorEntity)
+                val sensorEntity = database.switchDao().getDeviceById(sensorId)!!
+                repo.triggerMotionEvent(sensorEntity)
 
-            assertTrue(targetServer.relayStateOn.get())
-            assertEquals(true, database.switchDao().getDeviceById(targetId)?.isOn)
+                val refreshedSensor = database.switchDao().getDeviceById(sensorId)
+                assertNotNull(refreshedSensor)
+                assertTrue(refreshedSensor!!.lastMotionTime.isNotBlank())
+                assertTrue(refreshedSensor.isReachable)
+                assertFalse("Peer switch relay stays untouched by local motion telemetry refresh", targetServer.relayStateOn.get())
+                assertEquals(false, database.switchDao().getDeviceById(targetId)?.isOn)
+            } finally {
+                repo.close()
+            }
         }
     }
 }

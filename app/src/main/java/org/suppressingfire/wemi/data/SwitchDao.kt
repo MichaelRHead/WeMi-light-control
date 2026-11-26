@@ -62,25 +62,4 @@ interface SwitchDao {
 
     @Query("DELETE FROM wemo_home_networks")
     suspend fun deleteAllHomeNetworks()
-
-    @Query("SELECT * FROM wemo_rules ORDER BY id ASC")
-    fun getAllRules(): Flow<List<RuleEntity>>
-
-    @Query("SELECT COUNT(*) FROM wemo_rules")
-    suspend fun getRuleCount(): Int
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertRule(rule: RuleEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertRules(rules: List<RuleEntity>)
-
-    @Update
-    suspend fun updateRule(rule: RuleEntity)
-
-    @Query("DELETE FROM wemo_rules WHERE id = :id")
-    suspend fun deleteRuleById(id: Int)
-
-    @Query("DELETE FROM wemo_rules")
-    suspend fun deleteAllRules()
 }

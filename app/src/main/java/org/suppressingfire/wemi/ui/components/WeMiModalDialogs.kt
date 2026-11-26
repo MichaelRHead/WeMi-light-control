@@ -10,7 +10,8 @@ import org.suppressingfire.wemi.ui.SwitchViewModel
 
 /**
  * Hosts all mobile/tablet modal dialogs and bottom sheets (`AddWifiHomeNetworkDialog`,
- * `ProvisionApDialog`, `SsdpScannerModal`, `AddOrEditDeviceDialog`, and `AddRuleDialog`)
+ * `ProvisionApDialog`, `SsdpScannerModal`, `AddOrEditDeviceDialog`, `HardwareRuleEditorDialog`,
+ * `HardwareLocationDialog`, `HardwareRulesBackupDialog`, and `DeleteHardwareRuleConfirmDialog`)
  * outside `MainActivity.kt` so `WeMiSwitchApp` stays focused on top-level navigation and layout.
  */
 @Composable
@@ -25,7 +26,11 @@ internal fun WeMiModalDialogs(
     val showSsdpScannerSheet by viewModel.showSsdpScannerSheet.collectAsStateWithLifecycle()
     val showAddDeviceDialog by viewModel.showAddDeviceDialog.collectAsStateWithLifecycle()
     val editingDevice by viewModel.editingDevice.collectAsStateWithLifecycle()
-    val showAddRuleDialog by viewModel.showAddRuleDialog.collectAsStateWithLifecycle()
+    val hardwareRuleEditorRequest by viewModel.hardwareRuleEditorRequest.collectAsStateWithLifecycle()
+    val solarLocationDialogDevice by viewModel.solarLocationDialogDevice.collectAsStateWithLifecycle()
+    val backupRestoreDialogDevice by viewModel.backupRestoreDialogDevice.collectAsStateWithLifecycle()
+    val pendingDeleteHardwareRule by viewModel.pendingDeleteHardwareRule.collectAsStateWithLifecycle()
+    val hardwareRulesByDeviceId by viewModel.hardwareRulesByDeviceId.collectAsStateWithLifecycle()
 
     if (showAddHomeDialog) {
         val detectedLocalIp = remember { viewModel.detectCurrentLanIp() }
@@ -139,20 +144,41 @@ internal fun WeMiModalDialogs(
         )
     }
 
-    if (showAddRuleDialog) {
-        AddRuleDialog(
-            devices = homeDevices,
-            onDismiss = { viewModel.closeAddRuleDialog() },
-            onCreateRule = { name, ruleType, targetDevice, triggerSummary, targetStateOn, brightness ->
-                viewModel.addRule(
-                    name = name,
-                    ruleType = ruleType,
-                    targetDevice = targetDevice,
-                    triggerSummary = triggerSummary,
-                    targetStateOn = targetStateOn,
-                    targetBrightness = brightness
-                )
-            }
+    hardwareRuleEditorRequest?.let { req ->
+        HardwareRuleEditorDialog(
+            homeDevices = homeDevices,
+            snapshotsByDeviceId = hardwareRulesByDeviceId,
+            preselectedDeviceId = req.preselectedDeviceId,
+            editingRule = req.editingRule,
+            onDismiss = { viewModel.closeHardwareRuleEditorDialog() },
+            onSave = { targetDevice, draft -> viewModel.saveHardwareRule(targetDevice, draft) }
+        )
+    }
+
+    solarLocationDialogDevice?.let { device ->
+        HardwareLocationDialog(
+            device = device,
+            initialLocation = hardwareRulesByDeviceId[device.id]?.locationInfo,
+            onDismiss = { viewModel.closeSolarLocationDialog() },
+            onSaveLocation = { loc -> viewModel.saveSolarLocation(device, loc) }
+        )
+    }
+
+    backupRestoreDialogDevice?.let { device ->
+        HardwareRulesBackupDialog(
+            device = device,
+            backups = hardwareRulesByDeviceId[device.id]?.availableBackups.orEmpty(),
+            onDismiss = { viewModel.closeBackupRestoreDialog() },
+            onRestoreBackup = { entry -> viewModel.restoreHardwareRulesBackup(device, entry.filePath) }
+        )
+    }
+
+    pendingDeleteHardwareRule?.let { (device, rule) ->
+        DeleteHardwareRuleConfirmDialog(
+            device = device,
+            rule = rule,
+            onDismiss = { viewModel.cancelDeleteHardwareRule() },
+            onConfirmDelete = { viewModel.confirmDeleteHardwareRule() }
         )
     }
 }

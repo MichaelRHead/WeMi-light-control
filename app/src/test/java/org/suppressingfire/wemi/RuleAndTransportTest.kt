@@ -6,7 +6,6 @@ import java.io.EOFException
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.util.Calendar
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -24,19 +23,21 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.suppressingfire.wemi.data.DEFAULT_CABIN_HOME_KEY
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
-import org.suppressingfire.wemi.data.RuleEntity
-import org.suppressingfire.wemi.data.RuleScheduler
-import org.suppressingfire.wemi.data.RuleType
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.data.UNASSIGNED_ROOM
 import org.suppressingfire.wemi.data.normalizeRoomName
 import org.suppressingfire.wemi.network.GenaEventNotification
 import org.suppressingfire.wemi.network.GenaSubscriptionManager
+import org.suppressingfire.wemi.network.HardwareLongPressAction
+import org.suppressingfire.wemi.network.HardwareRule
+import org.suppressingfire.wemi.network.HardwareRuleDraft
+import org.suppressingfire.wemi.network.HardwareRuleType
+import org.suppressingfire.wemi.network.HardwareRulesDbMutator
+import org.suppressingfire.wemi.network.HardwareTimeAnchor
 import org.suppressingfire.wemi.network.LanHttpClient
 import org.suppressingfire.wemi.network.NetworkClient
 import org.suppressingfire.wemi.network.ProvisionerClient
@@ -51,64 +52,67 @@ import org.suppressingfire.wemi.widget.WidgetTargetConfig
 @Config(sdk = [36])
 class RuleAndTransportTest {
 
-    private fun calendarAt(year: Int, dayOfYear: Int, hour24: Int, minute: Int): Calendar =
-        Calendar.getInstance().apply {
-            set(Calendar.YEAR, year)
-            set(Calendar.DAY_OF_YEAR, dayOfYear)
-            set(Calendar.HOUR_OF_DAY, hour24)
-            set(Calendar.MINUTE, minute)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-
     @Test
-    fun ruleSchedulerEvaluatesClockDeterministicallyDeduplicatesMinuteAndIsolatesFailures() = runBlocking {
-        // 1. Validate parseScheduleTime24h valid formats and strict out-of-range rejection
-        assertEquals(Pair(19, 0), RuleScheduler.parseScheduleTime24h("Daily at 7:00 PM"))
-        assertEquals(Pair(12, 0), RuleScheduler.parseScheduleTime24h("Daily at 12:00 PM"))
-        assertEquals(Pair(0, 0), RuleScheduler.parseScheduleTime24h("Daily at 12:00 AM"))
-        assertEquals(Pair(23, 59), RuleScheduler.parseScheduleTime24h("Daily at 23:59"))
-        assertEquals(Pair(17, 30), RuleScheduler.parseScheduleTime24h("Daily at Sunset"))
-        assertEquals(Pair(6, 30), RuleScheduler.parseScheduleTime24h("Daily at Sunrise"))
-        assertEquals(Pair(0, 0), RuleScheduler.parseScheduleTime24h("Daily at Midnight"))
-        assertNull(RuleScheduler.parseScheduleTime24h("Daily at 25:00"))
-        assertNull(RuleScheduler.parseScheduleTime24h("Daily at 13:00 PM"))
-        assertNull(RuleScheduler.parseScheduleTime24h("Daily at 0:30 AM"))
-        assertNull(RuleScheduler.parseScheduleTime24h("Daily at 10:65 PM"))
-
-        // 2. Deterministic schedule evaluation with injected clock, dedup, next-day rollover & fault isolation
-        val triggeredIds = mutableListOf<Int>()
-        var currentClock = calendarAt(2026, dayOfYear = 100, hour24 = 19, minute = 0)
-        val scheduler = RuleScheduler(
-            onAutoOffExpired = {},
-            onScheduleRuleTriggered = { rule ->
-                triggeredIds.add(rule.id)
-                if (rule.id == 1) throw IllegalStateException("Simulated rule 1 dispatch error")
-            },
-            calendarProvider = { currentClock }
+    fun hardwareRuleDraftRoundTripsNativeRulesAndSanitizesSqlText() {
+        assertEquals(
+            "Evening Porch Sunset",
+            HardwareRulesDbMutator.sanitizeSqlText("Evening; \"Porch\" -- Sunset\n\r\u0000")
         )
+        assertTrue(HardwareRulesDbMutator.PRESET_SOLAR_LOCATIONS.any { it.cityName == "Seattle" })
 
-        val rules = listOf(
-            RuleEntity(1, "Failing Rule", RuleType.SCHEDULE.name, 1, "Lamp 1", "Daily at 7:00 PM", "ON", true, 100, true),
-            RuleEntity(2, "Healthy Rule", RuleType.SCHEDULE.name, 2, "Lamp 2", "Daily at 7:00 PM", "ON", true, 100, true),
-            RuleEntity(3, "Disabled Rule", RuleType.SCHEDULE.name, 3, "Lamp 3", "Daily at 7:00 PM", "ON", true, 100, false),
-            RuleEntity(4, "Auto Off Rule", RuleType.AUTO_OFF.name, 4, "Lamp 4", "Daily at 7:00 PM", "OFF", false, 100, true),
-            RuleEntity(5, "Different Time", RuleType.SCHEDULE.name, 5, "Lamp 5", "Daily at 8:15 PM", "ON", true, 100, true)
+        val solarRule = HardwareRule(
+            ruleId = 7,
+            name = "Porch Dusk to Dawn",
+            type = HardwareRuleType.SCHEDULE_INTERVAL,
+            rawFirmwareType = "Time Interval",
+            isEnabled = true,
+            ruleOrder = 1,
+            ownerDeviceUdn = "uuid:Lightswitch-3_0-SN1",
+            daysOfWeek = listOf(2, 3, 4, 5, 6),
+            startTime = org.suppressingfire.wemi.network.HardwareRuleTimePoint(rawSeconds = 64802, offsetSeconds = -900),
+            endTime = org.suppressingfire.wemi.network.HardwareRuleTimePoint(rawSeconds = 21601, offsetSeconds = 1800),
+            ruleDurationSeconds = 36000,
+            startAction = 1.0,
+            endAction = 0.0,
+            countdownSeconds = 0,
+            sensorDurationSeconds = 0,
+            appliesToInspectedSwitch = true
         )
+        assertTrue(solarRule.isEditableInApp)
+        val solarDraft = checkNotNull(HardwareRuleDraft.fromHardwareRule(solarRule))
+        assertEquals(7, solarDraft.existingRuleId)
+        assertEquals(HardwareTimeAnchor.SUNSET, solarDraft.startAnchor)
+        assertEquals(-15, solarDraft.startOffsetMinutes)
+        assertEquals(HardwareTimeAnchor.SUNRISE, solarDraft.endAnchor)
+        assertEquals(30, solarDraft.endOffsetMinutes)
+        assertEquals(listOf(2, 3, 4, 5, 6), solarDraft.daysOfWeek)
 
-        // First tick at 19:00 fires rules 1 and 2 (rule 1 throws, rule 2 still runs!)
-        assertEquals(2, scheduler.evaluateScheduledRulesNow(rules))
-        assertEquals(listOf(1, 2), triggeredIds)
+        val longPressRule = HardwareRule(
+            ruleId = 2,
+            name = "Hold All Off",
+            type = HardwareRuleType.LONG_PRESS,
+            rawFirmwareType = "Long Press",
+            isEnabled = true,
+            ruleOrder = 2,
+            ownerDeviceUdn = "uuid:Lightswitch-3_0-SN1",
+            daysOfWeek = listOf(-1),
+            startTime = org.suppressingfire.wemi.network.HardwareRuleTimePoint(60),
+            endTime = org.suppressingfire.wemi.network.HardwareRuleTimePoint(86400),
+            ruleDurationSeconds = 86340,
+            startAction = HardwareLongPressAction.TURN_OFF.code.toDouble(),
+            endAction = -1.0,
+            countdownSeconds = 0,
+            sensorDurationSeconds = 0,
+            targetDeviceUdns = listOf("uuid:Dimmer-2_0-SN2"),
+            appliesToInspectedSwitch = true
+        )
+        val lpDraft = checkNotNull(HardwareRuleDraft.fromHardwareRule(longPressRule))
+        assertEquals(HardwareLongPressAction.TURN_OFF, lpDraft.longPressAction)
+        assertEquals(listOf("uuid:Dimmer-2_0-SN2"), lpDraft.targetDeviceUdns)
 
-        // Second tick in the same minute deduplicates completely
-        assertEquals(0, scheduler.evaluateScheduledRulesNow(rules))
-        assertEquals(listOf(1, 2), triggeredIds)
-
-        // Next day at 19:00 fires rules 1 and 2 again
-        currentClock = calendarAt(2026, dayOfYear = 101, hour24 = 19, minute = 0)
-        assertEquals(2, scheduler.evaluateScheduledRulesNow(rules))
-        assertEquals(listOf(1, 2, 1, 2), triggeredIds)
-        scheduler.stopAll()
+        val awayRule = solarRule.copy(ruleId = 9, rawFirmwareType = "Away Mode", type = HardwareRuleType.AWAY_MODE)
+        assertFalse("Away Mode stays read-only/toggleable, not recreated in editor", awayRule.isEditableInApp)
+        assertNull(HardwareRuleDraft.fromHardwareRule(awayRule))
     }
 
     @Test
@@ -361,84 +365,51 @@ class RuleAndTransportTest {
     }
 
     @Test
-    fun autoOffAndMotionRulesIsolateSameNamedSwitchesAcrossWifiHomes() = runBlocking {
-        // 1. RuleScheduler AUTO_OFF isolates same-named switches across homes while keeping deleted-ID fallback
-        val scheduler = RuleScheduler(onAutoOffExpired = {}, onScheduleRuleTriggered = {})
+    fun hardwareRulesLocationInfoUpdatePreservesRulesAndPassesIntegrityCheck() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val dbFile = java.io.File.createTempFile("loc_mutator_", ".db", app.cacheDir)
         try {
-            val mainPorch = DeviceEntity(id = 1, name = "Porch Light", networkKey = DEFAULT_MAIN_HOME_KEY, isOn = true, isReachable = true)
-            val cabinPorch = DeviceEntity(id = 10, name = "Porch Light", networkKey = DEFAULT_CABIN_HOME_KEY, isOn = true, isReachable = true)
-            val mainOnlyRule = listOf(
-                RuleEntity(
-                    id = 5, name = "Main Porch Auto-Off", ruleType = RuleType.AUTO_OFF.name,
-                    targetDeviceId = 1, targetDeviceName = "Porch Light",
-                    triggerSummary = "After 15 minutes ON", actionSummary = "Turn OFF Porch Light",
-                    targetStateOn = false, isEnabled = true
+            org.suppressingfire.wemi.network.HardwareRulesSafetyValidator.createEmptyBelkinSchemaDb(dbFile)
+            val ownerUdn = "uuid:Lightswitch-3_0-WLS040LOC01"
+            val ruleId = HardwareRulesDbMutator.upsertRule(
+                sqliteFile = dbFile,
+                ownerDeviceUdn = ownerUdn,
+                draft = HardwareRuleDraft(
+                    name = "Porch Dusk Lights",
+                    type = HardwareRuleType.SCHEDULE_INTERVAL,
+                    isEnabled = true,
+                    daysOfWeek = listOf(1, 2, 3, 4, 5, 6, 7),
+                    startAnchor = HardwareTimeAnchor.SUNSET,
+                    startOffsetMinutes = -15,
+                    endAnchor = HardwareTimeAnchor.FIXED_TIME,
+                    endHour24 = 23,
+                    endMinute = 0,
+                    startActionOn = true,
+                    endActionOn = false
                 )
             )
-            val bothActive = setOf(1, 10)
-            scheduler.onDeviceStateUpdated(cabinPorch, mainOnlyRule, bothActive)
-            assertFalse("Foreign-home AUTO_OFF rule must not start timer on same-named device", scheduler.activeCountdownsSec.value.containsKey(10))
+            assertTrue(ruleId > 0)
 
-            scheduler.onDeviceStateUpdated(mainPorch, mainOnlyRule, bothActive)
-            assertEquals(900, scheduler.activeCountdownsSec.value[1])
+            val seattle = HardwareRulesDbMutator.PRESET_SOLAR_LOCATIONS.first { it.cityName == "Seattle" }
+            HardwareRulesDbMutator.updateLocationInfo(dbFile, seattle)
 
-            // When targetDeviceId=1 no longer exists in activeDeviceIds, fallback by name still works
-            scheduler.onDeviceStateUpdated(cabinPorch, mainOnlyRule, setOf(10))
-            assertEquals(900, scheduler.activeCountdownsSec.value[10])
+            val (b64, verdict) = org.suppressingfire.wemi.network.HardwareRulesSafetyValidator
+                .validateAndPackToBase64Zip(dbFile)
+            assertTrue("Packed rules.db with LOCATIONINFO must pass anti-brick validation: ${verdict.issues}", verdict.isSafeToStore)
+            assertNotNull(b64)
+
+            val parsed = org.suppressingfire.wemi.network.HardwareRulesDbCodec.parseSqliteFileReadOnly(
+                dbFile,
+                org.suppressingfire.wemi.network.HardwareRulesDbCodec.DEFAULT_ZIP_ENTRY_NAME,
+                ownerUdn
+            )
+            assertEquals(1, parsed.rules.size)
+            assertEquals("Seattle", parsed.locationInfo?.cityName)
+            assertEquals("47.6062", parsed.locationInfo?.latitude)
+            assertEquals("-122.3321", parsed.locationInfo?.longitude)
         } finally {
-            scheduler.stopAll()
-        }
-
-        // 2. Motion-trigger rule targeting Cabin's "Porch Light" must NOT hijack Main Home's "Porch Light"
-        val app = ApplicationProvider.getApplicationContext<Application>()
-        SwitchDatabase.closeCurrentInstance()
-        val dao = SwitchDatabase.getDatabase(app).switchDao()
-        FakeUpnpServer(initialFriendlyName = "Porch Light", serialNumber = "WLS040MAINP1", initialRelayOn = false).use { mainServer ->
-            FakeUpnpServer(initialFriendlyName = "Porch Light", serialNumber = "WLS040CABP2", initialRelayOn = false).use { cabinServer ->
-                val repo = SwitchRepository(dao = dao, context = app, initialDemoModeOverride = false)
-                try {
-                    val mainPorchId = dao.insertDevice(
-                        DeviceEntity(
-                            name = "Porch Light", roomName = "Porch", networkKey = DEFAULT_MAIN_HOME_KEY,
-                            ipAddress = "127.0.0.1", port = mainServer.port, isOn = false, isReachable = true,
-                            serialNumber = "WLS040MAINP1"
-                        )
-                    ).toInt()
-                    val cabinPorchId = dao.insertDevice(
-                        DeviceEntity(
-                            name = "Porch Light", roomName = "Porch", networkKey = DEFAULT_CABIN_HOME_KEY,
-                            ipAddress = "127.0.0.1", port = cabinServer.port, isOn = false, isReachable = true,
-                            serialNumber = "WLS040CABP2"
-                        )
-                    ).toInt()
-                    val mainSensor = DeviceEntity(
-                        name = "Main Porch Motion", roomName = "Porch", networkKey = DEFAULT_MAIN_HOME_KEY,
-                        deviceType = DeviceType.MOTION_SENSOR.name, ipAddress = "127.0.0.1", port = 49159
-                    ).let { it.copy(id = dao.insertDevice(it).toInt()) }
-
-                    dao.insertRule(
-                        RuleEntity(
-                            name = "Cabin Porch Motion", ruleType = RuleType.MOTION_TRIGGER.name,
-                            targetDeviceId = cabinPorchId, targetDeviceName = "Porch Light",
-                            triggerSummary = "Cabin motion", actionSummary = "Turn ON Porch Light",
-                            targetStateOn = true, isEnabled = true
-                        )
-                    )
-
-                    repo.triggerMotionEvent(mainSensor)
-                    assertFalse("Main Home same-named switch must not be hijacked by Cabin rule", mainServer.relayStateOn.get())
-                    assertFalse("Cabin Home switch must stay isolated from Main Home sensor", cabinServer.relayStateOn.get())
-
-                    // Deleting Cabin switch allows same-home name fallback to recover
-                    dao.deleteDeviceById(cabinPorchId)
-                    repo.triggerMotionEvent(mainSensor)
-                    assertTrue("Deleted targetDeviceId should fall back by name within triggering home", mainServer.relayStateOn.get())
-                    assertTrue(dao.getDeviceById(mainPorchId)?.isOn == true)
-                } finally {
-                    repo.close()
-                    SwitchDatabase.closeCurrentInstance()
-                }
-            }
+            runCatching { dbFile.delete() }
+            HardwareRulesDbMutator.cleanupSqliteSidecars(dbFile)
         }
     }
 

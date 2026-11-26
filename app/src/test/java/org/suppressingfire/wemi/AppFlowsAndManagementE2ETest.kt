@@ -2,29 +2,24 @@ package org.suppressingfire.wemi
 
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.percentOffset
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -33,26 +28,25 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.suppressingfire.wemi.data.DEFAULT_CABIN_HOME_KEY
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
-import org.suppressingfire.wemi.data.RuleEntity
 import org.suppressingfire.wemi.data.SwitchDao
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.ui.SwitchViewModel
 
 /**
- * Full-stack Jetpack Compose + Robolectric + loopback [FakeUpnpServer] E2E tests closing key
- * interactive management, navigation, and automation flows across phone & 10-inch tablet layouts:
+ * Full-stack Jetpack Compose + Robolectric + loopback [FakeUpnpServer] / [FakeHardwareRulesServer]
+ * E2E tests closing key interactive management, navigation, and on-device rules flows across phone
+ * & 10-inch tablet layouts:
  * 1. Multi-Home creation (`AddWifiHomeNetworkDialog`), Room collapse/expand, Room filter + Flat
  *    List toggle, context-sensitive header actions, and multi-layer `BackHandler` unwinding.
  * 2. Real-LAN hardware NVRAM rename (`ChangeFriendlyName` toggle ON vs. OFF), custom room move,
- *    Edit-Mode `Move Down` reordering, and `Delete Device` pruning active Auto-Off timers.
+ *    Edit-Mode `Move Down` reordering, and `Delete Device` cleanup.
  * 3. Add-dialog SSDP launcher (`scan_wifi_ssdp_button`), Search Target switching, `Rescan`, bulk
  *    `Adopt All`, More-tab Master ON/OFF, SOAP log `Clear`, and Demo ↔ Real LAN mode toggle.
- * 4. 10-inch Tablet landscape layout (`w840dp-h600dp-land`), Motion-Trigger Dimmer rule execution
- *    (honoring target brightness & Wi-Fi Home isolation over loopback SOAP), and Rule deletion.
+ * 4. 10-inch Tablet landscape layout (`w840dp-h600dp-land`), Motion sensor live telemetry refresh,
+ *    and On-Device Switch Rule creation + backup-protected deletion over loopback `rules1` SOAP.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -173,11 +167,11 @@ class AppFlowsAndManagementE2ETest {
             composeRule.onNodeWithTag("room_filter_All").performScrollTo().performClick()
             awaitListTag("devices_list", "room_header_Living Room")
 
-            // 4. Context-sensitive header '+' on Rules tab & 'Edit' auto-switching back to Devices
+            // 4. Context-sensitive header '+' on Rules tab opens HardwareRuleEditorDialog & 'Edit' auto-switches back to Devices
             composeRule.onNodeWithTag("nav_tab_rules").performClick()
             awaitTagDisplayed("rules_list")
             composeRule.onNodeWithTag("add_device_button").performClick()
-            awaitTagDisplayed("rule_name_input")
+            awaitTagDisplayed("hardware_rule_name_input")
             composeRule.onNodeWithText("Cancel").performClick()
             composeRule.waitForIdle()
 
@@ -209,7 +203,7 @@ class AppFlowsAndManagementE2ETest {
     }
 
     @Test
-    fun realLanHardwareRenameRoomMoveReorderDownAndDeletePrunesCountdown() {
+    fun realLanHardwareRenameRoomMoveReorderDownAndDeleteCleansDevice() {
         FakeUpnpServer(
             initialFriendlyName = "Patio Lamp", modelName = "WLS040",
             serialNumber = "WLS040MGT01", udn = "uuid:Lightswitch-3_0-WLS040MGT01", initialRelayOn = true
@@ -223,21 +217,13 @@ class AppFlowsAndManagementE2ETest {
                     val activeHome = vm.activeNetworkKey.value
                     val lampId = insertDevice(
                         "Patio Lamp", "Patio", activeHome, DeviceType.SWITCH_PLUG,
-                        lampServer.port, "WLS040MGT01", isOn = true, autoOffMinutes = 15, sortOrder = 0
+                        lampServer.port, "WLS040MGT01", isOn = true, sortOrder = 0
                     )
                     val fanId = insertDevice(
                         "Patio Fan", "Patio", activeHome, DeviceType.SWITCH_PLUG,
                         fanServer.port, "WLS040MGT02", isOn = false, sortOrder = 1
                     )
                     awaitListTag("devices_list", "device_row_$lampId")
-                    composeRule.awaitLoopbackIo {
-                        vm.activeAutoOffCountdownsSec.value.containsKey(lampId) &&
-                            runCatching {
-                                composeRule.onNodeWithTag("auto_off_countdown_$lampId", useUnmergedTree = true)
-                                    .assertIsDisplayed()
-                                true
-                            }.getOrDefault(false)
-                    }
 
                     // 1. Edit Patio Fan with Hardware NVRAM Sync ON + move into custom room 'Sunroom'
                     composeRule.onNodeWithTag("edit_devices_button").performClick()
@@ -286,12 +272,11 @@ class AppFlowsAndManagementE2ETest {
                             }
                     }
 
-                    // 4. Delete Patio Lamp via Edit Mode -> removes row & prunes active Auto-Off countdown
+                    // 4. Delete Patio Lamp via Edit Mode -> removes row cleanly
                     awaitListTag("devices_list", "delete_device_$lampId")
                     composeRule.onNodeWithTag("delete_device_$lampId").performClick()
                     composeRule.awaitLoopbackIo {
                         runBlocking { dao().getDeviceById(lampId) == null } &&
-                            !vm.activeAutoOffCountdownsSec.value.containsKey(lampId) &&
                             runCatching {
                                 composeRule.onNodeWithTag("device_row_$lampId").assertDoesNotExist()
                                 true
@@ -376,99 +361,82 @@ class AppFlowsAndManagementE2ETest {
 
     @Test
     @Config(sdk = [36], qualifiers = "w840dp-h600dp-land")
-    fun realLanMotionTriggerDimmerRuleDeletionAndTabletLayout() {
-        FakeUpnpServer(
-            initialFriendlyName = "Hallway Sconce", deviceTypeUrn = "urn:Belkin:device:dimmer:1",
-            modelName = "WDS060", serialNumber = "WDS060MOT01", udn = "uuid:Dimmer-1_0-WDS060MOT01",
-            initialRelayOn = false, initialBrightness = 100
-        ).use { dimmerServer ->
-            FakeUpnpServer(
-                initialFriendlyName = "Cabin Porch Light", modelName = "WLS040",
-                serialNumber = "WLS040CAB02", udn = "uuid:Lightswitch-3_0-WLS040CAB02", initialRelayOn = false
-            ).use { cabinServer ->
-                ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                    val vm = resetToCleanRealLan(scenario)
-                    val activeHome = vm.activeNetworkKey.value
+    fun realLanTabletLayoutMotionTelemetryAndOnDeviceRuleCreateDelete() {
+        val workDir = java.io.File(context.cacheDir, "tablet_hw_rules").apply { mkdirs() }
+        val switchUdn = "uuid:Lightswitch-3_0-WLS0403TAB01"
+        val sampleZip = FakeHardwareRulesServer.buildSampleOpenWrtRulesZip(
+            ownerUdn = switchUdn,
+            targetUdn = "uuid:Dimmer-2_0-WDS060TAB02",
+            workDir = workDir
+        )
+        FakeHardwareRulesServer(
+            initialFriendlyName = "Hallway Switch",
+            modelName = "WLS0403",
+            serialNumber = "WLS0403TAB01",
+            udn = switchUdn,
+            supportsRulesDb = true,
+            initialDbVersion = 2,
+            initialRulesZipBytes = sampleZip
+        ).use { rulesServer ->
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                val vm = resetToCleanRealLan(scenario)
+                val activeHome = vm.activeNetworkKey.value
 
-                    // Verify 10-inch Tablet landscape TopHeader keeps >= 48dp touch target height
-                    val addBounds = composeRule.onNodeWithTag("add_device_button").getUnclippedBoundsInRoot()
-                    assertTrue(
-                        "Expected >= 48dp header touch height on tablet, got ${addBounds.bottom - addBounds.top}",
-                        (addBounds.bottom - addBounds.top) >= 48.dp
-                    )
+                // Verify 10-inch Tablet landscape TopHeader keeps >= 48dp touch target height
+                val addBounds = composeRule.onNodeWithTag("add_device_button").getUnclippedBoundsInRoot()
+                assertTrue(
+                    "Expected >= 48dp header touch height on tablet, got ${addBounds.bottom - addBounds.top}",
+                    (addBounds.bottom - addBounds.top) >= 48.dp
+                )
 
-                    val dimmerId = insertDevice(
-                        "Hallway Sconce", "Hallway & Landing", activeHome, DeviceType.LIGHTBULB_DIMMER,
-                        dimmerServer.port, "WDS060MOT01", isOn = false, brightness = 100
-                    )
-                    val sensorId = insertDevice(
-                        "Hallway Motion", "Hallway & Landing", activeHome, DeviceType.MOTION_SENSOR,
-                        49159, "SENSORHAL01"
-                    )
-                    val cabinId = insertDevice(
-                        "Cabin Porch Light", "Porch", DEFAULT_CABIN_HOME_KEY, DeviceType.SWITCH_PLUG,
-                        cabinServer.port, "WLS040CAB02", isOn = false
-                    )
-                    // Seed a foreign-home motion rule that must NOT fire when Hallway Motion triggers
-                    runBlocking {
-                        dao().insertRule(
-                            RuleEntity(
-                                name = "Foreign Cabin Motion", ruleType = "MOTION_TRIGGER",
-                                targetDeviceId = cabinId, targetDeviceName = "Cabin Porch Light",
-                                triggerSummary = "Cabin motion", actionSummary = "Turn ON Cabin Porch Light",
-                                targetStateOn = true, isEnabled = true
-                            )
+                val switchId = runBlocking {
+                    dao().insertDevice(
+                        DeviceEntity(
+                            name = "Hallway Switch", roomName = "Hallway & Landing", networkKey = activeHome,
+                            deviceType = DeviceType.SWITCH_PLUG.name, ipAddress = "127.0.0.1", port = rulesServer.port,
+                            isOn = false, isReachable = true, serialNumber = "WLS0403TAB01", udn = switchUdn
                         )
-                    }
-
-                    // 1. Verify AUTO_OFF defaults to Turn Switch OFF, then create Motion Trigger rule targeting Hallway Sconce
-                    composeRule.onNodeWithTag("nav_tab_rules").performClick()
-                    awaitTagDisplayed("add_rule_button")
-                    composeRule.onNodeWithTag("add_rule_button").performClick()
-                    awaitTagDisplayed("rule_name_input")
-                    composeRule.onNodeWithText("Auto-Off Timer").performClick()
-                    composeRule.waitForIdle()
-                    composeRule.onNodeWithText("Action: Turn Switch OFF").assertIsDisplayed()
-                    composeRule.onNodeWithTag("rule_name_input").performTextReplacement("Hallway Night Glow")
-                    composeRule.onNodeWithText("Motion Trigger").performClick()
-                    composeRule.waitForIdle()
-                    composeRule.onNodeWithText("Action: Turn Switch ON").assertIsDisplayed()
-                    composeRule.onNodeWithTag("rule_brightness_slider").performScrollTo().performTouchInput {
-                        click(percentOffset(0.45f, 0.5f))
-                    }
-                    composeRule.onNodeWithTag("save_rule_button").performClick()
-
-                    var createdRuleId = -1
-                    composeRule.awaitLoopbackIo {
-                        val rule = runBlocking { dao().getAllRules().first().firstOrNull { it.name == "Hallway Night Glow" } }
-                        if (rule != null) { createdRuleId = rule.id; true } else false
-                    }
-
-                    // 2. Tap Motion Sensor row -> fires real loopback dimmer SOAP (~45%) & isolates Cabin Home
-                    composeRule.onNodeWithTag("nav_tab_devices").performClick()
-                    awaitListTag("devices_list", "device_row_$sensorId")
-                    composeRule.onNodeWithTag("device_name_$sensorId", useUnmergedTree = true).performClick()
-
-                    composeRule.awaitLoopbackIo {
-                        dimmerServer.relayStateOn.get() && dimmerServer.dimmerBrightness.get() in 30..60
-                    }
-                    assertFalse("Foreign-home motion rule must stay isolated", cabinServer.relayStateOn.get())
-                    assertTrue(runBlocking { dao().getDeviceById(dimmerId)?.isOn == true })
-
-                    // 3. Delete the created rule via RulesScreen delete_rule_<id> button
-                    composeRule.onNodeWithTag("nav_tab_rules").performClick()
-                    awaitListTag("rules_list", "rule_row_$createdRuleId")
-                    composeRule.onNodeWithTag("delete_rule_$createdRuleId").performClick()
-                    composeRule.awaitLoopbackIo {
-                        runBlocking { dao().getAllRules().first().none { it.id == createdRuleId } } &&
-                            runCatching {
-                                composeRule.onNodeWithTag("rule_row_$createdRuleId").assertDoesNotExist()
-                                true
-                            }.getOrDefault(false)
-                    }
-                    composeRule.onNodeWithTag("rule_row_$createdRuleId").assertDoesNotExist()
-                    assertNull(runBlocking { dao().getAllRules().first().find { it.id == createdRuleId } })
+                    ).toInt()
                 }
+                val sensorId = insertDevice(
+                    "Hallway Motion", "Hallway & Landing", activeHome, DeviceType.MOTION_SENSOR,
+                    49159, "SENSORHAL01"
+                )
+
+                // 1. Tap Motion Sensor row -> refreshes live motion telemetry timestamp
+                awaitListTag("devices_list", "device_row_$sensorId")
+                composeRule.onNodeWithTag("device_name_$sensorId", useUnmergedTree = true).performClick()
+                composeRule.awaitLoopbackIo {
+                    runBlocking { dao().getDeviceById(sensorId)?.lastMotionTime?.isNotBlank() == true }
+                }
+
+                // 2. Rules tab: read on-device rules, create a new Auto-Off Delay rule, then delete it with confirmation
+                composeRule.onNodeWithTag("nav_tab_rules").performClick()
+                awaitTagDisplayed("add_hardware_rule_button")
+                composeRule.onNodeWithTag("add_hardware_rule_button").performClick()
+                awaitTagDisplayed("hardware_rule_name_input")
+                composeRule.onNodeWithTag("hardware_rule_name_input").performTextReplacement("Hallway Night Off")
+                composeRule.onNodeWithTag("hardware_rule_type_countdown").performScrollTo().performClick()
+                composeRule.onNodeWithTag("countdown_preset_15").performScrollTo().performClick()
+                composeRule.onNodeWithTag("save_hardware_rule_button").performClick()
+
+                composeRule.awaitLoopbackIo {
+                    rulesServer.storeRulesCalls.get() >= 1 &&
+                        vm.hardwareRulesByDeviceId.value[switchId]?.rules?.any { it.name == "Hallway Night Off" } == true
+                }
+                val createdRuleId = vm.hardwareRulesByDeviceId.value[switchId]!!
+                    .rules.first { it.name == "Hallway Night Off" }.ruleId
+
+                awaitListTag("rules_list", "delete_hardware_rule_${switchId}_$createdRuleId")
+                composeRule.onNodeWithTag("delete_hardware_rule_${switchId}_$createdRuleId").performClick()
+                awaitTagDisplayed("confirm_delete_hardware_rule_button")
+                composeRule.onNodeWithTag("confirm_delete_hardware_rule_button").performClick()
+
+                composeRule.awaitLoopbackIo {
+                    rulesServer.storeRulesCalls.get() >= 2 &&
+                        vm.hardwareRulesByDeviceId.value[switchId]?.rules?.none { it.ruleId == createdRuleId } == true
+                }
+                assertNull(vm.hardwareRulesByDeviceId.value[switchId]?.rules?.find { it.ruleId == createdRuleId })
             }
         }
     }

@@ -12,10 +12,6 @@ import java.io.OutputStreamWriter
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
-import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.SocketFactory
@@ -47,9 +43,6 @@ import org.robolectric.annotation.Config
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
-import org.suppressingfire.wemi.data.RuleEntity
-import org.suppressingfire.wemi.data.RuleScheduler
-import org.suppressingfire.wemi.data.RuleType
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
@@ -66,10 +59,9 @@ import org.suppressingfire.wemi.ui.ProvisionApUiController
 import org.suppressingfire.wemi.ui.SwitchViewModel
 
 /**
- * Hermetic regression suite verifying coroutine cancellation propagation, RuleScheduler lifecycle
- * pruning & timer-replacement safety, concurrent repository adoption/metadata merging, GENA
- * placeholder SID eviction & brightness-only logs, provisioning identity preservation, and
- * ViewModel/UI controller re-entrancy guards.
+ * Hermetic regression suite verifying coroutine cancellation propagation, concurrent repository
+ * adoption/metadata merging, GENA placeholder SID eviction & brightness-only logs, provisioning
+ * identity preservation, and ViewModel/UI controller re-entrancy guards.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -88,56 +80,6 @@ class LifecycleAndConcurrencyTest {
     @After
     fun tearDown() {
         database.close()
-    }
-
-    @Test
-    fun `verify RuleScheduler prunes removed devices, avoids timer replacement races, and isolates schedule failures`() = runBlocking {
-        val expiredIds = CopyOnWriteArrayList<Int>()
-        val triggeredRuleIds = CopyOnWriteArrayList<Int>()
-        val scheduler = RuleScheduler(
-            onAutoOffExpired = { id -> expiredIds.add(id) },
-            onScheduleRuleTriggered = { rule ->
-                if (rule.id == 1) throw IllegalStateException("Simulated failing rule")
-                triggeredRuleIds.add(rule.id)
-            }
-        )
-        try {
-            // 1. Prune removed device before its 1-second timer expires while keeping active sibling
-            scheduler.startAutoOffCountdownSeconds(101, 1)
-            scheduler.startAutoOffCountdownSeconds(102, 45)
-            scheduler.pruneRemovedDevices(setOf(102))
-            assertFalse(101 in scheduler.activeCountdownsSec.value)
-            assertTrue(102 in scheduler.activeCountdownsSec.value)
-
-            // 2. Replace a 1-second timer with a 60-second timer; cancelled first timer must not clear or fire
-            scheduler.startAutoOffCountdownSeconds(202, 1)
-            scheduler.startAutoOffCountdownSeconds(202, 60)
-            delay(1250L)
-            assertFalse("Pruned device 101 must never expire", 101 in expiredIds)
-            assertFalse("Replaced device 202 must not expire early", 202 in expiredIds)
-            assertTrue((scheduler.activeCountdownsSec.value[202] ?: 0) > 50)
-
-            // 3. Schedule loop skips AUTO_OFF even with HH:mm text, isolates throwing rule, and stopAll resets keys
-            if (Calendar.getInstance().get(Calendar.SECOND) >= 58) delay(2200L)
-            val formattedNow = SimpleDateFormat("h:mm a", Locale.US).format(Calendar.getInstance().time)
-            val rules = listOf(
-                RuleEntity(id = 1, name = "Throwing Schedule", ruleType = RuleType.SCHEDULE.name, targetDeviceId = 10, targetDeviceName = "Porch", triggerSummary = "Daily at $formattedNow", actionSummary = "Turn ON", isEnabled = true),
-                RuleEntity(id = 2, name = "Auto-Off With Clock", ruleType = RuleType.AUTO_OFF.name, targetDeviceId = 11, targetDeviceName = "Garage", triggerSummary = "Daily at $formattedNow", actionSummary = "Turn OFF", isEnabled = true),
-                RuleEntity(id = 3, name = "Healthy Schedule", ruleType = RuleType.SCHEDULE.name, targetDeviceId = 12, targetDeviceName = "Kitchen", triggerSummary = "Daily at $formattedNow", actionSummary = "Turn ON", isEnabled = true)
-            )
-            scheduler.startScheduleLoop { rules }
-            withTimeout(2000L) { while (3 !in triggeredRuleIds) delay(25L) }
-            assertFalse("AUTO_OFF rule must never trigger in schedule loop", 2 in triggeredRuleIds)
-            assertEquals(listOf(3), triggeredRuleIds.toList())
-
-            scheduler.stopAll()
-            triggeredRuleIds.clear()
-            scheduler.startScheduleLoop { rules.filter { it.id == 3 } }
-            withTimeout(2000L) { while (3 !in triggeredRuleIds) delay(25L) }
-            assertEquals(listOf(3), triggeredRuleIds.toList())
-        } finally {
-            scheduler.stopAll()
-        }
     }
 
     @Test
@@ -382,7 +324,7 @@ class LifecycleAndConcurrencyTest {
     }
 
     @Test
-    fun `verify ViewModel prunes Auto-Off countdown on delete and controllers serialize scan, provision, and reconnect`() = runBlocking {
+    fun `verify ViewModel evicts hardware rules snapshot on delete and controllers serialize scan, provision, and reconnect`() = runBlocking {
         val app = ApplicationProvider.getApplicationContext<Application>()
         val store = ViewModelStore()
         val extras = MutableCreationExtras().apply {
@@ -398,19 +340,14 @@ class LifecycleAndConcurrencyTest {
                     }
                 }
             }
-            // 1. Delete a switch with an active Auto-Off timer and confirm countdown is pruned
+            // 1. Delete a switch with an inspected on-device rules snapshot and confirm cache entry is evicted
             awaitMainCondition { viewModel.devices.value.any { it.id > 0 } }
             val target = viewModel.devices.value.first { it.id > 0 && it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR }
-            viewModel.saveDevice(
-                id = target.id, name = target.name, roomName = target.roomName,
-                deviceType = target.parsedType, ipAddress = target.ipAddress, port = target.port,
-                brightness = target.brightness, isReachable = true, isOn = true,
-                autoOffMinutes = 15, syncFriendlyNameToHardware = false
-            )
-            awaitMainCondition { target.id in viewModel.activeAutoOffCountdownsSec.value }
+            viewModel.inspectDeviceHardwareRules(target)
+            awaitMainCondition { target.id in viewModel.hardwareRulesByDeviceId.value }
             viewModel.deleteDevice(target)
-            awaitMainCondition { target.id !in viewModel.activeAutoOffCountdownsSec.value }
-            assertFalse(target.id in viewModel.activeAutoOffCountdownsSec.value)
+            awaitMainCondition { target.id !in viewModel.hardwareRulesByDeviceId.value }
+            assertFalse(target.id in viewModel.hardwareRulesByDeviceId.value)
 
             // 2. ProvisionApUiController cancels superseded scan when provisioning begins and deduplicates concurrent triggers
             val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

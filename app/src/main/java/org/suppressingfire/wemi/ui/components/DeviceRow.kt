@@ -120,11 +120,12 @@ fun DeviceRow(
     onToggleNightMode: (() -> Unit)? = null,
     onPinDeviceWidget: (() -> Unit)? = null,
     isDemoShowroomMode: Boolean = false,
-    autoOffRemainingSeconds: Int? = null,
     hardwareRulesSnapshot: DeviceHardwareRulesSnapshot? = null,
     isInspectingHardwareRules: Boolean = false,
     udnToFriendlyName: Map<String, String> = emptyMap(),
     onInspectHardwareRules: (() -> Unit)? = null,
+    onAddHardwareRule: (() -> Unit)? = null,
+    onSyncDeviceClock: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val type = device.parsedType
@@ -238,20 +239,6 @@ fun DeviceRow(
                                     label = if (device.isOn) "ON • ${device.brightness}%" else "OFF • ${device.brightness}%",
                                     modifier = Modifier.testTag("power_state_badge_${device.id}")
                                 )
-                                if (autoOffRemainingSeconds != null && autoOffRemainingSeconds > 0) {
-                                    val mins = autoOffRemainingSeconds / 60
-                                    val secs = autoOffRemainingSeconds % 60
-                                    Text(
-                                        text = "Auto-Off ${mins}:${secs.toString().padStart(2, '0')}",
-                                        color = WemoTextSecondary,
-                                        fontFamily = FontFamily.Monospace,
-                                        fontSize = 11.sp,
-                                        maxLines = 1,
-                                        softWrap = false,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.testTag("auto_off_countdown_${device.id}")
-                                    )
-                                }
                                 Icon(
                                     imageVector = if (isExpanded) {
                                         Icons.Default.KeyboardArrowUp
@@ -274,26 +261,13 @@ fun DeviceRow(
                                     label = if (device.isOn) "ON" else "OFF",
                                     modifier = Modifier.testTag("power_state_badge_${device.id}")
                                 )
-                                val hasAutoOff = autoOffRemainingSeconds != null && autoOffRemainingSeconds > 0
-                                val subLabel = if (hasAutoOff) {
-                                    val mins = autoOffRemainingSeconds / 60
-                                    val secs = autoOffRemainingSeconds % 60
-                                    "Auto-Off ${mins}:${secs.toString().padStart(2, '0')}"
-                                } else {
-                                    device.ipAddress
-                                }
                                 Text(
-                                    text = subLabel,
+                                    text = device.ipAddress,
                                     color = WemoTextSecondary,
                                     fontFamily = FontFamily.Monospace,
                                     fontSize = 11.sp,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = if (hasAutoOff) {
-                                        Modifier.testTag("auto_off_countdown_${device.id}")
-                                    } else {
-                                        Modifier
-                                    }
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }
@@ -418,7 +392,9 @@ fun DeviceRow(
                         hardwareRulesSnapshot = hardwareRulesSnapshot,
                         isInspectingHardwareRules = isInspectingHardwareRules,
                         udnToFriendlyName = udnToFriendlyName,
-                        onInspectHardwareRules = onInspectHardwareRules
+                        onInspectHardwareRules = onInspectHardwareRules,
+                        onAddHardwareRule = onAddHardwareRule,
+                        onSyncDeviceClock = onSyncDeviceClock
                     )
                 }
             }

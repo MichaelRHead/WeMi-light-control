@@ -190,40 +190,6 @@ data class DeviceEntity(
     }
 }
 
-enum class RuleType {
-    SCHEDULE,
-    MOTION_TRIGGER,
-    AUTO_OFF;
-
-    companion object {
-        fun fromRaw(raw: String): RuleType {
-            val normalized = raw.trim().uppercase()
-            return when {
-                normalized.startsWith("AUTO_OFF") -> AUTO_OFF
-                normalized.startsWith("MOTION") -> MOTION_TRIGGER
-                else -> SCHEDULE
-            }
-        }
-    }
-}
-
-@Entity(tableName = "wemo_rules")
-data class RuleEntity(
-    @PrimaryKey(autoGenerate = true) val id: Int = 0,
-    val name: String,
-    val ruleType: String, // SCHEDULE, MOTION_TRIGGER, AUTO_OFF
-    val targetDeviceId: Int,
-    val targetDeviceName: String,
-    val triggerSummary: String,
-    val actionSummary: String,
-    val targetStateOn: Boolean = true,
-    val targetBrightness: Int = 100,
-    val isEnabled: Boolean = true
-) {
-    val parsedRuleType: RuleType
-        get() = RuleType.fromRaw(ruleType)
-}
-
 data class SoapLogEntry(
     val id: Long = System.nanoTime(),
     val timestamp: String,

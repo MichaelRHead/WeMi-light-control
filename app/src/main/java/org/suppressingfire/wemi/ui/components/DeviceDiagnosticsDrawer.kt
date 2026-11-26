@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Sensors
@@ -43,14 +42,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
-import org.suppressingfire.wemi.network.HardwareRulesCapability
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
@@ -75,7 +72,9 @@ internal fun ExpandedDrawer(
     hardwareRulesSnapshot: DeviceHardwareRulesSnapshot? = null,
     isInspectingHardwareRules: Boolean = false,
     udnToFriendlyName: Map<String, String> = emptyMap(),
-    onInspectHardwareRules: (() -> Unit)? = null
+    onInspectHardwareRules: (() -> Unit)? = null,
+    onAddHardwareRule: (() -> Unit)? = null,
+    onSyncDeviceClock: (() -> Unit)? = null
 ) {
     val type = device.parsedType
     var sliderVal by remember(device.brightness) {
@@ -319,169 +318,10 @@ internal fun ExpandedDrawer(
                 snapshot = hardwareRulesSnapshot,
                 isInspecting = isInspectingHardwareRules,
                 udnToName = udnToFriendlyName,
-                onInspectHardwareRules = onInspectHardwareRules
+                onInspectHardwareRules = onInspectHardwareRules,
+                onAddHardwareRule = onAddHardwareRule,
+                onSyncDeviceClock = onSyncDeviceClock
             )
-        }
-    }
-}
-
-/**
- * Compact per-switch on-device rules readout inside [ExpandedDrawer] (placed below Dimmer
- * Brightness and Connection Telemetry so Layout Invariant 4 stays intact).
- */
-@Composable
-private fun ExpandedDrawerHardwareRulesSection(
-    device: DeviceEntity,
-    snapshot: DeviceHardwareRulesSnapshot?,
-    isInspecting: Boolean,
-    udnToName: Map<String, String>,
-    onInspectHardwareRules: () -> Unit
-) {
-    val cap = snapshot?.capability ?: device.parsedHardwareRulesCapability
-    val lp = snapshot?.longPressCapable ?: device.hardwareRulesLongPressCapable
-    val rules = snapshot?.rules?.filter { it.appliesToInspectedSwitch }.orEmpty()
-
-    Surface(
-        color = Color.White,
-        shape = RoundedCornerShape(10.dp),
-        border = BorderStroke(1.dp, WemoDividerGray),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 6.dp)
-            .testTag("hardware_rules_drawer_section_${device.id}")
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    val statusLine = buildString {
-                        append("On-Device Rules: ${cap.displayLabel}")
-                        if (lp && cap.isSupportedOrLikely) append(" • Long Press")
-                    }
-                    Text(
-                        text = statusLine,
-                        color = if (cap.isSupportedOrLikely) WemoGreenDark else WemoTextPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp
-                    )
-                    val subtitle = when {
-                        snapshot != null && cap == HardwareRulesCapability.VERIFIED_SUPPORTED ->
-                            "${rules.size} rule(s) stored on switch (DB v${snapshot.dbVersion})"
-                        snapshot != null -> snapshot.diagnosticMessage
-                        else -> "Read stored schedules, auto-off delays & long-press targets"
-                    }
-                    Text(
-                        text = subtitle,
-                        color = WemoTextSecondary,
-                        fontSize = 11.sp
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                AssistChip(
-                    onClick = onInspectHardwareRules,
-                    enabled = !isInspecting && device.isReachable,
-                    label = {
-                        Text(
-                            text = when {
-                                isInspecting -> "Reading..."
-                                snapshot != null -> "Refresh"
-                                else -> "Inspect Rules"
-                            },
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Memory,
-                            contentDescription = "Inspect on-device rules for ${device.name}",
-                            modifier = Modifier.size(15.dp)
-                        )
-                    },
-                    colors = AssistChipDefaults.assistChipColors(
-                        leadingIconContentColor = WemoGreenDark,
-                        labelColor = WemoGreenDark
-                    ),
-                    modifier = Modifier.testTag("inspect_device_rules_${device.id}")
-                )
-            }
-            if (snapshot?.deviceTimeInfo?.needsTimeSync == true) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Switch clock needs sync — schedules may run off-time",
-                    color = Color(0xFF92400E),
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 11.sp
-                )
-            }
-            if (rules.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    rules.take(4).forEach { rule ->
-                        val (triggerText, actionText) = rule.formatTriggerAndAction(udnToName)
-                        Surface(
-                            color = if (rule.isEnabled) Color(0xFFF8FAFC) else Color(0xFFF3F4F6),
-                            shape = RoundedCornerShape(7.dp),
-                            border = BorderStroke(1.dp, WemoDividerGray),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp, vertical = 5.dp)
-                            ) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = rule.name,
-                                        color = if (rule.isEnabled) WemoTextPrimary else WemoTextSecondary,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 11.5.sp,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = if (rule.isEnabled) rule.type.displayLabel else "${rule.type.displayLabel} • Paused",
-                                        color = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary,
-                                        fontWeight = FontWeight.Medium,
-                                        fontSize = 10.sp,
-                                        maxLines = 1,
-                                        softWrap = false
-                                    )
-                                }
-                                Text(
-                                    text = "$triggerText → $actionText",
-                                    color = WemoTextSecondary,
-                                    fontSize = 10.5.sp,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                    if (rules.size > 4) {
-                        Text(
-                            text = "+${rules.size - 4} more rule(s) in Rules tab",
-                            color = WemoGreenDark,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-            }
         }
     }
 }

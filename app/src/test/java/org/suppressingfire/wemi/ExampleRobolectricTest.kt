@@ -190,10 +190,11 @@ class ExampleRobolectricTest {
         composeTestRule.onNodeWithText("Christmas Tree Kitchen").assertIsDisplayed()
         composeTestRule.onNodeWithTag("category_badge_4", useUnmergedTree = true).assertIsDisplayed()
 
-        // Switch to Rules tab and verify rules load
+        // Switch to Rules tab and verify On-Device Switch Rules header loads
         composeTestRule.onNodeWithTag("nav_tab_rules").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Evening Holiday Lights").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("hardware_rules_header_card").assertIsDisplayed()
+        composeTestRule.onNodeWithText("On-Device Switch Rules").assertIsDisplayed()
 
         // Switch to More tab and verify Master Switch Control & UPnP engine appear
         composeTestRule.onNodeWithTag("nav_tab_more").performClick()

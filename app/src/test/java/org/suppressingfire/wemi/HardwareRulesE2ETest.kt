@@ -1,6 +1,7 @@
 package org.suppressingfire.wemi
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -10,20 +11,24 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
+import androidx.lifecycle.ViewModelProvider
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.suppressingfire.wemi.ui.SwitchViewModel
 
 /**
- * Full-stack Jetpack Compose + Loopback UPnP/SOAP E2E test for Step 1 On-Device Switch Rules:
+ * Full-stack Jetpack Compose + Loopback UPnP/SOAP E2E test for Step 2 On-Device Switch Rules:
  * adopts a loopback OpenWrt switch (with Long Press, Auto-Off Countdown, Sunset Schedule, and
- * Away Mode rules) and a loopback RTOS Dimmer V2, inspects on-device rules from both the Rules
- * tab and the Devices tab expanded diagnostics drawer, and verifies existing local rules UI
- * stays accessible.
+ * Away Mode rules plus a year-2000 drifted clock) and a loopback RTOS Dimmer V2, inspects rules,
+ * creates/toggles/edits/deletes native on-device rules with automatic `timesync1#TimeSync`, updates
+ * Solar Location (`LOCATIONINFO`), restores a saved pre-write backup, and verifies the expanded
+ * Devices-tab diagnostics drawer readout.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -35,10 +40,25 @@ class HardwareRulesE2ETest {
     private fun awaitLoopbackIo(timeoutMs: Long = 6_000L, condition: () -> Boolean) =
         composeTestRule.awaitLoopbackIo(timeoutMs, condition)
 
+    private fun awaitRulesListNode(tagOrText: String, isTag: Boolean = true) {
+        val matcher = if (isTag) {
+            hasTestTag(tagOrText) or hasAnyDescendant(hasTestTag(tagOrText))
+        } else {
+            hasText(tagOrText, substring = true)
+        }
+        awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("rules_list").performScrollToNode(matcher)
+                true
+            }.getOrDefault(false)
+        }
+    }
+
     @Test
-    fun `E2E Rules tab and Device Drawer inspect OpenWrt stored rules and classify RTOS Dimmer V2`() {
+    fun `E2E full Step 2 On-Device Rules CRUD, auto clock sync, solar location, backup restore, and RTOS classification`() {
         composeTestRule.waitForIdle()
-        val workDir = File(composeTestRule.activity.cacheDir, "e2e_hw_rules").apply { mkdirs() }
+        val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
+        val workDir = File(composeTestRule.activity.cacheDir, "e2e_hw_rules_step2").apply { mkdirs() }
         val openWrtUdn = "uuid:Lightswitch-3_0-WLS0403E2E99"
         val rtosUdn = "uuid:Dimmer-2_0-WDS060E2E88"
         val sampleZip = FakeHardwareRulesServer.buildSampleOpenWrtRulesZip(
@@ -59,7 +79,7 @@ class HardwareRulesE2ETest {
             supportsRulesDb = true,
             initialDbVersion = 3,
             initialRulesZipBytes = sampleZip,
-            initialDeviceTimeUtc = 946_684_800L // Year 2000 -> triggers clock sync warning
+            initialDeviceTimeUtc = 946_684_800L // Year 2000 -> triggers clock sync warning + auto-sync on first write
         ).use { openWrtServer ->
             FakeHardwareRulesServer(
                 initialFriendlyName = "Master Dimmer V2",
@@ -72,97 +92,135 @@ class HardwareRulesE2ETest {
                 isRtos = true,
                 supportsRulesDb = false
             ).use { rtosServer ->
-                // 1. Add both simulated switches via AddOrEditDeviceDialog (blank name -> auto-populates friendlyName, DeviceType, and Tier-1 hints from /setup.xml)
+                // 1. Add both simulated switches via AddOrEditDeviceDialog (blank name -> auto-populates from /setup.xml)
                 addLoopbackSwitch(openWrtServer.port)
-                awaitLoopbackIo {
-                    runCatching {
-                        composeTestRule.onNodeWithTag("devices_list")
-                            .performScrollToNode(hasText("Porch Entry Switch"))
-                        true
-                    }.getOrDefault(false)
-                }
+                awaitLoopbackIo { vm.devices.value.any { it.serialNumber == "WLS0403E2E99" } }
+                val openWrtDeviceId = vm.devices.value.first { it.serialNumber == "WLS0403E2E99" }.id
 
                 addLoopbackSwitch(rtosServer.port)
-                awaitLoopbackIo {
-                    runCatching {
-                        composeTestRule.onNodeWithTag("devices_list")
-                            .performScrollToNode(hasText("Master Dimmer V2"))
-                        true
-                    }.getOrDefault(false)
-                }
+                awaitLoopbackIo { vm.devices.value.any { it.serialNumber == "WDS060E2E88" } }
+                val rtosDeviceId = vm.devices.value.first { it.serialNumber == "WDS060E2E88" }.id
 
-                // 2. Navigate to Rules tab and confirm both On-Device Rules header and existing Add Rule button are visible
+                // 2. Navigate to Rules tab: confirm On-Switch pill, New Rule & Read Rules buttons, and retirement of Read-Only / App-Run UI
                 composeTestRule.onNodeWithTag("nav_tab_rules").performClick()
                 composeTestRule.waitForIdle()
                 composeTestRule.onNodeWithTag("hardware_rules_header_card").assertIsDisplayed()
+                composeTestRule.onNodeWithTag("add_hardware_rule_button").assertIsDisplayed()
                 composeTestRule.onNodeWithTag("scan_hardware_rules_button").assertIsDisplayed()
-                composeTestRule.onNodeWithText("Read-Only").assertExists()
-                composeTestRule.onNodeWithText("App-Run").assertExists()
-                composeTestRule.onNodeWithTag("add_rule_button").assertIsDisplayed()
+                composeTestRule.onNodeWithText("On-Switch").assertExists()
+                composeTestRule.onNodeWithText("Read-Only").assertDoesNotExist()
+                composeTestRule.onNodeWithText("App-Run").assertDoesNotExist()
 
-                // 3. Tap "Read Rules" to trigger Tier-2 verification + read-only rules.db download across the home
+                // 3. Tap "Read Rules" to verify Tier-2 probe + read-only download
                 composeTestRule.onNodeWithTag("scan_hardware_rules_button").performClick()
                 awaitLoopbackIo {
                     openWrtServer.rulesDbDownloads.get() >= 1 && rtosServer.scpdFetches.get() >= 1
                 }
                 composeTestRule.waitForIdle()
-
-                // Verify RTOS Dimmer V2 was fast-rejected via /rulesservice.xml with zero FetchRules calls
-                assertTrue("RTOS switch should not receive FetchRules", rtosServer.fetchRulesCalls.get() == 0)
+                assertTrue("RTOS switch must not receive FetchRules", rtosServer.fetchRulesCalls.get() == 0)
 
                 // 4. Verify decoded OpenWrt rules, resolved target friendly name, clock warning, and solar location render
-                awaitLoopbackIo {
-                    runCatching {
-                        composeTestRule.onNodeWithTag("rules_list")
-                            .performScrollToNode(hasText("Hold to Toggle Porch"))
-                        true
-                    }.getOrDefault(false)
-                }
+                awaitRulesListNode("Hold to Toggle Porch", isTag = false)
                 composeTestRule.onNodeWithText("Hold to Toggle Porch").assertIsDisplayed()
                 composeTestRule.onNodeWithText("Toggle: Master Dimmer V2", substring = true).assertExists()
+                awaitRulesListNode("hardware_rules_device_card_$openWrtDeviceId", isTag = true)
                 composeTestRule.onNodeWithText("Switch clock needs sync").assertExists()
-                composeTestRule.onNodeWithText("Auto-Off Bathroom Fan").assertExists()
-                composeTestRule.onNodeWithText("Auto-Off after 30 min ON", substring = true).assertExists()
-                composeTestRule.onNodeWithText("Evening Sunset Porch").assertExists()
                 composeTestRule.onNodeWithText("Solar location on switch: Mountain View, CA, United States").assertExists()
+                awaitRulesListNode("Auto-Off Bathroom Fan", isTag = false)
+                composeTestRule.onNodeWithText("Auto-Off Bathroom Fan").assertIsDisplayed()
+                awaitRulesListNode("Evening Sunset Porch", isTag = false)
+                composeTestRule.onNodeWithText("Evening Sunset Porch").assertIsDisplayed()
 
-                // 5. Verify RTOS Dimmer V2 displays clean unsupported capability readout with Night Mode note
-                composeTestRule.onNodeWithTag("rules_list")
-                    .performScrollToNode(hasText("Master Dimmer V2"))
-                composeTestRule.onNodeWithText("Master Dimmer V2").assertIsDisplayed()
+                // Verify RTOS Dimmer V2 displays clean unsupported capability readout
+                awaitRulesListNode("hardware_rules_device_card_$rtosDeviceId", isTag = true)
                 composeTestRule.onNodeWithText("No On-Device Rules").assertExists()
                 composeTestRule.onNodeWithText(
                     "Firmware does not expose on-device rules storage. Dimmer Night Mode is still stored on-device."
                 ).assertExists()
 
-                // 5b. Verify user can collapse the switch cards after reading rules so Local App Rules stay immediately reachable
-                composeTestRule.onNodeWithTag("rules_list")
-                    .performScrollToNode(hasTestTag("toggle_hardware_rules_device_list_button"))
-                composeTestRule.onNodeWithText("Hide Switches").assertExists()
-                composeTestRule.onNodeWithTag("toggle_hardware_rules_device_list_button").performClick()
+                // 5. Create a new Auto-Off Delay rule on Porch Entry Switch -> auto-syncs drifted clock + writes DB v4
+                awaitRulesListNode("add_device_hardware_rule_$openWrtDeviceId", isTag = true)
+                composeTestRule.onNodeWithTag("add_device_hardware_rule_$openWrtDeviceId").performClick()
                 composeTestRule.waitForIdle()
-                composeTestRule.onNodeWithTag("rules_list")
-                    .performScrollToNode(hasTestTag("toggle_hardware_rules_device_list_button"))
-                composeTestRule.onNodeWithTag("toggle_hardware_rules_device_list_button").assertIsDisplayed()
-                composeTestRule.onNodeWithText("Show Switches (", substring = true).assertExists()
-                composeTestRule.onNodeWithText("on-device rule(s) read across", substring = true).assertExists()
-                composeTestRule.onNodeWithTag("rules_list")
-                    .performScrollToNode(hasTestTag("add_rule_button"))
-                composeTestRule.onNodeWithTag("add_rule_button").assertIsDisplayed()
+                composeTestRule.onNodeWithTag("hardware_rule_name_input")
+                    .performScrollTo()
+                    .performTextReplacement("Porch Quick Timer")
+                composeTestRule.onNodeWithTag("hardware_rule_type_countdown")
+                    .performScrollTo()
+                    .performClick()
+                composeTestRule.onNodeWithTag("countdown_preset_15")
+                    .performScrollTo()
+                    .performClick()
+                composeTestRule.onNodeWithTag("save_hardware_rule_button").performClick()
 
-                // Re-expand without triggering extra downloads and confirm cached rules reappear immediately
-                val downloadsBeforeReexpand = openWrtServer.rulesDbDownloads.get()
-                composeTestRule.onNodeWithTag("rules_list")
-                    .performScrollToNode(hasTestTag("toggle_hardware_rules_device_list_button"))
-                composeTestRule.onNodeWithTag("toggle_hardware_rules_device_list_button").performClick()
+                awaitLoopbackIo {
+                    openWrtServer.storeRulesCalls.get() == 1 &&
+                        openWrtServer.currentDbVersion.get() == 4 &&
+                        vm.hardwareRulesByDeviceId.value[openWrtDeviceId]?.rules?.any { it.name == "Porch Quick Timer" } == true
+                }
+                assertEquals("Drifted clock must auto-sync before first write", 1, openWrtServer.timeSyncCalls.get())
+                val createdRuleId = vm.hardwareRulesByDeviceId.value[openWrtDeviceId]!!
+                    .rules.first { it.name == "Porch Quick Timer" }.ruleId
+
+                // 6. Toggle the created rule OFF -> writes DB v5
+                awaitRulesListNode("toggle_hardware_rule_${openWrtDeviceId}_$createdRuleId", isTag = true)
+                composeTestRule.onNodeWithTag("toggle_hardware_rule_${openWrtDeviceId}_$createdRuleId").performClick()
+                awaitLoopbackIo {
+                    openWrtServer.currentDbVersion.get() == 5 &&
+                        vm.hardwareRulesByDeviceId.value[openWrtDeviceId]?.rules?.find { it.ruleId == createdRuleId }?.isEnabled == false
+                }
+
+                // 7. Edit the created rule -> rename to "Porch 30m Timer" (30 min) -> writes DB v6
+                awaitRulesListNode("edit_hardware_rule_${openWrtDeviceId}_$createdRuleId", isTag = true)
+                composeTestRule.onNodeWithTag("edit_hardware_rule_${openWrtDeviceId}_$createdRuleId").performClick()
                 composeTestRule.waitForIdle()
-                composeTestRule.onNodeWithText("Hide Switches").assertExists()
-                assertTrue(
-                    "Re-expanding should reuse cached snapshots without re-downloading",
-                    openWrtServer.rulesDbDownloads.get() == downloadsBeforeReexpand
-                )
+                composeTestRule.onNodeWithTag("hardware_rule_name_input")
+                    .performScrollTo()
+                    .performTextReplacement("Porch 30m Timer")
+                composeTestRule.onNodeWithTag("countdown_preset_30")
+                    .performScrollTo()
+                    .performClick()
+                composeTestRule.onNodeWithTag("save_hardware_rule_button").performClick()
+                awaitLoopbackIo {
+                    openWrtServer.currentDbVersion.get() == 6 &&
+                        vm.hardwareRulesByDeviceId.value[openWrtDeviceId]?.rules?.any { it.name == "Porch 30m Timer" } == true
+                }
 
-                // 6. Switch back to Devices tab, expand Porch Entry Switch drawer, and verify per-switch readout
+                // 8. Update Solar Location via HardwareLocationDialog (Seattle preset) -> writes DB v7
+                awaitRulesListNode("edit_solar_location_$openWrtDeviceId", isTag = true)
+                composeTestRule.onNodeWithTag("edit_solar_location_$openWrtDeviceId").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("solar_preset_seattle")
+                    .performScrollTo()
+                    .performClick()
+                composeTestRule.onNodeWithTag("save_solar_location_button").performClick()
+                awaitLoopbackIo {
+                    openWrtServer.currentDbVersion.get() == 7 &&
+                        vm.hardwareRulesByDeviceId.value[openWrtDeviceId]?.locationInfo?.cityName == "Seattle"
+                }
+                awaitRulesListNode("Solar location on switch: Seattle, WA, United States", isTag = false)
+
+                // 9. Delete "Porch 30m Timer" via DeleteHardwareRuleConfirmDialog -> writes DB v8
+                awaitRulesListNode("delete_hardware_rule_${openWrtDeviceId}_$createdRuleId", isTag = true)
+                composeTestRule.onNodeWithTag("delete_hardware_rule_${openWrtDeviceId}_$createdRuleId").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("confirm_delete_hardware_rule_button").performClick()
+                awaitLoopbackIo {
+                    openWrtServer.currentDbVersion.get() == 8 &&
+                        vm.hardwareRulesByDeviceId.value[openWrtDeviceId]?.rules?.none { it.ruleId == createdRuleId } == true
+                }
+
+                // 10. Restore the latest pre-delete backup (v7) via HardwareRulesBackupDialog -> writes DB v9 & restores "Porch 30m Timer"
+                awaitRulesListNode("open_backup_restore_$openWrtDeviceId", isTag = true)
+                composeTestRule.onNodeWithTag("open_backup_restore_$openWrtDeviceId").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("restore_backup_button_0").performScrollTo().performClick()
+                awaitLoopbackIo {
+                    openWrtServer.currentDbVersion.get() == 9 &&
+                        vm.hardwareRulesByDeviceId.value[openWrtDeviceId]?.rules?.any { it.name == "Porch 30m Timer" } == true
+                }
+
+                // 11. Switch to Devices tab, expand Porch Entry Switch drawer, and verify live DB v9 + Add Rule action
                 composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
                 composeTestRule.waitForIdle()
                 composeTestRule.onNodeWithTag("devices_list")
@@ -170,10 +228,9 @@ class HardwareRulesE2ETest {
                 composeTestRule.onNodeWithText("Porch Entry Switch").performClick()
                 composeTestRule.waitForIdle()
 
-                composeTestRule.onNodeWithText("4 rule(s) stored on switch (DB v3)").assertExists()
+                composeTestRule.onNodeWithText("5 rule(s) stored on switch (DB v9)").assertExists()
                 composeTestRule.onNodeWithText("On-Device Rules: On-Device Ready • Long Press").assertExists()
-                composeTestRule.onNodeWithText("Switch clock needs sync", substring = true).assertExists()
-                composeTestRule.onNodeWithText("Toggle: Master Dimmer V2", substring = true).assertExists()
+                composeTestRule.onNodeWithTag("drawer_add_hardware_rule_$openWrtDeviceId").assertExists()
             }
         }
     }

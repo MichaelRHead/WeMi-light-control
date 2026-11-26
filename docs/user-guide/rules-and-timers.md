@@ -1,85 +1,78 @@
-# Rules, Schedules & Auto-Off Timers
+# On-Device Switch Rules, Timers & Schedules
 
 [← Back to User Guide Index](../../USER_GUIDE.md)
 
-The **Rules** tab separates automation into two clear tiers—all running over your home Wi-Fi with no cloud account or external server required:
-1. **On-Device Switch Rules (`Read-Only`)** — *"Stored in switch memory • runs even when your phone is off"*
-2. **Local Switch Rules & Timers (`App-Run`)** — *"Runs from this device over local Wi-Fi • create & edit rules here"*
+The **Rules** tab manages **On-Device Switch Rules** (**`On-Switch`**) stored directly inside each compatible switch's own flash memory—so your schedules, auto-off delays, and wall-paddle long-press actions keep running reliably over your home Wi-Fi **even when your phone is turned off or away from home**, with no Belkin cloud account or external server required.
 
 ---
 
-## 1. Inspecting On-Device Switch Rules (`Read-Only`)
+## 1. Supported Hardware & Capability Badges
 
-Many classic switches, dimmers, and smart plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`) store automation rules directly inside the physical switch so they keep running even when your phone leaves the house or is turned off. Newer models (`WDS060` Dimmer V2, `WSP080` Mini V2) do not support on-device rule storage—though **Dimmer V2** still stores hardware **Night Mode** on-device.
+Classic OpenWrt switches, 3-way switches, 1st-Gen dimmers, and mini plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`) include a built-in rules engine inside the switch. Newer RTOS models (`WDS060` Dimmer V2, `WSP080` Mini V2) do not expose on-device rule storage—though **Dimmer V2** still stores hardware **Night Mode (`20%`)** on-device.
 
-> [!NOTE]
-> **Safe Read-Only Inspection**: WeMi currently inspects on-device rules in **`Read-Only`** mode so you can see what is already stored inside your switches without risking changes to switch firmware. You can also try it right away in **Demo Showroom Mode** using sample on-device rules.
+During normal Wi-Fi discovery, WeMi inspects the switch info it already downloaded—adding **zero extra network delay**—and caches verified results per firmware version:
 
-### How to Check Your Switches
-- **At-a-Glance Header**: At the top of the **Rules** tab, **On-Device Switch Rules** (marked **`Read-Only`** with *"Stored in switch memory • runs even when your phone is off"*) shows `<N> ready • <M> unsupported • <Total> switches` before scanning, and updates to **`<R> rule(s) read • <N> ready • <M> unsupported`** once you read any switch. *(Motion Sensors are omitted because they do not store switch rules.)*
-- **Read Every Switch at Once**: Tap **`Read Rules`** to expand your switch list and read stored rules from all reachable switches on the active Wi-Fi Home.
-- **Expand or Collapse the Switch List Anytime**: Tap **`Show Switches (<count>)`** to browse individual switches without scanning everything, or tap **`Hide Switches`** to collapse the list while keeping your cached rule snapshots intact (showing `<R> on-device rule(s) read across <K> switch(es)`). Inside the expanded list, switches are automatically sorted by priority—switches with stored rules first, followed by reachable ready, unchecked, and unsupported switches, with **`Offline`**-badged switches last—and you can tap **`Read`** (or **`Refresh`** after reading) on any reachable switch.
-- **Quick Preview from the Devices Tab**: You can also tap the body of any reachable switch on the **Devices** tab and tap **`Inspect Rules`** (or **`Refresh`**) to preview `DB v...`, any clock-sync warning, and up to 4 structured `trigger → action` rule cards inline (with **`• Paused`** badges and a **`+N more rule(s) in Rules tab`** overflow cue).
-- **Zero Extra Scan Delay**: During normal Wi-Fi discovery, WeMi inspects the switch details it already downloaded—adding zero extra network requests—and caches verified results per firmware version so unsupported switches aren't re-checked unnecessarily.
+- **`On-Device Ready`** (plus **`• Long Press`** on wall switches and 1st-Gen dimmers that support 2-second wall-paddle holds): Verified on-device rules storage ready for reading and editing.
+- **`Likely Supported`** / **`Likely Ready • Long Press`** or **`Likely Unsupported (RTOS)`**: Initial estimate from discovery before reading the switch directly.
+- **`Not Checked`**: Shown for manually added switches until you tap **`Read`** or **`Inspect Rules`**.
+- **`No On-Device Rules`**: Verified unsupported firmware (for `WDS060`, WeMi reminds you that **Dimmer Night Mode** is still stored on-device).
+- **`Offline`**: Shown on switches that are currently unreachable on your local Wi-Fi (automatically sorted to the bottom of the list).
 
-### Capability Badges & Decoded Details
-- **Capability Badges**:
-  - **`Likely Supported`** / **`Likely Ready • Long Press`** or **`Likely Unsupported (RTOS)`**: Initial estimate from discovery before reading the switch directly.
-  - **`Not Checked`**: Shown for manually added switches until you tap **`Read`** or **`Inspect Rules`**.
-  - **`On-Device Ready`** (plus **`• Long Press`** on wall switches and 1st-Gen dimmers that support 2-second wall-paddle holds): Verified on-device rules storage.
-  - **`No On-Device Rules`**: Verified unsupported firmware (for `WDS060`, WeMi reminds you that **Dimmer Night Mode** is still stored on-device).
-  - **`Offline`**: Shown on switches that are currently unreachable on your local Wi-Fi (sorted at the bottom of the switch list).
-- **Stored On-Device Rules**: Displays decoded **`Long Press`** rules (automatically turning hardware IDs into your friendly switch names), **`Auto-Off Delay`** timers, **`Schedule`** intervals (including on-device **`Sunrise`** / **`Sunset`** offsets and the switch's stored **`Solar location on switch`**), **`Timed Action`** rules, **`Away Mode`** occupancy rules, and **`Motion / Sensor`** triggers—marking disabled rules as **`• Paused`** and showing the database version (`DB v...`).
-- **Switch Clock Warning**: If a switch lost power and its internal clock drifted or reset (for example, back to the year 2000 after Belkin's cloud shutdown), WeMi highlights **`Switch clock needs sync`**.
-- **Automatic Local Backup**: Each time WeMi reads a valid rules archive from a switch, it keeps a rotating local backup of the untouched original file on your Android device ahead of future on-device rule editing.
+> [!TIP]
+> **Try It Without Hardware**: Enable **Demo Showroom Mode** on the **More** tab to explore sample Long Press, Auto-Off Delay, and Sunset schedules, test creating/editing/deleting rules, update Solar Location, and try Backup Restore safely offline.
 
 ---
 
-## 2. Local Switch Rules & Timers (`App-Run`)
+## 2. Supported On-Device Rule Types
 
-> [!NOTE]
-> **How `App-Run` Rules Work**: Separated below the on-device inspector, **Local Switch Rules & Timers** (marked **`App-Run`** with *"Runs from this device over local Wi-Fi • create & edit rules here"*) executes directly from your Android device over your home Wi-Fi while WeMi is running. Each rule stays isolated to the Wi-Fi Home where its switch lives, so two switches with the same name in different homes never interfere with each other.
+You can create, edit, pause/resume, and delete four native rule types directly on compatible switches:
 
-**WeMi Light Control** currently supports three kinds of **`App-Run`** local automation rules:
+| Rule Type | What It Does Inside the Switch | Key Options |
+| :--- | :--- | :--- |
+| **Long Press** | Hold the physical wall paddle for ~2 seconds to control one or more switches on your home Wi-Fi. *(Available on compatible wall switches and 1st-Gen dimmers.)* | Action (**`Toggle`**, **`Turn Off`**, **`Turn On`**) and one or more **Target Switches** (shown by friendly switch name). |
+| **Auto-Off Delay** | Automatically turns the switch **OFF** after it stays **ON** for your chosen duration—whether turned on from the wall, a widget, or the app. | Delay from **`1` to `1440` minutes** (quick presets: `5m`, `15m`, `30m`, `1h`, `2h`) and active days (`Every Day`, `Weekdays`, `Weekends`, or individual days). |
+| **Schedule** | Turns the switch **ON → OFF** (or **OFF → ON**) across a daily or weekly time window. | Fixed clock times (`-1h`, `+1h`, `+15m`) or on-device **`Sunrise`** / **`Sunset`** with offsets (`-30m`, `-15m`, `Exact`, `+15m`, `+30m`), plus active days. |
+| **Timed Action** | Runs a single **Turn ON** or **Turn OFF** action at a chosen time. | Fixed clock time or **`Sunrise`** / **`Sunset`** with offsets, **`Turn Switch ON`** / **`Turn Switch OFF`**, and active days. |
 
-| Rule Type | Icon | How It Works | Example Trigger |
-| :--- | :--- | :--- | :--- |
-| **Schedule** | Calendar / Clock | Runs daily at the clock time you type (`Daily at 6:30 PM`, `07:00`, `11:15 PM`, or `Daily at Sunset (5:15 PM)`). If you type a keyword without a specific clock time, WeMi uses built-in defaults: **`Sunset` (`5:30 PM`)**, **`Sunrise` (`6:30 AM`)**, and **`Midnight` (`12:00 AM`)**. | `Daily at 6:30 PM` or `Sunset` |
-| **Auto-Off Timer** | Stopwatch / Timer | Starts a live countdown whenever the target switch turns **ON** (whether toggled in the app, via a Home Screen widget, or pressed physically on the wall) and turns the switch **OFF** automatically when the timer reaches `0:00`. | `After 30 minutes ON` or `15 min` |
-| **Motion Trigger** | Motion Sensor Waves | Triggers the chosen switch or dimmer (including a custom brightness level for dimmers) whenever a Motion Sensor in the same Wi-Fi Home senses movement. | `When Hallway Motion senses movement` |
-
----
-
-## 3. Live Auto-Off Countdown Badges
-
-When an **Auto-Off Timer** rule is enabled for a switch:
-- As soon as the switch turns **ON**, WeMi starts a live second-by-second countdown (supporting durations from `1` minute up to `1440` minutes / 24 hours).
-- On the **Devices** tab, the switch row displays a live countdown (`Auto-Off 29:54`, `Auto-Off 29:53`, …) right beside its **`ON`** status pill.
-- Turning the switch **OFF** manually—or switching off the Auto-Off rule—cancels the countdown immediately.
+*(Pre-existing firmware rules such as **`Away Mode`** or **`Motion / Sensor`** rules already stored on a switch are preserved safely in switch memory and can be paused/resumed or deleted right alongside your other rules.)*
 
 ---
 
-## 4. Creating a New Local App Rule
+## 3. Reading, Creating, Editing & Managing Rules
 
-1. Open the **Rules** tab from the bottom navigation bar and tap **`New Rule`** (or tap **`+`** in the top header while on the **Rules** tab).
-2. In the **New Smart Switch Rule** dialog:
-   - **`Rule Name`**: Give your rule a clear name (for example, `Porch Sunset Timer` or `Hallway 15m Auto-Off`). If left blank, WeMi names it `<Switch Name> Rule`.
-   - **`Rule Type`**: Choose **`Schedule`**, **`Motion Trigger`**, or **`Auto-Off Timer`**. *(Selecting **`Auto-Off Timer`** automatically sets the default action to **Turn Switch OFF**.)*
-   - **`Target Switch / Bulb`**: Tap the chip for the switch or dimmer in your active Wi-Fi Home that you want this rule to control.
-   - **`When / Trigger Condition`**:
-     - For **Schedules**, enter a clock time like `Daily at 6:30 PM`, `22:30`, `Daily at Sunset (5:15 PM)`, or a keyword (`Sunset`, `Sunrise`, `Midnight`).
-     - For **Auto-Off Timers**, enter a duration in minutes such as `After 30 minutes ON` or `15 min`.
-   - **`Action: Turn Switch ON` / `Action: Turn Switch OFF`**: Toggle whether the rule turns the switch **ON** or **OFF**.
-   - **`Target Brightness` (Dimmers Only)**: When turning a dimmer **ON**, drag the slider (`1%–100%`) to choose the exact brightness level the rule applies.
-3. Tap **`Save`**.
+### Reading Existing Rules
+- **Read Every Switch at Once**: Open the **Rules** tab and tap **`Read Rules`** (changes to **`Refresh All`** once snapshots are loaded) to read stored rules from all reachable switches on your active Wi-Fi Home. Switches with stored rules sort to the top automatically.
+- **Read a Single Switch**: Tap **`Read`** (or **`Refresh`**) on any reachable switch card on the **Rules** tab—or expand a switch row on the **Devices** tab and tap **`Inspect Rules`** to preview up to 4 rule cards, **`Add Rule`**, or **`Sync Clock`** inline.
+
+### Creating or Editing an On-Device Rule
+1. Tap **`New Rule`** at the top of the **Rules** tab, tap **`+`** in the top header while on the **Rules** tab, or tap **`Add Rule`** on a specific switch card (or inside a switch's expanded drawer on the **Devices** tab).
+   - To edit an existing rule, tap the **`✎` (Edit)** icon on its rule card.
+2. Choose the **Switch** (when opened from the top button), enter a **`Rule Name`**, and pick a **`Rule Type`** (**`Long Press`**, **`Auto-Off Delay`**, **`Schedule`**, or **`Timed Action`**).
+3. Configure the action, target switches, delay minutes, or start/end times and active days, then choose **`Rule Active on Switch`** or **`Rule Paused`**.
+4. Tap **`Save to Switch`**.
+
+### Pausing, Resuming & Deleting Rules
+- **Enable / Disable Switch**: Toggle any rule ON or OFF directly on the switch; paused rules display a **`• Paused`** badge.
+- **`🗑` (Delete)**: Opens a confirmation dialog before removing the rule from switch flash memory.
 
 ---
 
-## 5. Testing & Managing Local App Rules
+## 4. Switch Clock Sync & Offline Solar Location
 
-Each row on the **Rules** tab has three controls on the right:
-- **`▶` (Play Button — Test Rule Now)**: Runs the rule immediately against the target switch on your local Wi-Fi so you can verify it works without waiting for the scheduled time.
-- **Enable / Disable Switch**: Turns the rule on or off. Disabling an active **Auto-Off Timer** cancels its running countdown immediately.
-- **`🗑` (Trash Icon)**: Deletes the rule.
+Because Belkin's cloud servers are discontinued, a switch that loses power can boot with its internal clock reset (for example, back to the year 2000), which prevents scheduled rules from running on time.
 
-*(Tip: To test a **Motion Trigger** rule, tap a Motion Sensor row on the **Devices** tab to **Refresh Motion** in Real LAN Mode or **Simulate Motion** in Demo Showroom Mode.)*
+- **Automatic Clock Sync**: Whenever WeMi detects clock drift (`Switch clock needs sync`) and you save a rule or update Solar Location, WeMi automatically syncs your phone's local UTC time and timezone offset to the switch first.
+- **Manual Clock Sync**: Tap **`Sync Clock`** (or **`Clock Sync`**) on any compatible switch card—or inside its expanded drawer on the **Devices** tab—to sync the switch's clock immediately without editing rules.
+- **Offline Solar Location (No Location Permission Needed)**: For accurate on-device **`Sunrise`** and **`Sunset`** schedules, tap **`Solar Location`** on a switch card, pick one of the built-in city presets (e.g., *San Francisco*, *Seattle*, *New York*, *London*, *Sydney*) or enter your latitude/longitude manually, and tap **`Save Location`**.
+
+---
+
+## 5. Built-In Anti-Brick Protection & One-Tap Backup Restore
+
+Every write to a switch's on-device rules archive follows a strict safety pipeline designed to protect older flash hardware:
+
+1. **Automatic Pre-Write Backup**: Before changing anything, WeMi saves an untouched copy of the switch's current rules archive on your Android device (retaining up to **5** recent backups per switch).
+2. **In-Place Preservation**: WeMi modifies only the targeted rule rows while keeping all other rules, pre-existing firmware tables, and the switch's original archive filename intact.
+3. **Pre-Upload Safety Gate**: Before sending data to the switch, WeMi sanitizes text fields, checks SQLite database integrity, enforces flash size limits and valid day/time ranges, and blocks invalid payloads automatically.
+4. **Post-Upload Verification**: After uploading, WeMi reads the switch's live rules database version back to confirm the switch accepted and reloaded the new version cleanly.
+5. **One-Tap Restore**: Tap **`Backups (<count>)`** on any switch card to inspect saved pre-write snapshots (with database version and timestamp) and tap **`Restore`** to roll a switch back safely anytime.

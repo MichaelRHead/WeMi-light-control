@@ -215,6 +215,7 @@ class HardwareRulesClient(
             nowUtcSecondsProvider = nowUtcSecondsProvider
         )
         val rawPath = fetchInfo.ruleDbPath.trim()
+        val existingBackups = HardwareRulesDbMutator.listBackupsForDevice(backupRootDir(), device.concurrencyKey())
         if (rawPath.isEmpty() || fetchInfo.ruleDbVersion <= 0) {
             return@withContext DeviceHardwareRulesSnapshot(
                 deviceId = device.id,
@@ -224,6 +225,7 @@ class HardwareRulesClient(
                 longPressCapable = effectiveLongPress,
                 dbVersion = fetchInfo.ruleDbVersion,
                 deviceTimeInfo = deviceTime,
+                availableBackups = existingBackups,
                 diagnosticMessage = "No on-device rules stored yet (DB v${fetchInfo.ruleDbVersion})",
                 inspectedAt = HardwareRulesProtocol.nowTime()
             ) to logs
@@ -243,6 +245,7 @@ class HardwareRulesClient(
                 longPressCapable = effectiveLongPress,
                 dbVersion = fetchInfo.ruleDbVersion,
                 deviceTimeInfo = deviceTime,
+                availableBackups = existingBackups,
                 diagnosticMessage = "Failed downloading rules archive: ${e.message ?: e.javaClass.simpleName}",
                 inspectedAt = HardwareRulesProtocol.nowTime()
             ) to logs
@@ -266,6 +269,7 @@ class HardwareRulesClient(
                 longPressCapable = effectiveLongPress,
                 dbVersion = fetchInfo.ruleDbVersion,
                 deviceTimeInfo = deviceTime,
+                availableBackups = existingBackups,
                 diagnosticMessage = "No on-device rules stored yet (HTTP 404)",
                 inspectedAt = HardwareRulesProtocol.nowTime()
             ) to logs
@@ -280,6 +284,7 @@ class HardwareRulesClient(
                 longPressCapable = effectiveLongPress,
                 dbVersion = fetchInfo.ruleDbVersion,
                 deviceTimeInfo = deviceTime,
+                availableBackups = existingBackups,
                 diagnosticMessage = "Switch returned HTTP ${binaryResp.code} for rules archive",
                 inspectedAt = HardwareRulesProtocol.nowTime()
             ) to logs
@@ -300,6 +305,7 @@ class HardwareRulesClient(
         } else {
             null
         }
+        val refreshedBackups = HardwareRulesDbMutator.listBackupsForDevice(backupRootDir(), device.concurrencyKey())
 
         logs += SoapLogEntry(
             timestamp = HardwareRulesProtocol.nowTime(),
@@ -325,6 +331,7 @@ class HardwareRulesClient(
             existingTables = unpacked.existingTables,
             integrityOk = unpacked.integrityOk,
             backupFilePath = backupFile?.absolutePath,
+            availableBackups = refreshedBackups,
             diagnosticMessage = unpacked.diagnosticMessage.ifBlank {
                 "Read ${unpacked.rules.size} rule(s) (DB v${fetchInfo.ruleDbVersion})"
             },
@@ -365,6 +372,120 @@ class HardwareRulesClient(
             currentDbVersion = currentDbVersion
         )
     }
+
+    /**
+     * Executes an armored live mutation on [device]'s on-device `rules.db` (probe → pre-write
+     * backup → automatic clock sync if needed → [mutateDb] → anti-brick validate → `StoreRules`
+     * → `FetchRules` version verification → refreshed snapshot).
+     */
+    suspend fun mutateAndStoreRulesDb(
+        device: DeviceEntity,
+        autoSyncClockIfNeeded: Boolean = true,
+        nowUtcMillisProvider: () -> Long = { System.currentTimeMillis() },
+        timeZone: TimeZone = TimeZone.getDefault(),
+        mutateDb: (sqliteFile: File) -> Unit
+    ): Pair<HardwareRulesWriteResult, List<SoapLogEntry>> = withContext(Dispatchers.IO) {
+        val logs = mutableListOf<SoapLogEntry>()
+        val probe = probeRulesCapability(device)
+        if (probe == null) {
+            return@withContext HardwareRulesWriteResult(
+                success = false,
+                snapshot = null,
+                message = "Switch unreachable on LAN (${device.ipAddress}:${device.port})"
+            ) to logs
+        }
+        logs += probe.logEntry
+        if (probe.capability != HardwareRulesCapability.VERIFIED_SUPPORTED) {
+            return@withContext HardwareRulesWriteResult(
+                success = false,
+                snapshot = null,
+                message = "Switch firmware does not support on-device rules storage (${probe.reason})"
+            ) to logs
+        }
+
+        val (storeResult, clockSynced, writeLogs) = HardwareRulesWriteEngine.executeMutateAndStoreRulesDb(
+            httpClient = httpClient,
+            device = device,
+            probe = probe,
+            workDir = workCacheDir(),
+            backupRootDir = backupRootDir(),
+            autoSyncClockIfNeeded = autoSyncClockIfNeeded,
+            nowUtcMillisProvider = nowUtcMillisProvider,
+            timeZone = timeZone,
+            mutateDb = mutateDb
+        )
+        logs += writeLogs
+        if (!storeResult.success) {
+            return@withContext HardwareRulesWriteResult(
+                success = false,
+                snapshot = null,
+                message = storeResult.errorInfo.ifBlank { "Unable to save rules to switch" },
+                clockSynced = clockSynced
+            ) to logs
+        }
+
+        val (refreshedSnap, refreshLogs) = fetchDeviceRulesSnapshot(device, saveRawBackup = false)
+        logs += refreshLogs
+        val clockSuffix = if (clockSynced) " • clock synced" else ""
+        HardwareRulesWriteResult(
+            success = true,
+            snapshot = refreshedSnap,
+            message = "Saved on-device rules (DB v${storeResult.verifiedVersion}$clockSuffix)",
+            clockSynced = clockSynced
+        ) to logs
+    }
+
+    /**
+     * Restores a saved raw `/rules.db` ZIP backup onto [device] at `currentVersion + 1` via the
+     * anti-brick validator and post-store `FetchRules` verification.
+     */
+    suspend fun restoreRulesFromBackup(
+        device: DeviceEntity,
+        backupFilePath: String
+    ): Pair<HardwareRulesWriteResult, List<SoapLogEntry>> = withContext(Dispatchers.IO) {
+        val logs = mutableListOf<SoapLogEntry>()
+        val probe = probeRulesCapability(device)
+            ?: return@withContext HardwareRulesWriteResult(
+                success = false,
+                snapshot = null,
+                message = "Switch unreachable on LAN (${device.ipAddress}:${device.port})"
+            ) to logs
+        logs += probe.logEntry
+        if (probe.capability != HardwareRulesCapability.VERIFIED_SUPPORTED) {
+            return@withContext HardwareRulesWriteResult(
+                success = false,
+                snapshot = null,
+                message = "Switch firmware does not support on-device rules storage"
+            ) to logs
+        }
+
+        val (storeResult, restoreLogs) = HardwareRulesWriteEngine.executeRestoreRulesBackup(
+            httpClient = httpClient,
+            device = device,
+            probe = probe,
+            backupFile = File(backupFilePath),
+            workDir = workCacheDir(),
+            backupRootDir = backupRootDir()
+        )
+        logs += restoreLogs
+        if (!storeResult.success) {
+            return@withContext HardwareRulesWriteResult(
+                success = false,
+                snapshot = null,
+                message = storeResult.errorInfo.ifBlank { "Backup restore failed" }
+            ) to logs
+        }
+        val (refreshedSnap, refreshLogs) = fetchDeviceRulesSnapshot(device, saveRawBackup = false)
+        logs += refreshLogs
+        HardwareRulesWriteResult(
+            success = true,
+            snapshot = refreshedSnap,
+            message = "Restored backup to switch (DB v${storeResult.verifiedVersion})"
+        ) to logs
+    }
+
+    fun listBackupsForDevice(device: DeviceEntity): List<HardwareRulesBackupEntry> =
+        HardwareRulesDbMutator.listBackupsForDevice(backupRootDir(), device.concurrencyKey())
 
     private suspend fun resolveWorkingPort(device: DeviceEntity): Int? {
         val expectedId = LanRuntimeUtils.expectedHardwareIdentity(device.serialNumber, device.udn).ifEmpty { null }

@@ -32,45 +32,33 @@ Related documents in this repository:
 
 ## 1. Upcoming Features Overview
 
-With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Real-LAN `<100ms` GENA subscriptions, parallel `Semaphore(3)` health polling, and ChromeOS ARCVM network-bound `MulticastSocket` discovery + physical-subnet fallback), Step 1 on-device hardware rules detection & read-only `rules.db` inspection (`Room v6`, `MIGRATION_5_6`, rotating raw-ZIP backups, and anti-brick pre-store validator), 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3` with `minSdk 24` compatibility), compact single-row `TopHeader` (`48.dp` accessible controls + `"All Off"` + in-app `ReleaseHistoryDialog`), zero-dependency Home Screen Light & Room Toggle Widgets (`WeMiSwitchWidgetProvider`, one-tap pinning & serial/UDN resolution), 3-column room-grouped Android TV dashboard (`wemi TV` with focusable inline dimmer sliders, Room Bar dimming & conditional `Holiday ON`), dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), confirmation-protected LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, `100%` `< 500`-line modularization across all `108` production and test `.kt` files, and `127` unit, protocol, hardware-rules, widget, telemetry, governance, ChromeOS ARCVM, and full-stack E2E tests across `25` suites complete, the upcoming features roadmap focuses on turning **WeMi Light Control** into a standalone, zero-cloud smart-home hub and OS-integrated controller:
+With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, immediate Real-LAN `<100ms` GENA subscriptions, parallel `Semaphore(3)` health polling, and ChromeOS ARCVM network-bound `MulticastSocket` discovery + physical-subnet fallback), full Step 1 & Step 2 on-device hardware rules management (zero-RTT Tier-1 + firmware-cached Tier-2 capability detection, live in-place `rules.db` editing for **Long Press**, **Auto-Off Delay**, **Sunrise/Sunset Schedules**, and **Timed Actions**, automatic `timesync1#TimeSync` clock sync, offline `LOCATIONINFO` solar coordinates, rotating raw-ZIP backup restore, anti-brick pre-store validator + `FetchRules` verification, and non-destructive Room v7 `MIGRATION_6_7` retiring legacy phone-only app rules), 3-state semantic category icons (`Christmas Tree`, `Fan`, `Light`, `Motion`, `Switch`), zero-cloud `10.22.22.1` provisioning (`Methods 1, 2 & 3` with `minSdk 24` compatibility), compact single-row `TopHeader` (`48.dp` accessible controls + `"All Off"` + in-app `ReleaseHistoryDialog`), zero-dependency Home Screen Light & Room Toggle Widgets (`WeMiSwitchWidgetProvider`, one-tap pinning & serial/UDN resolution), 3-column room-grouped Android TV dashboard (`wemi TV` with focusable inline dimmer sliders, Room Bar dimming & conditional `Holiday ON`), dark-gray IEC Power-Off / red Disconnected icons, Belkin soft-AP SSID filtering (`WeMo.*` / `Wemo.LS3W.*`), confirmation-protected LAN reset, `org.suppressingfire.wemi` package architecture, MIT license & brand governance, `100%` `< 500`-line modularization across all `115` production and test `.kt` files, and `130` unit, protocol, hardware-rules, widget, telemetry, governance, ChromeOS ARCVM, and full-stack E2E tests across `26` suites complete, the upcoming features roadmap focuses on turning **WeMi Light Control** into an OS-integrated smart-home controller and optional local hub:
 
 | Track | Upcoming Feature Area | Key Deliverables |
 | :--- | :--- | :--- |
-| **Track 1** | **On-Device Hardware Rules Management — Step 2 (Live Editing & App-Rule Removal)** | *(Step 1 Complete: zero-RTT Tier-1 + firmware-cached Tier-2 capability detection, read-only `rules.db` extraction & UI readout, rotating raw-ZIP backups, and anti-brick pre-store validator)* Step 2 adds live editing/creation/deletion for **Long Press**, **Auto-Off Delay (`Countdown Rule`)**, and **Schedules (`Time Interval` + Sunrise/Sunset)** via armored `StoreRules` + automatic `timesync1#TimeSync`, and drops legacy phone-only app automations (`RuleEntity`/`RuleScheduler`). |
-| **Track 2** | **Android Quick Settings Tiles, Multi-Switch 4x1 Widget Bar & Always-On TV Hub Service** | Android `TileService` quick toggles, a multi-switch 4x1 room bar widget companion to the shipped single-light/room Home Screen widget, and an optional `BOOT_COMPLETED` foreground service for Android TV / wall tablets acting as a 24/7 LAN controller. |
-| **Track 3** | **Expanded Hardware Fleet (`Insight`, `Maker`, `Link`, Dimmer Long-Press & Faders)** | Real-time power/wattage/kWh monitoring for **Insight (`F7C029`)** via `insight1#GetInsightParams`, hardware fade ramps & `<LongPress>` scene triggers for **Dimmers (`F7C059`/`WDS060`)**, and **Maker (`F7C043`)** / **Link (`F7C031`)** support. |
-| **Track 4** | **One-Tap OS Wi-Fi Handoff (`WifiNetworkSpecifier`) & Hardware `ReSetup`** | Android 10+ `WifiNetworkSpecifier` in-app connection to `WeMo.Light.*` / `WeMo.Mini.*` APs without leaving the app to open Android Settings, plus a confirmation-protected `basicevent1#ReSetup` factory reset action. |
-| **Track 5** | **Offline Astronomical Solar Calculator & GENA Motion-Sensor Automation Chains** | Offline NOAA latitude/longitude solar calculator for exact daily Sunrise/Sunset times (`Sunset - 20m`, `Sunrise + 15m`) and sub-second GENA `Motion` (`F7C028`) → multi-switch trigger chains with configurable hold timers. |
-| **Track 6** | **Household Profile Sync (JSON / QR Export-Import) & Local Webhook / Home Assistant Bridge** | Export/import remembered Wi-Fi Homes, room names, custom ordering, and rules via JSON file or on-screen QR code (ideal for syncing a phone setup onto an Android TV), plus an optional local REST/Webhook endpoint on Android TV. |
-| **Track 7** | **Phased Dependency & Toolchain Modernization ([`DEPENDENCY_UPGRADE_PLAN.md`](DEPENDENCY_UPGRADE_PLAN.md))** | *(Wave 1 Verified in AI Studio: `lifecycle 2.9.2`, `room 2.8.5`, `coroutines 1.11.0`, `androidx.test 1.7.0`, `robolectric 4.18.1`; Wave 2 Deferred Post-`v35.0`)* Next: Wave 2 upgrades Compose BOM + `activity-compose` + `lifecycle 2.10.0` (co-reviewed by `ai_studio_ux_cuj`) within AI Studio's `Gradle 9.3.1` / `AGP 9.1.1` / `Kotlin 2.2.10` / `compileSdk 36.1` ceiling; Wave 3 toolchain bump deferred until AI Studio upgrades its container Gradle binary. |
+| **Track 1** | **Android Quick Settings Tiles, Multi-Switch 4x1 Widget Bar & Always-On TV Hub Service** | Android `TileService` quick toggles, a multi-switch 4x1 room bar widget companion to the shipped single-light/room Home Screen widget, and an optional `BOOT_COMPLETED` foreground service for Android TV / wall tablets acting as a 24/7 LAN controller & periodic `timesync1` clock keeper. |
+| **Track 2** | **Expanded Hardware Fleet (`Insight`, `Maker`, `Link`, Dimmer Long-Press & Faders)** | Real-time power/wattage/kWh monitoring for **Insight (`F7C029`)** via `insight1#GetInsightParams`, hardware fade ramps & `<LongPress>` scene triggers for **Dimmers (`F7C059`/`WDS060`)**, and **Maker (`F7C043`)** / **Link (`F7C031`)** support. |
+| **Track 3** | **One-Tap OS Wi-Fi Handoff (`WifiNetworkSpecifier`) & Hardware `ReSetup`** | Android 10+ `WifiNetworkSpecifier` in-app connection to `WeMo.Light.*` / `WeMo.Mini.*` APs without leaving the app to open Android Settings, plus a confirmation-protected `basicevent1#ReSetup` factory reset action. |
+| **Track 4** | **On-Device Motion/Sensor & Away-Mode Rule Builders + Periodic Clock Maintenance** | Native `rules.db` editors for `Motion Controlled` (`DEVICECOMBINATION`) and `Away Mode` rules (building on the shipped Step 2 mutator), plus optional background `WorkManager` clock-drift checks for switches after household power outages. |
+| **Track 5** | **Household Profile Sync (JSON / QR Export-Import) & Local Webhook / Home Assistant Bridge** | Export/import remembered Wi-Fi Homes, room names, and custom ordering via JSON file or on-screen QR code (ideal for syncing a phone setup onto an Android TV), plus an optional local REST/Webhook endpoint on Android TV. |
+| **Track 6** | **Phased Dependency & Toolchain Modernization ([`DEPENDENCY_UPGRADE_PLAN.md`](DEPENDENCY_UPGRADE_PLAN.md))** | *(Wave 1 Verified in AI Studio: `lifecycle 2.9.2`, `room 2.8.5`, `coroutines 1.11.0`, `androidx.test 1.7.0`, `robolectric 4.18.1`; Wave 2 Deferred Post-`v35.0`)* Next: Wave 2 upgrades Compose BOM + `activity-compose` + `lifecycle 2.10.0` (co-reviewed by `ai_studio_ux_cuj`) within AI Studio's `Gradle 9.3.1` / `AGP 9.1.1` / `Kotlin 2.2.10` / `compileSdk 36.1` ceiling; Wave 3 toolchain bump deferred until AI Studio upgrades its container Gradle binary. |
 
 ---
 
 ## 2. Detailed Specifications for Upcoming Features
 
-### Track 1: On-Device Hardware Rules DB — Step 2 (Live Write Management & Phone-App Rule Retirement)
-Step 1 (owned by `discovery_and_grouping`) shipped zero-RTT Tier-1 `/setup.xml` capability hints, authoritative Tier-2 `/rulesservice.xml` + `rules1#FetchRules` verification cached per firmware in Room v6 (`MIGRATION_5_6`), schema-tolerant read-only `rules.db` SQLite-in-ZIP readout in the **Rules** tab and per-switch **Expanded Diagnostics Drawer**, rotating raw-ZIP backups, `timesync1#GetDeviceTime` / `#TimeSync`, and the anti-brick pre-store validator (`HardwareRulesSafetyValidator` + armored `StoreRules` read-back verification). Step 2 completes full on-device rule management:
-1. **In-Place Hardware Rule Editors (`Long Press`, `Auto-Off Delay`, `Time Interval` + Sunrise/Sunset)**:
-   - Mutate a switch's downloaded SQLite `rules.db` in place (preserving all pre-existing firmware tables and the original ZIP entry name), pass every write through `HardwareRulesSafetyValidator.validateAndPackToBase64Zip`, push via `HardwareRulesClient.storeValidatedRulesDb` (with mandatory `<errorInfo>` `"Successful"` check + post-store `FetchRules` version verification), and expose one-tap restore from the saved raw-ZIP backup.
-2. **Automatic Switch Clock & Solar Location Sync (`timesync1#TimeSync` + `LOCATIONINFO`)**:
-   - Automatically push local UTC + timezone offset via `timesync1#TimeSync` whenever `needsTimeSync == true` before writing schedules, and let users configure optional city/lat-lon coordinates in `LOCATIONINFO` for native Sunrise/Sunset rules.
-3. **Drop Phone-Only App Automations**:
-   - Once true on-device rule creation/editing/deletion is live in Step 2, retire the legacy phone-only `RuleEntity` / `RuleScheduler` / `RuleDialog` app automations from the phone app so the **Rules** tab is dedicated cleanly to on-device switch automation.
-
----
-
-### Track 2: Android Quick Settings Tiles, Multi-Switch 4x1 Widget Bar & Always-On TV Hub Mode
+### Track 1: Android Quick Settings Tiles, Multi-Switch 4x1 Widget Bar & Always-On TV Hub Mode
 1. **Multi-Switch Room Group 4x1 Bar Widget**:
    - Builds on the shipped one-tap single-light and room-toggle Home Screen widget (`WeMiSwitchWidgetProvider`, `v29.0–v31.0`) by adding a wider 4x1 bar displaying the active Wi-Fi Home, room master toggle, and up to 4 individual pinned switches/dimmers.
 2. **Android Quick Settings Tile (`QuickSettingsTileService`)**:
    - Allows pulling down the Android notification shade and toggling a favorite switch or whole room (e.g., `"Living Room Lights"`) with a single tap — even from the lock screen.
 3. **Always-On Android TV / Tablet LAN Hub Service (`HubForegroundService`)**:
    - Optional toggle in **More** (`"Run as Always-On Local Automation Hub"`), automatically enabled on Android TV (`UI_MODE_TYPE_TELEVISION`) and started on `BOOT_COMPLETED`.
-   - Keeps `GenaSubscriptionManager` and `RuleScheduler` alive in the background so scheduled rules, motion triggers, and `timesync1` clock updates run 24/7 on an Android TV box.
+   - Keeps `GenaSubscriptionManager` and periodic `timesync1#TimeSync` clock maintenance alive in the background on an always-on Android TV box or wall tablet.
 
 ---
 
-### Track 3: Expanded Smart Switch Hardware Support
+### Track 2: Expanded Smart Switch Hardware Support
 1. **Insight Energy Monitoring Plug (`F7C029` — `urn:Belkin:service:insight:1`)**:
    - Parse pipe-delimited `<InsightParams>` (`State|LastChangeTS|OnForSec|OnTodaySec|OnTotalSec|TimeWindow|AvgPowerW|CurrentPowerMw|TodayMwMin|TotalMwMin|StandbyThresholdMw`).
    - Distinguish `State = 1` (**ON / Drawing Load**) vs. `State = 8` (**Standby** — plugged-in appliance is idle below `StandbyThresholdMw`).
@@ -84,7 +72,7 @@ Step 1 (owned by `discovery_and_grouping`) shipped zero-RTT Tier-1 `/setup.xml` 
 
 ---
 
-### Track 4: Frictionless `10.22.22.1` Setup with `WifiNetworkSpecifier` & Hardware `ReSetup`
+### Track 3: Frictionless `10.22.22.1` Setup with `WifiNetworkSpecifier` & Hardware `ReSetup`
 1. **In-App Setup AP Join (`Android 10+ WifiNetworkSpecifier`)**:
    - Add a **"Find & Join Switch Setup AP"** button inside `ProvisionApDialog` using `WifiNetworkSpecifier.Builder().setSsidPattern(PatternMatcher("WeMo.", PatternMatcher.PATTERN_PREFIX)).build()`.
 2. **Hardware Wi-Fi Reset (`urn:Belkin:service:basicevent:1#ReSetup`)**:
@@ -92,18 +80,17 @@ Step 1 (owned by `discovery_and_grouping`) shipped zero-RTT Tier-1 `/setup.xml` 
 
 ---
 
-### Track 5: Offline Astronomical Solar Calculator & GENA Motion Chains
-1. **Offline Sunrise/Sunset Calculator (`SolarCalculator.kt`)**:
-   - Compute exact daily local Sunrise, Sunset, and Civil Twilight times from an optional user-configured city/latitude-longitude (zero location permission required if selected from a city preset or manual coordinates).
-   - Automatically update `SUNSET` / `SUNRISE` rules each day (with custom offsets like `Sunset - 15m` or `Sunrise + 30m`).
-2. **Real-Time Motion Sensor (`F7C028`) Automation Chains**:
-   - When `GenaSubscriptionManager` receives `<BinaryState>1</BinaryState>` from a `MOTION_SENSOR` (`urn:Belkin:device:sensor:1` / `urn:Belkin:device:NetCamSensor:1`), immediately evaluate all enabled `MOTION_TRIGGER` rules and turn ON the target room/switches, starting an automatic re-triggerable hold timer (`autoOffMinutes`).
+### Track 4: On-Device Motion/Sensor & Away-Mode Rule Builders + Periodic Clock Maintenance
+1. **Native `Motion Controlled` & `Away Mode` On-Device Rule Editors**:
+   - Extend `HardwareRulesDbMutator` and `HardwareRuleEditorDialog` beyond Long Press, Auto-Off Delay, Schedules, and Timed Actions to author native `DEVICECOMBINATION` sensor-triggered rules and `Away Mode` randomized occupancy windows directly inside compatible switches' `rules.db`.
+2. **Multi-Switch Rule Cloning & Periodic Post-Outage Clock Sync**:
+   - Allow copying a schedule or Solar Location across multiple switches in one tap and optionally schedule background `timesync1#TimeSync` checks after router/power outages.
 
 ---
 
-### Track 6: Household Configuration Sync (JSON / QR) & Android TV Local Bridge
+### Track 5: Household Configuration Sync (JSON / QR) & Android TV Local Bridge
 1. **Zero-Cloud Household Sync (`BackupManager.kt`)**:
-   - Export all `wemo_home_networks`, `wemo_devices` (including custom names, rooms, and sort order), and `wemo_rules` to a compact JSON file or multi-frame / compressed QR code.
+   - Export all `wemo_home_networks` and `wemo_devices` (including custom names, rooms, and sort order) to a compact JSON file or multi-frame / compressed QR code.
    - On Android TV, display a **"Pair from Phone"** local HTTP receiver (`http://<tv-ip>:8990/sync`) so the user can push their entire phone configuration to their living room TV in one tap over the home LAN.
 2. **Optional Local REST / Webhook Endpoint**:
    - Allow local scripts, Tasker, or Home Assistant on the LAN to query or trigger WeMi scenes via simple local HTTP calls when Android TV Hub Mode is active.

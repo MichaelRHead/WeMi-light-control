@@ -302,57 +302,6 @@ object DemoFixtures {
         )
     )
 
-    fun defaultClassicRules(): List<RuleEntity> = listOf(
-        RuleEntity(
-            id = 1,
-            name = "Evening Holiday Lights",
-            ruleType = "SCHEDULE",
-            targetDeviceId = 1,
-            targetDeviceName = "Christmas Tree Living",
-            triggerSummary = "Daily at Sunset (5:15 PM)",
-            actionSummary = "Turn ON Christmas Tree Living",
-            targetStateOn = true,
-            targetBrightness = 100,
-            isEnabled = true
-        ),
-        RuleEntity(
-            id = 2,
-            name = "Bedroom Motion Nightlight",
-            ruleType = "MOTION_TRIGGER",
-            targetDeviceId = 8,
-            targetDeviceName = "Lightbulb Bedroom",
-            triggerSummary = "When Bedroom Light Motion senses movement",
-            actionSummary = "Turn ON Lightbulb Bedroom (35%)",
-            targetStateOn = true,
-            targetBrightness = 35,
-            isEnabled = true
-        ),
-        RuleEntity(
-            id = 3,
-            name = "Landing Night Dimmer",
-            ruleType = "SCHEDULE",
-            targetDeviceId = 6,
-            targetDeviceName = "Lightbulb Landing",
-            triggerSummary = "Every night at 10:00 PM",
-            actionSummary = "Dim Lightbulb Landing to 21%",
-            targetStateOn = true,
-            targetBrightness = 21,
-            isEnabled = true
-        ),
-        RuleEntity(
-            id = 4,
-            name = "Midnight Candle Auto-Off",
-            ruleType = "AUTO_OFF",
-            targetDeviceId = 2,
-            targetDeviceName = "Christmas Candle",
-            triggerSummary = "Daily at 11:59 PM",
-            actionSummary = "Turn OFF Christmas Candle",
-            targetStateOn = false,
-            targetBrightness = 0,
-            isEnabled = true
-        )
-    )
-
     /**
      * Appends synthetic Demo Showroom SSDP responses for reachable remembered demo switches plus a
      * sample adoptable `"Patio String Lights"` switch on an RFC 1918 `/24` subnet.

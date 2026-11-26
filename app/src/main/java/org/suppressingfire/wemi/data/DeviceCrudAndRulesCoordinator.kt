@@ -125,41 +125,6 @@ internal class DeviceCrudAndRulesCoordinator(
             isReachable = true
         )
         dao.updateDevice(updated)
-
-        val devices = dao.getAllDevices().first()
-        val rules = dao.getAllRules().first()
-        rules.filter { it.isEnabled && it.parsedRuleType == RuleType.MOTION_TRIGGER }.forEach { rule ->
-            executeRuleAction(
-                rule = rule,
-                devices = devices,
-                requiredNetworkKey = device.networkKey.takeIf { it.isNotBlank() }
-            )
-        }
-    }
-
-    private suspend fun executeRuleAction(
-        rule: RuleEntity,
-        devices: List<DeviceEntity>,
-        requiredNetworkKey: String? = null
-    ) {
-        val scopedDevices = if (requiredNetworkKey != null) {
-            devices.filter { it.networkKey.isBlank() || it.networkKey == requiredNetworkKey }
-        } else {
-            devices
-        }
-        val target = scopedDevices.find { it.id == rule.targetDeviceId }
-            ?: if (rule.targetDeviceId <= 0 || devices.none { it.id == rule.targetDeviceId }) {
-                scopedDevices.find { it.name.equals(rule.targetDeviceName, ignoreCase = true) }
-            } else {
-                null
-            }
-        if (target != null) {
-            if (target.parsedType == DeviceType.LIGHTBULB_DIMMER && rule.targetStateOn) {
-                updateDeviceBrightness(target, rule.targetBrightness)
-            } else {
-                setDevicePowerExplicit(target, rule.targetStateOn)
-            }
-        }
     }
 
     suspend fun setDeviceReachableState(device: DeviceEntity, reachable: Boolean) {
@@ -446,21 +411,5 @@ internal class DeviceCrudAndRulesCoordinator(
                 dao.updateDevice(entity.copy(sortOrder = normalizedOrder))
             }
         }
-    }
-
-    suspend fun toggleRule(rule: RuleEntity) {
-        dao.updateRule(rule.copy(isEnabled = !rule.isEnabled))
-    }
-
-    suspend fun runRuleNow(rule: RuleEntity) {
-        executeRuleAction(rule = rule, devices = dao.getAllDevices().first())
-    }
-
-    suspend fun addRule(rule: RuleEntity) {
-        dao.insertRule(rule)
-    }
-
-    suspend fun deleteRule(id: Int) {
-        dao.deleteRuleById(id)
     }
 }

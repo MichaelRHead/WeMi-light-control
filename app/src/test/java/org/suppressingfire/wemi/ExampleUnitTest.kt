@@ -8,8 +8,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
-import org.suppressingfire.wemi.data.RuleType
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
+import org.suppressingfire.wemi.network.HardwareRuleType
+import org.suppressingfire.wemi.network.HardwareRulesCapability
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.XmlAndSkuParser
 import org.suppressingfire.wemi.ui.TvScene
@@ -17,7 +18,7 @@ import org.suppressingfire.wemi.ui.TvScene
 /**
  * Fast, zero-Android-framework JVM unit tests for pure protocol helpers (`XmlAndSkuParser`),
  * placeholder serial utilities (`LanRuntimeUtils`), 3-tier device identity matching
- * (`DeviceEntity.matchesDiscovered`), and typed `RuleType` / `TvScene` enums.
+ * (`DeviceEntity.matchesDiscovered`), and typed `HardwareRuleType` / `TvScene` enums.
  */
 class ExampleUnitTest {
 
@@ -141,9 +142,11 @@ class ExampleUnitTest {
         )
         assertFalse(swappedSerial.matchesDiscovered(discovered))
 
-        assertEquals(RuleType.MOTION_TRIGGER, RuleType.fromRaw("MOTION_TRIGGER"))
-        assertEquals(RuleType.AUTO_OFF, RuleType.fromRaw("auto_off"))
-        assertEquals(RuleType.SCHEDULE, RuleType.fromRaw("unknown_type"))
+        assertEquals(HardwareRuleType.LONG_PRESS, HardwareRuleType.fromFirmwareType("Long Press"))
+        assertEquals(HardwareRuleType.COUNTDOWN_TIMER, HardwareRuleType.fromFirmwareType("Countdown Rule"))
+        assertEquals(HardwareRuleType.SCHEDULE_INTERVAL, HardwareRuleType.fromFirmwareType("Time Interval"))
+        assertEquals(HardwareRulesCapability.VERIFIED_SUPPORTED, HardwareRulesCapability.fromRaw("VERIFIED_SUPPORTED"))
+        assertEquals(HardwareRulesCapability.UNKNOWN, HardwareRulesCapability.fromRaw("unknown_cap"))
 
         assertEquals(TvScene.MOVIE_MODE, TvScene.fromWireKey("MOVIE_MODE"))
         assertEquals(TvScene.HOLIDAY_ON, TvScene.fromWireKey("holiday_on"))

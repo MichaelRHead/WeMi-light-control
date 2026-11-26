@@ -11,10 +11,9 @@ import org.suppressingfire.wemi.network.LanRuntimeUtils
 @Database(
     entities = [
         DeviceEntity::class,
-        RuleEntity::class,
         HomeNetworkEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class SwitchDatabase : RoomDatabase() {
@@ -32,6 +31,12 @@ abstract class SwitchDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE wemo_devices ADD COLUMN hardwareRulesVerifiedFirmware TEXT NOT NULL DEFAULT ''"
                 )
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("DROP TABLE IF EXISTS wemo_rules")
             }
         }
 
@@ -57,7 +62,7 @@ abstract class SwitchDatabase : RoomDatabase() {
                     val instance = if (isRobolectric) {
                         Room.inMemoryDatabaseBuilder(appCtx, SwitchDatabase::class.java)
                             .allowMainThreadQueries()
-                            .addMigrations(MIGRATION_5_6)
+                            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
                             .fallbackToDestructiveMigration(dropAllTables = true)
                             .build()
                     } else {
@@ -66,7 +71,7 @@ abstract class SwitchDatabase : RoomDatabase() {
                             SwitchDatabase::class.java,
                             "wemi_switch_database"
                         )
-                            .addMigrations(MIGRATION_5_6)
+                            .addMigrations(MIGRATION_5_6, MIGRATION_6_7)
                             .fallbackToDestructiveMigration(dropAllTables = true)
                             .build()
                     }

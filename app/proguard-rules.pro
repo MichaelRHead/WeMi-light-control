@@ -19,7 +19,7 @@
 # Preserve domain enums whose constant names are persisted in Room SQLite (e.g. DeviceType.valueOf).
 -keep enum org.suppressingfire.wemi.** { *; }
 
-# Preserve Room v6 database, DAO, generated *_Impl classes, and @Entity models.
+# Preserve Room v7 database, DAO, generated *_Impl classes, and @Entity models.
 -keep @androidx.room.Entity class org.suppressingfire.wemi.data.** { *; }
 -keep @androidx.room.Database class org.suppressingfire.wemi.data.** { *; }
 -keep @androidx.room.Dao class org.suppressingfire.wemi.data.** { *; }

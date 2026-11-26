@@ -13,16 +13,15 @@ import kotlinx.coroutines.launch
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
-import org.suppressingfire.wemi.data.RuleEntity
 import org.suppressingfire.wemi.data.SwitchRepository
 
 /**
  * Cohesive ViewModel-scoped UI controller for remembered Wi-Fi Home profiles, Demo Showroom
- * vs. Real LAN mode transitions, local automation [RuleEntity] CRUD, and 1-press Android TV
- * scenes ([TvScene]).
+ * vs. Real LAN mode transitions, and 1-press Android TV scenes ([TvScene]).
  *
- * Extracted from [SwitchViewModel] (mirroring [ProvisionApUiController]) so [SwitchViewModel]
- * focuses on reactive Room flows, SSDP discovery, and per-device/per-room switch actions.
+ * Extracted from [SwitchViewModel] (mirroring [ProvisionApUiController] and
+ * [HardwareRulesUiController]) so [SwitchViewModel] focuses on reactive Room flows, SSDP
+ * discovery, and per-device/per-room switch actions.
  */
 internal class HomeAndRulesUiController(
     private val scope: CoroutineScope,
@@ -38,9 +37,6 @@ internal class HomeAndRulesUiController(
 
     private val _showAddHomeDialog = MutableStateFlow(false)
     val showAddHomeDialog: StateFlow<Boolean> = _showAddHomeDialog.asStateFlow()
-
-    private val _showAddRuleDialog = MutableStateFlow(false)
-    val showAddRuleDialog: StateFlow<Boolean> = _showAddRuleDialog.asStateFlow()
 
     private val reconnectLock = Any()
 
@@ -245,95 +241,6 @@ internal class HomeAndRulesUiController(
                     onShowTransientStatus("Bedtime Scene: Turned OFF all switches across all rooms")
                 }
             }
-        }
-    }
-
-    fun toggleRule(rule: RuleEntity) {
-        scope.launch {
-            repository.toggleRule(rule)
-        }
-    }
-
-    fun runRuleNow(rule: RuleEntity) {
-        scope.launch {
-            repository.runRuleNow(rule)
-            onShowTransientStatus("Executed rule: ${rule.name}")
-        }
-    }
-
-    fun openAddRuleDialog() {
-        _showAddRuleDialog.value = true
-    }
-
-    fun closeAddRuleDialog() {
-        _showAddRuleDialog.value = false
-    }
-
-    fun addRule(
-        name: String,
-        ruleType: String,
-        targetDevice: DeviceEntity,
-        triggerSummary: String,
-        targetStateOn: Boolean,
-        targetBrightness: Int
-    ) {
-        _showAddRuleDialog.value = false
-        scope.launch {
-            val actionSummary = buildString {
-                append(if (targetStateOn) "Turn ON " else "Turn OFF ")
-                append(targetDevice.name)
-                if (targetStateOn && targetDevice.parsedType == DeviceType.LIGHTBULB_DIMMER) {
-                    append(" ($targetBrightness%)")
-                }
-            }
-            val resolvedRuleName = name.trim().ifEmpty { "Custom Switch Rule" }
-            repository.addRule(
-                RuleEntity(
-                    name = resolvedRuleName,
-                    ruleType = ruleType,
-                    targetDeviceId = targetDevice.id,
-                    targetDeviceName = targetDevice.name,
-                    triggerSummary = triggerSummary.trim().ifEmpty { "Daily at 7:00 PM" },
-                    actionSummary = actionSummary,
-                    targetStateOn = targetStateOn,
-                    targetBrightness = targetBrightness.coerceIn(1, 100),
-                    isEnabled = true
-                )
-            )
-            onShowTransientStatus("Created rule: $resolvedRuleName")
-        }
-    }
-
-    val hardwareRulesByDeviceId: StateFlow<Map<Int, org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot>> =
-        repository.hardwareRulesByDeviceId
-    val inspectingRuleDeviceIds: StateFlow<Set<Int>> = repository.inspectingRuleDeviceIds
-    val isScanningAllDeviceRules: StateFlow<Boolean> = repository.isScanningAllDeviceRules
-
-    fun inspectDeviceHardwareRules(device: DeviceEntity, forceRecheck: Boolean = false) {
-        scope.launch {
-            val snapshot = repository.inspectDeviceHardwareRules(device, forceRecheck)
-            onShowTransientStatus("${device.name}: ${snapshot.diagnosticMessage.ifBlank { snapshot.capability.displayLabel }}")
-        }
-    }
-
-    fun inspectAllHomeHardwareRules(forceRecheck: Boolean = false) {
-        val targetKey = _activeNetworkKey.value
-        scope.launch {
-            val results = repository.inspectAllHomeHardwareRules(targetKey, forceRecheck)
-            val supportedCount = results.count {
-                it.capability == org.suppressingfire.wemi.network.HardwareRulesCapability.VERIFIED_SUPPORTED
-            }
-            val totalRules = results.sumOf { snap -> snap.rules.count { it.appliesToInspectedSwitch } }
-            onShowTransientStatus(
-                "Scanned ${results.size} switch(es): $supportedCount on-device ready • $totalRules rule(s) read"
-            )
-        }
-    }
-
-    fun deleteRule(rule: RuleEntity) {
-        scope.launch {
-            repository.deleteRule(rule.id)
-            onShowTransientStatus("Deleted rule: ${rule.name}")
         }
     }
 }

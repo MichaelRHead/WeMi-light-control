@@ -13,7 +13,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -21,12 +20,14 @@ import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.HomeNetworkEntity
-import org.suppressingfire.wemi.data.RuleEntity
-import org.suppressingfire.wemi.data.RuleScheduler
 import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SsdpDiscoveredDevice
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
+import org.suppressingfire.wemi.network.HardwareLocationInfo
+import org.suppressingfire.wemi.network.HardwareRule
+import org.suppressingfire.wemi.network.HardwareRuleDraft
 import org.suppressingfire.wemi.network.LanNetworkSnapshot
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkMonitor
@@ -75,21 +76,6 @@ class SwitchViewModel internal constructor(
     )
     val lanNetworkState: StateFlow<LanNetworkSnapshot> = networkMonitor.networkState
 
-    private val ruleScheduler = RuleScheduler(
-        scope = viewModelScope,
-        onAutoOffExpired = { deviceId ->
-            val updated = repository.turnOffDeviceById(deviceId)
-            if (updated != null) {
-                showTransientStatus("${updated.name}: Turned OFF automatically by Auto-Off Timer")
-            }
-        },
-        onScheduleRuleTriggered = { rule ->
-            repository.runRuleNow(rule)
-            showTransientStatus("Scheduled Rule Executed: ${rule.name}")
-        }
-    )
-    val activeAutoOffCountdownsSec: StateFlow<Map<Int, Int>> = ruleScheduler.activeCountdownsSec
-
     val devices: StateFlow<List<DeviceEntity>> = repository.allDevices
         .stateIn(
             scope = viewModelScope,
@@ -102,13 +88,6 @@ class SwitchViewModel internal constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = if (repository.isDemoShowroomMode.value) SwitchRepository.defaultHomeNetworks() else emptyList()
-        )
-
-    val rules: StateFlow<List<RuleEntity>> = repository.allRules
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = if (repository.isDemoShowroomMode.value) SwitchRepository.defaultClassicRules() else emptyList()
         )
 
     val soapLogs: StateFlow<List<SoapLogEntry>> = repository.soapLogs
@@ -144,16 +123,29 @@ class SwitchViewModel internal constructor(
             _collapsedRooms.value = emptySet()
             _expandedDeviceIds.value = emptySet()
             _isEditMode.value = false
+            hardwareRulesController.dismissAllDialogs()
         },
         onShowTransientStatus = ::showTransientStatus
     )
     val activeNetworkKey: StateFlow<String> = homeAndRulesController.activeNetworkKey
     val isReconnectingHome: StateFlow<Boolean> = homeAndRulesController.isReconnectingHome
     val showAddHomeDialog: StateFlow<Boolean> = homeAndRulesController.showAddHomeDialog
-    val showAddRuleDialog: StateFlow<Boolean> = homeAndRulesController.showAddRuleDialog
-    val hardwareRulesByDeviceId = homeAndRulesController.hardwareRulesByDeviceId
-    val inspectingRuleDeviceIds = homeAndRulesController.inspectingRuleDeviceIds
-    val isScanningAllDeviceRules = homeAndRulesController.isScanningAllDeviceRules
+
+    private val hardwareRulesController = HardwareRulesUiController(
+        scope = viewModelScope,
+        repository = repository,
+        activeNetworkKeyProvider = { activeNetworkKey.value },
+        onShowTransientStatus = ::showTransientStatus
+    )
+    val hardwareRulesByDeviceId: StateFlow<Map<Int, DeviceHardwareRulesSnapshot>> =
+        hardwareRulesController.hardwareRulesByDeviceId
+    val inspectingRuleDeviceIds: StateFlow<Set<Int>> = hardwareRulesController.inspectingRuleDeviceIds
+    val isScanningAllDeviceRules: StateFlow<Boolean> = hardwareRulesController.isScanningAllDeviceRules
+    val hardwareRuleEditorRequest: StateFlow<HardwareRuleEditorRequest?> = hardwareRulesController.editorRequest
+    val solarLocationDialogDevice: StateFlow<DeviceEntity?> = hardwareRulesController.locationDialogDevice
+    val backupRestoreDialogDevice: StateFlow<DeviceEntity?> = hardwareRulesController.backupDialogDevice
+    val pendingDeleteHardwareRule: StateFlow<Pair<DeviceEntity, HardwareRule>?> =
+        hardwareRulesController.pendingDeleteRule
 
     private val deviceActionsController = DeviceActionsUiController(
         scope = viewModelScope,
@@ -218,18 +210,6 @@ class SwitchViewModel internal constructor(
             }
         }
 
-        // Keep Auto-Off countdown timers and Schedule loop synced with live device/rule states
-        ruleScheduler.startScheduleLoop { rules.value }
-        viewModelScope.launch {
-            combine(devices, rules) { devList, ruleList -> Pair(devList, ruleList) }
-                .collectLatest { (devList, ruleList) ->
-                    val activeDeviceIds = devList.mapTo(HashSet()) { it.id }
-                    ruleScheduler.pruneRemovedDevices(activeDeviceIds)
-                    devList.forEach { dev ->
-                        ruleScheduler.onDeviceStateUpdated(dev, ruleList, activeDeviceIds)
-                    }
-                }
-        }
         viewModelScope.launch {
             devices.collectLatest { devList ->
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -243,13 +223,14 @@ class SwitchViewModel internal constructor(
             viewModelScope.launch {
                 var tick = 0
                 while (isActive) {
-                    val localIp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { repository.detectCurrentLanIp() }
+                    val localIp = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        repository.detectCurrentLanIp()
+                    }
                     delay(if (LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)) 15_000L else 30_000L)
                     if (!isDemoShowroomMode.value) {
                         val key = activeNetworkKey.value
                         repository.pollActiveHomeStates(key)
                         if (tick % 8 == 0) {
-                            // Renew GENA 300s subscriptions every ~240s
                             repository.refreshGenaSubscriptionsForHome(key)
                         }
                         tick++
@@ -393,23 +374,31 @@ class SwitchViewModel internal constructor(
 
     fun turnAllSwitches(turnOn: Boolean) = deviceActionsController.turnAllSwitches(turnOn)
 
-    fun toggleRule(rule: RuleEntity) = homeAndRulesController.toggleRule(rule)
-    fun runRuleNow(rule: RuleEntity) = homeAndRulesController.runRuleNow(rule)
-    fun openAddRuleDialog() = homeAndRulesController.openAddRuleDialog()
-    fun closeAddRuleDialog() = homeAndRulesController.closeAddRuleDialog()
-
-    fun addRule(
-        name: String, ruleType: String, targetDevice: DeviceEntity,
-        triggerSummary: String, targetStateOn: Boolean, targetBrightness: Int
-    ) = homeAndRulesController.addRule(name, ruleType, targetDevice, triggerSummary, targetStateOn, targetBrightness)
-
-    fun deleteRule(rule: RuleEntity) = homeAndRulesController.deleteRule(rule)
-
     fun inspectDeviceHardwareRules(device: DeviceEntity, forceRecheck: Boolean = false) =
-        homeAndRulesController.inspectDeviceHardwareRules(device, forceRecheck)
-
+        hardwareRulesController.inspectDeviceHardwareRules(device, forceRecheck)
     fun inspectAllHomeHardwareRules(forceRecheck: Boolean = false) =
-        homeAndRulesController.inspectAllHomeHardwareRules(forceRecheck)
+        hardwareRulesController.inspectAllHomeHardwareRules(forceRecheck)
+    fun openAddHardwareRuleDialog(device: DeviceEntity? = null) = hardwareRulesController.openAddHardwareRuleDialog(device)
+    fun openEditHardwareRuleDialog(device: DeviceEntity, rule: HardwareRule) =
+        hardwareRulesController.openEditHardwareRuleDialog(device, rule)
+    fun closeHardwareRuleEditorDialog() = hardwareRulesController.closeHardwareRuleEditorDialog()
+    fun saveHardwareRule(device: DeviceEntity, draft: HardwareRuleDraft) = hardwareRulesController.saveHardwareRule(device, draft)
+    fun toggleHardwareRule(device: DeviceEntity, rule: HardwareRule, enabled: Boolean) =
+        hardwareRulesController.toggleHardwareRule(device, rule, enabled)
+    fun requestDeleteHardwareRule(device: DeviceEntity, rule: HardwareRule) =
+        hardwareRulesController.requestDeleteHardwareRule(device, rule)
+    fun cancelDeleteHardwareRule() = hardwareRulesController.cancelDeleteHardwareRule()
+    fun confirmDeleteHardwareRule() = hardwareRulesController.confirmDeleteHardwareRule()
+    fun syncDeviceClock(device: DeviceEntity) = hardwareRulesController.syncDeviceClock(device)
+    fun openSolarLocationDialog(device: DeviceEntity) = hardwareRulesController.openSolarLocationDialog(device)
+    fun closeSolarLocationDialog() = hardwareRulesController.closeSolarLocationDialog()
+    fun saveSolarLocation(device: DeviceEntity, location: HardwareLocationInfo) =
+        hardwareRulesController.saveSolarLocation(device, location)
+    fun openBackupRestoreDialog(device: DeviceEntity) = hardwareRulesController.openBackupRestoreDialog(device)
+    fun closeBackupRestoreDialog() = hardwareRulesController.closeBackupRestoreDialog()
+    fun restoreHardwareRulesBackup(device: DeviceEntity, backupFilePath: String) =
+        hardwareRulesController.restoreBackup(device, backupFilePath)
+    fun dismissHardwareRuleDialogs() = hardwareRulesController.dismissAllDialogs()
 
     fun toggleDimmerNightMode(device: DeviceEntity) = deviceActionsController.toggleDimmerNightMode(device)
 
@@ -459,7 +448,6 @@ class SwitchViewModel internal constructor(
         super.onCleared()
         statusBannerJob?.cancel()
         networkMonitor.stopMonitoring()
-        ruleScheduler.stopAll()
         repository.close()
         if (SwitchRepository.isRunningInRobolectric()) {
             SwitchDatabase.closeCurrentInstance()

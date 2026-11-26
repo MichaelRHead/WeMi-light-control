@@ -17,7 +17,7 @@ While in **Edit Mode**, the right side of every switch row replaces its Power Ri
 | **`↑` (Up Arrow)** | **Move Up** | Moves the switch higher in your list. In **Grouped by Room** or single-room filter view, it swaps with the switch above it in the **same room** without disturbing other rooms. In **Flat List** view, it reorders across your active Wi-Fi Home. |
 | **`↓` (Down Arrow)** | **Move Down** | Moves the switch lower within the same room (when grouped/filtered) or across your active Wi-Fi Home (in Flat List view). |
 | **`✎` (Pencil Icon)** | **Edit Device** | Opens the **Edit** dialog for that switch (you can also tap anywhere on the row while in Edit Mode). |
-| **`🗑` (Trash Icon)** | **Delete Device** | Removes the switch from your saved list, cancels any active Auto-Off timer for it, and stops its live push subscription immediately. |
+| **`🗑` (Trash Icon)** | **Delete Device** | Removes the switch from your saved list, clears its cached on-device rules snapshot, and stops its live push subscription immediately. |
 
 Tap **`Done`** in the top-right header (or press your device's **Back** button) to exit **Edit Mode** and return to normal switching.
 

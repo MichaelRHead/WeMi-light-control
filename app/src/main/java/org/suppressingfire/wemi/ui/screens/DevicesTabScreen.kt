@@ -81,7 +81,6 @@ data class DevicesTabUiState(
     val togglingDeviceIds: Set<Int>,
     val isEditMode: Boolean,
     val isDemoShowroomMode: Boolean = false,
-    val activeAutoOffCountdownsSec: Map<Int, Int>,
     val hardwareRulesByDeviceId: Map<Int, DeviceHardwareRulesSnapshot> = emptyMap(),
     val inspectingRuleDeviceIds: Set<Int> = emptySet()
 )
@@ -114,7 +113,9 @@ data class DevicesTabActions(
     val onToggleNightMode: (DeviceEntity) -> Unit,
     val onPinRoomWidget: ((String) -> Unit)? = null,
     val onPinDeviceWidget: ((DeviceEntity) -> Unit)? = null,
-    val onInspectDeviceHardwareRules: ((DeviceEntity) -> Unit)? = null
+    val onInspectDeviceHardwareRules: ((DeviceEntity) -> Unit)? = null,
+    val onAddDeviceHardwareRule: ((DeviceEntity) -> Unit)? = null,
+    val onSyncDeviceClock: ((DeviceEntity) -> Unit)? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -295,11 +296,12 @@ private fun BoundDeviceRow(
         onToggleNightMode = { actions.onToggleNightMode(device) },
         onPinDeviceWidget = actions.onPinDeviceWidget?.let { pin -> { pin(device) } },
         isDemoShowroomMode = state.isDemoShowroomMode,
-        autoOffRemainingSeconds = state.activeAutoOffCountdownsSec[device.id],
         hardwareRulesSnapshot = state.hardwareRulesByDeviceId[device.id],
         isInspectingHardwareRules = device.id in state.inspectingRuleDeviceIds,
         udnToFriendlyName = udnToName,
         onInspectHardwareRules = actions.onInspectDeviceHardwareRules?.let { inspect -> { inspect(device) } },
+        onAddHardwareRule = actions.onAddDeviceHardwareRule?.let { add -> { add(device) } },
+        onSyncDeviceClock = actions.onSyncDeviceClock?.let { sync -> { sync(device) } },
         modifier = modifier
     )
 }

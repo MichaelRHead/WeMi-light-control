@@ -19,15 +19,13 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.suppressingfire.wemi.data.DeviceEntity
-import org.suppressingfire.wemi.data.RuleEntity
-import org.suppressingfire.wemi.data.RuleType
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.network.NetworkClient
 
 /**
  * Tier 2 Repository Concurrency, Idempotent Batch Fan-Out (`Semaphore(3)`), and Room CRUD
- * (`moveDeviceOrder`, `deleteDevice`, `deleteRule`) Integration Tests.
+ * (`moveDeviceOrder`, `deleteDevice`) Integration Tests.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -100,7 +98,7 @@ class BatchAndCrudIntegrationTest {
     }
 
     @Test
-    fun `verify moveDeviceOrder, deleteDevice, and deleteRule Room CRUD persistence`() = runBlocking {
+    fun `verify moveDeviceOrder and deleteDevice Room CRUD persistence`() = runBlocking {
         val repo = SwitchRepository(
             dao = database.switchDao(),
             initialDemoModeOverride = false
@@ -142,23 +140,6 @@ class BatchAndCrudIntegrationTest {
         repo.moveDeviceOrder(movedB, moveUp = false)
         val orderedAfterDown = database.switchDao().getAllDevices().first()
         assertEquals(listOf("Switch A", "Switch B"), orderedAfterDown.map { it.name })
-
-        // Add and delete a RuleEntity
-        val ruleId = database.switchDao().insertRule(
-            RuleEntity(
-                name = "Office Night Off",
-                ruleType = RuleType.SCHEDULE.name,
-                targetDeviceId = idA,
-                targetDeviceName = "Switch A",
-                triggerSummary = "Daily at 11:00 PM",
-                actionSummary = "Turn OFF Switch A",
-                targetStateOn = false,
-                isEnabled = true
-            )
-        ).toInt()
-        assertEquals(1, database.switchDao().getRuleCount())
-        repo.deleteRule(ruleId)
-        assertEquals(0, database.switchDao().getRuleCount())
 
         // Delete Switch A
         repo.deleteDevice(idA)

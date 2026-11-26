@@ -148,11 +148,14 @@ class FakeHardwareRulesServer(
                         .replace("<![CDATA[", "")
                         .replace("]]>", "")
                         .trim()
-                    if (b64.isNotEmpty()) {
-                        runCatching { currentRulesZipBytes.set(Base64.decode(b64, Base64.DEFAULT)) }
-                    }
-                    if (newVer != null && !simulateReadBackStaleVersion.getAndSet(false)) {
-                        currentDbVersion.set(newVer)
+                    val isStale = simulateReadBackStaleVersion.getAndSet(false)
+                    if (!isStale) {
+                        if (b64.isNotEmpty()) {
+                            runCatching { currentRulesZipBytes.set(Base64.decode(b64, Base64.DEFAULT)) }
+                        }
+                        if (newVer != null) {
+                            currentDbVersion.set(newVer)
+                        }
                     }
                     """<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:StoreRulesResponse xmlns:u="urn:Belkin:service:rules:1"><errorInfo>Storing of rules DB Successful!</errorInfo></u:StoreRulesResponse></s:Body></s:Envelope>"""
                 }

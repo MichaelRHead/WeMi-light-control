@@ -24,7 +24,11 @@ import kotlinx.coroutines.sync.withPermit
 import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
 import org.suppressingfire.wemi.network.GenaEventNotification
 import org.suppressingfire.wemi.network.GenaSubscriptionManager
+import org.suppressingfire.wemi.network.HardwareLocationInfo
+import org.suppressingfire.wemi.network.HardwareRule
+import org.suppressingfire.wemi.network.HardwareRuleDraft
 import org.suppressingfire.wemi.network.HardwareRulesClient
+import org.suppressingfire.wemi.network.HardwareRulesWriteResult
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkClient
 import org.suppressingfire.wemi.network.NetworkMonitor
@@ -139,16 +143,10 @@ class SwitchRepository(
             if (list.isEmpty() && demoMode) defaultHomeNetworks() else list
         }
 
-    val allRules: Flow<List<RuleEntity>> =
-        combine(dao.getAllRules(), initialSeedDone, _isDemoShowroomMode) { list, _, demoMode ->
-            if (list.isEmpty() && demoMode) defaultClassicRules() else list
-        }
-
     suspend fun ensureSeeded(): String = seedAndModeMutex.withLock {
         if (_isDemoShowroomMode.value) {
             if (dao.getHomeNetworkCount() == 0) dao.insertHomeNetworks(defaultHomeNetworks())
             if (dao.getDeviceCount() == 0) dao.insertDevices(defaultClassicDevices())
-            if (dao.getRuleCount() == 0) dao.insertRules(defaultClassicRules())
             initialSeedDone.value = true
             DEFAULT_MAIN_HOME_KEY
         } else {
@@ -178,7 +176,6 @@ class SwitchRepository(
         } else {
             resetRuntimeDeviceState()
             dao.deleteAllDevices()
-            dao.deleteAllRules()
             dao.deleteAllHomeNetworks()
             val localIp = kotlinx.coroutines.withContext(Dispatchers.IO) { detectCurrentLanIp() }
             val activeKey = discoveryCoordinator.sanitizeAndResolveInitialLanHome(localIp)
@@ -203,11 +200,9 @@ class SwitchRepository(
         resetRuntimeDeviceState()
         prefs?.edit { putBoolean(KEY_DEMO_SHOWROOM_MODE, true) }
         dao.deleteAllDevices()
-        dao.deleteAllRules()
         dao.deleteAllHomeNetworks()
         dao.insertHomeNetworks(defaultHomeNetworks())
         dao.insertDevices(defaultClassicDevices())
-        dao.insertRules(defaultClassicRules())
         onActiveKeyResolved?.invoke(DEFAULT_MAIN_HOME_KEY)
         _isDemoShowroomMode.value = true
     }
@@ -450,13 +445,26 @@ class SwitchRepository(
     ): List<DeviceHardwareRulesSnapshot> =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.inspectAllHomeHardwareRules(networkKey, forceRecheck) }
 
+    suspend fun saveHardwareRule(device: DeviceEntity, draft: HardwareRuleDraft): HardwareRulesWriteResult =
+        awaitDemoSeedIfPending().let { hardwareRulesCoordinator.saveHardwareRule(device, draft) }
+
+    suspend fun toggleHardwareRule(device: DeviceEntity, rule: HardwareRule, enabled: Boolean): HardwareRulesWriteResult =
+        awaitDemoSeedIfPending().let { hardwareRulesCoordinator.toggleHardwareRule(device, rule, enabled) }
+
+    suspend fun deleteHardwareRule(device: DeviceEntity, rule: HardwareRule): HardwareRulesWriteResult =
+        awaitDemoSeedIfPending().let { hardwareRulesCoordinator.deleteHardwareRule(device, rule) }
+
+    suspend fun syncDeviceClock(device: DeviceEntity): HardwareRulesWriteResult =
+        awaitDemoSeedIfPending().let { hardwareRulesCoordinator.syncDeviceClock(device) }
+
+    suspend fun updateDeviceSolarLocation(device: DeviceEntity, location: HardwareLocationInfo): HardwareRulesWriteResult =
+        awaitDemoSeedIfPending().let { hardwareRulesCoordinator.updateDeviceSolarLocation(device, location) }
+
+    suspend fun restoreHardwareRulesBackup(device: DeviceEntity, backupFilePath: String): HardwareRulesWriteResult =
+        awaitDemoSeedIfPending().let { hardwareRulesCoordinator.restoreHardwareRulesBackup(device, backupFilePath) }
+
     suspend fun moveDeviceOrder(device: DeviceEntity, moveUp: Boolean, withinRoomOnly: Boolean = false) =
         awaitDemoSeedIfPending().let { crudCoordinator.moveDeviceOrder(device, moveUp, withinRoomOnly) }
-
-    suspend fun toggleRule(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.toggleRule(rule) }
-    suspend fun runRuleNow(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.runRuleNow(rule) }
-    suspend fun addRule(rule: RuleEntity) = awaitDemoSeedIfPending().let { crudCoordinator.addRule(rule) }
-    suspend fun deleteRule(id: Int) = awaitDemoSeedIfPending().let { crudCoordinator.deleteRule(id) }
 
     fun clearLogs() {
         _soapLogs.value = emptyList()
@@ -478,7 +486,5 @@ class SwitchRepository(
         fun defaultHomeNetworks(): List<HomeNetworkEntity> = DemoFixtures.defaultHomeNetworks()
 
         fun defaultClassicDevices(): List<DeviceEntity> = DemoFixtures.defaultClassicDevices()
-
-        fun defaultClassicRules(): List<RuleEntity> = DemoFixtures.defaultClassicRules()
     }
 }

@@ -16,9 +16,9 @@ At the top of the screen, the compact single-row **Ocean Teal & Deep Sapphire** 
 | **`All Off` Button** | Right cluster | Turns **OFF** every reachable switch and dimmer on your active Wi-Fi Home in a single tap. |
 | **Refresh Icon** | Right cluster | Opens the live **SSDP Network Discovery Scan** sheet and scans your local Wi-Fi for switches (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
 | **`Edit` / `Done` Button** | Right cluster | Switches to **Edit Mode** (switching to the **Devices** tab first if needed) so you can reorder, rename, edit, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
-| **`+` (Add) Button** | Far top-right | On the **Devices** or **More** tab, opens **Add Smart Switch Device**. On the **Rules** tab, opens **New Smart Switch Rule**. |
+| **`+` (Add) Button** | Far top-right | On the **Devices** or **More** tab, opens **Add Smart Switch Device**. On the **Rules** tab, opens **New On-Device Switch Rule**. |
 
-Along the bottom of the screen, the three navigation tabs switch between **Devices** (your lights and rooms), **Rules** (on-device switch rules plus local schedules and auto-off timers), and **More** (whole-home controls, Demo Mode, packet log, and open-source notices).
+Along the bottom of the screen, the three navigation tabs switch between **Devices** (your lights and rooms), **Rules** (on-device switch rules stored directly inside switch memory), and **More** (whole-home controls, Demo Mode, packet log, and open-source notices).
 
 > [!TIP]
 > **Predictable Back Button**: Pressing your device's **Back** button steps cleanly out of open dialogs, the discovery scanner, Edit Mode, or a single-room filter, and returns from **Rules** or **More** back to **Devices** before exiting the app.
@@ -70,8 +70,8 @@ Below the name, you'll see live status indicators:
   - **2 Bars — Amber (`Slow • > 65ms`)**: Busy Wi-Fi or weaker 2.4 GHz signal.
   - **0 Bars — Red (`Offline • Timeout`)**: Switch did not respond on the local network.
 - **Power State & Details**:
-  - **Switches & Plugs**: Shows the **`ON`** / **`OFF`** pill, the switch's local IP address (or a live **`Auto-Off M:SS`** countdown when an Auto-Off timer is running), and the category badge (`Tree Lights`, `Fan`, `Light`, `Switch`).
-  - **Dimmers**: Shows the **`ON • 75%`** / **`OFF • 75%`** pill, optional **`Auto-Off M:SS`** countdown, an expand arrow (`v` / `^`), and the category badge.
+  - **Switches & Plugs**: Shows the **`ON`** / **`OFF`** pill, the switch's local IP address, and the category badge (`Tree Lights`, `Fan`, `Light`, `Switch`).
+  - **Dimmers**: Shows the **`ON • 75%`** / **`OFF • 75%`** pill, an expand arrow (`v` / `^`), and the category badge.
   - **Motion Sensors**: Shows **`Motion sensed: <time>`** and the **`Motion`** badge.
 
 ---
@@ -81,7 +81,7 @@ Below the name, you'll see live status indicators:
 What happens when you tap the body of a row (outside the right-side power ring):
 - **Reachable switch, dimmer, or plug**: Expands its **Inline Controls & Telemetry Drawer**.
 - **Offline switch**: Runs a self-healing reconnection check right away. *(To edit an offline switch's IP or settings, tap **`Edit`** in the top header first.)*
-- **Motion Sensor**: Updates motion status (**`Refresh Motion`** in Real LAN Mode, or **`Simulate Motion`** in Demo Showroom Mode to test your motion rules).
+- **Motion Sensor**: Updates live motion telemetry (**`Refresh Motion`** in Real LAN Mode, or **`Simulate Motion`** in Demo Showroom Mode).
 
 Inside an expanded drawer, controls appear in this order:
 
@@ -97,7 +97,7 @@ Inside an expanded drawer, controls appear in this order:
    - Tap **`Configure IP`** to open the **Edit** dialog for renaming, changing rooms, or updating the IP address.
 4. **On-Device Rules (Switches, Dimmers & Plugs)**:
    - Displays whether the switch supports built-in hardware rules (**`On-Device Rules: ...`**, plus **`• Long Press`** on compatible wall switches and 1st-Gen dimmers).
-   - Tap **`Inspect Rules`** (which changes to **`Refresh`** once read) on any reachable switch to verify capability in read-only mode, see the stored database version (`DB v...`) and any **`Switch clock needs sync`** alert, and preview up to 4 structured `trigger → action` rule cards right inside the drawer (showing **`• Paused`** for disabled rules and a **`+N more rule(s) in Rules tab`** cue when more rules exist). See [Rules, Schedules & Auto-Off Timers](rules-and-timers.md) for the full **Rules** tab view.
+   - Tap **`Inspect Rules`** (changes to **`Refresh`** once read) to verify capability, see the stored database version (`DB v...`) and any **`Switch clock needs sync`** alert, tap **`Add Rule`** or **`Sync Clock`** right from the drawer, and preview up to 4 structured `trigger → action` rule cards inline (showing **`• Paused`** for disabled rules and a **`+N more rule(s) in Rules tab`** cue when more rules exist). See [On-Device Switch Rules, Timers & Schedules](rules-and-timers.md) for full management, Solar Location, and Backup Restore.
 
 ---
 

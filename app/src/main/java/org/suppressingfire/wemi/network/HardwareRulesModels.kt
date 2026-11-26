@@ -260,6 +260,12 @@ data class HardwareRule(
         }
     }
 
+    val isEditableInApp: Boolean
+        get() = type == HardwareRuleType.LONG_PRESS ||
+            type == HardwareRuleType.COUNTDOWN_TIMER ||
+            type == HardwareRuleType.SCHEDULE_INTERVAL ||
+            type == HardwareRuleType.SIMPLE_TIMER
+
     private fun formatBinaryAction(value: Double?): String? = when (value?.toInt()) {
         0 -> "Turn OFF"
         1 -> "Turn ON"
@@ -267,6 +273,126 @@ data class HardwareRule(
         else -> null
     }
 }
+
+enum class HardwareTimeAnchor(val label: String) {
+    FIXED_TIME("Clock Time"),
+    SUNRISE("Sunrise"),
+    SUNSET("Sunset")
+}
+
+/**
+ * Editable form payload used to create or update an on-device hardware rule inside `rules.db`.
+ */
+data class HardwareRuleDraft(
+    val existingRuleId: Int? = null,
+    val name: String,
+    val type: HardwareRuleType,
+    val isEnabled: Boolean = true,
+    val daysOfWeek: List<Int> = listOf(1, 2, 3, 4, 5, 6, 7),
+    val longPressAction: HardwareLongPressAction = HardwareLongPressAction.TOGGLE,
+    val targetDeviceUdns: List<String> = emptyList(),
+    val countdownMinutes: Int = 30,
+    val startAnchor: HardwareTimeAnchor = HardwareTimeAnchor.FIXED_TIME,
+    val startHour24: Int = 18,
+    val startMinute: Int = 30,
+    val startOffsetMinutes: Int = 0,
+    val endAnchor: HardwareTimeAnchor = HardwareTimeAnchor.FIXED_TIME,
+    val endHour24: Int = 23,
+    val endMinute: Int = 0,
+    val endOffsetMinutes: Int = 0,
+    val startActionOn: Boolean = true,
+    val endActionOn: Boolean = false
+) {
+    companion object {
+        fun fromHardwareRule(rule: HardwareRule): HardwareRuleDraft? {
+            if (!rule.isEditableInApp) return null
+            val startPoint = rule.startTime
+            val endPoint = rule.endTime
+            val (sAnchor, sHour, sMin, sOff) = decodeTimePoint(startPoint, defaultHour = 18, defaultMinute = 30)
+            val (eAnchor, eHour, eMin, eOff) = decodeTimePoint(endPoint, defaultHour = 23, defaultMinute = 0)
+            val cleanDays = rule.daysOfWeek.filter { it in 1..7 }.distinct().sorted()
+                .ifEmpty { listOf(1, 2, 3, 4, 5, 6, 7) }
+            return HardwareRuleDraft(
+                existingRuleId = rule.ruleId,
+                name = rule.name,
+                type = rule.type,
+                isEnabled = rule.isEnabled,
+                daysOfWeek = cleanDays,
+                longPressAction = HardwareLongPressAction.fromActionDouble(rule.startAction),
+                targetDeviceUdns = rule.targetDeviceUdns,
+                countdownMinutes = (rule.countdownSeconds / 60).coerceIn(1, 1440),
+                startAnchor = sAnchor,
+                startHour24 = sHour,
+                startMinute = sMin,
+                startOffsetMinutes = sOff,
+                endAnchor = eAnchor,
+                endHour24 = eHour,
+                endMinute = eMin,
+                endOffsetMinutes = eOff,
+                startActionOn = (rule.startAction?.toInt() ?: 1) != 0,
+                endActionOn = (rule.endAction?.toInt() ?: 0) != 0
+            )
+        }
+
+        private data class DecodedTime(
+            val anchor: HardwareTimeAnchor,
+            val hour24: Int,
+            val minute: Int,
+            val offsetMinutes: Int
+        )
+
+        private fun decodeTimePoint(
+            point: HardwareRuleTimePoint?,
+            defaultHour: Int,
+            defaultMinute: Int
+        ): DecodedTime {
+            if (point == null) return DecodedTime(HardwareTimeAnchor.FIXED_TIME, defaultHour, defaultMinute, 0)
+            return when {
+                point.isSunrise -> DecodedTime(
+                    anchor = HardwareTimeAnchor.SUNRISE,
+                    hour24 = 6,
+                    minute = 0,
+                    offsetMinutes = (point.offsetSeconds / 60).coerceIn(-120, 120)
+                )
+                point.isSunset -> DecodedTime(
+                    anchor = HardwareTimeAnchor.SUNSET,
+                    hour24 = 18,
+                    minute = 0,
+                    offsetMinutes = (point.offsetSeconds / 60).coerceIn(-120, 120)
+                )
+                else -> {
+                    val totalMin = (point.rawSeconds.coerceIn(0, 86399) / 60)
+                    DecodedTime(
+                        anchor = HardwareTimeAnchor.FIXED_TIME,
+                        hour24 = (totalMin / 60) % 24,
+                        minute = totalMin % 60,
+                        offsetMinutes = 0
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Metadata for one retained raw `/rules.db` ZIP backup saved locally before inspecting or writing.
+ */
+data class HardwareRulesBackupEntry(
+    val filePath: String,
+    val dbVersion: Int,
+    val createdAtLabel: String,
+    val sizeBytes: Long
+)
+
+/**
+ * Result of any Step 2 write, toggle, delete, clock-sync, solar-location, or backup-restore action.
+ */
+data class HardwareRulesWriteResult(
+    val success: Boolean,
+    val snapshot: DeviceHardwareRulesSnapshot?,
+    val message: String,
+    val clockSynced: Boolean = false
+)
 
 /**
  * Validation verdict produced before packing or uploading any `rules.db` archive.
@@ -279,7 +405,7 @@ data class HardwareRulesValidationResult(
 )
 
 /**
- * Complete read-only inspection result for a single switch's on-device rules engine.
+ * Complete inspection snapshot for a single switch's on-device rules engine.
  */
 data class DeviceHardwareRulesSnapshot(
     val deviceId: Int,
@@ -295,6 +421,7 @@ data class DeviceHardwareRulesSnapshot(
     val existingTables: Set<String> = emptySet(),
     val integrityOk: Boolean = true,
     val backupFilePath: String? = null,
+    val availableBackups: List<HardwareRulesBackupEntry> = emptyList(),
     val diagnosticMessage: String = "",
     val inspectedAt: String = ""
 ) {

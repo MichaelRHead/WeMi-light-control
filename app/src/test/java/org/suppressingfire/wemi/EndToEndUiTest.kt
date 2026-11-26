@@ -227,31 +227,42 @@ class EndToEndUiTest {
         composeTestRule.onNodeWithText("Cancel").performClick()
         composeTestRule.waitForIdle()
 
-        // 2. Navigate to Rules tab, create a new Schedule rule via AddWeMoRuleDialog, and execute it
+        // 2. Navigate to Rules tab, read demo on-device rules, create a new on-device Auto-Off Delay rule, and toggle it
         composeTestRule.onNodeWithTag("nav_tab_rules").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("add_rule_button").performClick()
-        composeTestRule.waitForIdle()
-
-        composeTestRule.onNodeWithTag("rule_name_input")
-            .performScrollTo()
-            .performTextReplacement("Late Night Tree Off")
-        composeTestRule.onNodeWithTag("save_rule_button").performClick()
+        composeTestRule.onNodeWithTag("scan_hardware_rules_button").performClick()
         awaitLoopbackIo {
             runCatching {
                 composeTestRule.onNodeWithTag("rules_list")
-                    .performScrollToNode(hasText("Late Night Tree Off"))
+                    .performScrollToNode(hasText("Goodnight Long Press"))
                 true
             }.getOrDefault(false)
         }
-        composeTestRule.onNodeWithText("Late Night Tree Off").assertIsDisplayed()
-
-        // Execute rule 1 ("Evening Holiday Lights") and toggle its enabled switch
         composeTestRule.onNodeWithTag("rules_list")
-            .performScrollToNode(hasTestTag("rule_row_1"))
-        composeTestRule.onNodeWithTag("run_rule_1").performClick()
+            .performScrollToNode(hasTestTag("add_hardware_rule_button"))
+        composeTestRule.onNodeWithTag("add_hardware_rule_button").performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("toggle_rule_1").performClick()
+
+        composeTestRule.onNodeWithTag("hardware_rule_name_input")
+            .performScrollTo()
+            .performTextReplacement("Late Night Tree Auto-Off")
+        composeTestRule.onNodeWithTag("hardware_rule_type_countdown")
+            .performScrollTo()
+            .performClick()
+        composeTestRule.onNodeWithTag("save_hardware_rule_button").performClick()
+        awaitLoopbackIo {
+            runCatching {
+                composeTestRule.onNodeWithTag("rules_list")
+                    .performScrollToNode(hasText("Late Night Tree Auto-Off"))
+                true
+            }.getOrDefault(false)
+        }
+        composeTestRule.onNodeWithText("Late Night Tree Auto-Off").assertIsDisplayed()
+
+        // Toggle an existing demo on-device rule (Christmas Tree Living id=1, ruleId=11)
+        composeTestRule.onNodeWithTag("rules_list")
+            .performScrollToNode(hasTestTag("toggle_hardware_rule_1_11"))
+        composeTestRule.onNodeWithTag("toggle_hardware_rule_1_11").performClick()
         composeTestRule.waitForIdle()
     }
 
@@ -362,31 +373,11 @@ class EndToEndUiTest {
     }
 
     @Test
-    fun `verify E2E DeviceRow Auto-Off countdown badge and grouped-by-room Move Up reordering`() {
+    fun `verify E2E grouped-by-room Move Up reordering preserves room isolation`() {
         val vm = androidx.lifecycle.ViewModelProvider(composeTestRule.activity)[org.suppressingfire.wemi.ui.SwitchViewModel::class.java]
         awaitLoopbackIo { vm.devices.value.any { it.id == 14 } }
 
-        // 1. Configure a 5-minute Auto-Off timer on ON dimmer 'Lightbulb Bedroom' (id = 8) and verify 'Auto-Off' badge renders in DeviceRow
-        val bedroomDimmer = vm.devices.value.first { it.id == 8 }
-        vm.saveDevice(
-            id = bedroomDimmer.id,
-            name = bedroomDimmer.name,
-            roomName = bedroomDimmer.roomName,
-            deviceType = bedroomDimmer.parsedType,
-            ipAddress = bedroomDimmer.ipAddress,
-            port = bedroomDimmer.port,
-            brightness = bedroomDimmer.brightness,
-            isReachable = true,
-            isOn = true,
-            autoOffMinutes = 5
-        )
-        awaitLoopbackIo { (vm.activeAutoOffCountdownsSec.value[8] ?: 0) > 0 }
-
-        composeTestRule.onNodeWithTag("devices_list")
-            .performScrollToNode(hasTestTag("device_row_8"))
-        composeTestRule.onNodeWithTag("auto_off_countdown_8", useUnmergedTree = true).assertIsDisplayed()
-
-        // 2. Enter Edit Mode in Grouped-by-Room view and click Move Up on 'Bedroom Ceiling Fan' (id = 14) so it moves above 'Lightbulb Bedroom' (id = 8)
+        // Enter Edit Mode in Grouped-by-Room view and click Move Up on 'Bedroom Ceiling Fan' (id = 14) so it moves above 'Lightbulb Bedroom' (id = 8)
         composeTestRule.onNodeWithTag("edit_devices_button").performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("devices_list")
@@ -459,18 +450,6 @@ class EndToEndUiTest {
                 "Blank manual-IP Name must not fire ChangeFriendlyName overwriting hardware NVRAM",
                 bathServer.receivedSoapActions.none { it.contains("ChangeFriendlyName") }
             )
-
-            // Also verify blank Rule name uses 'Custom Switch Rule' in transient status banner
-            vm.addRule(
-                name = "   ",
-                ruleType = "SCHEDULE",
-                targetDevice = adopted,
-                triggerSummary = "Daily at 8:00 PM",
-                targetStateOn = true,
-                targetBrightness = 65
-            )
-            awaitLoopbackIo { vm.rules.value.any { it.targetDeviceId == adopted.id } }
-            assertEquals("Created rule: Custom Switch Rule", vm.statusBannerMessage.value)
         }
     }
 }
