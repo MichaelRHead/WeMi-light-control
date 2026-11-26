@@ -12,13 +12,13 @@ At the top of the screen, the compact single-row **Ocean Teal & Deep Sapphire** 
 
 | Control | Location | What It Does |
 | :--- | :--- | :--- |
-| **`wemi` Wordmark & Version Pill (`v36.0`)** | Top-left | Displays the **`wemi`** logo alongside a subtle version badge (such as **`v36.0`**). Tap the version badge anytime to open the scrollable **Release History** dialog (with an **`Installed`** tag on your current version) to see what's new across releases. |
+| **`wemi` Wordmark & Version Pill (`v37.0`)** | Top-left | Displays the **`wemi`** logo alongside a subtle version badge (such as **`v37.0`**). Tap the version badge anytime to open the scrollable **Release History** dialog (with an **`Installed`** tag on your current version) to see what's new across releases. |
 | **`All Off` Button** | Right cluster | Turns **OFF** every reachable switch and dimmer on your active Wi-Fi Home in a single tap. |
 | **Refresh Icon** | Right cluster | Opens the live **SSDP Network Discovery Scan** sheet and scans your local Wi-Fi for switches (see [Switch Discovery & Network Scanning](switch-discovery.md)). |
 | **`Edit` / `Done` Button** | Right cluster | Switches to **Edit Mode** (switching to the **Devices** tab first if needed) so you can reorder, rename, edit, or delete switches (see [Editing, Renaming, Reordering & Adding Switches](editing-and-managing-devices.md)). |
 | **`+` (Add) Button** | Far top-right | On the **Devices** or **More** tab, opens **Add Smart Switch Device**. On the **Rules** tab, opens **New On-Device Switch Rule**. |
 
-Along the bottom of the screen, the three navigation tabs switch between **Devices** (your lights and rooms), **Rules** (on-device switch rules stored directly inside switch memory), and **More** (whole-home controls, Demo Mode, packet log, and open-source notices).
+Along the bottom of the screen, the three navigation tabs switch between **Devices** (your lights and rooms), **Rules** (on-device switch rules stored directly inside switch memory), and **More** (whole-home controls, Demo Mode, zero-cloud **Household Config Sync**, packet log, and open-source notices).
 
 > [!TIP]
 > **Predictable Back Button**: Pressing your device's **Back** button steps cleanly out of open dialogs, the discovery scanner, Edit Mode, or a single-room filter, and returns from **Rules** or **More** back to **Devices** before exiting the app.
@@ -88,14 +88,11 @@ Inside an expanded drawer, controls appear in this order:
 1. **Brightness Slider, Quick Presets & Night Mode (Dimmers Only)**:
    - Drag the **Brightness Level** slider (`1%–100%`) or tap a quick preset chip (**`21%`**, **`50%`**, **`75%`**, **`100%`**). Adjusting brightness on an `OFF` dimmer automatically turns it **ON** to that level.
    - Tap **`Night Mode (20%)`** to toggle hardware Night Mode on `F7C059` / `WDS060` Smart Dimmers, capping late-night brightness at a gentle `20%`.
-2. **Connection & Latency Banner**:
-   - Shows live round-trip speed (`Connection: Active (11ms SOAP Round-Trip)`), last checked time, and `<ip>:<port>`.
-   - Tap **`Ping RTT`** to test the switch's response time immediately.
-3. **Hardware Info & Quick Actions**:
-   - Shows the local UPnP endpoint (`http://192.168.1.104:49153`), Serial Number (`SN`), and firmware version.
-   - Tap **`Add Widget`** to pin a one-tap Home Screen toggle widget for this light (see [Home Screen Light & Room Widgets](home-screen-widgets.md)).
-   - Tap **`Configure IP`** to open the **Edit** dialog for renaming, changing rooms, or updating the IP address.
-4. **On-Device Rules (Switches, Dimmers & Plugs)**:
+2. **Unified Connection, Hardware Info & Quick Actions Card**:
+   - **Connection & Latency Row**: Shows live round-trip speed (`Connection: Active (11ms SOAP Round-Trip)` or offline port status), `Last Checked` timestamp, and a **`Ping RTT`** chip to measure response time immediately.
+   - **Hardware Details**: Shows the local UPnP endpoint (`UPnP Endpoint: http://192.168.1.104:49153`), Serial Number (`SN`), and firmware version.
+   - **Quick Action Chips**: **`Reconnect`** (when offline) or **`Refresh Motion`** / **`Simulate Motion`** (for motion sensors), **`Add Widget`** to pin a one-tap Home Screen toggle widget (see [Home Screen Light & Room Widgets](home-screen-widgets.md)), and **`Configure IP`** to open the **Edit** dialog for renaming, changing rooms, or updating the IP address.
+3. **On-Device Rules (Switches, Dimmers & Plugs)**:
    - Displays whether the switch supports built-in hardware rules (**`On-Device Rules: ...`**, plus **`• Long Press`** on compatible wall switches and 1st-Gen dimmers).
    - Tap **`Inspect Rules`** (changes to **`Refresh`** once read) to verify capability, see the stored database version (`DB v...`) and any **`Switch clock needs sync`** alert, tap **`Add Rule`**, **`Sync Clock`**, or **`Manage Rules`** right from the drawer, and preview up to 4 structured `trigger → action` rule cards inline (showing **`• Paused`** for disabled rules and a clickable **`+N more rule(s) in Rules tab`** link when more rules exist). See [On-Device Switch Rules, Timers & Schedules](rules-and-timers.md) for full management, Solar Location, and Backup Restore.
 

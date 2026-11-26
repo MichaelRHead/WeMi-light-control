@@ -46,8 +46,8 @@ WeMi detects your local Wi-Fi network without asking for intrusive Android GPS o
 If you want to start fresh on your local network:
 1. Open the **More** tab and tap **`Reset Homes, Discovered Switches & Rooms`**.
 2. In the **`Reset Homes, Switches & Rooms?`** confirmation dialog:
-   - Choose **`Reset & Rescan LAN`** to clear all saved homes, switches, and room assignments and immediately scan your Wi-Fi for switches from a clean **`My Home`** profile.
+   - Choose **`Reset & Rescan LAN`** to clear all saved homes, switches, room assignments, Home Screen widget bindings, diagnostic logs, and local rule backups, then immediately scan your Wi-Fi for switches from a clean **`My Home`** profile.
    - Choose **`Reset Empty`** to clear everything into an empty **`My Home`** without scanning right away.
    - Choose **`Cancel`** to keep your current setup.
 
-*(Tip: If you have Home Screen widgets pinned before a reset and run **`Reset & Rescan LAN`**, your single-light and room widgets automatically reconnect to your rediscovered switches by hardware ID and room name!)*
+*(Note: Resetting also clears Home Screen widget bindings for your privacy — after resetting, tap any placed widget to choose a light or room again.)*

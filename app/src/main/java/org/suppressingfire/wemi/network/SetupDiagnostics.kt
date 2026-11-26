@@ -349,10 +349,12 @@ object TelemetryFileExporter {
             } else {
                 soapLogs.forEach { entry ->
                     val okTag = if (entry.isLiveLanSuccess) "OK" else "ERR"
+                    val safeName = redactor.scrubFreeText(entry.deviceName)
                     val safeAction = redactor.scrubFreeText(entry.soapAction)
+                    val safeEndpoint = redactor.scrubFreeText(entry.endpoint)
                     val safeStatus = redactor.scrubFreeText(entry.statusText)
                     appendLine(
-                        "[${entry.timestamp}] [$okTag] ${entry.deviceName} | $safeAction | ${entry.endpoint} -> $safeStatus"
+                        "[${entry.timestamp}] [$okTag] $safeName | $safeAction | $safeEndpoint -> $safeStatus"
                     )
                     val snippet = redactor.scrubFreeText(sanitizeXmlSnippet(entry.xmlSnippet))
                     if (snippet.isNotEmpty()) {

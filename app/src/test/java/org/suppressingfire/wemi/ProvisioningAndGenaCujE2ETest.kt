@@ -442,6 +442,37 @@ class ProvisioningAndGenaCujE2ETest {
                             db.switchDao().getAllDevices().first().count { it.networkKey == insertedHome.networkKey }
                         )
                     }
+
+                    // Stale-context SOAP entries (GENA endpoint serial, unregistered GetApList/ConnectHome SSIDs, orphaned widget sn/udn) must redact by default
+                    val staleLogs = listOf(
+                        org.suppressingfire.wemi.data.SoapLogEntry(
+                            timestamp = "10:00:00 AM", deviceName = "Porch", soapAction = "GENA PropChange",
+                            endpoint = "NOTIFY http://192.168.1.20:51234/gena/221940KSTALE99",
+                            statusText = "BinaryState=1", xmlSnippet = "<BinaryState>1</BinaryState>", isLiveLanSuccess = true
+                        ),
+                        org.suppressingfire.wemi.data.SoapLogEntry(
+                            timestamp = "10:00:01 AM", deviceName = "Setup AP", soapAction = "WiFiSetup1#ConnectHomeNetwork(NeighborNet24, ch=6)",
+                            endpoint = "http://10.22.22.1:49152/upnp/control/WiFiSetup1",
+                            statusText = "OK", xmlSnippet = "<ssid>NeighborNet24</ssid> OtherWifi|11|72|WPA2PSK/AES", isLiveLanSuccess = true
+                        ),
+                        org.suppressingfire.wemi.data.SoapLogEntry(
+                            timestamp = "10:00:02 AM", deviceName = "Widget #9", soapAction = "Widget#Toggle(DEVICE)",
+                            endpoint = "widget://9",
+                            statusText = "Orphaned sn=WLS040ORPHAN77 udn=uuid:Lightswitch-2_0-WLS040ORPHAN77", xmlSnippet = "", isLiveLanSuccess = false
+                        )
+                    )
+                    val redacted = org.suppressingfire.wemi.network.TelemetryFileExporter.buildFullTelemetryReport(
+                        setupSnapshot = org.suppressingfire.wemi.network.SetupDebugSnapshot(),
+                        soapLogs = staleLogs,
+                        includeSensitiveIdentifiers = false
+                    )
+                    assertFalse(redacted.contains("221940KSTALE99"))
+                    assertFalse(redacted.contains("NeighborNet24"))
+                    assertFalse(redacted.contains("OtherWifi"))
+                    assertFalse(redacted.contains("WLS040ORPHAN77"))
+                    assertTrue(redacted.contains("/gena/***LE99"))
+                    assertTrue(redacted.contains("sn=***AN77"))
+                    assertTrue(redacted.contains("udn=uuid:Lightswitch-2_0-***AN77"))
                 } finally {
                     repo.close()
                     db.close()

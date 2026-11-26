@@ -38,6 +38,13 @@ internal class TelemetryRedactionSession(
         )
         private val MAC_COLON_REGEX = Regex("\\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\\b")
         private val MAC_HEX12_REGEX = Regex("\\b[0-9A-Fa-f]{12}\\b")
+        private val XML_SSID_REGEX = Regex("(<ssid>|&lt;ssid&gt;)([^<&\\r\\n]+)(</ssid>|&lt;/ssid&gt;)", RegexOption.IGNORE_CASE)
+        private val CONNECT_HOME_SSID_REGEX = Regex("(ConnectHomeNetwork\\()([^,)]+)(,)")
+        private val AP_LIST_ROW_REGEX = Regex("(^|[,;\\s])([^|,;\\r\\n]+)(\\|\\d{1,2}\\|-?\\d{1,3}\\|[A-Za-z0-9_-]+/[A-Za-z0-9_-]+)")
+        private val UDN_TOKEN_REGEX = Regex("\\buuid:[A-Za-z0-9_.-]+-[A-Za-z0-9]{5,}\\b", RegexOption.IGNORE_CASE)
+        private val KV_SN_REGEX = Regex("(\\bsn=)([A-Za-z0-9_.-]{5,})", RegexOption.IGNORE_CASE)
+        private val KV_UDN_REGEX = Regex("(\\budn=)([^\\s,;\"']+)", RegexOption.IGNORE_CASE)
+        private val GENA_PATH_KEY_REGEX = Regex("(/gena/)([A-Za-z0-9_.:-]{5,})", RegexOption.IGNORE_CASE)
         private val EXTRA_IS_SENSITIVE_KEY = "android.content.extra.IS_SENSITIVE"
 
         /**
@@ -205,6 +212,39 @@ internal class TelemetryRedactionSession(
                     result = Regex(Regex.escape(rawKey), RegexOption.IGNORE_CASE).replace(result, alias)
                 }
             }
+        result = XML_SSID_REGEX.replace(result) { m ->
+            val inner = m.groupValues[2].trim()
+            if (inner.startsWith("SSID#")) m.value else "${m.groupValues[1]}${redactSsid(inner)}${m.groupValues[3]}"
+        }
+        result = CONNECT_HOME_SSID_REGEX.replace(result) { m ->
+            val inner = m.groupValues[2].trim()
+            if (inner.startsWith("SSID#")) m.value else "${m.groupValues[1]}${redactSsid(inner)}${m.groupValues[3]}"
+        }
+        result = AP_LIST_ROW_REGEX.replace(result) { m ->
+            val ssid = m.groupValues[2].trim()
+            if (ssid.startsWith("SSID#")) m.value else "${m.groupValues[1]}${redactSsid(ssid)}${m.groupValues[3]}"
+        }
+        result = UDN_TOKEN_REGEX.replace(result) { m ->
+            if ("***" in m.value) m.value else redactUdn(m.value)
+        }
+        result = KV_UDN_REGEX.replace(result) { m ->
+            val token = m.groupValues[2]
+            if (token.equals("none", ignoreCase = true) || "***" in token || token == "****") m.value
+            else "${m.groupValues[1]}${redactUdn(token)}"
+        }
+        result = KV_SN_REGEX.replace(result) { m ->
+            val token = m.groupValues[2]
+            if (token.equals("none", ignoreCase = true) || token.startsWith("***")) m.value
+            else "${m.groupValues[1]}${redactSerial(token)}"
+        }
+        result = GENA_PATH_KEY_REGEX.replace(result) { m ->
+            val token = m.groupValues[2]
+            when {
+                token.startsWith("dev_", ignoreCase = true) || "***" in token || token.startsWith("****") -> m.value
+                token.startsWith("uuid:", ignoreCase = true) -> "${m.groupValues[1]}${redactUdn(token)}"
+                else -> "${m.groupValues[1]}${redactSerial(token)}"
+            }
+        }
         result = MAC_COLON_REGEX.replace(result) { m ->
             val hex = m.value.replace(":", "").replace("-", "")
             "****${hex.takeLast(4).uppercase(Locale.US)}"

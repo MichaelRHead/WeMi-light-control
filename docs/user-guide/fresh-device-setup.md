@@ -61,7 +61,7 @@ Inside the **Provision New Switch AP (`10.22.22.1`)** dialog:
    - As soon as the dialog opens, WeMi automatically probes `10.22.22.1` across ports `49151–49159` and displays **`Detected Hardware: <name> (<model> • Port <port>)`** along with the switch's MAC address, serial number, and recommended encryption mode.
    - If the switch cannot be reached (for example, your phone switched away from the setup hotspot), the status box turns soft red with a clear warning.
 2. **Choose Your 2.4 GHz Home Wi-Fi (`Scan APs`)**:
-   - Leave **`Setup AP IP`** set to **`10.22.22.1`** and tap **`Scan APs`** to ask the switch which 2.4 GHz networks it sees.
+   - Leave **`Setup AP IP`** set to **`10.22.22.1`** (WeMi validates that any custom address is a private local IPv4 address) and tap **`Scan APs`** to ask the switch which 2.4 GHz networks it sees.
    - Tap your home Wi-Fi chip under **`Discovered 2.4 GHz Networks`**. WeMi automatically fills in **`Target 2.4 GHz Wi-Fi SSID`**, **`2.4G Ch`**, **`Auth Mode`** (usually `WPA2PSK`), and **`Encrypt`** (usually `AES`).
    - If your network is hidden or didn't show up, you can type the SSID manually.
 3. **Enter Your Home Wi-Fi Password**:

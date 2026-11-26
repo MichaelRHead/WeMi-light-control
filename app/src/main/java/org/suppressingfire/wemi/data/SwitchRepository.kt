@@ -172,6 +172,7 @@ class SwitchRepository(
         deviceMutexes.clear()
         _latestSsdpReport.value = null
         hardwareRulesCoordinator.clearRuntimeState()
+        provisioningCoordinator.clearCachedSetupState()
     }
 
     suspend fun setDemoShowroomMode(

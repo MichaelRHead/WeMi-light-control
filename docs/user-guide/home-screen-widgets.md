@@ -59,7 +59,7 @@ Each widget mirrors the app's **three clear visual states** so you always know w
 - **Resizable Layout**: Widgets default to a compact **3×1** tile and can be resized horizontally or vertically (down to **2×1** or wider for long switch names) by long-pressing the widget on your Home Screen and dragging its resize handles.
 - **Reconfiguring a Widget**:
   - On Android launchers that support widget reconfiguration, long-press the widget and tap the **Settings / Pencil** icon to point it to a different light or room.
-  - If you delete a switch from the app or reset your switches, any widget linked to that removed switch changes to **`Tap to reconfigure`**—just tap it to pick a new light or room.
+  - If you delete a single switch from the app, any widget linked to that switch changes to **`Tap to reconfigure`**—just tap it to pick a new light or room. If you run **Reset Homes, Discovered Switches & Rooms** from the **More** tab, saved widget bindings are cleared as part of the privacy wipe and show **`Tap to choose light or room`** until you re-bind them.
 - **Automatic Two-Way Sync**:
   - Tapping a widget updates both the widget and the WeMi app immediately.
   - Turning a switch ON/OFF inside the app or pressing the physical switch on your wall updates your Home Screen widgets automatically.

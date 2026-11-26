@@ -30,6 +30,11 @@ internal class ProvisioningCoordinator(
     var lastScannedAps: List<ScannedAp> = emptyList()
         private set
 
+    fun clearCachedSetupState() {
+        lastDetectedDescriptor = null
+        lastScannedAps = emptyList()
+    }
+
     fun latestProbeDiagnosticSummary(): String = provisionerClient.lastProbeDiagnosticSummary
 
     fun latestApScanDiagnosticSummary(): String = provisionerClient.lastApScanDiagnosticSummary

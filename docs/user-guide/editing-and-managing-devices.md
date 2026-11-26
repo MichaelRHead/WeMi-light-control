@@ -45,7 +45,7 @@ Tap **`+`** in the top header (on the **Devices** or **More** tab) to open **Add
 5. **`Hardware Type`**:
    - Choose **`Light Switch / Plug`**, **`Dimmer / Lightbulb`**, or **`Motion Sensor`**.
 6. **`Local IP Address` & `Port` (Automatic 9-Port Detection)**:
-   - Enter the switch's local IPv4 address (for example, `192.168.1.115`) and port (default `49153`).
+   - Enter the switch's private local IPv4 address (`10.x.x.x`, `172.16–31.x.x`, or `192.168.x.x`, such as `192.168.1.115`) and TCP port (`1–65535`, default `49153`). WeMi validates the IP and port inline so public or invalid addresses cannot be saved accidentally.
    - When you save a manually entered IP in **Real LAN Mode**, WeMi automatically checks all 9 smart-switch UPnP ports (`49151–49159`) at that IP and fills in the switch's real hardware type, serial number, firmware version, and live ON/OFF state.
 7. **`Initial Brightness` (Dimmers Only)**:
    - When **`Dimmer / Lightbulb`** is selected, you can set its starting brightness (`1%–100%`) right inside the dialog.
