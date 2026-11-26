@@ -15,12 +15,12 @@ RELEASE_VERSION: v37.0
 VERSION_CODE: 37
 ROUND_NUMBER: 1
 RELEASE_STATUS: IN_REVIEW
-CURRENT_TURN: security_and_privacy
+CURRENT_TURN: code_quality_and_testing
 CANDIDATE_BASE_SHA: a385155
 SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (a385155 @ 2026-11-26 08:52 PST)
 SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (cf273ea @ 2026-11-26 09:06 PST)
 SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (4e71935 @ 2026-11-26 09:21 PST)
-SIGN_OFF_SECURITY_AND_PRIVACY: PENDING
+SIGN_OFF_SECURITY_AND_PRIVACY: SIGNED_OFF (c684037 @ 2026-11-26 09:42 PST)
 SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
 SIGN_OFF_LICENSE_GOVERNANCE: PENDING
 SIGN_OFF_APP_PROMOTER: PENDING
@@ -41,7 +41,7 @@ PROMOTED_AT: NONE
 | **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `a385155` | `2026-11-26 08:52 PST` | Recorded Stage 1 UX sign-off from AI Studio commit a385155 for v37.0 (Zero-Cloud Household Config Sync, security hardening, and expanded drawer polish). |
 | **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `cf273ea` | `2026-11-26 09:06 PST` | Verified v37.0 discovery, 3-tier identity, ChromeOS ARCVM, on-device rules, and Household Config Sync. Fixed in-bundle deduplication, exact-identity-first merge order, router SSID preservation, Wi-Fi-bound UDP discovery, ARCVM receive guards, and synced v37.0 discovery docs. |
 | **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `SIGNED_OFF` | `4e71935` | `2026-11-26 09:21 PST` | Audited telemetry redaction, reset cleanup, Play assets, and user docs for v37.0. |
-| **4 (Review 3)** | `security_and_privacy` | **Antigravity Security & Privacy Agent** | `PENDING` | `-` | `-` | Awaiting Security & Privacy Agent review. |
+| **4 (Review 3)** | `security_and_privacy` | **Antigravity Security & Privacy Agent** | `SIGNED_OFF` | `c684037` | `2026-11-26 09:42 PST` | Hardened v37.0 Household Sync with SPAKE2 Group 14, AAD, framing, FLAG_SECURE, and Privacy Policy disclosures. |
 | **5 (Review 4)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
 | **6 (Review 5)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
 | **7 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `PENDING` | `-` | `-` | Awaiting Stages 1-6 sign-off. |
@@ -145,4 +145,5 @@ PROMOTED_AT: NONE
 | 2026-11-26 08:52 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `a385155` | Recorded Stage 1 UX sign-off from AI Studio commit a385155 for v37.0 (Zero-Cloud Household Config Sync, security hardening, and expanded drawer polish). |
 | 2026-11-26 09:06 PST | `1` | `discovery_and_grouping` | `SIGNED_OFF` | `telemetry_and_debugging` | `cf273ea` | Verified v37.0 discovery, 3-tier identity, ChromeOS ARCVM, on-device rules, and Household Config Sync. Fixed in-bundle deduplication, exact-identity-first merge order, router SSID preservation, Wi-Fi-bound UDP discovery, ARCVM receive guards, and synced v37.0 discovery docs. |
 | 2026-11-26 09:21 PST | `1` | `telemetry_and_debugging` | `SIGNED_OFF` | `security_and_privacy` | `4e71935` | Audited telemetry redaction, reset cleanup, Play assets, and user docs for v37.0. |
+| 2026-11-26 09:42 PST | `1` | `security_and_privacy` | `SIGNED_OFF` | `code_quality_and_testing` | `c684037` | Hardened v37.0 Household Sync with SPAKE2 Group 14, AAD, framing, FLAG_SECURE, and Privacy Policy disclosures. |
 <!-- AUDIT_LOG_END -->
