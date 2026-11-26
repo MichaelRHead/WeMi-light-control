@@ -58,6 +58,10 @@ fun MoreScreen(
     onResetLanHomesAndSwitches: (Boolean) -> Unit = {},
     onToggleDemoShowroomMode: (Boolean) -> Unit = {},
     onOpenProvisionApWizard: () -> Unit = {},
+    onExportHouseholdJson: (writeJson: suspend (String) -> Unit) -> Unit = {},
+    onImportHouseholdStream: (sourceDescription: String, openStream: () -> java.io.InputStream?) -> Unit = { _, _ -> },
+    onOpenSendLanSync: () -> Unit = {},
+    onOpenReceiveLanSync: () -> Unit = {},
     onClearLogs: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -85,6 +89,17 @@ fun MoreScreen(
                 onResetClassicDevices = onResetClassicDevices,
                 onResetLanHomesAndSwitches = onResetLanHomesAndSwitches,
                 onOpenProvisionApWizard = onOpenProvisionApWizard
+            )
+        }
+
+        item(key = "more_household_config_sync") {
+            HouseholdSyncCard(
+                homeCount = homeNetworks.size,
+                deviceCount = allDevices.size,
+                onExportHouseholdJson = onExportHouseholdJson,
+                onImportHouseholdStream = onImportHouseholdStream,
+                onOpenSendLanSync = onOpenSendLanSync,
+                onOpenReceiveLanSync = onOpenReceiveLanSync
             )
         }
 

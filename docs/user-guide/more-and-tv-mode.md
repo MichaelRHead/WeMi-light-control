@@ -32,9 +32,24 @@ Other quick actions in this card:
 
 ---
 
-## 3. Live UPnP / SOAP Packet Log Inspector
+## 3. Household Config Sync (JSON & Local Wi-Fi Pairing)
 
-Below the engine card on the **More** tab, **UPnP / SOAP Packet Log** shows the **10 most recent** local commands and events on screen (out of the latest 50 kept in memory—including background Home Screen widget taps and Chromebook polling notices):
+Right below the engine card on the **More** tab, **Household Config Sync** lets you back up or copy your remembered Wi-Fi Homes, custom switch names, room assignments, and switch order to another phone, tablet, Chromebook, or Android TV—**with zero cloud accounts and without exporting Wi-Fi passwords, telemetry logs, or rule backups**:
+
+- **`Send to TV`**: Scans your local Wi-Fi for nearby WeMi devices waiting in Receive/Sync mode (or lets you enter an IP address and port manually for Chromebooks or restricted Wi-Fi). Enter the **6-digit one-time pairing code** shown on the receiving device and tap **`Send Setup`**. Your configuration is encrypted with that 6-digit code before crossing your Wi-Fi network.
+- **`Receive`**: Opens a temporary 2-minute encrypted receiver on your current phone, tablet, or Chromebook with a 6-digit pairing code so another WeMi device can push its household setup to you.
+- **`Export JSON`**: Saves a compact `wemi-household-config.json` file to any folder you choose using Android's file picker (no storage permissions required).
+- **`Import JSON`**: Opens a saved `wemi-household-config.json` file and displays a summary before making any changes.
+
+Whenever you import from JSON or receive a local Wi-Fi transfer, WeMi asks how you want to apply it:
+- **`Merge`** *(Recommended)*: Matches existing switches by hardware serial number or UPnP ID, updates their custom names, rooms, and order, keeps your live local IP addresses and any other local switches, and adds missing switches.
+- **`Replace All`**: Swaps your saved Wi-Fi Homes and switches with the imported configuration.
+
+---
+
+## 4. Live UPnP / SOAP Packet Log Inspector
+
+Below the sync card on the **More** tab, **UPnP / SOAP Packet Log** shows the **10 most recent** local commands and events on screen (out of the latest 50 kept in memory—including background Home Screen widget taps and Chromebook polling notices):
 - Each entry displays:
   - **Device Name & Action** (for example, `Front Porch Light • SetBinaryState (ON)` or `Widget#Toggle`)
   - **Timestamp** (`h:mm:ss a`, such as `8:15:42 PM`)
@@ -45,7 +60,7 @@ Below the engine card on the **More** tab, **UPnP / SOAP Packet Log** shows the 
 
 ---
 
-## 4. Open Source License & Third-Party Notices (`More` Tab)
+## 5. Open Source License & Third-Party Notices (`More` Tab)
 
 At the bottom of the **More** tab, the **Open Source License** card displays **`MIT License • Copyright (c) 2026 Michael R. Head & Contributors`**:
 - Tap **`View License`** (or **`Hide`**) to expand:
@@ -54,14 +69,14 @@ At the bottom of the **More** tab, the **Open Source License** card displays **`
 
 ---
 
-## 5. Android TV 10-Foot Dashboard (`wemi TV`)
+## 6. Android TV 10-Foot Dashboard (`wemi TV`)
 
 When installed on an **Android TV** or **Google TV** device, WeMi automatically launches its dedicated 10-foot remote-friendly dashboard (**`wemi TV`**)—no mode switch required.
 
 ### Navigating `wemi TV` with Your TV Remote (D-Pad)
 
 1. **Compact Single-Row Top Bar**:
-   - Shows the **`wemi TV`** badge, active count (`X/Y ON`), a status pill for whichever switch is currently highlighted, a **`Dimmer X%` / `Done Dimming`** indicator whenever a dimmer is focused, your **Quick Scenes**, and **`Rescan`**.
+   - Shows the **`wemi TV`** badge, active count (`X/Y ON`), a status pill for whichever switch is currently highlighted, a **`Dimmer X%` / `Done Dimming`** indicator whenever a dimmer is focused, your **Quick Scenes**, **`Rescan`**, and **`Sync`**.
    - Over 90% of the screen stays dedicated to your rooms and switch cards.
 2. **3-Column Room-Grouped Switch Grid & Room Bars**:
    - Switches are grouped under full-width **Room Bars** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `UNASSIGNED` last) in a 3-column grid.
@@ -79,8 +94,9 @@ When installed on an **Android TV** or **Google TV** device, WeMi automatically 
      - Press **`Left`** / **`Right`** to step brightness down or up by **`10%`** (`10%–100%`).
      - Press **`Up`**, **`OK`**, **`Back`**, **`Play/Pause`**, or **`Menu`** to return to the On/Off Toggle.
      - Press **`Down`** to move smoothly to the switch or room below.
-5. **One-Click TV Quick Scenes & Non-Blocking LAN Rescan**:
+5. **One-Click TV Quick Scenes, Non-Blocking LAN Rescan & Phone-to-TV Sync**:
    - **`Movie 20%`**: Dims **all reachable smart dimmers/bulbs** on your active Wi-Fi Home to **`20%`** concurrently (leaving regular ON/OFF switches untouched).
    - **`Holiday ON`** *(shown automatically only when your active home includes matching holiday or festive switches—such as Christmas tree, holiday, Diwali/Dewali, Hanukkah, Halloween, or fairy/string lights)*: Turns matching holiday switches **ON** concurrently without touching everyday switches or holiday lights that are already ON.
    - **`All OFF`**: Turns every reachable switch and dimmer across all rooms **OFF** concurrently.
    - **`Rescan`**: Runs a background local Wi-Fi scan and refresh with a non-blocking status bar at the bottom of the screen—never popping up blocking dialogs over your TV.
+   - **`Sync`**: Opens the 10-foot **Pair from Phone** overlay displaying a large 6-digit one-time pairing code and the TV's local IP/port (valid for 2 minutes). Push your custom rooms, names, and switch order from your phone's **More → Household Config Sync → Send to TV**, then press **`OK`** on **`Merge & Apply`** (or **`Replace All`**) on your TV remote.

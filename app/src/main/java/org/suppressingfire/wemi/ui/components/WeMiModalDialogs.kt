@@ -31,6 +31,7 @@ internal fun WeMiModalDialogs(
     val backupRestoreDialogDevice by viewModel.backupRestoreDialogDevice.collectAsStateWithLifecycle()
     val pendingDeleteHardwareRule by viewModel.pendingDeleteHardwareRule.collectAsStateWithLifecycle()
     val hardwareRulesByDeviceId by viewModel.hardwareRulesByDeviceId.collectAsStateWithLifecycle()
+    val householdSyncState by viewModel.householdSyncState.collectAsStateWithLifecycle()
 
     if (showAddHomeDialog) {
         val detectedLocalIp = remember { viewModel.detectCurrentLanIp() }
@@ -179,6 +180,33 @@ internal fun WeMiModalDialogs(
             rule = rule,
             onDismiss = { viewModel.cancelDeleteHardwareRule() },
             onConfirmDelete = { viewModel.confirmDeleteHardwareRule() }
+        )
+    }
+
+    if (householdSyncState.showSendDialog) {
+        HouseholdSyncSendDialog(
+            state = householdSyncState,
+            onRescanPeers = { viewModel.householdSync.discoverLanPeers() },
+            onPushToPeer = { ip, port, pin ->
+                viewModel.householdSync.pushToLanPeer(ip, port, pin, isTvSender = false)
+            },
+            onDismiss = { viewModel.householdSync.closeSendDialog() }
+        )
+    }
+
+    val pendingImport = householdSyncState.pendingImport
+    if (pendingImport != null) {
+        HouseholdImportConfirmDialog(
+            pending = pendingImport,
+            onConfirm = { mode -> viewModel.householdSync.confirmPendingImport(mode) },
+            onCancel = { viewModel.householdSync.cancelPendingImport() }
+        )
+    } else if (householdSyncState.showReceiveDialog) {
+        HouseholdSyncReceiveDialog(
+            session = householdSyncState.activeReceiveSession,
+            statusMessage = householdSyncState.receiveStatusMessage,
+            onStartNewSession = { viewModel.householdSync.openReceiveDialog(isTv = false) },
+            onDismiss = { viewModel.householdSync.closeReceiveDialog() }
         )
     }
 }

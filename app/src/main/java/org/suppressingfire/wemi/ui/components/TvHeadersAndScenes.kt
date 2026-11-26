@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Park
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
@@ -77,7 +78,8 @@ internal fun TvTopHeaderBar(
     onPrimaryActionOnFocused: (DeviceEntity) -> Unit,
     onToggleDimmingFocused: (Int?) -> Unit,
     onApplyTvScene: (String) -> Unit,
-    onScanSsdpClick: () -> Unit
+    onScanSsdpClick: () -> Unit,
+    onOpenHouseholdSync: () -> Unit = {}
 ) {
     val isFocusedDimmer =
         focusedDevice != null &&
@@ -97,7 +99,7 @@ internal fun TvTopHeaderBar(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
@@ -125,7 +127,7 @@ internal fun TvTopHeaderBar(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     TvTopRightActionChips(
                         isRefreshing = isRefreshing,
@@ -135,7 +137,8 @@ internal fun TvTopHeaderBar(
                         onNavigateDownFromTopBar = onNavigateDownFromTopBar,
                         onNavigateTopActionHorizontal = onNavigateTopActionHorizontal,
                         onApplyTvScene = onApplyTvScene,
-                        onScanSsdpClick = onScanSsdpClick
+                        onScanSsdpClick = onScanSsdpClick,
+                        onOpenHouseholdSync = onOpenHouseholdSync
                     )
                 }
             }
@@ -170,7 +173,8 @@ internal fun TvTopHeaderBar(
                     onNavigateDownFromTopBar = onNavigateDownFromTopBar,
                     onNavigateTopActionHorizontal = onNavigateTopActionHorizontal,
                     onApplyTvScene = onApplyTvScene,
-                    onScanSsdpClick = onScanSsdpClick
+                    onScanSsdpClick = onScanSsdpClick,
+                    onOpenHouseholdSync = onOpenHouseholdSync
                 )
             }
         }
@@ -328,7 +332,8 @@ private fun TvTopRightActionChips(
     onNavigateDownFromTopBar: () -> Boolean,
     onNavigateTopActionHorizontal: (Int) -> Boolean,
     onApplyTvScene: (String) -> Unit,
-    onScanSsdpClick: () -> Unit
+    onScanSsdpClick: () -> Unit,
+    onOpenHouseholdSync: () -> Unit
 ) {
     TvSceneChip(
         title = "Movie 20%",
@@ -373,7 +378,7 @@ private fun TvTopRightActionChips(
         focusRequester = topActionFocusRequesters.getOrNull(3),
         onFocusGained = { onSelectTopActionFocus(3) },
         onNavigateLeft = { onNavigateTopActionHorizontal(2) },
-        onNavigateRight = { true },
+        onNavigateRight = { onNavigateTopActionHorizontal(4) },
         onNavigateDown = onNavigateDownFromTopBar,
         onClick = onScanSsdpClick,
         testTag = "tv_scan_button",
@@ -383,6 +388,19 @@ private fun TvTopRightActionChips(
         unfocusedBorderColor = TvCyanFocusBorder.copy(alpha = 0.65f),
         iconTint = Color.White,
         fontWeight = FontWeight.Bold
+    )
+
+    TvSceneChip(
+        title = "Sync",
+        icon = Icons.Default.Sync,
+        iconContentDescription = "Pair and Sync from Phone",
+        focusRequester = topActionFocusRequesters.getOrNull(4),
+        onFocusGained = { onSelectTopActionFocus(4) },
+        onNavigateLeft = { onNavigateTopActionHorizontal(3) },
+        onNavigateRight = { true },
+        onNavigateDown = onNavigateDownFromTopBar,
+        onClick = onOpenHouseholdSync,
+        testTag = "tv_sync_button"
     )
 }
 
@@ -444,10 +462,10 @@ internal fun TvSceneChip(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 11.dp, vertical = 6.dp)
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)
         ) {
-            Icon(icon, contentDescription = iconContentDescription, tint = iconTint, modifier = Modifier.size(15.dp))
-            Spacer(modifier = Modifier.width(6.dp))
+            Icon(icon, contentDescription = iconContentDescription, tint = iconTint, modifier = Modifier.size(14.dp))
+            Spacer(modifier = Modifier.width(5.dp))
             Text(
                 text = title,
                 color = Color.White,

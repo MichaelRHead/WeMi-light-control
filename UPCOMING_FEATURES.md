@@ -43,7 +43,7 @@ With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, `LanEndpoint
 | **Track 2** | **Expanded Hardware Fleet (`Insight`, `Maker`, `Link`, Dimmer Long-Press & Faders)** | Real-time power/wattage/kWh monitoring for **Insight (`F7C029`)** via `insight1#GetInsightParams`, hardware fade ramps & `<LongPress>` scene triggers for **Dimmers (`F7C059`/`WDS060`)**, and **Maker (`F7C043`)** / **Link (`F7C031`)** support. |
 | **Track 3** | **One-Tap OS Wi-Fi Handoff (`WifiNetworkSpecifier`) & Hardware `ReSetup`** | Android 10+ `WifiNetworkSpecifier` in-app connection to `WeMo.Light.*` / `WeMo.Mini.*` APs without leaving the app to open Android Settings, plus a confirmation-protected `basicevent1#ReSetup` factory reset action. |
 | **Track 4** | **On-Device Motion/Sensor & Away-Mode Rule Builders + Periodic Clock Maintenance** | Native `rules.db` editors for `Motion Controlled` (`DEVICECOMBINATION`) and `Away Mode` rules (building on the shipped Step 2 mutator), plus optional background `WorkManager` clock-drift checks for switches after household power outages. |
-| **Track 5** | **Household Profile Sync (JSON / QR Export-Import) & Local Webhook / Home Assistant Bridge** | Export/import remembered Wi-Fi Homes, room names, and custom ordering via JSON file or on-screen QR code (ideal for syncing a phone setup onto an Android TV), plus an optional local REST/Webhook endpoint on Android TV. |
+| **Track 5** | **Optional Local REST / Webhook Bridge (Android TV / Wall Tablet)** | *(Zero-Cloud Household JSON Export/Import & PIN-Encrypted Phone-to-TV Local LAN Pairing Sync shipped post-`v36.0`)* Remaining: optional opt-in token-authenticated local REST/Webhook endpoint on Android TV when Hub Mode is active. |
 | **Track 6** | **Phased Dependency & Toolchain Modernization ([`DEPENDENCY_UPGRADE_PLAN.md`](DEPENDENCY_UPGRADE_PLAN.md))** | *(Wave 1 Verified in AI Studio: `lifecycle 2.9.2`, `room 2.8.5`, `coroutines 1.11.0`, `androidx.test 1.7.0`, `robolectric 4.18.1`; Wave 2 Deferred Post-`v35.0`)* Next: Wave 2 upgrades Compose BOM + `activity-compose` + `lifecycle 2.10.0` (co-reviewed by `ai_studio_ux_cuj`) within AI Studio's `Gradle 9.3.1` / `AGP 9.1.1` / `Kotlin 2.2.10` / `compileSdk 36.1` ceiling; Wave 3 toolchain bump deferred until AI Studio upgrades its container Gradle binary. |
 
 ---
@@ -91,10 +91,8 @@ With the core local UPnP/SSDP/SOAP/GENA engine (`LanHttpClient.kt`, `LanEndpoint
 
 ---
 
-### Track 5: Household Configuration Sync (JSON / QR) & Android TV Local Bridge
-1. **Zero-Cloud Household Sync (`BackupManager.kt`)**:
-   - Export all `wemo_home_networks` and `wemo_devices` (including custom names, rooms, and sort order) to a compact JSON file or multi-frame / compressed QR code.
-   - On Android TV, display a **"Pair from Phone"** local HTTP receiver (`http://<tv-ip>:8990/sync`) so the user can push their entire phone configuration to their living room TV in one tap over the home LAN.
-2. **Optional Local REST / Webhook Endpoint**:
-   - Allow local scripts, Tasker, or Home Assistant on the LAN to query or trigger WeMi scenes via simple local HTTP calls when Android TV Hub Mode is active.
+### Track 5: Optional Local REST / Webhook Bridge (Android TV / Wall Tablet)
+*(Note: Zero-cloud Household Configuration JSON Export/Import and one-tap PIN-encrypted Phone-to-TV / Phone-to-Device local LAN sync have shipped.)*
+1. **Optional Local REST / Webhook Endpoint**:
+   - Allow local scripts, Tasker, or Home Assistant on the LAN to query or trigger WeMi rooms and scenes via token-authenticated local HTTP calls when an opt-in Android TV / wall-tablet Hub Mode is active.
 

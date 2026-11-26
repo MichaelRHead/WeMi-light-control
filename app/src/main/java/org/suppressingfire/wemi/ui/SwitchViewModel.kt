@@ -115,7 +115,7 @@ class SwitchViewModel internal constructor(
     val statusBannerMessage: StateFlow<String?> = _statusBannerMessage.asStateFlow()
     private var statusBannerJob: Job? = null
 
-    private val homeAndRulesController = HomeAndRulesUiController(
+    private val homeAndRulesController: HomeAndRulesUiController = HomeAndRulesUiController(
         scope = viewModelScope,
         repository = repository,
         onClearRoomFilterAndSelection = {
@@ -124,6 +124,7 @@ class SwitchViewModel internal constructor(
             _expandedDeviceIds.value = emptySet()
             _isEditMode.value = false
             hardwareRulesController.dismissAllDialogs()
+            householdSync.dismissAllDialogs()
         },
         onShowTransientStatus = ::showTransientStatus
     )
@@ -131,11 +132,9 @@ class SwitchViewModel internal constructor(
     val isReconnectingHome: StateFlow<Boolean> = homeAndRulesController.isReconnectingHome
     val showAddHomeDialog: StateFlow<Boolean> = homeAndRulesController.showAddHomeDialog
 
-    private val hardwareRulesController = HardwareRulesUiController(
-        scope = viewModelScope,
-        repository = repository,
-        activeNetworkKeyProvider = { activeNetworkKey.value },
-        onShowTransientStatus = ::showTransientStatus
+    private val hardwareRulesController: HardwareRulesUiController = HardwareRulesUiController(
+        scope = viewModelScope, repository = repository,
+        activeNetworkKeyProvider = { activeNetworkKey.value }, onShowTransientStatus = ::showTransientStatus
     )
     val hardwareRulesByDeviceId: StateFlow<Map<Int, DeviceHardwareRulesSnapshot>> =
         hardwareRulesController.hardwareRulesByDeviceId
@@ -147,9 +146,25 @@ class SwitchViewModel internal constructor(
     val pendingDeleteHardwareRule: StateFlow<Pair<DeviceEntity, HardwareRule>?> =
         hardwareRulesController.pendingDeleteRule
 
-    private val deviceActionsController = DeviceActionsUiController(
+    internal val householdSync: HouseholdSyncUiController = HouseholdSyncUiController(
         scope = viewModelScope,
+        appContext = application.applicationContext,
         repository = repository,
+        onActiveNetworkKeyUpdated = { resolvedKey ->
+            homeAndRulesController.setActiveNetworkKey(resolvedKey)
+            _selectedRoomFilter.value = null
+            _collapsedRooms.value = emptySet()
+            _expandedDeviceIds.value = emptySet()
+        },
+        onAfterImportApplied = {
+            if (!isDemoShowroomMode.value) reconnectCurrentHomeNetwork()
+        },
+        onShowTransientStatus = ::showTransientStatus
+    )
+    val householdSyncState: StateFlow<HouseholdSyncUiState> = householdSync.uiState
+
+    private val deviceActionsController = DeviceActionsUiController(
+        scope = viewModelScope, repository = repository,
         activeNetworkKeyProvider = { activeNetworkKey.value },
         currentWifiSsidProvider = ::currentWifiSsid,
         currentDevicesProvider = { devices.value },
@@ -164,11 +179,8 @@ class SwitchViewModel internal constructor(
     val showAddDeviceDialog: StateFlow<Boolean> = deviceActionsController.showAddDeviceDialog
 
     private val provisionApUiController = ProvisionApUiController(
-        scope = viewModelScope,
-        repository = repository,
-        networkMonitor = networkMonitor,
-        activeNetworkKeyProvider = { activeNetworkKey.value },
-        onShowTransientStatus = ::showTransientStatus
+        scope = viewModelScope, repository = repository, networkMonitor = networkMonitor,
+        activeNetworkKeyProvider = { activeNetworkKey.value }, onShowTransientStatus = ::showTransientStatus
     )
     val showProvisionApDialog: StateFlow<Boolean> = provisionApUiController.showProvisionApDialog
     val scannedSetupAps: StateFlow<List<ScannedAp>> = provisionApUiController.scannedSetupAps
@@ -288,77 +300,42 @@ class SwitchViewModel internal constructor(
     }
 
     fun toggleGroupByRoom() { _isGroupedByRoom.value = !_isGroupedByRoom.value }
-
     fun selectRoomFilter(roomName: String?) { _selectedRoomFilter.value = roomName }
-
     fun toggleRoomCollapse(roomName: String) {
         val current = _collapsedRooms.value
         _collapsedRooms.value = if (roomName in current) current - roomName else current + roomName
     }
-
     fun toggleRoomPower(roomName: String) = deviceActionsController.toggleRoomPower(roomName)
-
     fun updateRoomBrightness(roomName: String, brightness: Int) =
         deviceActionsController.updateRoomBrightness(roomName, brightness)
-
     fun toggleEditMode() { _isEditMode.value = !_isEditMode.value }
-
     fun setEditMode(enabled: Boolean) { _isEditMode.value = enabled }
-
     fun toggleExpandDevice(deviceId: Int) {
         val current = _expandedDeviceIds.value
         _expandedDeviceIds.value = if (deviceId in current) current - deviceId else current + deviceId
     }
-
     fun toggleDevicePower(device: DeviceEntity) = deviceActionsController.toggleDevicePower(device)
-
     fun updateBrightness(device: DeviceEntity, brightness: Int) =
         deviceActionsController.updateBrightness(device, brightness)
-
-    fun simulateOrRefreshMotion(device: DeviceEntity) =
-        deviceActionsController.simulateOrRefreshMotion(device)
-
+    fun simulateOrRefreshMotion(device: DeviceEntity) = deviceActionsController.simulateOrRefreshMotion(device)
     fun reconnectDevice(device: DeviceEntity) = deviceActionsController.reconnectDevice(device)
-
     fun pingDeviceLatency(device: DeviceEntity) = deviceActionsController.pingDeviceLatency(device)
-
     fun openSsdpScannerAndScan(searchTarget: String = selectedSearchTarget.value, manualSubnetOverride: String? = null) =
         deviceActionsController.openSsdpScannerAndScan(searchTarget, manualSubnetOverride)
-
     fun scanManualSubnet(subnetPrefix: String) = deviceActionsController.scanManualSubnet(subnetPrefix)
-
     fun closeSsdpScanner() = deviceActionsController.closeSsdpScanner()
-
-    fun selectSearchTargetAndScan(searchTarget: String) =
-        deviceActionsController.selectSearchTargetAndScan(searchTarget)
-
+    fun selectSearchTargetAndScan(searchTarget: String) = deviceActionsController.selectSearchTargetAndScan(searchTarget)
     fun refreshDevicesFromNetwork() = deviceActionsController.refreshDevicesFromNetwork()
-
-    fun adoptSsdpDevice(discovered: SsdpDiscoveredDevice) =
-        deviceActionsController.adoptSsdpDevice(discovered)
-
+    fun adoptSsdpDevice(discovered: SsdpDiscoveredDevice) = deviceActionsController.adoptSsdpDevice(discovered)
     fun adoptAllSsdpDevices() = deviceActionsController.adoptAllSsdpDevices()
-
     fun openAddDeviceDialog() = deviceActionsController.openAddDeviceDialog()
-
     fun closeAddDeviceDialog() = deviceActionsController.closeAddDeviceDialog()
-
-    fun openEditDeviceDialog(device: DeviceEntity) =
-        deviceActionsController.openEditDeviceDialog(device)
-
+    fun openEditDeviceDialog(device: DeviceEntity) = deviceActionsController.openEditDeviceDialog(device)
     fun closeEditDeviceDialog() = deviceActionsController.closeEditDeviceDialog()
 
     fun saveDevice(
-        id: Int,
-        name: String,
-        roomName: String,
-        deviceType: DeviceType,
-        ipAddress: String,
-        port: Int,
-        brightness: Int,
-        isReachable: Boolean,
-        isOn: Boolean,
-        autoOffMinutes: Int,
+        id: Int, name: String, roomName: String, deviceType: DeviceType, ipAddress: String,
+        port: Int, brightness: Int, isReachable: Boolean, isOn: Boolean, autoOffMinutes: Int,
         syncFriendlyNameToHardware: Boolean = false
     ) = deviceActionsController.saveDevice(
         id, name, roomName, deviceType, ipAddress, port, brightness,
@@ -371,8 +348,7 @@ class SwitchViewModel internal constructor(
     }
 
     fun moveDevice(device: DeviceEntity, moveUp: Boolean) = deviceActionsController.moveDevice(
-        device = device,
-        moveUp = moveUp,
+        device = device, moveUp = moveUp,
         withinRoomOnly = _isGroupedByRoom.value || _selectedRoomFilter.value != null
     )
 
@@ -410,18 +386,10 @@ class SwitchViewModel internal constructor(
     fun scanSetupApNetworks(apHost: String = "10.22.22.1") = provisionApUiController.scanSetupApNetworks(apHost)
 
     fun provisionSetupAp(
-        apHost: String = "10.22.22.1",
-        ssid: String,
-        password: String,
-        channel: Int = 6,
-        authMode: String = "WPA2PSK",
-        encryptionType: String = "AES",
-        encryptionMethod: Int = 0,
-        addPasswordLengths: Boolean? = null,
-        customDeviceName: String = "",
-        roomName: String = "",
-        deviceType: DeviceType? = null,
-        keepDialogOpenOnSuccess: Boolean = false
+        apHost: String = "10.22.22.1", ssid: String, password: String, channel: Int = 6,
+        authMode: String = "WPA2PSK", encryptionType: String = "AES", encryptionMethod: Int = 0,
+        addPasswordLengths: Boolean? = null, customDeviceName: String = "", roomName: String = "",
+        deviceType: DeviceType? = null, keepDialogOpenOnSuccess: Boolean = false
     ) = provisionApUiController.provisionSetupAp(
         apHost, ssid, password, channel, authMode, encryptionType,
         encryptionMethod, addPasswordLengths, customDeviceName, roomName,
@@ -432,12 +400,14 @@ class SwitchViewModel internal constructor(
         homeAndRulesController.toggleDemoShowroomMode(enabled) {
             _selectedRoomFilter.value = null
             hardwareRulesController.dismissAllDialogs()
+            householdSync.dismissAllDialogs()
         }
 
     fun resetToClassicScreenshotDevices() =
         homeAndRulesController.resetToClassicScreenshotDevices {
             _selectedRoomFilter.value = null
             hardwareRulesController.dismissAllDialogs()
+            householdSync.dismissAllDialogs()
         }
 
     fun clearSoapLogs() = repository.clearLogs()
@@ -451,6 +421,7 @@ class SwitchViewModel internal constructor(
     override fun onCleared() {
         super.onCleared()
         statusBannerJob?.cancel()
+        householdSync.close()
         networkMonitor.stopMonitoring()
         repository.close()
         if (SwitchRepository.isRunningInRobolectric()) {

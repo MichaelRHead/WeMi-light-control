@@ -53,6 +53,7 @@ import org.suppressingfire.wemi.ui.components.BottomNavigationBar
 import org.suppressingfire.wemi.ui.components.ReleaseHistoryDialog
 import org.suppressingfire.wemi.ui.components.TopHeader
 import org.suppressingfire.wemi.ui.components.TvDashboardScreen
+import org.suppressingfire.wemi.ui.components.TvHouseholdSyncOverlay
 import org.suppressingfire.wemi.ui.components.WeMiModalDialogs
 import org.suppressingfire.wemi.ui.screens.DevicesTabActions
 import org.suppressingfire.wemi.ui.screens.DevicesTabScreen
@@ -127,6 +128,7 @@ fun WeMiSwitchApp(
     val hardwareRulesByDeviceId by viewModel.hardwareRulesByDeviceId.collectAsStateWithLifecycle()
     val inspectingRuleDeviceIds by viewModel.inspectingRuleDeviceIds.collectAsStateWithLifecycle()
     val isScanningAllDeviceRules by viewModel.isScanningAllDeviceRules.collectAsStateWithLifecycle()
+    val householdSyncState by viewModel.householdSyncState.collectAsStateWithLifecycle()
     var showReleaseHistoryDialog by rememberSaveable { mutableStateOf(false) }
 
     val homeDevices = remember(devices, activeNetworkKey) {
@@ -158,6 +160,7 @@ fun WeMiSwitchApp(
 
     BackHandler(
         enabled = showReleaseHistoryDialog ||
+            householdSyncState.hasAnyDialogOpen ||
             hasHardwareRuleDialog ||
             showAddDeviceDialog ||
             editingDevice != null ||
@@ -170,6 +173,7 @@ fun WeMiSwitchApp(
     ) {
         when {
             showReleaseHistoryDialog -> showReleaseHistoryDialog = false
+            householdSyncState.hasAnyDialogOpen -> viewModel.householdSync.dismissAllDialogs()
             hasHardwareRuleDialog -> viewModel.dismissHardwareRuleDialogs()
             showAddDeviceDialog || editingDevice != null -> {
                 viewModel.closeAddDeviceDialog()
@@ -263,8 +267,17 @@ fun WeMiSwitchApp(
                     onReconnectDevice = { viewModel.reconnectDevice(it) },
                     onToggleRoomPower = { viewModel.toggleRoomPower(it) },
                     onApplyTvScene = { viewModel.applyTvScene(it) },
-                    onScanSsdpClick = { viewModel.refreshDevicesFromNetwork() }
+                    onScanSsdpClick = { viewModel.refreshDevicesFromNetwork() },
+                    onOpenHouseholdSync = { viewModel.householdSync.openReceiveDialog(isTv = true) }
                 )
+                if (householdSyncState.showReceiveDialog || householdSyncState.pendingImport != null) {
+                    TvHouseholdSyncOverlay(
+                        state = householdSyncState,
+                        onStartNewSession = { viewModel.householdSync.openReceiveDialog(isTv = true) },
+                        onConfirmImport = { mode -> viewModel.householdSync.confirmPendingImport(mode) },
+                        onDismiss = { viewModel.householdSync.closeReceiveDialog() }
+                    )
+                }
             } else {
                 val devicesTabActions = remember(viewModel, context) {
                     DevicesTabActions(
@@ -403,6 +416,14 @@ fun WeMiSwitchApp(
                                 },
                                 onToggleDemoShowroomMode = { viewModel.toggleDemoShowroomMode(it) },
                                 onOpenProvisionApWizard = { viewModel.openProvisionApDialog() },
+                                onExportHouseholdJson = { writer ->
+                                    viewModel.householdSync.exportHouseholdJsonToWriter(isTv = false, writeJson = writer)
+                                },
+                                onImportHouseholdStream = { src, opener ->
+                                    viewModel.householdSync.readAndStageJsonImportFromStream(src, opener)
+                                },
+                                onOpenSendLanSync = { viewModel.householdSync.openSendDialog() },
+                                onOpenReceiveLanSync = { viewModel.householdSync.openReceiveDialog(isTv = false) },
                                 onClearLogs = { viewModel.clearSoapLogs() }
                             )
                         }

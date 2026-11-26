@@ -29,6 +29,9 @@ import org.suppressingfire.wemi.network.HardwareRule
 import org.suppressingfire.wemi.network.HardwareRuleDraft
 import org.suppressingfire.wemi.network.HardwareRulesClient
 import org.suppressingfire.wemi.network.HardwareRulesWriteResult
+import org.suppressingfire.wemi.network.HouseholdImportMode
+import org.suppressingfire.wemi.network.HouseholdImportSummary
+import org.suppressingfire.wemi.network.HouseholdSyncBundle
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkClient
 import org.suppressingfire.wemi.network.NetworkMonitor
@@ -131,6 +134,12 @@ class SwitchRepository(
     private val genaPollingCoordinator: GenaAndHealthPollingCoordinator = GenaAndHealthPollingCoordinator(
         dao, networkClient, genaManager, lanSemaphore, deviceMutexes, lastSetStateTimestampMs,
         { _isDemoShowroomMode.value }, discoveryCoordinator::attemptTwoStageReconnect, ::appendLog, ::nowFormatted
+    )
+
+    private val householdSyncCoordinator = HouseholdSyncCoordinator(
+        dao, seedAndModeMutex, { _isDemoShowroomMode.value }, ::detectCurrentLanIp,
+        { prefs?.edit { putBoolean(KEY_DEMO_SHOWROOM_MODE, false) }; _isDemoShowroomMode.value = false },
+        ::resetRuntimeDeviceState, ::appendLog, ::nowFormatted
     )
 
     val allDevices: Flow<List<DeviceEntity>> =
@@ -444,50 +453,43 @@ class SwitchRepository(
 
     suspend fun inspectDeviceHardwareRules(device: DeviceEntity, forceRecheck: Boolean = false): DeviceHardwareRulesSnapshot =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.inspectDeviceHardwareRules(device, forceRecheck) }
-
     suspend fun inspectAllHomeHardwareRules(networkKey: String, forceRecheck: Boolean = false): List<DeviceHardwareRulesSnapshot> =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.inspectAllHomeHardwareRules(networkKey, forceRecheck) }
-
     suspend fun saveHardwareRule(device: DeviceEntity, draft: HardwareRuleDraft): HardwareRulesWriteResult =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.saveHardwareRule(device, draft) }
-
     suspend fun toggleHardwareRule(device: DeviceEntity, rule: HardwareRule, enabled: Boolean): HardwareRulesWriteResult =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.toggleHardwareRule(device, rule, enabled) }
-
     suspend fun deleteHardwareRule(device: DeviceEntity, rule: HardwareRule): HardwareRulesWriteResult =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.deleteHardwareRule(device, rule) }
-
     suspend fun syncDeviceClock(device: DeviceEntity): HardwareRulesWriteResult =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.syncDeviceClock(device) }
-
     suspend fun updateDeviceSolarLocation(device: DeviceEntity, location: HardwareLocationInfo): HardwareRulesWriteResult =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.updateDeviceSolarLocation(device, location) }
-
     suspend fun restoreHardwareRulesBackup(device: DeviceEntity, backupFilePath: String): HardwareRulesWriteResult =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.restoreHardwareRulesBackup(device, backupFilePath) }
+
+    suspend fun buildHouseholdExportBundle(sourceDeviceLabel: String = "WeMi Device"): HouseholdSyncBundle =
+        awaitDemoSeedIfPending().let { householdSyncCoordinator.buildExportBundle(sourceDeviceLabel) }
+    suspend fun exportHouseholdJson(sourceDeviceLabel: String = "WeMi Device"): String =
+        awaitDemoSeedIfPending().let { householdSyncCoordinator.exportHouseholdJson(sourceDeviceLabel) }
+    suspend fun importHouseholdBundle(
+        bundle: HouseholdSyncBundle,
+        mode: HouseholdImportMode = HouseholdImportMode.MERGE,
+        onActiveKeyResolved: ((String) -> Unit)? = null
+    ): HouseholdImportSummary = householdSyncCoordinator.importHouseholdBundle(bundle, mode, onActiveKeyResolved)
 
     suspend fun moveDeviceOrder(device: DeviceEntity, moveUp: Boolean, withinRoomOnly: Boolean = false) =
         awaitDemoSeedIfPending().let { crudCoordinator.moveDeviceOrder(device, moveUp, withinRoomOnly) }
 
-    fun clearLogs() {
-        _soapLogs.value = emptyList()
-    }
-
-    fun close() {
-        genaManager.close()
-        repoScope.cancel()
-    }
+    fun clearLogs() { _soapLogs.value = emptyList() }
+    fun close() { genaManager.close(); repoScope.cancel() }
 
     companion object {
         private const val PREFS_NAME = "wemi_controller_prefs"
         private const val KEY_DEMO_SHOWROOM_MODE = "demo_showroom_mode"
-
         fun isRunningInRobolectric(): Boolean = LanRuntimeUtils.isRunningInRobolectric()
-
         val DEFAULT_ROOMS: List<String> = DemoFixtures.DEFAULT_ROOMS
-
         fun defaultHomeNetworks(): List<HomeNetworkEntity> = DemoFixtures.defaultHomeNetworks()
-
         fun defaultClassicDevices(): List<DeviceEntity> = DemoFixtures.defaultClassicDevices()
     }
 }

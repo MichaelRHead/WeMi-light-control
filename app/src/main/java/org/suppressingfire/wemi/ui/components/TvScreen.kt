@@ -81,7 +81,8 @@ fun TvDashboardScreen(
     onReconnectDevice: (DeviceEntity) -> Unit,
     onToggleRoomPower: (String) -> Unit,
     onApplyTvScene: (String) -> Unit,
-    onScanSsdpClick: () -> Unit
+    onScanSsdpClick: () -> Unit,
+    onOpenHouseholdSync: () -> Unit = {}
 ) {
     // Group switches by canonical room (with "Unassigned" placed last) while preserving user sortOrder within each room
     val groupedByRoom: List<Pair<String, List<DeviceEntity>>> = remember(devices, selectedRoomFilter) {
@@ -110,7 +111,7 @@ fun TvDashboardScreen(
         focusRequesters.getOrPut(target) { FocusRequester() }
     }
     val topActionFocusRequesters = remember {
-        (0..3).map { requesterFor(TvFocusTarget.TopAction(it)) }
+        (0..4).map { requesterFor(TvFocusTarget.TopAction(it)) }
     }
 
     val gridIndexByTarget: Map<TvFocusTarget, Int> = remember(groupedByRoom) {
@@ -282,7 +283,7 @@ fun TvDashboardScreen(
                 if (firstRoom != null) navigateTo(TvFocusTarget.RoomHeader(firstRoom)) else true
             },
             onNavigateTopActionHorizontal = { targetIdx ->
-                val resolvedIdx = if (!hasHolidayDevices && targetIdx == 1) 2 else targetIdx.coerceIn(0, 3)
+                val resolvedIdx = if (!hasHolidayDevices && targetIdx == 1) 2 else targetIdx.coerceIn(0, 4)
                 navigateTo(TvFocusTarget.TopAction(resolvedIdx))
             },
             onPrimaryActionOnFocused = { triggerPrimaryAction(it) },
@@ -294,7 +295,8 @@ fun TvDashboardScreen(
                 }
             },
             onApplyTvScene = onApplyTvScene,
-            onScanSsdpClick = onScanSsdpClick
+            onScanSsdpClick = onScanSsdpClick,
+            onOpenHouseholdSync = onOpenHouseholdSync
         )
 
         Spacer(modifier = Modifier.height(10.dp))
