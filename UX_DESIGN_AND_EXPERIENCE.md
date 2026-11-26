@@ -14,6 +14,7 @@ Related documentation:
 - [`UX_DESIGN.md`](UX_DESIGN.md) — Android UX Design Guidelines: Navigation Patterns, Accessibility Standards & User Interaction Flows *(Owned Exclusively by the Google AI Studio Agent)*
 - [`DEBUGGING_AND_SUPPORT.md`](DEBUGGING_AND_SUPPORT.md) — On-Device Telemetry, `10.22.22.1` Provisioning Diagnostics & Support Architecture *(Owned Exclusively by the Antigravity Debugging & Support Agent — read-only for the Google AI Studio Agent)*
 - [`DISCOVERY_AND_ROOM_GROUPING.md`](DISCOVERY_AND_ROOM_GROUPING.md) — Internal Device Discovery Logic, Self-Healing Identity Resolution & Automatic Room Grouping Architecture *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — read-only for the Google AI Studio Agent)*
+- [`SECURITY_AND_PRIVACY.md`](SECURITY_AND_PRIVACY.md) — Security Threat Model, Privacy Lifecycle Invariants & Stage 4 Hardening Backlog *(Owned Exclusively by the Antigravity Security & Privacy Agent — read-only for the Google AI Studio Agent)*
 - [`LICENSE_GOVERNANCE.md`](LICENSE_GOVERNANCE.md) — Open-Source MIT License Parity, Permissive Dependency Policy & Brand/Trademark Governance *(Owned Exclusively by the Antigravity License & Brand Governance Agent — read-only for the Google AI Studio Agent)*
 - [`AGENTS.md`](AGENTS.md) — Architecture & Agent Guide
 - [`IMPLEMENTED.md`](IMPLEMENTED.md) — Reverse-Chronological Change Log (`v1.0` → `v36.0`)
@@ -116,7 +117,7 @@ Every screen and component in **WeMi Light Control** must obey these five layout
 ### Invariant 4: Top-First Primary Controls in Expandable Drawers (`ExpandedDrawer`)
 - **Rule**: When a user taps a dimmable light row to expand its inline drawer, the interactive controls they came for must appear **first**, before technical telemetry.
 - **Implementation**:
-  - `DeviceDiagnosticsDrawer.kt` renders the **Brightness Level Slider (`1–100%`)** and wrapping `FlowRow` of quick presets (**`1%`**, **`21%`**, **`25%`**, **`50%`**, **`75%`**, **`100%`**, and **`Night Mode (20%)`**) at the **very top** of `ExpandedDrawer`, followed by the RTT latency bar (`Ping RTT`, `Configure IP`) and UPnP endpoint/serial metadata below.
+  - `DeviceDiagnosticsDrawer.kt` renders the **Brightness Level Slider (`1–100%`)** and wrapping `FlowRow` of quick presets (**`21%`**, **`50%`**, **`75%`**, **`100%`**, and **`Night Mode (20%)`**) at the **very top** of `ExpandedDrawer`, followed by a unified Connection & Hardware Details card where `UPnP Endpoint` and `SN / Firmware` (`device_diagnostics_metadata_<id>`) span the full card width above the wrapping action chips (`Add Widget`, `Configure IP`, `Reconnect`) so metadata never wraps into a squeezed vertical strip beside buttons.
 
 ### Invariant 5: Non-Blocking Feedback & Synchronous Modal Dismissal
 - **Rule**: Transient status banners must never block touches on underlying list items, and modal dialogs must close immediately when the user taps Save/Confirm.
