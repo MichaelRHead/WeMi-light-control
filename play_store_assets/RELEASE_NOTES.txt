@@ -1,4 +1,4 @@
-WeMi Switch Control v37.0:
-• Zero-Cloud Household Sync: Share Wi-Fi Homes, switch names, rooms & order across phones, tablets, Chromebooks & Android TV via JSON export/import or 6-digit PIN-encrypted local Wi-Fi pairing (no cloud or Wi-Fi passwords).
-• Security & Privacy Hardening: Redacted-by-default diagnostics, ephemeral setup passwords, RFC 1918 LAN validation, non-exported widget actions & cloud Auto-Backup exclusions.
-• UX Polish: Cleaner full-width expanded switch drawers.
+WeMi Switch Control v38.0:
+• Context-Aware Android TV Action Bar: Moving TV remote focus across room cards, scenes, offline switches, sensors, or Sync now updates the top-bar OK hint live and hides stale dimmer chips.
+• Zero-Cloud Household Sync: Share Wi-Fi Homes, names, rooms & order across phones, tablets, Chromebooks & TV via JSON or 6-digit PIN local Wi-Fi pairing.
+• Security & Privacy: Redacted-by-default diagnostics & RFC 1918 LAN checks.

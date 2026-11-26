@@ -11,41 +11,41 @@ This file is the live synchronization state machine for the **7-Agent / 8-Stage 
 ## 1. Live Release State Machine Header (Machine & Human Readable)
 
 <!-- RELEASE_STATE_BEGIN -->
-RELEASE_VERSION: v37.0
-VERSION_CODE: 37
+RELEASE_VERSION: v38.0
+VERSION_CODE: 38
 ROUND_NUMBER: 1
-RELEASE_STATUS: PROMOTED_TO_CLOSED_TESTING
-CURRENT_TURN: NONE
-CANDIDATE_BASE_SHA: a385155
-SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (a385155 @ 2026-11-26 08:52 PST)
-SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (cf273ea @ 2026-11-26 09:06 PST)
-SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (4e71935 @ 2026-11-26 09:21 PST)
-SIGN_OFF_SECURITY_AND_PRIVACY: SIGNED_OFF (c684037 @ 2026-11-26 09:42 PST)
-SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (1721e7f @ 2026-11-26 10:05 PST)
-SIGN_OFF_LICENSE_GOVERNANCE: SIGNED_OFF (78952e6 @ 2026-11-26 10:18 PST)
-SIGN_OFF_APP_PROMOTER: PROMOTED (vc=37 internal -> alpha @ 2026-11-26 11:56 PST)
-FINAL_RELEASE_SHA: v37.0-rc
-CONCLUDED_AT: 2026-11-26 11:23 PST
-PROMOTED_VERSION_CODE: 37
-PROMOTED_TRACK: alpha
-PROMOTED_AT: 2026-11-26 11:56 PST
+RELEASE_STATUS: IN_REVIEW
+CURRENT_TURN: discovery_and_grouping
+CANDIDATE_BASE_SHA: v38.0-rc
+SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (v38.0-rc @ 2026-11-26 15:00 PST)
+SIGN_OFF_DISCOVERY_AND_GROUPING: PENDING
+SIGN_OFF_TELEMETRY_AND_DEBUGGING: PENDING
+SIGN_OFF_SECURITY_AND_PRIVACY: PENDING
+SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
+SIGN_OFF_LICENSE_GOVERNANCE: PENDING
+SIGN_OFF_APP_PROMOTER: PENDING
+FINAL_RELEASE_SHA: NONE
+CONCLUDED_AT: NONE
+PROMOTED_VERSION_CODE: NONE
+PROMOTED_TRACK: NONE
+PROMOTED_AT: NONE
 <!-- RELEASE_STATE_END -->
 
 ---
 
-## 2. Current Release Candidate Sign-Off Status (`v37.0` / `versionCode = 37`)
+## 2. Current Release Candidate Sign-Off Status (`v38.0` / `versionCode = 38`)
 
 <!-- SIGN_OFF_TABLE_BEGIN -->
 | Stage | Role ID | Agent | Status | Verified Commit SHA | Timestamp (PST) | Verification Summary |
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
-| **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `a385155` | `2026-11-26 08:52 PST` | Recorded Stage 1 UX sign-off from AI Studio commit a385155 for v37.0 (Zero-Cloud Household Config Sync, security hardening, and expanded drawer polish). |
-| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `cf273ea` | `2026-11-26 09:06 PST` | Verified v37.0 discovery, 3-tier identity, ChromeOS ARCVM, on-device rules, and Household Config Sync. Fixed in-bundle deduplication, exact-identity-first merge order, router SSID preservation, Wi-Fi-bound UDP discovery, ARCVM receive guards, and synced v37.0 discovery docs. |
-| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `SIGNED_OFF` | `4e71935` | `2026-11-26 09:21 PST` | Audited telemetry redaction, reset cleanup, Play assets, and user docs for v37.0. |
-| **4 (Review 3)** | `security_and_privacy` | **Antigravity Security & Privacy Agent** | `SIGNED_OFF` | `c684037` | `2026-11-26 09:42 PST` | Hardened v37.0 Household Sync with SPAKE2 Group 14, AAD, framing, FLAG_SECURE, and Privacy Policy disclosures. |
-| **5 (Review 4)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `SIGNED_OFF` | `1721e7f` | `2026-11-26 10:05 PST` | Verified 138/138 .kt files <500L (max 496L), 156/156 Kotlin tests across 30 suites, zero compiler/lint warnings, clean debug APK, and hardened Household Sync UI lifecycle, TV focus containment, SAF export truncation, and test isolation. |
-| **6 (Review 5)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `SIGNED_OFF` | `78952e6` | `2026-11-26 10:18 PST` | Verified MIT LICENSE <-> MoreScreen.kt parity, AndroidX/Kotlin Apache-2.0 allowlist, 11-package SHA-256 CI-only requirements-play.txt lockfile, 4-permission manifest & non-exported WeMiWidgetActionReceiver, 4-domain cloud Auto-Backup exclusions, zero WeMo brand leaks across UI/widgets/sync/Play assets, 156/156 Kotlin tests (30 suites), 28/28 Python tests, sync_play_assets validate-local, and clean lintDebug + assembleDebug. |
-| **7 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `SIGNED_OFF` | `v37.0-rc` | `2026-11-26 11:23 PST` | Concluded v37.0 (versionCode = 37, org.suppressingfire.wemi) 7-agent release review: all 6 stages signed off Round 1 (ai_studio_ux_cuj a385155, discovery_and_grouping cf273ea, telemetry_and_debugging 4e71935, security_and_privacy c684037 SPAKE2 Group 14 + AAD + FLAG_SECURE, code_quality_and_testing 1721e7f 138/138 .kt <500L & 156/156 Kotlin tests across 30 suites, license_governance 78952e6); synced UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md, docs/user-guide/release-notes.md, and IMPLEMENTED.md (0 broken links); verified 138/138 .kt <500L (max 496L), 28/28 Python Play tests, sync_play_assets validate-local (19/30 title, 75/80 short, 3776/4000 full, 484/500 release notes, 16 PNGs across 7 slots), and clean AI Studio compile_applet build. Approved for Google Play Store upload and Stage 8 promotion. |
-| **8 (Promote)** | `app_promoter` | **Antigravity App Promoter Agent (Closed Testing)** | `PROMOTED` | `5c35203` | `2026-11-26 11:56 PST` | Promoted Play build 37 release 0.0.0.37 from internal to alpha via GitHub Actions run 45887283856. |
+| **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `v38.0-rc` | `2026-11-26 15:00 PST` | Completed Stage 1 UX & CUJ audit for v38.0 (versionCode = 38): audited the Context-Aware Android TV Top-Bar OK Action Chip (TvFocusModel.kt, TvScreen.kt, TvHeadersAndScenes.kt) and existing surfaces (139/139 .kt files <500L max 496L, zero dead controls or trademark leaks); bumped app/build.gradle.kts to 38.0 (versionCode 38) and prepended v38.0 to ReleaseHistoryCatalog.kt; regenerated Play Store & TV PNG assets (16 API-synced PNGs across 7 slots); updated RELEASE_NOTES.txt (449/500), STORE_LISTING.md (19/30, 75/80, 3698/4000), docs/user-guide/release-notes.md, UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md (0 broken links), and IMPLEMENTED.md; verified 156/156 Kotlin tests across 30 suites (--rerun), 28/28 Python Play tests, sync_play_assets.py validate-local, and clean AI Studio compile_applet build. |
+| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `PENDING` | `-` | `-` | Awaiting Discovery & Room Grouping Agent review. |
+| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `PENDING` | `-` | `-` | Awaiting Telemetry & Debugging Agent review. |
+| **4 (Review 3)** | `security_and_privacy` | **Antigravity Security & Privacy Agent** | `PENDING` | `-` | `-` | Awaiting Security & Privacy Agent review. |
+| **5 (Review 4)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
+| **6 (Review 5)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
+| **7 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `PENDING` | `-` | `-` | Awaiting Stages 1-6 sign-off. |
+| **8 (Promote)** | `app_promoter` | **Antigravity App Promoter Agent (Closed Testing)** | `PENDING` | `-` | `-` | Awaiting Stage 7 approval and AI Studio internal testing upload. |
 <!-- SIGN_OFF_TABLE_END -->
 
 ---
@@ -150,4 +150,5 @@ PROMOTED_AT: 2026-11-26 11:56 PST
 | 2026-11-26 10:18 PST | `1` | `license_governance` | `SIGNED_OFF` | `ai_studio_ux_cuj` | `78952e6` | Verified MIT LICENSE <-> MoreScreen.kt parity, AndroidX/Kotlin Apache-2.0 allowlist, 11-package SHA-256 CI-only requirements-play.txt lockfile, 4-permission manifest & non-exported WeMiWidgetActionReceiver, 4-domain cloud Auto-Backup exclusions, zero WeMo brand leaks across UI/widgets/sync/Play assets, 156/156 Kotlin tests (30 suites), 28/28 Python tests, sync_play_assets validate-local, and clean lintDebug + assembleDebug. |
 | 2026-11-26 11:23 PST | `1` | `ai_studio_ux_cuj` | `APPROVED_FOR_PLAY_STORE` | `NONE` | `v37.0-rc` | Concluded v37.0 (versionCode = 37, org.suppressingfire.wemi) 7-agent release review: all 6 stages signed off Round 1 (ai_studio_ux_cuj a385155, discovery_and_grouping cf273ea, telemetry_and_debugging 4e71935, security_and_privacy c684037 SPAKE2 Group 14 + AAD + FLAG_SECURE, code_quality_and_testing 1721e7f 138/138 .kt <500L & 156/156 Kotlin tests across 30 suites, license_governance 78952e6); synced UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md, docs/user-guide/release-notes.md, and IMPLEMENTED.md (0 broken links); verified 138/138 .kt <500L (max 496L), 28/28 Python Play tests, sync_play_assets validate-local (19/30 title, 75/80 short, 3776/4000 full, 484/500 release notes, 16 PNGs across 7 slots), and clean AI Studio compile_applet build. Approved for Google Play Store upload and Stage 8 promotion. |
 | 2026-11-26 11:56 PST | `1` | `app_promoter` | `PROMOTED_TO_CLOSED_TESTING` | `NONE` | `5c35203` | Promoted Play build 37 release 0.0.0.37 from internal to alpha via GitHub Actions run 45887283856. |
+| 2026-11-26 15:00 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `v38.0-rc` | Completed Stage 1 UX & CUJ audit for v38.0 (versionCode = 38): audited the Context-Aware Android TV Top-Bar OK Action Chip (TvFocusModel.kt, TvScreen.kt, TvHeadersAndScenes.kt) and existing surfaces (139/139 .kt files <500L max 496L, zero dead controls or trademark leaks); bumped app/build.gradle.kts to 38.0 (versionCode 38) and prepended v38.0 to ReleaseHistoryCatalog.kt; regenerated Play Store & TV PNG assets (16 API-synced PNGs across 7 slots); updated RELEASE_NOTES.txt (449/500), STORE_LISTING.md (19/30, 75/80, 3698/4000), docs/user-guide/release-notes.md, UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md (0 broken links), and IMPLEMENTED.md; verified 156/156 Kotlin tests across 30 suites (--rerun), 28/28 Python Play tests, sync_play_assets.py validate-local, and clean AI Studio compile_applet build. |
 <!-- AUDIT_LOG_END -->

@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, Chromebooks (ChromeOS), and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v37.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v38.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v37.0`)
+## Quick Release Summary (`v1.0` → `v38.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v38.0`](#version-380-versioncode--38--november-26-2026)** | `38` | Nov 26, 2026 | **Context-Aware Android TV (`wemi TV`) Remote Action Bar**: Moving the TV D-Pad selector across Room Master cards, top-bar scenes (`Movie 20%`, `Holiday ON`, `All OFF`, `Rescan`, `Sync`), offline switches, or motion sensors immediately updates the top-bar OK hint (including room dimming hints when a room has reachable dimmers), hides the dimmer-mode chip whenever focus leaves a dimmer, and invokes the focused room or action directly |
 | **[`v37.0`](#version-370-versioncode--37--november-26-2026)** | `37` | Nov 26, 2026 | **Zero-Cloud Household Configuration Sync (JSON Export/Import & 6-Digit PIN Phone-to-TV Local Pairing), Comprehensive Security & Privacy Hardening & Expanded Switch Drawer Layout Fix**: Sync Wi-Fi Homes, custom switch names, rooms, and ordering across phones, tablets, Chromebooks, and Android TV with zero cloud accounts or Wi-Fi passwords; redact diagnostic exports by default with opt-in Full Diagnostics toggles, ephemeral auto-remasking Wi-Fi setup passwords, RFC 1918 LAN validation, non-exported widget receivers, and cloud Auto-Backup exclusions; plus a cleaner full-width expanded switch drawer |
 | **[`v36.0`](#version-360-versioncode--36--november-25-2026)** | `36` | Nov 25, 2026 | **Live On-Device Switch Rules Management (`On-Switch`), Automatic Clock Sync, Offline Solar Location, Pre-Write Backup Restore & Security/UX Hardening**: Create, edit, toggle, and delete native **Long Press**, **Auto-Off Delay**, **Schedule** (with **Sunrise/Sunset** offsets), and **Timed Action** rules directly in compatible switch memory (retiring phone-only app rules cleanly in Room v7), with automatic clock sync, offline city/signed-coordinate solar setup, automatic pre-write backups with one-tap restore, masked Wi-Fi setup passwords, and a unified **Rules** tab + expanded drawer **Manage Rules** bridge |
 | **[`v35.0`](#version-350-versioncode--35--november-22-2026)** | `35` | Nov 22, 2026 | **On-Device Switch Rules Inspector (Read-Only), Two-Tier Rules UX & Refreshed User Guides**: Zero-delay capability detection + firmware-cached verification, read-only inspection of stored switch rules (`Long Press`, `Auto-Off Delay`, `Schedule` / `Sunrise`-`Sunset`, `Away Mode`, clock-sync alerts) in the collapsible **Rules** tab and expanded switch drawer, plus refreshed User Guides & new Home Screen Widgets guide |
@@ -52,6 +53,12 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 38.0 (`versionCode = 38`) — November 26, 2026
+- **Context-Aware Android TV (`wemi TV`) Remote Action Bar**: Moving your TV remote selector onto any **Room Master** bar now immediately updates the top-bar OK action chip to show `<Room Name> • OK Toggle Room` (or `<Room Name> • OK Toggle Room • ◄/► Dim` when the room includes reachable dimmers) instead of remaining stuck on the previously highlighted switch.
+- **Accurate Hints Across Every TV Focus Target**: Moving focus onto top-bar scenes and controls (`Movie 20%`, `Holiday ON`, `All OFF`, `Rescan`, `Sync`), offline switches (`• OK Reconnect`), or motion sensors (`• OK Refresh`) updates the top-bar OK chip in real time, hides the dimmer-mode chip whenever focus leaves a reachable dimmer, and runs the focused room or action when selected.
+
+---
 
 ### Version 37.0 (`versionCode = 37`) — November 26, 2026
 - **Zero-Cloud Household Configuration Sync (JSON & PIN-Encrypted Local Wi-Fi Pairing)**: Set up your switches, custom names, rooms, and ordering once on your phone and share them effortlessly to Android TV, another phone, a tablet, or a Chromebook—with zero cloud accounts, zero storage permissions, and zero Wi-Fi passwords ever leaving your device.

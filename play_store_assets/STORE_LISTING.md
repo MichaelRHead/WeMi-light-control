@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v37.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v38.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `37.0` (`versionCode = 37`)
+- **Version:** `38.0` (`versionCode = 38`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Chromebooks (ChromeOS)**, **Android Home Screen Widgets**, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,11 +17,11 @@ WeMi Switch Control brings fast, reliable local-network control back to Belkin's
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery, local SOAP HTTP commands, and `<100ms` UPnP GENA push updates—with no cloud account, external server, or subscription required.
 
-### What's New in Version 37.0
-- **Zero-Cloud Household Configuration Sync:** Share your remembered Wi-Fi Homes, custom switch names, room assignments, and ordering across Android phones, tablets, Chromebooks, and Android TV—either as a portable JSON file (zero storage permissions) or directly over your home Wi-Fi using a temporary 6-digit PIN-encrypted transfer (no cloud account or Wi-Fi passwords ever exported).
-- **Comprehensive Security & Privacy Hardening:** Diagnostic exports now redact SSIDs, MAC addresses, serials, UDNs, and DNS IPs by default (with an opt-in Full Diagnostics toggle), `10.22.22.1` setup Wi-Fi passwords stay ephemeral in memory and auto-remask when switching apps, LAN endpoints validate private IPv4 ranges, Home Screen widget actions are isolated to non-exported receivers, and saved device lists stay excluded from cloud Auto-Backup.
-- **Expanded Switch Drawer & TV Sync Polish:** Unified the expanded switch drawer so `UPnP Endpoint`, `Serial Number`, and `Firmware` sit cleanly across the full card width above wrapping action chips (`Add Widget`, `Configure IP`, `Reconnect`), and added a one-tap **`Sync`** chip and D-Pad **`Pair from Phone`** overlay on Android TV (`wemi TV`).
-- **Live On-Device Switch Rules, Chromebook LAN Support & Widgets:** Create, edit, toggle, and back up native Schedules (including Sunrise/Sunset), Auto-Off delays, Timed Actions, and Long Press targets directly in compatible switch memory—alongside ChromeOS LAN discovery, Home Screen Light & Room Widgets, and pure Kotlin/DEX packaging (`minSdk 24+`).
+### What's New in Version 38.0
+- **Context-Aware Android TV (`wemi TV`) Remote Action Bar:** Moving the TV D-Pad selector across Room Master headers, top-bar scenes (`Movie 20%`, `Holiday ON`, `All OFF`, `Rescan`, `Sync`), offline switches, or motion sensors now updates the top-bar OK hint immediately (including room dimming hints when a room has reachable dimmers) and hides stale dimmer chips whenever focus leaves a dimmer.
+- **Zero-Cloud Household Configuration Sync:** Share your remembered Wi-Fi Homes, custom switch names, rooms, and ordering across Android phones, tablets, Chromebooks, and Android TV via portable JSON (zero storage permissions) or 6-digit PIN-encrypted local Wi-Fi pairing (no cloud account or Wi-Fi passwords).
+- **Security, Privacy & Drawer Polish:** Diagnostics redact SSIDs, MACs, serials, UDNs, and DNS IPs by default (with an opt-in Full Diagnostics toggle), `10.22.22.1` setup Wi-Fi passwords stay ephemeral in memory, LAN endpoints validate private IPv4 ranges, widget actions use non-exported receivers, saved device lists stay excluded from cloud Auto-Backup, and expanded switch drawers use a clean full-width layout.
+- **Live On-Device Switch Rules, Chromebook LAN Support & Widgets:** Manage native Schedules (with Sunrise/Sunset), Auto-Off delays, Timed Actions, and Long Press targets directly in compatible switch memory—alongside ChromeOS LAN discovery, Home Screen Light & Room Widgets, and pure Kotlin/DEX packaging (`minSdk 24+`).
 
 ### Key Features
 - **Zero-Cloud Household Sync:** Export/import portable JSON or pair phone-to-TV and phone-to-phone setups over local Wi-Fi with a 6-digit encrypted PIN and identity-safe Merge or Replace.

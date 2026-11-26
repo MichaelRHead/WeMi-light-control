@@ -9,6 +9,12 @@ data class ReleaseHistoryEntry(
 
 val WEMI_RELEASE_HISTORY: List<ReleaseHistoryEntry> = listOf(
     ReleaseHistoryEntry(
+        version = "v38.0",
+        releaseDate = "Nov 26, 2026",
+        headline = "Context-Aware Android TV Remote Action Bar",
+        summary = "Moving the Android TV D-Pad selector across Room Master headers, top-bar scenes (Movie 20%, Holiday ON, All OFF, Rescan, Sync), offline switches, or motion sensors now updates the top-bar OK action hint immediately (including room dimming hints when a room has dimmers), hides the dimmer-mode chip whenever focus leaves a reachable dimmer, and invokes the focused room or action directly."
+    ),
+    ReleaseHistoryEntry(
         version = "v37.0",
         releaseDate = "Nov 26, 2026",
         headline = "Zero-Cloud Household Sync, Security Hardening & Drawer Polish",
