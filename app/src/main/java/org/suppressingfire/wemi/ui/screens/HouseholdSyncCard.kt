@@ -67,7 +67,8 @@ internal fun HouseholdSyncCard(
     ) { uri ->
         if (uri != null) {
             onExportHouseholdJson { jsonText ->
-                context.contentResolver.openOutputStream(uri)?.use { out ->
+                (context.contentResolver.openOutputStream(uri, "wt")
+                    ?: context.contentResolver.openOutputStream(uri))?.use { out ->
                     out.write(jsonText.toByteArray(Charsets.UTF_8))
                     out.flush()
                 } ?: throw IllegalStateException("Could not open destination file")

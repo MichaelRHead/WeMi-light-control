@@ -16,34 +16,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.suppressingfire.wemi.data.SwitchRepository
 import org.suppressingfire.wemi.network.HouseholdImportMode
-import org.suppressingfire.wemi.network.HouseholdSyncBundle
 import org.suppressingfire.wemi.network.HouseholdSyncCodec
 import org.suppressingfire.wemi.network.HouseholdSyncLanClient
 import org.suppressingfire.wemi.network.HouseholdSyncLanServer
-import org.suppressingfire.wemi.network.HouseholdSyncPeer
-import org.suppressingfire.wemi.network.HouseholdSyncServerSession
-
-data class PendingHouseholdImport(
-    val sourceDescription: String,
-    val bundle: HouseholdSyncBundle
-)
-
-data class HouseholdSyncUiState(
-    val showSendDialog: Boolean = false,
-    val showReceiveDialog: Boolean = false,
-    val pendingImport: PendingHouseholdImport? = null,
-    val discoveredPeers: List<HouseholdSyncPeer> = emptyList(),
-    val isDiscoveringPeers: Boolean = false,
-    val isPushingToPeer: Boolean = false,
-    val sendStatusMessage: String? = null,
-    val sendErrorMessage: String? = null,
-    val activeReceiveSession: HouseholdSyncServerSession? = null,
-    val receiveStatusMessage: String? = null,
-    val isImporting: Boolean = false
-) {
-    val hasAnyDialogOpen: Boolean
-        get() = showSendDialog || showReceiveDialog || pendingImport != null
-}
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 
 /**
  * ViewModel-scoped UI controller for zero-cloud Household Configuration Sync:
@@ -168,31 +144,46 @@ internal class HouseholdSyncUiController(
     fun discoverLanPeers(discoveryUdpPort: Int = HouseholdSyncLanServer.DEFAULT_DISCOVERY_UDP_PORT) {
         discoverJob?.cancel()
         _uiState.update { it.copy(isDiscoveringPeers = true, sendErrorMessage = null) }
-        discoverJob = scope.launch {
+        lateinit var jobRef: Job
+        jobRef = scope.launch {
             try {
                 val peers = lanClient.discoverPeers(discoveryUdpPort = discoveryUdpPort)
-                _uiState.update {
-                    it.copy(
-                        discoveredPeers = peers,
-                        isDiscoveringPeers = false,
-                        sendStatusMessage = if (peers.isNotEmpty()) {
-                            "Found ${peers.size} nearby WeMi receiver(s)"
-                        } else {
-                            "No receivers detected yet — open Sync on your TV/device or enter its IP & port below"
-                        }
-                    )
+                _uiState.update { state ->
+                    if (!state.showSendDialog || state.isPushingToPeer) {
+                        state.copy(isDiscoveringPeers = false)
+                    } else {
+                        state.copy(
+                            discoveredPeers = peers,
+                            isDiscoveringPeers = false,
+                            sendStatusMessage = if (peers.isNotEmpty()) {
+                                "Found ${peers.size} nearby WeMi receiver(s)"
+                            } else {
+                                "No receivers detected yet — open Sync on your TV/device or enter its IP & port below"
+                            }
+                        )
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                _uiState.update {
-                    it.copy(
-                        isDiscoveringPeers = false,
-                        sendStatusMessage = "Enter the receiver's IP, port, and 6-digit code below"
-                    )
+                _uiState.update { state ->
+                    if (!state.showSendDialog || state.isPushingToPeer) {
+                        state.copy(isDiscoveringPeers = false)
+                    } else {
+                        state.copy(
+                            isDiscoveringPeers = false,
+                            sendStatusMessage = "Enter the receiver's IP, port, and 6-digit code below"
+                        )
+                    }
+                }
+            } finally {
+                if (discoverJob === jobRef) {
+                    discoverJob = null
+                    _uiState.update { it.copy(isDiscoveringPeers = false) }
                 }
             }
         }
+        discoverJob = jobRef
     }
 
     fun pushToLanPeer(
@@ -201,9 +192,19 @@ internal class HouseholdSyncUiController(
         pairingCode: String,
         isTvSender: Boolean = false
     ) {
+        discoverJob?.cancel()
+        discoverJob = null
         pushJob?.cancel()
-        _uiState.update { it.copy(isPushingToPeer = true, sendErrorMessage = null, sendStatusMessage = "Encrypting & sending...") }
-        pushJob = scope.launch {
+        _uiState.update {
+            it.copy(
+                isDiscoveringPeers = false,
+                isPushingToPeer = true,
+                sendErrorMessage = null,
+                sendStatusMessage = "Encrypting & sending..."
+            )
+        }
+        lateinit var jobRef: Job
+        jobRef = scope.launch {
             try {
                 val label = deviceDisplayLabel(isTvSender)
                 val bundle = withContext(Dispatchers.IO) {
@@ -227,9 +228,12 @@ internal class HouseholdSyncUiController(
                     senderLabel = label
                 )
                 if (result.success) {
+                    discoverJob?.cancel()
+                    discoverJob = null
                     _uiState.update {
                         it.copy(
                             showSendDialog = false,
+                            isDiscoveringPeers = false,
                             isPushingToPeer = false,
                             sendStatusMessage = null,
                             sendErrorMessage = null
@@ -255,8 +259,14 @@ internal class HouseholdSyncUiController(
                         sendErrorMessage = "Could not send household config: ${e.message ?: "error"}"
                     )
                 }
+            } finally {
+                if (pushJob === jobRef) {
+                    pushJob = null
+                    _uiState.update { it.copy(isPushingToPeer = false) }
+                }
             }
         }
+        pushJob = jobRef
     }
 
     fun openReceiveDialog(
@@ -269,6 +279,7 @@ internal class HouseholdSyncUiController(
         _uiState.update {
             it.copy(
                 showReceiveDialog = true,
+                isStartingReceiveSession = true,
                 pendingImport = null,
                 activeReceiveSession = null,
                 receiveStatusMessage = "Starting local Wi-Fi pairing receiver..."
@@ -290,6 +301,7 @@ internal class HouseholdSyncUiController(
                             if (!receiveSessionEpoch.compareAndSet(myEpoch, myEpoch + 1)) return@startSession
                             _uiState.update {
                                 it.copy(
+                                    isStartingReceiveSession = false,
                                     activeReceiveSession = null,
                                     receiveStatusMessage = null,
                                     pendingImport = PendingHouseholdImport(
@@ -303,6 +315,7 @@ internal class HouseholdSyncUiController(
                             if (!receiveSessionEpoch.compareAndSet(myEpoch, myEpoch + 1)) return@startSession
                             _uiState.update {
                                 it.copy(
+                                    isStartingReceiveSession = false,
                                     activeReceiveSession = null,
                                     receiveStatusMessage = "Pairing code expired — tap New Code to try again"
                                 )
@@ -312,6 +325,7 @@ internal class HouseholdSyncUiController(
                             if (!receiveSessionEpoch.compareAndSet(myEpoch, myEpoch + 1)) return@startSession
                             _uiState.update {
                                 it.copy(
+                                    isStartingReceiveSession = false,
                                     activeReceiveSession = null,
                                     receiveStatusMessage = "Pairing closed after too many wrong codes — tap New Code"
                                 )
@@ -319,12 +333,16 @@ internal class HouseholdSyncUiController(
                         }
                     )
                 }
-            } catch (e: CancellationException) {
+            } catch (t: Throwable) {
                 server.close()
-                throw e
+                if (receiveSessionEpoch.get() == myEpoch) {
+                    _uiState.update { it.copy(isStartingReceiveSession = false) }
+                }
+                throw t
             }
             if (receiveSessionEpoch.get() != myEpoch || !_uiState.value.showReceiveDialog) {
                 server.close()
+                _uiState.update { it.copy(isStartingReceiveSession = false) }
                 return@launch
             }
             lanServer = server
@@ -332,25 +350,27 @@ internal class HouseholdSyncUiController(
                 server.close()
                 lanServer = null
                 val localIp = withContext(Dispatchers.IO) { repository.detectCurrentLanIp() }
-                val isArcVm = org.suppressingfire.wemi.network.LanRuntimeUtils.isCarrierGradeNatIpv4(localIp) ||
-                    org.suppressingfire.wemi.network.LanRuntimeUtils.isArcVmRuntime(appContext, localIp)
+                val isArcVm = LanRuntimeUtils.isCarrierGradeNatIpv4(localIp) ||
+                    LanRuntimeUtils.isArcVmRuntime(appContext, localIp)
                 val msg = if (isArcVm) {
                     "Chromebook runs inside an isolated network VM that cannot accept inbound Wi-Fi pairing. Use Import JSON here instead (Send to TV still works outbound)."
                 } else {
                     "Could not start local LAN receiver — check Wi-Fi connection"
                 }
                 _uiState.update {
-                    it.copy(
-                        activeReceiveSession = null,
-                        receiveStatusMessage = msg
-                    )
+                    it.copy(isStartingReceiveSession = false, activeReceiveSession = null, receiveStatusMessage = msg)
                 }
             } else {
-                _uiState.update {
-                    it.copy(
-                        activeReceiveSession = session,
-                        receiveStatusMessage = "Ready on ${session.ipAddress}:${session.port}"
-                    )
+                _uiState.update { state ->
+                    if (state.pendingImport != null || server.currentSession == null) {
+                        state.copy(isStartingReceiveSession = false)
+                    } else {
+                        state.copy(
+                            isStartingReceiveSession = false,
+                            activeReceiveSession = session,
+                            receiveStatusMessage = "Ready on ${session.ipAddress}:${session.port}"
+                        )
+                    }
                 }
             }
         }
@@ -366,64 +386,40 @@ internal class HouseholdSyncUiController(
         if (current.activeReceiveSession == null && lanServer == null && receiveJob == null) return
         stopLanServer()
         _uiState.update {
-            if (!it.showReceiveDialog || it.pendingImport != null) {
-                it
-            } else {
-                it.copy(
-                    activeReceiveSession = null,
-                    receiveStatusMessage = "Pairing paused in background — tap New Code to resume"
-                )
-            }
-        }
-    }
-
-    fun closeReceiveDialog() {
-        stopLanServer()
-        _uiState.update {
-            it.copy(
-                showReceiveDialog = false,
+            if (!it.showReceiveDialog || it.pendingImport != null) it else it.copy(
+                isStartingReceiveSession = false,
                 activeReceiveSession = null,
-                receiveStatusMessage = null,
-                pendingImport = null
+                receiveStatusMessage = "Pairing paused in background — tap New Code to resume"
             )
         }
     }
 
-    fun cancelPendingImport() {
+    fun closeReceiveDialog() = clearReceiveDialogState(isImporting = false)
+
+    fun cancelPendingImport() = clearReceiveDialogState(isImporting = false)
+
+    private fun clearReceiveDialogState(isImporting: Boolean) {
         stopLanServer()
         _uiState.update {
             it.copy(
                 pendingImport = null,
                 showReceiveDialog = false,
+                isStartingReceiveSession = false,
                 activeReceiveSession = null,
-                receiveStatusMessage = null
+                receiveStatusMessage = null,
+                isImporting = if (isImporting) true else it.isImporting
             )
         }
     }
 
     fun confirmPendingImport(mode: HouseholdImportMode) {
         val pending = _uiState.value.pendingImport ?: return
-        stopLanServer()
         // Dismiss modal synchronously before Dispatchers.IO work (android-code-modularization Invariant 1)
-        _uiState.update {
-            it.copy(
-                pendingImport = null,
-                showReceiveDialog = false,
-                activeReceiveSession = null,
-                receiveStatusMessage = null,
-                isImporting = true
-            )
-        }
+        clearReceiveDialogState(isImporting = true)
         scope.launch {
             try {
                 val summary = withContext(Dispatchers.IO) {
-                    repository.importHouseholdBundle(
-                        bundle = pending.bundle,
-                        mode = mode,
-                        onActiveKeyResolved = { resolvedKey ->
-                            onActiveNetworkKeyUpdated(resolvedKey)
-                        }
-                    )
+                    repository.importHouseholdBundle(bundle = pending.bundle, mode = mode)
                 }
                 onActiveNetworkKeyUpdated(summary.activeNetworkKey)
                 val modeLabel = if (summary.mode == HouseholdImportMode.MERGE) "Merged" else "Imported"

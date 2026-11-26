@@ -602,21 +602,12 @@ GRADLE_INIT_SCRIPT="$GRADLE_INIT_DIR/00-proxy-and-certs.gradle"
 mkdir -p "$GRADLE_INIT_DIR"
 TMP_INIT="${GRADLE_INIT_SCRIPT}.tmp.$$"
 cat <<'EOF' > "$TMP_INIT"
-settingsEvaluated { settings ->
+beforeSettings { settings ->
     def mirrorUrl = "https://maven-central.storage-download.googleapis.com/maven2/"
     [settings.pluginManagement.repositories, settings.dependencyResolutionManagement.repositories].each { repos ->
-        def hasMirror = repos.any { it instanceof MavenArtifactRepository && it.url.toString().startsWith(mirrorUrl) }
-        if (!hasMirror) {
-            def idx = repos.findIndexOf {
-                it instanceof MavenArtifactRepository && it.url.toString().startsWith("https://repo.maven.apache.org/maven2")
-            }
-            if (idx >= 0) {
-                def mirror = repos.maven {
-                    name = "GoogleMavenCentralMirror"
-                    url = uri(mirrorUrl)
-                }
-                repos.remove(mirror)
-                repos.add(idx, mirror)
+        repos.all { repo ->
+            if (repo instanceof MavenArtifactRepository && repo.url.toString().startsWith("https://repo.maven.apache.org/maven2")) {
+                repo.url = uri(mirrorUrl)
             }
         }
     }

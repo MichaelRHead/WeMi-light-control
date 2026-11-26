@@ -6,7 +6,6 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Pure OpenSSL `EVP_BytesToKey` MD5 + `AES-128-CBC` Wi-Fi password encryption and decryption
@@ -15,7 +14,6 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * - **Method 2** (Gen-2 RTOS `WLS040` / `WLS0403` / `WDS060` / `WSP080`): `mac[0..6] + serial + mac[6..12] + METHOD_2_RTOS_SALT_SUFFIX`, `addLengths = false`
  * - **Method 3** (`binaryOption = 1`): `mac[0..3] + mac[9..12] + serial + METHOD_3_BINARY_OPTION_EXTRA + mac[6..9] + mac[3..6]`, `addLengths = true`
  */
-@OptIn(ExperimentalEncodingApi::class)
 object PasswordCrypto {
 
     const val METHOD_2_RTOS_SALT_SUFFIX = "b3{8t;80dIN{ra83eC1s?M70?683@2Yf"

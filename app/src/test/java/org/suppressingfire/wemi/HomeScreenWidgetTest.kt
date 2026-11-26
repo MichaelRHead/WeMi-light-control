@@ -1,6 +1,7 @@
 package org.suppressingfire.wemi
 
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import androidx.test.core.app.ApplicationProvider
@@ -19,6 +20,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows
 import org.robolectric.annotation.Config
 import org.suppressingfire.wemi.data.DEFAULT_CABIN_HOME_KEY
 import org.suppressingfire.wemi.data.DEFAULT_MAIN_HOME_KEY
@@ -26,7 +28,9 @@ import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.network.SharedSoapLogStore
 import org.suppressingfire.wemi.widget.WeMiSwitchWidgetProvider
+import org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver
 import org.suppressingfire.wemi.widget.WidgetActionExecutor
 import org.suppressingfire.wemi.widget.WidgetConfigStore
 import org.suppressingfire.wemi.widget.WidgetRemoteViewsBuilder
@@ -43,16 +47,18 @@ class HomeScreenWidgetTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        WeMiSwitchWidgetProvider.actionRunnerForTests = null
-        WeMiSwitchWidgetProvider.repositoryProviderForTests = null
-        WidgetConfigStore.clearAll(context)
-        SwitchDatabase.closeCurrentInstance()
+        resetWidgetTestState()
     }
 
     @After
-    fun tearDown() {
+    fun tearDown() = resetWidgetTestState()
+
+    private fun resetWidgetTestState() {
         WeMiSwitchWidgetProvider.actionRunnerForTests = null
         WeMiSwitchWidgetProvider.repositoryProviderForTests = null
+        WeMiWidgetActionReceiver.clearPendingPinNoncesForTests()
+        WidgetActionExecutor.clearAllWidgetMutexes()
+        SharedSoapLogStore.clear(context)
         WidgetConfigStore.clearAll(context)
         SwitchDatabase.closeCurrentInstance()
     }
@@ -403,73 +409,56 @@ class HomeScreenWidgetTest {
                 assertEquals("Offline • Room", offlineRoomState.subtitle)
 
                 val provider = WeMiSwitchWidgetProvider()
-                val actionReceiver = org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver()
-                val providerComponent = android.content.ComponentName(context, WeMiSwitchWidgetProvider::class.java)
-                val shadowWidgetMgr = org.robolectric.Shadows.shadowOf(AppWidgetManager.getInstance(context))
+                val actionReceiver = WeMiWidgetActionReceiver()
+                val providerComponent = ComponentName(context, WeMiSwitchWidgetProvider::class.java)
+                val shadowWidgetMgr = Shadows.shadowOf(AppWidgetManager.getInstance(context))
                 shadowWidgetMgr.bindAppWidgetId(702, providerComponent)
                 shadowWidgetMgr.bindAppWidgetId(701, providerComponent)
                 WeMiSwitchWidgetProvider.actionRunnerForTests = { block -> runBlocking { block() } }
                 WeMiSwitchWidgetProvider.repositoryProviderForTests = { repo }
+                fun pinIntent(id: Int, type: WidgetTargetType, block: Intent.() -> Unit) =
+                    Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
+                        putExtra(WeMiWidgetActionReceiver.EXTRA_PIN_NONCE, WeMiWidgetActionReceiver.issuePendingPinNonce())
+                        putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, type.name)
+                        block()
+                    }
 
                 // Non-positive widget IDs must be ignored cleanly
-                actionReceiver.onReceive(
-                    context,
-                    Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -5)
-                        putExtra(org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.EXTRA_PIN_NONCE, org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.issuePendingPinNonce())
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.ROOM.name)
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
-                    }
-                )
+                actionReceiver.onReceive(context, pinIntent(-5, WidgetTargetType.ROOM) {
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
+                })
                 assertTrue(WidgetConfigStore.allConfiguredWidgetIds(context).isEmpty())
 
                 // Pin a Room widget via ACTION_WIDGET_PINNED broadcast (with stale homeKey)
-                actionReceiver.onReceive(
-                    context,
-                    Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 702)
-                        putExtra(org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.EXTRA_PIN_NONCE, org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.issuePendingPinNonce())
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.ROOM.name)
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, DEFAULT_MAIN_HOME_KEY)
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_DISPLAY_NAME, "Garage")
-                    }
-                )
+                actionReceiver.onReceive(context, pinIntent(702, WidgetTargetType.ROOM) {
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, DEFAULT_MAIN_HOME_KEY)
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_DISPLAY_NAME, "Garage")
+                })
                 assertEquals("Garage", WidgetConfigStore.load(context, 702)?.normalizedRoomName())
 
                 // Tap the offline Room widget via ACTION_TOGGLE_WIDGET -> wakes offline switch ON & heals networkKey
-                actionReceiver.onReceive(
-                    context,
-                    Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 702)
-                    }
-                )
+                actionReceiver.onReceive(context, Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 702)
+                })
                 assertTrue("Expected offline Room widget tap to wake server ON", server.relayStateOn.get())
                 assertTrue(dao.getDeviceById(savedId)?.isReachable == true)
                 assertTrue(dao.getDeviceById(savedId)?.isOn == true)
                 assertEquals("wifi_lan_192_168_86", WidgetConfigStore.load(context, 702)?.networkKey)
 
                 // Pin a Device widget with placeholder serial "UNKNOWN" -> strips placeholder, heals on toggle OFF
-                actionReceiver.onReceive(
-                    context,
-                    Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 701)
-                        putExtra(org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.EXTRA_PIN_NONCE, org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.issuePendingPinNonce())
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.DEVICE.name)
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_DEVICE_ID, savedId)
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_SERIAL_NUMBER, "UNKNOWN")
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, "wifi_lan_192_168_86")
-                        putExtra(WeMiSwitchWidgetProvider.EXTRA_DISPLAY_NAME, "Garage Overhead")
-                    }
-                )
+                actionReceiver.onReceive(context, pinIntent(701, WidgetTargetType.DEVICE) {
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_DEVICE_ID, savedId)
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_SERIAL_NUMBER, "UNKNOWN")
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, "wifi_lan_192_168_86")
+                    putExtra(WeMiSwitchWidgetProvider.EXTRA_DISPLAY_NAME, "Garage Overhead")
+                })
                 assertEquals("", WidgetConfigStore.load(context, 701)?.serialNumber)
-                actionReceiver.onReceive(
-                    context,
-                    Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
-                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 701)
-                    }
-                )
+                actionReceiver.onReceive(context, Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
+                    putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 701)
+                })
                 assertFalse("Expected device widget toggle broadcast to turn server OFF", server.relayStateOn.get())
                 assertEquals("WLS040BCAST01", WidgetConfigStore.load(context, 701)?.serialNumber)
 

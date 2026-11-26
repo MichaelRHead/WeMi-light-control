@@ -62,6 +62,7 @@ private val SyncReceiveInfoSurface = Color(0xFFE0F2FE)
 internal fun HouseholdSyncReceiveDialog(
     session: HouseholdSyncServerSession?,
     statusMessage: String?,
+    isStarting: Boolean = false,
     onStartNewSession: () -> Unit,
     onPauseSession: () -> Unit = {},
     onDismiss: () -> Unit
@@ -170,7 +171,7 @@ internal fun HouseholdSyncReceiveDialog(
             }
         },
         confirmButton = {
-            if (session == null) {
+            if (session == null && !isStarting) {
                 Button(
                     onClick = onStartNewSession,
                     colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),

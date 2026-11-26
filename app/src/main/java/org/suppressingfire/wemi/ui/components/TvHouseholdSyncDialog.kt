@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -248,7 +249,7 @@ internal fun TvHouseholdSyncOverlay(
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        if (session == null) {
+                        if (session == null && !state.isStartingReceiveSession) {
                             TvSyncActionButton(
                                 label = "New Code",
                                 isPrimary = true,
@@ -262,7 +263,7 @@ internal fun TvHouseholdSyncOverlay(
                             label = "Cancel",
                             isPrimary = false,
                             focusRequester = cancelRequester,
-                            onNavigateLeft = if (session == null) {
+                            onNavigateLeft = if (session == null && !state.isStartingReceiveSession) {
                                 { runCatching { newCodeRequester.requestFocus() }; true }
                             } else {
                                 { true }
@@ -313,6 +314,7 @@ private fun TvSyncActionButton(
                         Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> { currentClick(); true }
                         Key.DirectionLeft -> currentLeft()
                         Key.DirectionRight -> currentRight()
+                        Key.DirectionUp, Key.DirectionDown -> true
                         else -> false
                     }
                 } else {
@@ -320,6 +322,7 @@ private fun TvSyncActionButton(
                 }
             }
             .focusable()
+            .focusProperties { canFocus = false }
             .clickable(onClick = onClick)
             .testTag(testTag)
     ) {

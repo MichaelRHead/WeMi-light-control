@@ -13,7 +13,6 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Pure-Kotlin, zero-dependency balanced PAKE (**SPAKE2**, RFC 9382) over the RFC 3526 2048-bit
@@ -25,7 +24,6 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * 6-digit PIN from captured packets (`~10^6` space). Every wrong attempt requires an online
  * handshake against the receiver's strict 5-attempt lockout and single-use challenge nonce.
  */
-@OptIn(ExperimentalEncodingApi::class)
 internal object HouseholdSyncPake {
     const val PROTOCOL_VERSION = 2
     private const val PBKDF2_ITERATIONS = 100_000

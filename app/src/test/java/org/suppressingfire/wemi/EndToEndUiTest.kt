@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
  * End-to-End (E2E) Jetpack Compose + Loopback UPnP/SOAP Hardware UI Tests.
  *
  * Exercises full-stack user flows from Compose UI gestures -> SwitchViewModel -> SwitchRepository ->
- * NetworkClient / FakeUpnpServer -> Room v5 Database -> Compose UI state updates.
+ * NetworkClient / FakeUpnpServer -> Room v7 Database -> Compose UI state updates.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])

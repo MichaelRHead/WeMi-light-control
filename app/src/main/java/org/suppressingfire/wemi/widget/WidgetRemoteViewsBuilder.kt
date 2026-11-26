@@ -420,6 +420,9 @@ object WidgetUpdater {
             manager.requestPinAppWidget(provider, extras, successCallback)
         }.getOrDefault(false)
 
+        if (!accepted) {
+            WeMiWidgetActionReceiver.consumePendingPinNonce(pinNonce)
+        }
         return if (accepted) {
             "Confirm on your Home Screen to pin \"$label\" widget."
         } else {

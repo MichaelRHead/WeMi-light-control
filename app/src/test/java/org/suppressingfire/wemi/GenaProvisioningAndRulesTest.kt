@@ -54,10 +54,14 @@ class GenaProvisioningAndRulesTest {
     @Test
     fun `verify Phase 3 UPnP GENA SUBSCRIBE, HTTP 412 recovery, and embedded NOTIFY propertyset callback`() = runBlocking {
         val receivedNotification = AtomicReference<GenaEventNotification?>(null)
+        val deliveredLatch = java.util.concurrent.CountDownLatch(1)
         val genaManager = GenaSubscriptionManager(
             localIpProvider = { "127.0.0.1" },
             preferredListenPort = 0,
-            onNotification = { receivedNotification.set(it) }
+            onNotification = {
+                receivedNotification.set(it)
+                deliveredLatch.countDown()
+            }
         )
 
         FakeUpnpServer(
@@ -96,7 +100,7 @@ class GenaProvisioningAndRulesTest {
                 )
                 assertTrue(respLine.contains("200 OK"))
 
-                delay(100)
+                assertTrue("Expected GENA NOTIFY callback", deliveredLatch.await(2, java.util.concurrent.TimeUnit.SECONDS))
                 val event = receivedNotification.get()
                 assertNotNull(event)
                 assertEquals("WLS0403KITCHEN", event?.deviceKey)

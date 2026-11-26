@@ -20,7 +20,6 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import javax.xml.parsers.DocumentBuilderFactory
 import kotlin.concurrent.thread
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -330,10 +329,14 @@ class SecurityAndPrivacyHardeningTest {
     @Test
     fun sec04GenaRejectsSpoofedNotifyWrongTokenWrongSidAndWrongMethod() = runBlocking {
         val received = CopyOnWriteArrayList<GenaEventNotification>()
+        val deliveredLatch = java.util.concurrent.CountDownLatch(1)
         val manager = GenaSubscriptionManager(
             localIpProvider = { "127.0.0.1" },
             preferredListenPort = 0,
-            onNotification = { received.add(it) }
+            onNotification = {
+                received.add(it)
+                deliveredLatch.countDown()
+            }
         )
         FakeUpnpServer(initialFriendlyName = "Hallway Switch", serialNumber = "WLS040SEC04").use { server ->
             try {
@@ -369,13 +372,13 @@ class SecurityAndPrivacyHardeningTest {
                     val line = s.getInputStream().bufferedReader().readLine().orEmpty()
                     assertTrue("Expected 405 for GET, got $line", line.contains("405"))
                 }
-                delay(80)
+                assertFalse("Spoofed GENA probes must never emit notifications", deliveredLatch.await(80, java.util.concurrent.TimeUnit.MILLISECONDS))
                 assertTrue("Spoofed GENA probes must never emit notifications", received.isEmpty())
 
                 // 5. Authentic NOTIFY (captured token + matching SID + matching source IP) -> 200 OK
                 val okResp = server.pushGenaNotify(callbackPort = port, deviceKey = "WLS040SEC04", binaryStatePayload = "1", sid = sub.sid)
                 assertTrue("Expected 200 OK for authentic NOTIFY, got $okResp", okResp.contains("200 OK"))
-                delay(100)
+                assertTrue("Expected authentic NOTIFY callback", deliveredLatch.await(2, java.util.concurrent.TimeUnit.SECONDS))
                 assertEquals(1, received.size)
                 assertEquals(true, received.single().binaryStateOn)
             } finally {

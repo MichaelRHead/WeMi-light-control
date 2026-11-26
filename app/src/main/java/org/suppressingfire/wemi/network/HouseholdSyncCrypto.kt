@@ -9,7 +9,6 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.PBEKeySpec
 import javax.crypto.spec.SecretKeySpec
 import kotlin.io.encoding.Base64
-import kotlin.io.encoding.ExperimentalEncodingApi
 
 /**
  * Authenticated encryption helper for ephemeral local-LAN household pairing transfers.
@@ -19,7 +18,6 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  * household JSON payload with `AES/GCM/NoPadding` (12-byte random IV, 128-bit auth tag, fixed
  * domain AAD). All temporary PIN char arrays and key byte arrays are zeroed in `finally` blocks.
  */
-@OptIn(ExperimentalEncodingApi::class)
 object HouseholdSyncCrypto {
     private const val ENVELOPE_VERSION = 1
     private const val PBKDF2_ITERATIONS = 100_000

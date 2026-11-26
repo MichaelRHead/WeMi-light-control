@@ -43,9 +43,12 @@ import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.network.SharedSoapLogStore
 import org.suppressingfire.wemi.ui.SwitchViewModel
 import org.suppressingfire.wemi.widget.SwitchWidgetConfigureActivity
 import org.suppressingfire.wemi.widget.WeMiSwitchWidgetProvider
+import org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver
+import org.suppressingfire.wemi.widget.WidgetActionExecutor
 import org.suppressingfire.wemi.widget.WidgetConfigStore
 import org.suppressingfire.wemi.widget.WidgetTargetType
 import org.suppressingfire.wemi.widget.WidgetUpdater
@@ -86,6 +89,9 @@ class HomeScreenWidgetUiE2ETest {
         WeMiSwitchWidgetProvider.cancelAndJoinPendingWorkForTests()
         WeMiSwitchWidgetProvider.actionRunnerForTests = null
         WeMiSwitchWidgetProvider.repositoryProviderForTests = null
+        WeMiWidgetActionReceiver.clearPendingPinNoncesForTests()
+        WidgetActionExecutor.clearAllWidgetMutexes()
+        SharedSoapLogStore.clear(context)
         context.getSharedPreferences("wemi_controller_prefs", Context.MODE_PRIVATE).edit().clear().commit()
         WidgetConfigStore.clearAll(context)
         SwitchDatabase.closeCurrentInstance()
