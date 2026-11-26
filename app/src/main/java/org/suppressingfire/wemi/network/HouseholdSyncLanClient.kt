@@ -3,11 +3,15 @@ package org.suppressingfire.wemi.network
 import android.content.Context
 import android.net.wifi.WifiManager
 import java.net.DatagramPacket
-import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.InetSocketAddress
+import java.net.MulticastSocket
+import java.net.NetworkInterface
 import java.net.SocketTimeoutException
 import javax.net.SocketFactory
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 data class HouseholdSyncPushResult(
@@ -26,6 +30,11 @@ class HouseholdSyncLanClient(
     private val localIpProvider: () -> String = { LanRuntimeUtils.resolvePreferredLanInterfaceIpv4().first },
     private val allowLoopbackForTests: Boolean = LanRuntimeUtils.isRunningInRobolectric()
 ) {
+    companion object {
+        private val PORT_REGEX = Regex("""\bport=(\d{1,5})\b""")
+        private val ROLE_REGEX = Regex("""\brole=(TV|DEVICE)\b""")
+    }
+
     private val httpClient = LanHttpClient(
         socketFactory = wifiSocketFactory,
         connectTimeoutMs = 1_500,
@@ -52,12 +61,31 @@ class HouseholdSyncLanClient(
                     acquire()
                 }
             }
-            DatagramSocket().use { socket ->
+            val activeBinding = if (allowLoopbackForTests) null else NetworkMonitor.resolveActiveLanBinding(appContext)
+            val localIp = localIpProvider().trim()
+            MulticastSocket(null).use { socket ->
+                socket.reuseAddress = true
                 socket.broadcast = true
+                runCatching { socket.timeToLive = 4 }
+                socket.bind(InetSocketAddress(0))
+                if (!allowLoopbackForTests) {
+                    activeBinding?.network?.let { net -> runCatching { net.bindSocket(socket) } }
+                    val targetIf = activeBinding?.interfaceName
+                        ?.let { name -> runCatching { NetworkInterface.getByName(name) }.getOrNull() }
+                        ?: runCatching {
+                            if (LanRuntimeUtils.isPrivateRfc1918Ipv4(localIp)) {
+                                NetworkInterface.getByInetAddress(InetAddress.getByName(localIp))
+                            } else {
+                                null
+                            }
+                        }.getOrNull()
+                    if (targetIf != null) runCatching { socket.networkInterface = targetIf }
+                }
                 socket.soTimeout = 180
                 val probeBytes = HouseholdSyncLanServer.DISCOVERY_PROBE_PREFIX.toByteArray(Charsets.UTF_8)
                 val targets = buildProbeTargets()
                 for (targetIp in targets) {
+                    ensureActive()
                     runCatching {
                         val addr = InetAddress.getByName(targetIp)
                         socket.send(DatagramPacket(probeBytes, probeBytes.size, addr, discoveryUdpPort))
@@ -67,6 +95,7 @@ class HouseholdSyncLanClient(
                 val deadlineMs = System.currentTimeMillis() + timeoutMs.coerceIn(150L, 3_000L)
                 val buf = ByteArray(512)
                 while (System.currentTimeMillis() < deadlineMs) {
+                    ensureActive()
                     try {
                         val packet = DatagramPacket(buf, buf.size)
                         socket.receive(packet)
@@ -83,6 +112,8 @@ class HouseholdSyncLanClient(
                     }
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (_: Exception) {
             // Best-effort discovery; manual IP:port remains available
         } finally {
@@ -127,6 +158,8 @@ class HouseholdSyncLanClient(
 
         val plaintextJson = try {
             HouseholdSyncCodec.encodeToJson(bundle)
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return@withContext HouseholdSyncPushResult(
                 success = false,
@@ -140,6 +173,8 @@ class HouseholdSyncLanClient(
                 pairingCode = normalizedPin,
                 senderLabel = senderLabel
             )
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             return@withContext HouseholdSyncPushResult(
                 success = false,
@@ -187,6 +222,8 @@ class HouseholdSyncLanClient(
                     statusMessage = "Receiver rejected transfer (HTTP ${response.code})"
                 )
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             HouseholdSyncPushResult(
                 success = false,
@@ -211,9 +248,9 @@ class HouseholdSyncLanClient(
     internal fun parseDiscoveryReply(senderIp: String, rawReply: String): HouseholdSyncPeer? {
         if (!rawReply.startsWith(HouseholdSyncLanServer.DISCOVERY_REPLY_PREFIX)) return null
         val rest = rawReply.removePrefix(HouseholdSyncLanServer.DISCOVERY_REPLY_PREFIX).trim()
-        val portMatch = Regex("""\bport=(\d{1,5})\b""").find(rest) ?: return null
+        val portMatch = PORT_REGEX.find(rest) ?: return null
         val port = portMatch.groupValues[1].toIntOrNull()?.takeIf { it in 1..65535 } ?: return null
-        val role = Regex("""\brole=(TV|DEVICE)\b""").find(rest)?.groupValues?.get(1) ?: "DEVICE"
+        val role = ROLE_REGEX.find(rest)?.groupValues?.get(1) ?: "DEVICE"
         val namePart = rest.substringAfter("name=", "").trim()
         val cleanName = HouseholdSyncCodec.sanitizeLabel(namePart, maxLen = 48)
             .ifEmpty { if (role == "TV") "WeMi TV" else "WeMi Device" }

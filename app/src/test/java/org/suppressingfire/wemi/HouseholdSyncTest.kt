@@ -379,4 +379,94 @@ class HouseholdSyncTest {
             server.close()
         }
     }
+
+    @Test
+    fun mergeDeduplicatesBundlePreservesRouterSsidAndPreventsFactoryNameHijack() = runBlocking {
+        val dao = SwitchDatabase.getDatabase(context).switchDao()
+        val repo = SwitchRepository(dao = dao, context = context, initialDemoModeOverride = false)
+        try {
+            dao.insertHomeNetwork(
+                HomeNetworkEntity(
+                    networkKey = "wifi_home_192_168_1",
+                    homeName = "Main Home",
+                    ssidLabel = "HeadFamily-2.4G",
+                    subnetPrefix = "192.168.1",
+                    gatewayIp = "192.168.1.1"
+                )
+            )
+            val existingBlankId = dao.insertDevice(
+                DeviceEntity(
+                    name = "WeMo Mini",
+                    roomName = "Hallway",
+                    networkKey = "wifi_home_192_168_1",
+                    wifiSsid = "HeadFamily-2.4G",
+                    ipAddress = "192.168.1.51",
+                    port = 49153,
+                    serialNumber = ""
+                )
+            ).toInt()
+
+            // Incoming bundle lists a brand-new factory-named switch BEFORE the real .51 switch,
+            // plus a duplicate serial entry, generic "LAN ..." SSID, and a blank-serial switch.
+            val bundle = HouseholdSyncBundle(
+                homes = listOf(
+                    SyncedHomeProfile("wifi_home_192_168_1", "Main Home", "LAN 192.168.1.0/24", "192.168.1.0/24", "192.168.1.1"),
+                    SyncedHomeProfile("wifi_home_192_168_1", "Duplicate Home", "Local Wi-Fi", "192.168.1", "192.168.1.1")
+                ),
+                devices = listOf(
+                    SyncedDeviceProfile("WeMo Mini", "Office", "wifi_home_192_168_1", wifiSsid = "LAN 192.168.1.0/24", ipAddress = "192.168.1.99", serialNumber = "SER-NEW-99"),
+                    SyncedDeviceProfile("WeMo Mini", "Hallway", "wifi_home_192_168_1", wifiSsid = "Local Wi-Fi", ipAddress = "192.168.1.51", serialNumber = "SER-REAL-51"),
+                    SyncedDeviceProfile("WeMo Mini Dup", "Garage", "wifi_home_192_168_1", ipAddress = "192.168.1.52", serialNumber = "SER-REAL-51"),
+                    SyncedDeviceProfile("Blank Serial Plug", "Den", "wifi_home_192_168_1", ipAddress = "192.168.1.77", serialNumber = "")
+                )
+            )
+            val summary = repo.importHouseholdBundle(bundle, mode = HouseholdImportMode.MERGE)
+            assertEquals(1, summary.homesUpdated)
+            assertEquals(1, summary.devicesUpdated)
+            assertEquals(2, summary.devicesAdded)
+
+            val home = dao.getAllHomeNetworks().first().single()
+            assertEquals("HeadFamily-2.4G", home.ssidLabel)
+            assertEquals("192.168.1", home.subnetPrefix)
+
+            val allDevices = dao.getAllDevices().first()
+            assertEquals(3, allDevices.size)
+            val updatedExisting = allDevices.first { it.id == existingBlankId }
+            assertEquals("SER-REAL-51", updatedExisting.serialNumber)
+            assertEquals("HeadFamily-2.4G", updatedExisting.wifiSsid)
+            val blankPlug = allDevices.first { it.name == "Blank Serial Plug" }
+            assertEquals("", blankPlug.serialNumber)
+        } finally {
+            repo.close()
+        }
+    }
+
+    @Test
+    fun lanServerRejectsUnroutableCgnatAndLoopbackInProductionMode() {
+        val cgnatServer = HouseholdSyncLanServer(
+            localIpProvider = { "100.115.92.6" },
+            preferredListenPort = 0,
+            discoveryUdpPort = -1,
+            allowLoopbackForTests = false
+        )
+        val loopbackProdServer = HouseholdSyncLanServer(
+            localIpProvider = { "127.0.0.1" },
+            preferredListenPort = 0,
+            discoveryUdpPort = -1,
+            allowLoopbackForTests = false
+        )
+        try {
+            assertEquals(
+                null,
+                cgnatServer.startSession("Chromebook", isTv = false, onPayloadReceived = {}, onSessionExpired = {}, onSessionLockedOut = {})
+            )
+            assertEquals(
+                null,
+                loopbackProdServer.startSession("Offline Phone", isTv = false, onPayloadReceived = {}, onSessionExpired = {}, onSessionLockedOut = {})
+            )
+        } finally {
+            cgnatServer.close()
+            loopbackProdServer.close()
+        }
+    }
 }

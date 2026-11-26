@@ -155,6 +155,8 @@ class SwitchViewModel internal constructor(
             _selectedRoomFilter.value = null
             _collapsedRooms.value = emptySet()
             _expandedDeviceIds.value = emptySet()
+            _isEditMode.value = false
+            hardwareRulesController.dismissAllDialogs()
         },
         onAfterImportApplied = {
             if (!isDemoShowroomMode.value) reconnectCurrentHomeNetwork()

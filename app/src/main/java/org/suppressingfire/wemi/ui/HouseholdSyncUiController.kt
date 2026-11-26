@@ -331,10 +331,18 @@ internal class HouseholdSyncUiController(
             if (session == null) {
                 server.close()
                 lanServer = null
+                val localIp = withContext(Dispatchers.IO) { repository.detectCurrentLanIp() }
+                val isArcVm = org.suppressingfire.wemi.network.LanRuntimeUtils.isCarrierGradeNatIpv4(localIp) ||
+                    org.suppressingfire.wemi.network.LanRuntimeUtils.isArcVmRuntime(appContext, localIp)
+                val msg = if (isArcVm) {
+                    "Chromebook runs inside an isolated network VM that cannot accept inbound Wi-Fi pairing. Use Import JSON here instead (Send to TV still works outbound)."
+                } else {
+                    "Could not start local LAN receiver — check Wi-Fi connection"
+                }
                 _uiState.update {
                     it.copy(
                         activeReceiveSession = null,
-                        receiveStatusMessage = "Could not start local LAN receiver — check Wi-Fi connection"
+                        receiveStatusMessage = msg
                     )
                 }
             } else {

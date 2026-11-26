@@ -34,7 +34,6 @@ object XmlAndSkuParser {
     private val SERVICE_BLOCK_REGEX = Regex("<service>([\\s\\S]*?)</service>", RegexOption.IGNORE_CASE)
     private val CONTROL_URL_REGEX = Regex("<controlURL>([^<]+)</controlURL>", RegexOption.IGNORE_CASE)
     private val SCPD_URL_REGEX = Regex("<SCPDURL>([^<]+)</SCPDURL>", RegexOption.IGNORE_CASE)
-    private val HOST_PORT_REGEX = Regex("http://([^:/]+):(\\d+)")
     private val META_INFO_REGEX = Regex("<MetaInfo>([^<]+)</MetaInfo>", RegexOption.IGNORE_CASE)
     private val SIGNAL_STRENGTH_REGEX = Regex("<SignalStrength>([^<]+)</SignalStrength>", RegexOption.IGNORE_CASE)
     private val AP_LIST_REGEX = Regex("<(?:ApList|NetworkList)>([\\s\\S]*?)</(?:ApList|NetworkList)>", RegexOption.IGNORE_CASE)
@@ -227,8 +226,8 @@ object XmlAndSkuParser {
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "WeMo_WW_2.00.11532.PVT"
         val macAddress = MAC_ADDRESS_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
-        val udn = LanEndpointPolicy.sanitizeHardwareIdentifier(
-            LanRuntimeUtils.canonicalHardwareUdn(
+        val udn = LanRuntimeUtils.canonicalHardwareUdn(
+            LanEndpointPolicy.sanitizeHardwareIdentifier(
                 UDN_REGEX.find(xml)?.groupValues?.getOrNull(1)?.trim()
                     ?: usnHeader.ifEmpty {
                         if (!LanRuntimeUtils.isPlaceholderSerial(serial)) "uuid:Lightswitch-1_0-$serial" else ""

@@ -49,28 +49,25 @@ internal class HouseholdSyncCoordinator(
         mode: HouseholdImportMode = HouseholdImportMode.MERGE,
         onActiveKeyResolved: ((String) -> Unit)? = null
     ): HouseholdImportSummary = seedAndModeMutex.withLock {
+        val sanitized = HouseholdSyncCodec.deduplicateAndSanitize(bundle)
         val wasDemoMode = isDemoShowroomMode()
-        if (wasDemoMode) {
-            onResetRuntimeState()
-            dao.deleteAllDevices()
-            dao.deleteAllHomeNetworks()
-            onExitDemoModeForImport()
-        }
-
         val effectiveMode = if (wasDemoMode) HouseholdImportMode.REPLACE else mode
         val summary = when (effectiveMode) {
-            HouseholdImportMode.REPLACE -> applyReplaceLocked(bundle)
-            HouseholdImportMode.MERGE -> applyMergeLocked(bundle)
+            HouseholdImportMode.REPLACE -> applyReplaceLocked(sanitized)
+            HouseholdImportMode.MERGE -> applyMergeLocked(sanitized)
+        }
+        if (wasDemoMode) {
+            onExitDemoModeForImport()
         }
         onActiveKeyResolved?.invoke(summary.activeNetworkKey)
         appendLog(
             SoapLogEntry(
                 timestamp = nowFormatted(),
-                deviceName = bundle.sourceDeviceLabel,
+                deviceName = sanitized.sourceDeviceLabel,
                 endpoint = "local://household-sync",
                 soapAction = "HouseholdSync#${effectiveMode.name}",
                 statusText = "${summary.homesAdded + summary.homesUpdated} home(s) • +${summary.devicesAdded} added, ${summary.devicesUpdated} updated",
-                xmlSnippet = "schema=v${bundle.schemaVersion} mode=${effectiveMode.name} activeHome=${summary.activeNetworkKey}",
+                xmlSnippet = "schema=v${sanitized.schemaVersion} mode=${effectiveMode.name} activeHome=${summary.activeNetworkKey}",
                 isLiveLanSuccess = true
             )
         )
@@ -142,11 +139,11 @@ internal class HouseholdSyncCoordinator(
                 }
 
             if (matched != null) {
-                val mergedSsid = incoming.ssidLabel.takeIf {
-                    it.isNotBlank() &&
-                        !XmlAndSkuParser.isWemoDeviceSetupSsid(it) &&
-                        !it.equals("Local LAN", ignoreCase = true)
-                } ?: matched.ssidLabel
+                val mergedSsid = pickPreferredRouterSsid(
+                    incoming = incoming.ssidLabel,
+                    existing = matched.ssidLabel,
+                    fallback = "Local LAN"
+                )
                 val updated = matched.copy(
                     homeName = incoming.homeName.ifBlank { matched.homeName },
                     ssidLabel = mergedSsid,
@@ -177,7 +174,16 @@ internal class HouseholdSyncCoordinator(
         var devicesAdded = 0
         var devicesUpdated = 0
 
-        for ((idx, incoming) in bundle.devices.withIndex()) {
+        // Match exact hardware identities (Tier-1 serial -> Tier-2 UDN -> Tier-3 endpoint) before
+        // fuzzy friendly-name fallback so new switches never hijack existing blank-serial rows.
+        val prioritizedDevices = bundle.devices.withIndex().sortedWith(
+            compareBy<IndexedValue<SyncedDeviceProfile>> { indexed ->
+                val targetKey = importedKeyToLocalKey[indexed.value.networkKey] ?: fallbackHomeKey
+                bestMatchPriority(existingDevices, indexed.value, targetKey)
+            }.thenBy { it.index }
+        )
+
+        for ((idx, incoming) in prioritizedDevices) {
             val targetHomeKey = importedKeyToLocalKey[incoming.networkKey] ?: fallbackHomeKey
             val matched = findMatchingExistingDeviceForImport(
                 existingDevices = existingDevices,
@@ -192,21 +198,32 @@ internal class HouseholdSyncCoordinator(
                 } else if (!LanRuntimeUtils.isPlaceholderSerial(incoming.serialNumber)) {
                     incoming.serialNumber
                 } else {
-                    matched.serialNumber
+                    ""
                 }
                 val mergedUdn = LanRuntimeUtils.canonicalHardwareUdn(matched.udn)
                     .ifEmpty { LanRuntimeUtils.canonicalHardwareUdn(incoming.udn) }
-                val mergedSsid = incoming.wifiSsid.takeIf {
-                    it.isNotBlank() && !XmlAndSkuParser.isWemoDeviceSetupSsid(it)
-                } ?: matched.wifiSsid.ifBlank { ssidByHomeKey[targetHomeKey] ?: "Local LAN" }
+                val mergedSsid = pickPreferredRouterSsid(
+                    incoming = incoming.wifiSsid,
+                    existing = matched.wifiSsid,
+                    fallback = ssidByHomeKey[targetHomeKey] ?: "Local LAN"
+                )
+                val matchedIpValid = HouseholdSyncCodec.sanitizeHostOrBlank(
+                    matched.ipAddress,
+                    allowLoopback = LanRuntimeUtils.isRunningInRobolectric()
+                ).isNotEmpty()
+                val movedToDifferentHome = matched.networkKey != targetHomeKey
+                val useIncomingEndpoint = (movedToDifferentHome && incoming.ipAddress.isNotBlank()) ||
+                    (!matchedIpValid && incoming.ipAddress.isNotBlank())
+                val mergedIp = if (useIncomingEndpoint) incoming.ipAddress else matched.ipAddress.ifBlank { incoming.ipAddress }
+                val mergedPort = if (useIncomingEndpoint || matched.ipAddress.isBlank()) incoming.port else matched.port
                 val updated = matched.copy(
                     name = incoming.name,
                     roomName = normalizeRoomName(incoming.roomName),
                     networkKey = targetHomeKey,
                     wifiSsid = mergedSsid,
                     deviceType = incoming.deviceType,
-                    ipAddress = matched.ipAddress.ifBlank { incoming.ipAddress },
-                    port = if (matched.ipAddress.isNotBlank()) matched.port else incoming.port,
+                    ipAddress = mergedIp,
+                    port = mergedPort,
                     serialNumber = mergedSerial,
                     udn = mergedUdn,
                     macAddress = matched.macAddress.ifBlank { incoming.macAddress },
@@ -248,6 +265,52 @@ internal class HouseholdSyncCoordinator(
         )
     }
 
+    private fun pickPreferredRouterSsid(incoming: String, existing: String, fallback: String): String {
+        val cleanIncoming = HouseholdSyncCodec.sanitizeSsidLabel(incoming, fallback = "")
+        val cleanExisting = HouseholdSyncCodec.sanitizeSsidLabel(existing, fallback = "")
+        val cleanFallback = HouseholdSyncCodec.sanitizeSsidLabel(fallback, fallback = "Local LAN")
+        return when {
+            cleanIncoming.isNotEmpty() && !HouseholdSyncCodec.isGenericLanSsid(cleanIncoming) -> cleanIncoming
+            cleanExisting.isNotEmpty() && !HouseholdSyncCodec.isGenericLanSsid(cleanExisting) -> cleanExisting
+            cleanIncoming.isNotEmpty() -> cleanIncoming
+            cleanExisting.isNotEmpty() -> cleanExisting
+            else -> cleanFallback
+        }
+    }
+
+    private fun bestMatchPriority(
+        existingDevices: List<DeviceEntity>,
+        incoming: SyncedDeviceProfile,
+        targetHomeKey: String
+    ): Int {
+        val incomingRealSerial = incoming.serialNumber.takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty()
+        val incomingUdn = LanRuntimeUtils.canonicalHardwareUdn(incoming.udn)
+        if (incomingRealSerial.isNotEmpty() && existingDevices.any {
+                !LanRuntimeUtils.isPlaceholderSerial(it.serialNumber) &&
+                    it.serialNumber.equals(incomingRealSerial, ignoreCase = true)
+            }
+        ) return 0
+        val homeCandidates = existingDevices.filter { it.networkKey == targetHomeKey }
+        if (incomingUdn.isNotEmpty() && homeCandidates.any {
+                !hasRealIdentityConflict(it, incomingRealSerial, incomingUdn) &&
+                    LanRuntimeUtils.canonicalHardwareUdn(it.udn).equals(incomingUdn, ignoreCase = true)
+            }
+        ) return 1
+        if (incoming.ipAddress.isNotBlank()) {
+            if (homeCandidates.any {
+                    !hasRealIdentityConflict(it, incomingRealSerial, incomingUdn) &&
+                        it.ipAddress == incoming.ipAddress && it.port == incoming.port
+                }
+            ) return 2
+            if (incoming.ipAddress != "127.0.0.1" && homeCandidates.any {
+                    !hasRealIdentityConflict(it, incomingRealSerial, incomingUdn) &&
+                        it.ipAddress == incoming.ipAddress
+                }
+            ) return 3
+        }
+        return 4
+    }
+
     private fun buildNormalizedHomeEntities(bundle: HouseholdSyncBundle): List<HomeNetworkEntity> {
         if (bundle.homes.isNotEmpty()) {
             return bundle.homes.map { home: SyncedHomeProfile ->
@@ -265,7 +328,10 @@ internal class HouseholdSyncCoordinator(
         }
         val inferredKey = bundle.devices.firstOrNull()?.networkKey ?: DEFAULT_MAIN_HOME_KEY
         val inferredIp = bundle.devices.firstOrNull { it.ipAddress.isNotBlank() }?.ipAddress.orEmpty()
-        val inferredPrefix = if (inferredIp.count { it == '.' } == 3) inferredIp.substringBeforeLast('.') else ""
+        val inferredPrefix = HouseholdSyncCodec.sanitizeSubnetPrefix(
+            inferredIp,
+            allowLoopback = LanRuntimeUtils.isRunningInRobolectric()
+        )
         return listOf(
             HomeNetworkEntity(
                 networkKey = inferredKey,
@@ -300,7 +366,7 @@ internal class HouseholdSyncCoordinator(
         latencyMs = 0,
         lastCheckedTime = "Synced • Reconnecting...",
         lastMotionTime = "",
-        serialNumber = incoming.serialNumber.ifBlank { LanRuntimeUtils.DEFAULT_PLACEHOLDER_SERIAL },
+        serialNumber = incoming.serialNumber.takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
         firmwareVersion = "",
         hardwareModel = incoming.hardwareModel,
         macAddress = incoming.macAddress,

@@ -137,6 +137,8 @@ class NetworkClient(
         candidatePortsOverride: List<Int>? = null
     ): Int? = withContext(Dispatchers.IO) {
         val ports = candidatePortsOverride ?: orderedCandidatePorts(preferredPort)
+        val allowLoopback = LanRuntimeUtils.isRunningInRobolectric()
+        if (!LanEndpointPolicy.isAllowedLanHost(ipAddress, allowLoopback = allowLoopback)) return@withContext null
         val cleanExpected = expectedSerialOrUdn?.trim().orEmpty()
         val cleanExpectedUdn = LanRuntimeUtils.canonicalHardwareUdn(cleanExpected)
         val isExpectedUdn = cleanExpected.startsWith("uuid:", ignoreCase = true)
@@ -241,7 +243,9 @@ class NetworkClient(
             }
         } else if (discoveredPort == null && expectedIdentity.isNotEmpty()) {
             onError?.invoke("9-port probe: no match")
-        } else if (discoveredPort == null && expectedIdentity.isEmpty()) {
+        } else if (discoveredPort == null && expectedIdentity.isEmpty() &&
+            LanEndpointPolicy.isAllowedLanHost(device.ipAddress, allowLoopback = LanRuntimeUtils.isRunningInRobolectric())
+        ) {
             for (port in orderedCandidatePorts(device.port).drop(1)) {
                 try {
                     wifiSocketFactory.createSocket().use { s ->

@@ -44,6 +44,11 @@ internal class SetupApProber(
         preferredPort: Int = 49152
     ): SetupDeviceDescriptor? = withContext(Dispatchers.IO) {
         val isLoopback = apHost == "127.0.0.1" || apHost.equals("localhost", ignoreCase = true)
+        val effectiveHost = if (apHost.equals("localhost", ignoreCase = true)) "127.0.0.1" else apHost.trim()
+        if (!LanEndpointPolicy.isAllowedLanHost(effectiveHost, allowLoopback = LanRuntimeUtils.isRunningInRobolectric())) {
+            lastProbeDiagnosticSummary = "Rejected non-LAN Setup AP host '$apHost'"
+            return@withContext null
+        }
         val loopbackExtraPorts = if (isLoopback) NetworkClient.currentLoopbackCandidatePorts() else emptyList()
         val candidates = (listOf(preferredPort) + loopbackExtraPorts + setupPorts).distinct()
         val paths = listOf("/setup.xml", "/Lightsetup.xml")

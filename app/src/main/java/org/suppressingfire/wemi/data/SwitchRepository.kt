@@ -138,7 +138,7 @@ class SwitchRepository(
 
     private val householdSyncCoordinator = HouseholdSyncCoordinator(
         dao, seedAndModeMutex, { _isDemoShowroomMode.value }, ::detectCurrentLanIp,
-        { prefs?.edit { putBoolean(KEY_DEMO_SHOWROOM_MODE, false) }; _isDemoShowroomMode.value = false },
+        { prefs?.edit { putBoolean(KEY_DEMO_SHOWROOM_MODE, false) }; initialSeedDone.value = true; _isDemoShowroomMode.value = false },
         ::resetRuntimeDeviceState, ::appendLog, ::nowFormatted
     )
 

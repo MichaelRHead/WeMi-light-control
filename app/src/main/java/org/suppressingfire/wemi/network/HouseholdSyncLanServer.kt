@@ -10,6 +10,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.MulticastSocket
+import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
@@ -54,7 +55,7 @@ data class ReceivedHouseholdSync(
  *
  * Security & lifecycle invariants:
  * - Lives only while the user keeps the Receive/Pair dialog open (auto-expires after 120s).
- * - Binds directly to the active local LAN IPv4 address (never `0.0.0.0` unless interface bind fails).
+ * - Binds directly to the active local LAN IPv4 address (rejecting unroutable CGNAT / loopback in production).
  * - Enforces RFC 1918 source-IP validation (`127.0.0.1` test-only), `Semaphore(4)` connection cap,
  *   bounded headers (`<= 24`), bounded body (`<= 384 KiB`), and `2.5s` socket read deadlines.
  * - Requires AES-256-GCM authentication with the one-time 6-digit pairing code and locks/closes the
@@ -118,18 +119,28 @@ class HouseholdSyncLanServer(
     ): HouseholdSyncServerSession? {
         stopSession()
 
-        val resolvedIp = bindAddress?.hostAddress ?: localIpProvider().trim()
-        val preferredAddr = bindAddress ?: runCatching {
-            if (LanEndpointPolicy.parseStrictIpv4Literal(resolvedIp) != null) {
-                InetAddress.getByName(resolvedIp)
-            } else {
-                null
-            }
-        }.getOrNull()
+        val rawLocalIp = localIpProvider().trim()
+        val resolvedIp = when {
+            bindAddress != null -> bindAddress.hostAddress.orEmpty()
+            allowLoopbackForTests && NetworkMonitor.activeLanBindingOverrideForTests == null -> "127.0.0.1"
+            else -> rawLocalIp
+        }
+        if (LanRuntimeUtils.isCarrierGradeNatIpv4(resolvedIp) || resolvedIp.startsWith("10.22.22.")) {
+            return null
+        }
+        if (!LanEndpointPolicy.isAllowedLanHost(resolvedIp, allowLoopback = allowLoopbackForTests)) {
+            return null
+        }
+        val preferredAddr = bindAddress ?: runCatching { InetAddress.getByName(resolvedIp) }.getOrNull()
+            ?: return null
 
+        var boundToPreferred = true
         val tcpSocket = try {
-            runCatching { bindTcpSocket(preferredAddr) }
-                .getOrElse { if (preferredAddr != null) bindTcpSocket(null) else throw it }
+            runCatching { bindTcpSocket(preferredAddr) }.getOrElse {
+                boundToPreferred = false
+                if (!allowLoopbackForTests) throw it
+                bindTcpSocket(InetAddress.getByName("127.0.0.1"))
+            }
         } catch (_: Exception) {
             return null
         }
@@ -148,10 +159,8 @@ class HouseholdSyncLanServer(
         failedAuthAttempts.set(0)
         isRunning.set(true)
 
-        val actualUdpPort = startUdpDiscoveryResponder(tcpSocket.localPort, cleanLabel, isTv)
-        val displayIp = preferredAddr?.hostAddress
-            ?: resolvedIp.takeIf { LanEndpointPolicy.parseStrictIpv4Literal(it) != null }
-            ?: "127.0.0.1"
+        val actualUdpPort = startUdpDiscoveryResponder(tcpSocket.localPort, cleanLabel, isTv, resolvedIp)
+        val displayIp = if (boundToPreferred) preferredAddr.hostAddress.orEmpty() else "127.0.0.1"
         val session = HouseholdSyncServerSession(
             ipAddress = displayIp,
             port = tcpSocket.localPort,
@@ -237,15 +246,26 @@ class HouseholdSyncLanServer(
         }
     }
 
-    private fun startUdpDiscoveryResponder(tcpPort: Int, label: String, isTv: Boolean): Int {
+    private fun startUdpDiscoveryResponder(
+        tcpPort: Int,
+        label: String,
+        isTv: Boolean,
+        localIp: String
+    ): Int {
         if (discoveryUdpPort < 0) return -1
+        var createdSocket: DatagramSocket? = null
         return try {
             val socket: DatagramSocket = if (discoveryUdpPort == 0) {
                 DatagramSocket(0)
             } else {
                 val ms = MulticastSocket(null)
+                createdSocket = ms
                 ms.reuseAddress = true
                 ms.bind(InetSocketAddress(discoveryUdpPort))
+                val activeBinding = if (allowLoopbackForTests) null else NetworkMonitor.resolveActiveLanBinding(appContext)
+                if (!allowLoopbackForTests) {
+                    activeBinding?.network?.let { net -> runCatching { net.bindSocket(ms) } }
+                }
                 runCatching {
                     val wifiMgr = appContext?.applicationContext?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
                     multicastLock = wifiMgr?.createMulticastLock("WeMiHouseholdSyncLock")?.apply {
@@ -253,12 +273,20 @@ class HouseholdSyncLanServer(
                         acquire()
                     }
                 }
-                runCatching {
-                    @Suppress("DEPRECATION")
-                    ms.joinGroup(InetAddress.getByName(DISCOVERY_MULTICAST_GROUP))
-                }
+                val targetIf = activeBinding?.interfaceName
+                    ?.let { name -> runCatching { NetworkInterface.getByName(name) }.getOrNull() }
+                    ?: runCatching {
+                        if (LanRuntimeUtils.isPrivateRfc1918Ipv4(localIp)) {
+                            NetworkInterface.getByInetAddress(InetAddress.getByName(localIp))
+                        } else {
+                            null
+                        }
+                    }.getOrNull()
+                val groupAddr = InetSocketAddress(InetAddress.getByName(DISCOVERY_MULTICAST_GROUP), discoveryUdpPort)
+                runCatching { ms.joinGroup(groupAddr, targetIf) }
                 ms
             }
+            createdSocket = socket
             socket.soTimeout = 600
             udpSocket = socket
             val replyPayload = buildString {
@@ -294,6 +322,9 @@ class HouseholdSyncLanServer(
             }
             socket.localPort
         } catch (_: Exception) {
+            runCatching { createdSocket?.close() }
+            runCatching { if (multicastLock?.isHeld == true) multicastLock?.release() }
+            multicastLock = null
             -1
         }
     }

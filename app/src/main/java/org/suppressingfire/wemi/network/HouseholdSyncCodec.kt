@@ -91,51 +91,55 @@ object HouseholdSyncCodec {
         exportedAtEpochMs: Long = System.currentTimeMillis(),
         allowLoopback: Boolean = LanRuntimeUtils.isRunningInRobolectric()
     ): HouseholdSyncBundle {
-        val cleanHomes = homes
-            .sortedWith(compareBy<HomeNetworkEntity> { it.sortOrder }.thenBy { it.homeName })
-            .take(MAX_HOMES)
-            .mapIndexed { idx, home ->
-                val cleanSubnet = sanitizeSubnetPrefix(home.subnetPrefix, allowLoopback)
-                val cleanGateway = sanitizeHostOrBlank(home.gatewayIp, allowLoopback)
-                    .ifEmpty { if (cleanSubnet.isNotEmpty()) "$cleanSubnet.1" else "" }
-                SyncedHomeProfile(
-                    networkKey = sanitizeNetworkKey(home.networkKey, idx),
-                    homeName = sanitizeLabel(home.homeName, maxLen = 64).ifEmpty { "My Home" },
-                    ssidLabel = sanitizeSsidLabel(home.ssidLabel),
-                    subnetPrefix = cleanSubnet,
-                    gatewayIp = cleanGateway,
-                    autoReconnectOnArrival = home.autoReconnectOnArrival,
-                    sortOrder = home.sortOrder.coerceIn(0, 10_000)
-                )
-            }
-        val cleanDevices = devices
-            .sortedWith(compareBy<DeviceEntity> { it.sortOrder }.thenBy { it.id })
-            .take(MAX_DEVICES)
-            .mapIndexed { idx, dev ->
-                val cleanSerial = LanEndpointPolicy.sanitizeHardwareIdentifier(dev.serialNumber, maxLen = 64)
-                    .takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }
-                    .orEmpty()
-                val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(
-                    LanEndpointPolicy.sanitizeHardwareIdentifier(dev.udn, maxLen = 96)
-                )
-                val cleanMac = LanEndpointPolicy.sanitizeHardwareIdentifier(dev.macAddress, maxLen = 32)
-                val cleanType = runCatching { DeviceType.valueOf(dev.deviceType) }
-                    .getOrDefault(DeviceType.SWITCH_PLUG).name
-                SyncedDeviceProfile(
-                    name = sanitizeLabel(dev.name, maxLen = 80).ifEmpty { "Smart Switch ${idx + 1}" },
-                    roomName = normalizeRoomName(sanitizeLabel(dev.roomName, maxLen = 64)),
-                    networkKey = sanitizeNetworkKey(dev.networkKey, 0),
-                    wifiSsid = sanitizeSsidLabel(dev.wifiSsid, fallback = ""),
-                    deviceType = cleanType,
-                    ipAddress = sanitizeHostOrBlank(dev.ipAddress, allowLoopback),
-                    port = dev.port.takeIf { it in 1..65535 } ?: 49153,
-                    serialNumber = cleanSerial,
-                    udn = cleanUdn,
-                    macAddress = cleanMac,
-                    hardwareModel = sanitizeLabel(dev.hardwareModel, maxLen = 64).ifEmpty { "LightSwitch" },
-                    sortOrder = dev.sortOrder.coerceIn(0, 100_000)
-                )
-            }
+        val cleanHomes = deduplicateHomes(
+            homes
+                .sortedWith(compareBy<HomeNetworkEntity> { it.sortOrder }.thenBy { it.homeName })
+                .take(MAX_HOMES)
+                .mapIndexed { idx, home ->
+                    val cleanSubnet = sanitizeSubnetPrefix(home.subnetPrefix, allowLoopback)
+                    val cleanGateway = sanitizeHostOrBlank(home.gatewayIp, allowLoopback)
+                        .ifEmpty { if (cleanSubnet.isNotEmpty()) "$cleanSubnet.1" else "" }
+                    SyncedHomeProfile(
+                        networkKey = sanitizeNetworkKey(home.networkKey, idx),
+                        homeName = sanitizeHomeName(home.homeName),
+                        ssidLabel = sanitizeSsidLabel(home.ssidLabel),
+                        subnetPrefix = cleanSubnet,
+                        gatewayIp = cleanGateway,
+                        autoReconnectOnArrival = home.autoReconnectOnArrival,
+                        sortOrder = home.sortOrder.coerceIn(0, 10_000)
+                    )
+                }
+        )
+        val cleanDevices = deduplicateDevices(
+            devices
+                .sortedWith(compareBy<DeviceEntity> { it.sortOrder }.thenBy { it.id })
+                .take(MAX_DEVICES)
+                .mapIndexed { idx, dev ->
+                    val cleanSerial = LanEndpointPolicy.sanitizeHardwareIdentifier(dev.serialNumber, maxLen = 64)
+                        .takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }
+                        .orEmpty()
+                    val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(
+                        LanEndpointPolicy.sanitizeHardwareIdentifier(dev.udn, maxLen = 96)
+                    )
+                    val cleanMac = LanEndpointPolicy.sanitizeHardwareIdentifier(dev.macAddress, maxLen = 32)
+                    val cleanType = runCatching { DeviceType.valueOf(dev.deviceType) }
+                        .getOrDefault(DeviceType.SWITCH_PLUG).name
+                    SyncedDeviceProfile(
+                        name = sanitizeLabel(dev.name, maxLen = 80).ifEmpty { "Smart Switch ${idx + 1}" },
+                        roomName = normalizeRoomName(sanitizeLabel(dev.roomName, maxLen = 64)),
+                        networkKey = sanitizeNetworkKey(dev.networkKey, 0),
+                        wifiSsid = sanitizeSsidLabel(dev.wifiSsid, fallback = ""),
+                        deviceType = cleanType,
+                        ipAddress = sanitizeHostOrBlank(dev.ipAddress, allowLoopback),
+                        port = dev.port.takeIf { it in 1..65535 } ?: 49153,
+                        serialNumber = cleanSerial,
+                        udn = cleanUdn,
+                        macAddress = cleanMac,
+                        hardwareModel = sanitizeLabel(dev.hardwareModel, maxLen = 64).ifEmpty { "LightSwitch" },
+                        sortOrder = dev.sortOrder.coerceIn(0, 100_000)
+                    )
+                }
+        )
         return HouseholdSyncBundle(
             schemaVersion = SCHEMA_VERSION,
             exportedAtEpochMs = exportedAtEpochMs,
@@ -213,54 +217,58 @@ object HouseholdSyncCodec {
 
         val rawHomes = (root["homes"] as? List<*>) ?: emptyList<Any?>()
         require(rawHomes.size <= MAX_HOMES) { "Too many homes in configuration (max $MAX_HOMES)" }
-        val homes = rawHomes.mapIndexed { idx, item ->
-            val obj = item as? Map<*, *>
-                ?: throw IllegalArgumentException("Invalid home entry at index $idx")
-            val subnet = sanitizeSubnetPrefix(obj["subnetPrefix"] as? String, allowLoopback)
-            val gw = sanitizeHostOrBlank(obj["gatewayIp"] as? String, allowLoopback)
-                .ifEmpty { if (subnet.isNotEmpty()) "$subnet.1" else "" }
-            SyncedHomeProfile(
-                networkKey = sanitizeNetworkKey(obj["networkKey"] as? String, idx),
-                homeName = sanitizeLabel(obj["homeName"] as? String, maxLen = 64).ifEmpty { "My Home" },
-                ssidLabel = sanitizeSsidLabel(obj["ssidLabel"] as? String),
-                subnetPrefix = subnet,
-                gatewayIp = gw,
-                autoReconnectOnArrival = (obj["autoReconnectOnArrival"] as? Boolean) ?: true,
-                sortOrder = ((obj["sortOrder"] as? Number)?.toInt() ?: idx).coerceIn(0, 10_000)
-            )
-        }
+        val homes = deduplicateHomes(
+            rawHomes.mapIndexed { idx, item ->
+                val obj = item as? Map<*, *>
+                    ?: throw IllegalArgumentException("Invalid home entry at index $idx")
+                val subnet = sanitizeSubnetPrefix(obj["subnetPrefix"] as? String, allowLoopback)
+                val gw = sanitizeHostOrBlank(obj["gatewayIp"] as? String, allowLoopback)
+                    .ifEmpty { if (subnet.isNotEmpty()) "$subnet.1" else "" }
+                SyncedHomeProfile(
+                    networkKey = sanitizeNetworkKey(obj["networkKey"] as? String, idx),
+                    homeName = sanitizeHomeName(obj["homeName"] as? String),
+                    ssidLabel = sanitizeSsidLabel(obj["ssidLabel"] as? String),
+                    subnetPrefix = subnet,
+                    gatewayIp = gw,
+                    autoReconnectOnArrival = (obj["autoReconnectOnArrival"] as? Boolean) ?: true,
+                    sortOrder = ((obj["sortOrder"] as? Number)?.toInt() ?: idx).coerceIn(0, 10_000)
+                )
+            }
+        )
 
         val rawDevices = (root["devices"] as? List<*>) ?: emptyList<Any?>()
         require(rawDevices.size <= MAX_DEVICES) { "Too many switches in configuration (max $MAX_DEVICES)" }
         val defaultKey = homes.firstOrNull()?.networkKey ?: DEFAULT_MAIN_HOME_KEY
-        val devices = rawDevices.mapIndexed { idx, item ->
-            val obj = item as? Map<*, *>
-                ?: throw IllegalArgumentException("Invalid switch entry at index $idx")
-            val name = sanitizeLabel(obj["name"] as? String, maxLen = 80)
-            require(name.isNotEmpty()) { "Switch entry $idx is missing a friendly name" }
-            val rawType = (obj["deviceType"] as? String).orEmpty().trim()
-            val cleanType = runCatching { DeviceType.valueOf(rawType) }
-                .getOrDefault(DeviceType.SWITCH_PLUG).name
-            val rawSerial = LanEndpointPolicy.sanitizeHardwareIdentifier(obj["serialNumber"] as? String, maxLen = 64)
-            val cleanSerial = if (LanRuntimeUtils.isPlaceholderSerial(rawSerial)) "" else rawSerial
-            val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(
-                LanEndpointPolicy.sanitizeHardwareIdentifier(obj["udn"] as? String, maxLen = 96)
-            )
-            SyncedDeviceProfile(
-                name = name,
-                roomName = normalizeRoomName(sanitizeLabel(obj["roomName"] as? String, maxLen = 64)),
-                networkKey = sanitizeNetworkKey(obj["networkKey"] as? String, 0, fallback = defaultKey),
-                wifiSsid = sanitizeSsidLabel(obj["wifiSsid"] as? String, fallback = ""),
-                deviceType = cleanType,
-                ipAddress = sanitizeHostOrBlank(obj["ipAddress"] as? String, allowLoopback),
-                port = ((obj["port"] as? Number)?.toInt() ?: 49153).takeIf { it in 1..65535 } ?: 49153,
-                serialNumber = cleanSerial,
-                udn = cleanUdn,
-                macAddress = LanEndpointPolicy.sanitizeHardwareIdentifier(obj["macAddress"] as? String, maxLen = 32),
-                hardwareModel = sanitizeLabel(obj["hardwareModel"] as? String, maxLen = 64).ifEmpty { "LightSwitch" },
-                sortOrder = ((obj["sortOrder"] as? Number)?.toInt() ?: idx).coerceIn(0, 100_000)
-            )
-        }
+        val devices = deduplicateDevices(
+            rawDevices.mapIndexed { idx, item ->
+                val obj = item as? Map<*, *>
+                    ?: throw IllegalArgumentException("Invalid switch entry at index $idx")
+                val name = sanitizeLabel(obj["name"] as? String, maxLen = 80)
+                require(name.isNotEmpty()) { "Switch entry $idx is missing a friendly name" }
+                val rawType = (obj["deviceType"] as? String).orEmpty().trim()
+                val cleanType = runCatching { DeviceType.valueOf(rawType) }
+                    .getOrDefault(DeviceType.SWITCH_PLUG).name
+                val rawSerial = LanEndpointPolicy.sanitizeHardwareIdentifier(obj["serialNumber"] as? String, maxLen = 64)
+                val cleanSerial = if (LanRuntimeUtils.isPlaceholderSerial(rawSerial)) "" else rawSerial
+                val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(
+                    LanEndpointPolicy.sanitizeHardwareIdentifier(obj["udn"] as? String, maxLen = 96)
+                )
+                SyncedDeviceProfile(
+                    name = name,
+                    roomName = normalizeRoomName(sanitizeLabel(obj["roomName"] as? String, maxLen = 64)),
+                    networkKey = sanitizeNetworkKey(obj["networkKey"] as? String, 0, fallback = defaultKey),
+                    wifiSsid = sanitizeSsidLabel(obj["wifiSsid"] as? String, fallback = ""),
+                    deviceType = cleanType,
+                    ipAddress = sanitizeHostOrBlank(obj["ipAddress"] as? String, allowLoopback),
+                    port = ((obj["port"] as? Number)?.toInt() ?: 49153).takeIf { it in 1..65535 } ?: 49153,
+                    serialNumber = cleanSerial,
+                    udn = cleanUdn,
+                    macAddress = LanEndpointPolicy.sanitizeHardwareIdentifier(obj["macAddress"] as? String, maxLen = 32),
+                    hardwareModel = sanitizeLabel(obj["hardwareModel"] as? String, maxLen = 64).ifEmpty { "LightSwitch" },
+                    sortOrder = ((obj["sortOrder"] as? Number)?.toInt() ?: idx).coerceIn(0, 100_000)
+                )
+            }
+        )
 
         require(homes.isNotEmpty() || devices.isNotEmpty()) {
             "Household configuration contains no Wi-Fi Homes or switches"
@@ -275,12 +283,132 @@ object HouseholdSyncCodec {
         )
     }
 
+    /**
+     * Defense-in-depth sanitization and 3-tier deduplication for bundles passed directly in Kotlin
+     * without going through [decodeFromJson].
+     */
+    internal fun deduplicateAndSanitize(
+        bundle: HouseholdSyncBundle,
+        allowLoopback: Boolean = LanRuntimeUtils.isRunningInRobolectric()
+    ): HouseholdSyncBundle {
+        val cleanHomes = deduplicateHomes(
+            bundle.homes.take(MAX_HOMES).mapIndexed { idx, home ->
+                val subnet = sanitizeSubnetPrefix(home.subnetPrefix, allowLoopback)
+                val gw = sanitizeHostOrBlank(home.gatewayIp, allowLoopback)
+                    .ifEmpty { if (subnet.isNotEmpty()) "$subnet.1" else "" }
+                home.copy(
+                    networkKey = sanitizeNetworkKey(home.networkKey, idx),
+                    homeName = sanitizeHomeName(home.homeName),
+                    ssidLabel = sanitizeSsidLabel(home.ssidLabel),
+                    subnetPrefix = subnet,
+                    gatewayIp = gw,
+                    sortOrder = home.sortOrder.coerceIn(0, 10_000)
+                )
+            }
+        )
+        val defaultKey = cleanHomes.firstOrNull()?.networkKey ?: DEFAULT_MAIN_HOME_KEY
+        val cleanDevices = deduplicateDevices(
+            bundle.devices.take(MAX_DEVICES).mapIndexedNotNull { idx, dev ->
+                val name = sanitizeLabel(dev.name, maxLen = 80)
+                if (name.isEmpty()) return@mapIndexedNotNull null
+                val rawSerial = LanEndpointPolicy.sanitizeHardwareIdentifier(dev.serialNumber, maxLen = 64)
+                val cleanSerial = if (LanRuntimeUtils.isPlaceholderSerial(rawSerial)) "" else rawSerial
+                val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(
+                    LanEndpointPolicy.sanitizeHardwareIdentifier(dev.udn, maxLen = 96)
+                )
+                val cleanType = runCatching { DeviceType.valueOf(dev.deviceType.trim()) }
+                    .getOrDefault(DeviceType.SWITCH_PLUG).name
+                dev.copy(
+                    name = name,
+                    roomName = normalizeRoomName(sanitizeLabel(dev.roomName, maxLen = 64)),
+                    networkKey = sanitizeNetworkKey(dev.networkKey, 0, fallback = defaultKey),
+                    wifiSsid = sanitizeSsidLabel(dev.wifiSsid, fallback = ""),
+                    deviceType = cleanType,
+                    ipAddress = sanitizeHostOrBlank(dev.ipAddress, allowLoopback),
+                    port = dev.port.takeIf { it in 1..65535 } ?: 49153,
+                    serialNumber = cleanSerial,
+                    udn = cleanUdn,
+                    macAddress = LanEndpointPolicy.sanitizeHardwareIdentifier(dev.macAddress, maxLen = 32),
+                    hardwareModel = sanitizeLabel(dev.hardwareModel, maxLen = 64).ifEmpty { "LightSwitch" },
+                    sortOrder = dev.sortOrder.coerceIn(0, 100_000)
+                )
+            }
+        )
+        return bundle.copy(
+            sourceDeviceLabel = sanitizeLabel(bundle.sourceDeviceLabel, maxLen = 64).ifEmpty { "WeMi Device" },
+            homes = cleanHomes,
+            devices = cleanDevices
+        )
+    }
+
     internal fun quoteJson(value: String): String = StrictJsonCodec.quoteJson(value)
 
     internal fun parseJsonObject(input: String): Map<String, Any?> = StrictJsonCodec.parseJsonObject(input)
 
-    internal fun sanitizeLabel(raw: String?, maxLen: Int = 80): String =
-        LanEndpointPolicy.sanitizeSingleLineToken(raw.orEmpty(), maxLen = maxLen)
+    internal fun sanitizeLabel(raw: String?, maxLen: Int = 80): String {
+        val singleLine = LanEndpointPolicy.sanitizeSingleLineToken(raw.orEmpty(), maxLen = maxLen)
+        val filtered = buildString(singleLine.length) {
+            for (ch in singleLine) {
+                val code = ch.code
+                val isControl = code < 0x20 || code == 0x7F
+                val isBidi = code in 0x202A..0x202E || code in 0x2066..0x2069
+                if (!isControl && !isBidi) append(ch)
+            }
+        }
+        return filtered.trim()
+    }
+
+    internal fun isGenericLanSsid(raw: String?): Boolean {
+        val clean = raw?.trim().orEmpty()
+        return clean.isEmpty() ||
+            clean.equals("Local LAN", ignoreCase = true) ||
+            clean.equals("Local Wi-Fi", ignoreCase = true) ||
+            clean.startsWith("LAN ", ignoreCase = true)
+    }
+
+    internal fun isCgnatLabel(raw: String?): Boolean {
+        val clean = raw?.trim().orEmpty()
+        if (clean.isEmpty()) return false
+        if (clean.startsWith("LAN ", ignoreCase = true)) {
+            val suffix = clean.removePrefix("LAN ").removePrefix("lan ").trim().substringBefore('/')
+            if (LanRuntimeUtils.isCarrierGradeNatIpv4(suffix)) return true
+        }
+        val parenToken = clean.substringAfter('(', "").substringBefore(')', "").trim()
+        return parenToken.isNotEmpty() && LanRuntimeUtils.isCarrierGradeNatIpv4(parenToken)
+    }
+
+    private fun sanitizeHomeName(raw: String?): String {
+        val clean = sanitizeLabel(raw, maxLen = 64)
+        return if (clean.isEmpty() || XmlAndSkuParser.isWemoDeviceSetupSsid(clean) || isCgnatLabel(clean)) {
+            "My Home"
+        } else {
+            clean
+        }
+    }
+
+    internal fun sanitizeSsidLabel(raw: String?, fallback: String = "Local LAN"): String {
+        val clean = sanitizeLabel(raw, maxLen = 64)
+        return if (clean.isEmpty() || XmlAndSkuParser.isWemoDeviceSetupSsid(clean) || isCgnatLabel(clean)) {
+            fallback
+        } else {
+            clean
+        }
+    }
+
+    internal fun sanitizeHostOrBlank(raw: String?, allowLoopback: Boolean): String {
+        val clean = raw?.trim().orEmpty()
+        if (clean.isEmpty() || LanRuntimeUtils.isCarrierGradeNatIpv4(clean)) return ""
+        if (clean.startsWith("10.22.22.") || clean.startsWith("10.0.2.")) return ""
+        return if (LanEndpointPolicy.isAllowedLanHost(clean, allowLoopback = allowLoopback)) clean else ""
+    }
+
+    internal fun sanitizeSubnetPrefix(raw: String?, allowLoopback: Boolean): String {
+        val normalized = LanRuntimeUtils.normalizeSubnetPrefixOrNull(raw) ?: return ""
+        val probeHost = "$normalized.1"
+        if (LanRuntimeUtils.isCarrierGradeNatIpv4(probeHost)) return ""
+        if (LanRuntimeUtils.isPrivateRfc1918Ipv4(normalized)) return normalized
+        return if (allowLoopback && normalized == "127.0.0") normalized else ""
+    }
 
     private fun sanitizeNetworkKey(
         raw: String?,
@@ -292,23 +420,34 @@ object HouseholdSyncCodec {
         return cleaned.ifEmpty { fallback }
     }
 
-    private fun sanitizeSsidLabel(raw: String?, fallback: String = "Local LAN"): String {
-        val clean = sanitizeLabel(raw, maxLen = 64)
-        return if (clean.isEmpty() || XmlAndSkuParser.isWemoDeviceSetupSsid(clean)) fallback else clean
+    private fun deduplicateHomes(homes: List<SyncedHomeProfile>): List<SyncedHomeProfile> {
+        val seenKeys = HashSet<String>(homes.size)
+        return homes.filter { seenKeys.add(it.networkKey) }
     }
 
-    private fun sanitizeHostOrBlank(raw: String?, allowLoopback: Boolean): String {
-        val clean = raw?.trim().orEmpty()
-        if (clean.isEmpty() || LanRuntimeUtils.isCarrierGradeNatIpv4(clean)) return ""
-        if (clean.startsWith("10.22.22.")) return ""
-        return if (LanEndpointPolicy.isAllowedLanHost(clean, allowLoopback = allowLoopback)) clean else ""
-    }
+    private fun deduplicateDevices(devices: List<SyncedDeviceProfile>): List<SyncedDeviceProfile> {
+        val seenSerials = HashSet<String>()
+        val seenUdns = HashSet<String>()
+        val seenEndpoints = HashSet<String>()
+        val result = ArrayList<SyncedDeviceProfile>(devices.size)
+        for (dev in devices) {
+            val serialKey = dev.serialNumber.takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }
+                ?.lowercase(Locale.US).orEmpty()
+            val udnKey = LanRuntimeUtils.canonicalHardwareUdn(dev.udn)
+                .takeIf { it.isNotEmpty() }
+                ?.let { "${dev.networkKey}|${it.lowercase(Locale.US)}" }.orEmpty()
+            val endpointKey = dev.ipAddress.takeIf { it.isNotBlank() }
+                ?.let { "${dev.networkKey}|$it:${dev.port}" }.orEmpty()
 
-    private fun sanitizeSubnetPrefix(raw: String?, allowLoopback: Boolean): String {
-        val clean = raw?.trim().orEmpty().removeSuffix(".")
-        if (clean.isEmpty() || clean == "10.22.22") return ""
-        val probeHost = "$clean.1"
-        if (LanRuntimeUtils.isCarrierGradeNatIpv4(probeHost)) return ""
-        return if (LanEndpointPolicy.isAllowedLanHost(probeHost, allowLoopback = allowLoopback)) clean else ""
+            if (serialKey.isNotEmpty() && serialKey in seenSerials) continue
+            if (serialKey.isEmpty() && udnKey.isNotEmpty() && udnKey in seenUdns) continue
+            if (serialKey.isEmpty() && udnKey.isEmpty() && endpointKey.isNotEmpty() && endpointKey in seenEndpoints) continue
+
+            if (serialKey.isNotEmpty()) seenSerials.add(serialKey)
+            if (udnKey.isNotEmpty()) seenUdns.add(udnKey)
+            if (endpointKey.isNotEmpty()) seenEndpoints.add(endpointKey)
+            result.add(dev)
+        }
+        return result
     }
 }
