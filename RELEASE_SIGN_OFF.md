@@ -15,13 +15,13 @@ RELEASE_VERSION: v37.0
 VERSION_CODE: 37
 ROUND_NUMBER: 1
 RELEASE_STATUS: IN_REVIEW
-CURRENT_TURN: code_quality_and_testing
+CURRENT_TURN: license_governance
 CANDIDATE_BASE_SHA: a385155
 SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (a385155 @ 2026-11-26 08:52 PST)
 SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (cf273ea @ 2026-11-26 09:06 PST)
 SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (4e71935 @ 2026-11-26 09:21 PST)
 SIGN_OFF_SECURITY_AND_PRIVACY: SIGNED_OFF (c684037 @ 2026-11-26 09:42 PST)
-SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
+SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (1721e7f @ 2026-11-26 10:05 PST)
 SIGN_OFF_LICENSE_GOVERNANCE: PENDING
 SIGN_OFF_APP_PROMOTER: PENDING
 FINAL_RELEASE_SHA: NONE
@@ -42,7 +42,7 @@ PROMOTED_AT: NONE
 | **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `cf273ea` | `2026-11-26 09:06 PST` | Verified v37.0 discovery, 3-tier identity, ChromeOS ARCVM, on-device rules, and Household Config Sync. Fixed in-bundle deduplication, exact-identity-first merge order, router SSID preservation, Wi-Fi-bound UDP discovery, ARCVM receive guards, and synced v37.0 discovery docs. |
 | **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `SIGNED_OFF` | `4e71935` | `2026-11-26 09:21 PST` | Audited telemetry redaction, reset cleanup, Play assets, and user docs for v37.0. |
 | **4 (Review 3)** | `security_and_privacy` | **Antigravity Security & Privacy Agent** | `SIGNED_OFF` | `c684037` | `2026-11-26 09:42 PST` | Hardened v37.0 Household Sync with SPAKE2 Group 14, AAD, framing, FLAG_SECURE, and Privacy Policy disclosures. |
-| **5 (Review 4)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
+| **5 (Review 4)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `SIGNED_OFF` | `1721e7f` | `2026-11-26 10:05 PST` | Verified 138/138 .kt files <500L (max 496L), 156/156 Kotlin tests across 30 suites, zero compiler/lint warnings, clean debug APK, and hardened Household Sync UI lifecycle, TV focus containment, SAF export truncation, and test isolation. |
 | **6 (Review 5)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
 | **7 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `PENDING` | `-` | `-` | Awaiting Stages 1-6 sign-off. |
 | **8 (Promote)** | `app_promoter` | **Antigravity App Promoter Agent (Closed Testing)** | `PENDING` | `-` | `-` | Awaiting Stage 7 approval and AI Studio internal testing upload. |
@@ -146,4 +146,5 @@ PROMOTED_AT: NONE
 | 2026-11-26 09:06 PST | `1` | `discovery_and_grouping` | `SIGNED_OFF` | `telemetry_and_debugging` | `cf273ea` | Verified v37.0 discovery, 3-tier identity, ChromeOS ARCVM, on-device rules, and Household Config Sync. Fixed in-bundle deduplication, exact-identity-first merge order, router SSID preservation, Wi-Fi-bound UDP discovery, ARCVM receive guards, and synced v37.0 discovery docs. |
 | 2026-11-26 09:21 PST | `1` | `telemetry_and_debugging` | `SIGNED_OFF` | `security_and_privacy` | `4e71935` | Audited telemetry redaction, reset cleanup, Play assets, and user docs for v37.0. |
 | 2026-11-26 09:42 PST | `1` | `security_and_privacy` | `SIGNED_OFF` | `code_quality_and_testing` | `c684037` | Hardened v37.0 Household Sync with SPAKE2 Group 14, AAD, framing, FLAG_SECURE, and Privacy Policy disclosures. |
+| 2026-11-26 10:05 PST | `1` | `code_quality_and_testing` | `SIGNED_OFF` | `license_governance` | `1721e7f` | Verified 138/138 .kt files <500L (max 496L), 156/156 Kotlin tests across 30 suites, zero compiler/lint warnings, clean debug APK, and hardened Household Sync UI lifecycle, TV focus containment, SAF export truncation, and test isolation. |
 <!-- AUDIT_LOG_END -->
