@@ -15,11 +15,11 @@ RELEASE_VERSION: v36.0
 VERSION_CODE: 36
 ROUND_NUMBER: 1
 RELEASE_STATUS: IN_REVIEW
-CURRENT_TURN: telemetry_and_debugging
+CURRENT_TURN: code_quality_and_testing
 CANDIDATE_BASE_SHA: v36.0-rc
 SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (v36.0-rc @ 2026-11-25 19:58 PST)
 SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (48142a8 @ 2026-11-25 21:09 PST)
-SIGN_OFF_TELEMETRY_AND_DEBUGGING: PENDING
+SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (373b7a5 @ 2026-11-25 21:21 PST)
 SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
 SIGN_OFF_LICENSE_GOVERNANCE: PENDING
 SIGN_OFF_APP_PROMOTER: PENDING
@@ -39,7 +39,7 @@ PROMOTED_AT: NONE
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
 | **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `v36.0-rc` | `2026-11-25 19:58 PST` | Initiated v36.0 (versionCode = 36) Stage 1 UX/CUJ & Obsolete UI Cleanup Audit covering Step 2 live On-Device Switch Rules and the Multi-Skill Swarm Hardening Pass (116/116 .kt files < 500L, zero retired Read-Only/App-Run badges, masked Wi-Fi setup passwords, rememberSaveable & +/-1m steppers, 48dp+ touch targets, TalkBack semantics, offline 3-state widget picker previews, trademark boundaries). Bumped version to 36.0, prepended v36.0 to ReleaseHistoryCatalog.kt, refreshed GeneratePlayStoreAssets.java and regenerated all 24 Play Store/TV graphics for live On-Switch rules, updated UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md (0 broken links), IMPLEMENTED.md, docs/user-guide/release-notes.md, RELEASE_NOTES.txt (492/500 chars), and STORE_LISTING.md. Verified 134/134 Kotlin tests across 26 suites (--rerun-tasks), 28/28 Python Play tests, validate-local (16 PNGs across 7 slots), and clean AI Studio compile_applet build. |
 | **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `48142a8` | `2026-11-25 21:09 PST` | Verified v36.0 discovery, 3-tier identity, ChromeOS ARCVM, room grouping, and live on-device rules safety. Made shared rules read-only in UI, tightened live-DB ownership checks, and synced v36.0 discovery docs. |
-| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `PENDING` | `-` | `-` | Awaiting Telemetry & Debugging Agent review. |
+| **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `SIGNED_OFF` | `373b7a5` | `2026-11-25 21:21 PST` | Verified v36.0 telemetry, password masking, redaction, 5-section export, and backup exclusions. Synced owned and shared v36.0 guides and skills with zero broken links, and reported minor read-only UX and license doc drift. |
 | **4 (Review 3)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
 | **5 (Review 4)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `PENDING` | `-` | `-` | Awaiting License & Brand Governance Agent review. |
 | **6 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `PENDING` | `-` | `-` | Awaiting Stages 1-5 sign-off. |
@@ -134,4 +134,5 @@ PROMOTED_AT: NONE
 | 2026-11-22 09:20 PST | `1` | `app_promoter` | `PROMOTED_TO_CLOSED_TESTING` | `NONE` | `58ba152` | Promoted Play build 35 release 0.0.0.35 from internal to alpha via GitHub Actions run 45048868969. |
 | 2026-11-25 19:58 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `v36.0-rc` | Initiated v36.0 (versionCode = 36) Stage 1 UX/CUJ & Obsolete UI Cleanup Audit covering Step 2 live On-Device Switch Rules and the Multi-Skill Swarm Hardening Pass (116/116 .kt files < 500L, zero retired Read-Only/App-Run badges, masked Wi-Fi setup passwords, rememberSaveable & +/-1m steppers, 48dp+ touch targets, TalkBack semantics, offline 3-state widget picker previews, trademark boundaries). Bumped version to 36.0, prepended v36.0 to ReleaseHistoryCatalog.kt, refreshed GeneratePlayStoreAssets.java and regenerated all 24 Play Store/TV graphics for live On-Switch rules, updated UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md (0 broken links), IMPLEMENTED.md, docs/user-guide/release-notes.md, RELEASE_NOTES.txt (492/500 chars), and STORE_LISTING.md. Verified 134/134 Kotlin tests across 26 suites (--rerun-tasks), 28/28 Python Play tests, validate-local (16 PNGs across 7 slots), and clean AI Studio compile_applet build. |
 | 2026-11-25 21:09 PST | `1` | `discovery_and_grouping` | `SIGNED_OFF` | `telemetry_and_debugging` | `48142a8` | Verified v36.0 discovery, 3-tier identity, ChromeOS ARCVM, room grouping, and live on-device rules safety. Made shared rules read-only in UI, tightened live-DB ownership checks, and synced v36.0 discovery docs. |
+| 2026-11-25 21:21 PST | `1` | `telemetry_and_debugging` | `SIGNED_OFF` | `code_quality_and_testing` | `373b7a5` | Verified v36.0 telemetry, password masking, redaction, 5-section export, and backup exclusions. Synced owned and shared v36.0 guides and skills with zero broken links, and reported minor read-only UX and license doc drift. |
 <!-- AUDIT_LOG_END -->
