@@ -30,14 +30,14 @@
 
 ### A. Data Safety Section
 - **Does your app collect or share any of the required user data types?** → **No**
-- **Explanation:** All switch IPs, friendly names, SSDP discovery results, rules, and Home Screen widget bindings are stored strictly on-device in local Room SQLite storage and local `SharedPreferences` and communicated only over the user's local LAN (`239.255.255.250:1900` and `http://<local-ip>:49153`), and ephemeral diagnostic telemetry files (`wemi-telemetry-latest.txt`) are excluded from cloud Auto-Backup (`backup_rules.xml` & `data_extraction_rules.xml`).
+- **Explanation:** Remembered Wi-Fi homes, discovered switch inventory (local IPs, friendly names, hardware metadata), and Home Screen widget bindings are stored strictly on-device in local Room v7 SQLite storage and local `SharedPreferences`, and all switch traffic communicates exclusively over the user's local LAN (`239.255.255.250:1900` and `http://<local-ip>:<port>`). Native automation rules are stored directly on compatible smart switches via local LAN `FetchRules` / `StoreRules` / `TimeSync` calls, and optional sunrise/sunset Solar Location uses offline city presets or user-entered latitude/longitude written solely to the switch over local Wi-Fi with zero Android Location permissions. Both ephemeral diagnostic telemetry exports (`wemi-telemetry-latest.txt`) and local pre-write raw-ZIP switch rule backups (`hardware_rules_backups`) are excluded from Android cloud Auto-Backup and device-to-device transfer (`backup_rules.xml` & `data_extraction_rules.xml`).
 
 ### B. App Content & Permissions
 - **Ads:** No, my app does not contain ads.
 - **App Access:** All functionality is available without special access or login credentials (starts in Real LAN Mode with a live local SSDP scanner and includes an optional Demo Showroom Mode toggle on the More tab for exploring without hardware).
 - **Target Audience:** 13+ / Everyone (General utility app).
-- **Permissions Used (Install-time normal permissions only):**
-  - `android.permission.INTERNET` (Local HTTP SOAP calls to switches)
+- **Permissions Used (Install-time normal permissions only; zero Android Location permissions):**
+  - `android.permission.INTERNET` (Local HTTP SOAP calls to switches, including `FetchRules`, `StoreRules`, and `TimeSync`)
   - `android.permission.ACCESS_NETWORK_STATE`
   - `android.permission.ACCESS_WIFI_STATE`
   - `android.permission.CHANGE_WIFI_MULTICAST_STATE` (Acquires `WifiManager.MulticastLock` during SSDP `M-SEARCH` discovery)

@@ -3,10 +3,11 @@ package org.suppressingfire.wemi.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
@@ -20,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -42,6 +42,7 @@ import org.suppressingfire.wemi.network.TelemetryFileExporter
  * match, AES-128-CBC encryption details, and step-by-step trace lines with one-tap `Copy` and
  * `Save/Share` export to `wemi-telemetry-latest.txt`.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Suppress("DEPRECATION")
 @Composable
 internal fun ProvisionDebugPanel(
@@ -85,31 +86,33 @@ internal fun ProvisionDebugPanel(
             modifier = Modifier.padding(10.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
                     text = "SETUP DIAGNOSTICS",
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
                     fontSize = 10.sp,
-                    color = Color(0xFF8BE836),
-                    modifier = Modifier.weight(1f)
+                    color = Color(0xFF8BE836)
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     OutlinedButton(
                         onClick = { userExpandedOverride = !isExpanded },
-                        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         border = BorderStroke(1.dp, Color(0xFF475569)),
                         modifier = Modifier
-                            .height(24.dp)
+                            .heightIn(min = 36.dp)
                             .testTag("toggle_provision_debug_button")
                     ) {
                         Text(
                             text = if (isExpanded) "Hide" else "Details",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = Color(0xFFE2E8F0),
                             maxLines = 1,
                             softWrap = false
@@ -124,15 +127,15 @@ internal fun ProvisionDebugPanel(
                             }
                             copiedFeedback = true
                         },
-                        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         border = BorderStroke(1.dp, Color(0xFF475569)),
                         modifier = Modifier
-                            .height(24.dp)
+                            .heightIn(min = 36.dp)
                             .testTag("copy_provision_debug_button")
                     ) {
                         Text(
                             text = if (copiedFeedback) "Copied" else "Copy",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = Color(0xFFE2E8F0),
                             maxLines = 1,
                             softWrap = false
@@ -148,15 +151,15 @@ internal fun ProvisionDebugPanel(
                             )
                             sharedFeedback = true
                         },
-                        contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                         border = BorderStroke(1.dp, Color(0xFF475569)),
                         modifier = Modifier
-                            .height(24.dp)
+                            .heightIn(min = 36.dp)
                             .testTag("share_provision_debug_button")
                     ) {
                         Text(
                             text = if (sharedFeedback) "Saved" else "Save/Share",
-                            fontSize = 10.sp,
+                            fontSize = 11.sp,
                             color = Color(0xFFE2E8F0),
                             maxLines = 1,
                             softWrap = false

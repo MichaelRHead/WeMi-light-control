@@ -1,14 +1,15 @@
 # Privacy Policy for WeMi Switch Control
 
-**Effective Date:** November 7, 2026
+**Effective Date:** November 26, 2026
 
 ## Overview
-WeMi Switch Control ("the App") is a local-network smart switch controller. We respect your privacy and have designed the App so that all device configurations, switch states, and automation rules remain strictly on your Android device.
+WeMi Switch Control ("the App") is a local-network smart switch controller. We respect your privacy and have designed the App so that all remembered homes, discovered switches, preferences, and local backups remain strictly on your Android device, while native switch automation rules live directly on compatible smart switches over your local Wi-Fi network.
 
 ## Information Collection and Use
-- **No Personal Data Collected:** The App does not require an account, login, email address, or cloud registration.
-- **Local Network Communication Only:** The App uses standard Android Wi-Fi and network permissions (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`) solely to discover UPnP/SSDP smart switches on your local Wi-Fi network (`239.255.255.250:1900`) and send local HTTP SOAP commands (`GetBinaryState`, `SetBinaryState`) directly to your switches' local IP addresses.
-- **On-Device Storage:** Device names, local IP addresses, ports, schedules, and Home Screen widget target preferences are stored locally on your device using Android Room SQLite storage and local SharedPreferences. Optional local diagnostic log exports (`wemi-telemetry-latest.txt`) stay strictly on-device unless you explicitly share them and are excluded from Android cloud Auto-Backup.
+- **No Personal Data Collected:** The App does not require an account, login, email address, cloud registration, or Android GPS/Location permissions.
+- **Local Network Communication Only:** The App uses standard Android Wi-Fi and network permissions (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`) solely to discover UPnP/SSDP smart switches on your local Wi-Fi network (`239.255.255.250:1900`), control switches (`GetBinaryState`, `SetBinaryState`), and read, write, or synchronize on-device switch automation rules and switch clocks (`FetchRules`, `StoreRules`, `TimeSync`) directly over your local LAN.
+- **On-Device Storage & Backup Exclusions:** Remembered Wi-Fi home profiles and discovered switch inventory (names, local IP addresses, ports, and hardware metadata) are stored locally on your device using Android Room v7 SQLite storage alongside local `SharedPreferences` for Home Screen widget target bindings and app preferences. Automation rules are stored directly inside compatible smart switches' onboard memory rather than on any external server. Before modifying on-device rules, the App saves local pre-write raw-ZIP backups (`hardware_rules_backups`) so you can restore previous rule sets in one tap. Both local pre-write rule backups (`hardware_rules_backups`) and optional local diagnostic log exports (`wemi-telemetry-latest.txt`) stay strictly on-device unless you explicitly share a diagnostic report, and both are excluded from Android cloud Auto-Backup and device-to-device transfer.
+- **Optional Solar Location (Offline Presets or Manual Coordinates Only):** If you configure sunrise or sunset schedules on a compatible switch, you may select an offline built-in city preset or manually enter latitude and longitude values. Those coordinates are written solely over your local Wi-Fi network to your switch's onboard `LOCATIONINFO` table so the switch can calculate sunrise and sunset locally. The App requests zero Android Location permissions, never accesses GPS or network location, and never transmits coordinates to external servers or includes exact coordinates in exported telemetry reports.
 
 ## Third-Party Sharing & Analytics
 The App contains no advertising SDKs, no third-party analytics trackers, and does not sell or transmit user data to any external server.

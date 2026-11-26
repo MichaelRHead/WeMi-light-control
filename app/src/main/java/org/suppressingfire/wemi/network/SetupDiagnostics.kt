@@ -152,13 +152,34 @@ object TelemetryFileExporter {
         "(&lt;(?:[a-z0-9_.-]+:)?password\\b[^&]*?&gt;)((?:(?!&lt;/)[\\s\\S])*)$",
         RegexOption.IGNORE_CASE
     )
+    private val RULE_DB_BODY_TAG_REGEX = Regex(
+        "(<(?:[a-z0-9_.-]+:)?ruleDbBody\\b[^>]*>)([\\s\\S]*?)(</(?:[a-z0-9_.-]+:)?ruleDbBody>)",
+        RegexOption.IGNORE_CASE
+    )
+    private val ESCAPED_RULE_DB_BODY_TAG_REGEX = Regex(
+        "(&lt;(?:[a-z0-9_.-]+:)?ruleDbBody\\b[^&]*?&gt;)([\\s\\S]*?)(&lt;/(?:[a-z0-9_.-]+:)?ruleDbBody&gt;)",
+        RegexOption.IGNORE_CASE
+    )
+    private val UNCLOSED_RULE_DB_BODY_TAG_REGEX = Regex(
+        "(<(?:[a-z0-9_.-]+:)?ruleDbBody\\b[^>]*>)((?:(?!</(?:[a-z0-9_.-]+:)?ruleDbBody>)[\\s\\S])*)$",
+        RegexOption.IGNORE_CASE
+    )
+    private val UNCLOSED_ESCAPED_RULE_DB_BODY_TAG_REGEX = Regex(
+        "(&lt;(?:[a-z0-9_.-]+:)?ruleDbBody\\b[^&]*?&gt;)((?:(?!&lt;/(?:[a-z0-9_.-]+:)?ruleDbBody&gt;)[\\s\\S])*)$",
+        RegexOption.IGNORE_CASE
+    )
 
-    private fun redactTagMatch(openTag: String, rawInner: String, closeTag: String = ""): String {
+    private fun redactTagMatch(
+        openTag: String,
+        rawInner: String,
+        closeTag: String = "",
+        lengthLabel: String = "encLen"
+    ): String {
         val inner = rawInner.trim()
         return if (inner.startsWith("[REDACTED", ignoreCase = true)) {
             "$openTag$rawInner$closeTag"
         } else {
-            "$openTag[REDACTED encLen=${inner.length}]$closeTag"
+            "$openTag[REDACTED $lengthLabel=${inner.length}]$closeTag"
         }
     }
 
@@ -172,8 +193,20 @@ object TelemetryFileExporter {
         val step3 = UNCLOSED_PASSWORD_TAG_REGEX.replace(step2) { m ->
             redactTagMatch(m.groupValues[1], m.groupValues[2])
         }
-        val redacted = UNCLOSED_ESCAPED_PASSWORD_TAG_REGEX.replace(step3) { m ->
+        val step4 = UNCLOSED_ESCAPED_PASSWORD_TAG_REGEX.replace(step3) { m ->
             redactTagMatch(m.groupValues[1], m.groupValues[2])
+        }
+        val step5 = RULE_DB_BODY_TAG_REGEX.replace(step4) { m ->
+            redactTagMatch(m.groupValues[1], m.groupValues[2], m.groupValues[3], lengthLabel = "base64Len")
+        }
+        val step6 = ESCAPED_RULE_DB_BODY_TAG_REGEX.replace(step5) { m ->
+            redactTagMatch(m.groupValues[1], m.groupValues[2], m.groupValues[3], lengthLabel = "base64Len")
+        }
+        val step7 = UNCLOSED_RULE_DB_BODY_TAG_REGEX.replace(step6) { m ->
+            redactTagMatch(m.groupValues[1], m.groupValues[2], lengthLabel = "base64Len")
+        }
+        val redacted = UNCLOSED_ESCAPED_RULE_DB_BODY_TAG_REGEX.replace(step7) { m ->
+            redactTagMatch(m.groupValues[1], m.groupValues[2], lengthLabel = "base64Len")
         }
         val compact = redacted.replace(Regex("\\s+"), " ").trim()
         return if (compact.length > maxChars) "${compact.take(maxChars - 1)}…" else compact
@@ -227,7 +260,8 @@ object TelemetryFileExporter {
         homes: List<HomeNetworkEntity> = emptyList(),
         devices: List<DeviceEntity> = emptyList(),
         soapLogs: List<SoapLogEntry> = emptyList(),
-        widgets: List<WidgetTargetConfig> = emptyList()
+        widgets: List<WidgetTargetConfig> = emptyList(),
+        hardwareRulesByDeviceId: Map<Int, DeviceHardwareRulesSnapshot> = emptyMap()
     ): String {
         val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         return buildString {
@@ -267,9 +301,28 @@ object TelemetryFileExporter {
                         ""
                     }
                     val udnPart = if (d.udn.isNotBlank()) " udn=${d.udn}" else ""
+                    val rulesMetaPart = buildString {
+                        append(" rulesCap=${d.hardwareRulesCapability}")
+                        if (d.hardwareRulesLongPressCapable) append(" lp=1")
+                        if (d.hardwareRulesVerifiedFirmware.isNotBlank()) {
+                            append(" rulesFw=${d.hardwareRulesVerifiedFirmware}")
+                        }
+                    }
                     appendLine(
-                        "[DEV #${d.id}] name=\"${d.name}\" room=\"${d.normalizedRoomName}\" home=${d.networkKey} addr=${d.ipAddress}:${d.port} state=$stateStr$dimmerPart rtt=${d.latencyMs}ms sku=\"${d.hardwareModel}\" fw=\"${d.firmwareVersion}\" sn=${d.serialNumber} mac=${d.macAddress}$udnPart ssid=\"${d.wifiSsid}\""
+                        "[DEV #${d.id}] name=\"${d.name}\" room=\"${d.normalizedRoomName}\" home=${d.networkKey} addr=${d.ipAddress}:${d.port} state=$stateStr$dimmerPart rtt=${d.latencyMs}ms sku=\"${d.hardwareModel}\" fw=\"${d.firmwareVersion}\" sn=${d.serialNumber} mac=${d.macAddress}$udnPart ssid=\"${d.wifiSsid}\"$rulesMetaPart"
                     )
+                    val rulesSnap = hardwareRulesByDeviceId[d.id]
+                    if (rulesSnap != null) {
+                        val driftLabel = rulesSnap.deviceTimeInfo?.driftSeconds?.toString() ?: "n/a"
+                        val needsSyncLabel = rulesSnap.deviceTimeInfo?.needsTimeSync?.toString() ?: "unknown"
+                        val hasSolarLoc = rulesSnap.locationInfo?.let { loc ->
+                            loc.latitude.isNotBlank() || loc.longitude.isNotBlank() || loc.cityName.isNotBlank()
+                        } == true
+                        val solarLocLabel = if (hasSolarLoc) "set" else "unset"
+                        appendLine(
+                            "  rules: dbV=${rulesSnap.dbVersion} rules=${rulesSnap.rules.size} integrity=${rulesSnap.integrityOk} driftSec=$driftLabel needsSync=$needsSyncLabel backups=${rulesSnap.availableBackups.size} solarLoc=$solarLocLabel"
+                        )
+                    }
                 }
             }
             appendLine()

@@ -2,8 +2,10 @@
 <!--
    Auto Backup rules for API <= 30.
    Room database (wemi_switch_database) and preferences remain backed up, while ephemeral
-   diagnostic LAN telemetry exports (IPs, MACs, SSIDs) stay strictly local to the device.
+   diagnostic LAN telemetry exports (wemi-telemetry-latest.txt) and local on-device switch
+   rule backups (hardware_rules_backups) stay strictly local to the device.
 -->
 <full-backup-content>
     <exclude domain="file" path="wemi-telemetry-latest.txt" />
+    <exclude domain="file" path="hardware_rules_backups" />
 </full-backup-content>

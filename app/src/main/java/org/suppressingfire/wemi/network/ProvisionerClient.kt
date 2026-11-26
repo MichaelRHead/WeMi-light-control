@@ -395,7 +395,7 @@ class ProvisionerClient(
             overallSuccess ->
                 "Provisioned to '$ssid' (Status=$netStatus, Method $effectiveMethod, lengths=$effectiveAddLengths) • Setup AP closed, switch joining Home Wi-Fi"
             httpSuccess && netStatus == 0 ->
-                "Switch did not join '$ssid' (NetworkStatus=0 after polling, Method=$effectiveMethod, lengths=$effectiveAddLengths, Ch=$effectiveChannel). Setup AP left open — screenshot the debug panel below or try another AES Method / Length option."
+                "Switch did not join '$ssid' (NetworkStatus=0 after polling, Method=$effectiveMethod, lengths=$effectiveAddLengths, Ch=$effectiveChannel). Setup AP left open — tap Copy or Save/Share in the debug panel below, or try another AES Method / Length option."
             else ->
                 "Setup AP ($apHost:$resolvedPort) unreachable — connect phone Wi-Fi to the switch's 10.22.22.1 setup network first ($lastProbeDiagnosticSummary)"
         }

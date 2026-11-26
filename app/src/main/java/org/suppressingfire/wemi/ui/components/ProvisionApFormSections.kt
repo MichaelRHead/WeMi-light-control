@@ -1,6 +1,7 @@
 package org.suppressingfire.wemi.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -8,19 +9,34 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.suppressingfire.wemi.data.DeviceCategory
 import org.suppressingfire.wemi.data.SwitchRepository
@@ -50,6 +66,8 @@ internal fun ProvisionWifiTargetSection(
     onAuthModeChange: (String) -> Unit,
     onEncryptionTypeChange: (String) -> Unit
 ) {
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -114,42 +132,106 @@ internal fun ProvisionWifiTargetSection(
         onValueChange = onPasswordChange,
         label = { Text("Wi-Fi Password") },
         singleLine = true,
+        visualTransformation = if (passwordVisible) {
+            VisualTransformation.None
+        } else {
+            PasswordVisualTransformation()
+        },
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.Password,
+            autoCorrectEnabled = false
+        ),
+        trailingIcon = {
+            IconButton(
+                onClick = { passwordVisible = !passwordVisible },
+                modifier = Modifier
+                    .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                    .testTag("toggle_provision_password_visibility")
+            ) {
+                Icon(
+                    imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                    contentDescription = if (passwordVisible) "Hide password" else "Show password"
+                )
+            }
+        },
         modifier = Modifier
             .fillMaxWidth()
             .testTag("provision_password_input")
     )
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        OutlinedTextField(
-            value = channelText,
-            onValueChange = onChannelChange,
-            label = { Text("2.4G Ch") },
-            singleLine = true,
-            modifier = Modifier
-                .weight(0.7f)
-                .testTag("provision_channel_input")
-        )
-        OutlinedTextField(
-            value = authMode,
-            onValueChange = onAuthModeChange,
-            label = { Text("Auth Mode") },
-            singleLine = true,
-            modifier = Modifier
-                .weight(1.2f)
-                .testTag("provision_auth_input")
-        )
-        OutlinedTextField(
-            value = encryptionType,
-            onValueChange = onEncryptionTypeChange,
-            label = { Text("Encrypt") },
-            singleLine = true,
-            modifier = Modifier
-                .weight(1f)
-                .testTag("provision_encrypt_input")
-        )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        if (maxWidth >= 340.dp) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                OutlinedTextField(
+                    value = channelText,
+                    onValueChange = onChannelChange,
+                    label = { Text("2.4G Ch", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(0.8f)
+                        .testTag("provision_channel_input")
+                )
+                OutlinedTextField(
+                    value = authMode,
+                    onValueChange = onAuthModeChange,
+                    label = { Text("Auth Mode", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(1.25f)
+                        .testTag("provision_auth_input")
+                )
+                OutlinedTextField(
+                    value = encryptionType,
+                    onValueChange = onEncryptionTypeChange,
+                    label = { Text("Encrypt", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .weight(0.95f)
+                        .testTag("provision_encrypt_input")
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = channelText,
+                        onValueChange = onChannelChange,
+                        label = { Text("2.4G Ch", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(0.85f)
+                            .testTag("provision_channel_input")
+                    )
+                    OutlinedTextField(
+                        value = encryptionType,
+                        onValueChange = onEncryptionTypeChange,
+                        label = { Text("Encrypt", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        singleLine = true,
+                        modifier = Modifier
+                            .weight(1.15f)
+                            .testTag("provision_encrypt_input")
+                    )
+                }
+                OutlinedTextField(
+                    value = authMode,
+                    onValueChange = onAuthModeChange,
+                    label = { Text("Auth Mode", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("provision_auth_input")
+                )
+            }
+        }
     }
 }
 

@@ -169,11 +169,12 @@ object WidgetActionExecutor {
                         false
                     } else {
                         val resolvedHomeKey = roomSwitches.first().networkKey
+                        val roomName = config.normalizedRoomName()
                         val reachable = roomSwitches.filter { it.isReachable }
-                        if (reachable.isNotEmpty()) {
+                        val succeededCount = if (reachable.isNotEmpty()) {
                             val targetOn = reachable.none { it.isOn }
                             repository.toggleRoomPower(
-                                roomName = config.normalizedRoomName(),
+                                roomName = roomName,
                                 targetOn = targetOn,
                                 networkKey = resolvedHomeKey
                             )
@@ -181,8 +182,8 @@ object WidgetActionExecutor {
                             // All switches in this room were previously marked offline — actively probe/wake them
                             coroutineScope {
                                 roomSwitches.map { dev ->
-                                    async { repository.setDevicePowerExplicit(dev, true) }
-                                }.awaitAll()
+                                    async { repository.setDevicePowerExplicit(dev, true).isReachable }
+                                }.awaitAll().count { it }
                             }
                         }
                         if (resolvedHomeKey.isNotBlank() && resolvedHomeKey != config.networkKey) {
@@ -191,10 +192,10 @@ object WidgetActionExecutor {
                         logWidgetEvent(
                             context = appCtx,
                             appWidgetId = appWidgetId,
-                            label = "Widget #$appWidgetId (${config.normalizedRoomName()})",
+                            label = "Widget #$appWidgetId ($roomName)",
                             action = "Widget#Toggle(ROOM)",
-                            statusText = "Updated ${roomSwitches.size} switch(es) in \"${config.normalizedRoomName()}\" (home=$resolvedHomeKey)",
-                            success = true
+                            statusText = "Updated $succeededCount/${roomSwitches.size} switch(es) in \"$roomName\" (home=$resolvedHomeKey)",
+                            success = succeededCount > 0
                         )
                         true
                     }

@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.HomeNetworkEntity
 import org.suppressingfire.wemi.data.SoapLogEntry
+import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
 import org.suppressingfire.wemi.network.LanNetworkSnapshot
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
@@ -49,6 +50,7 @@ fun MoreScreen(
     homeNetworks: List<HomeNetworkEntity> = emptyList(),
     setupDebugSnapshot: SetupDebugSnapshot = SetupDebugSnapshot(),
     lanNetworkState: LanNetworkSnapshot = LanNetworkSnapshot(),
+    hardwareRulesByDeviceId: Map<Int, DeviceHardwareRulesSnapshot> = emptyMap(),
     onTurnAllOn: () -> Unit,
     onTurnAllOff: () -> Unit,
     onScanNetwork: () -> Unit,
@@ -92,6 +94,7 @@ fun MoreScreen(
                 homeNetworks = homeNetworks,
                 setupDebugSnapshot = setupDebugSnapshot,
                 lanNetworkState = lanNetworkState,
+                hardwareRulesByDeviceId = hardwareRulesByDeviceId,
                 soapLogs = soapLogs,
                 isDemoShowroomMode = isDemoShowroomMode,
                 onClearLogs = onClearLogs

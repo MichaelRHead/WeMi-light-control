@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
@@ -33,9 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -43,10 +46,10 @@ import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.HomeNetworkEntity
 import org.suppressingfire.wemi.data.SoapLogEntry
+import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
 import org.suppressingfire.wemi.network.LanNetworkSnapshot
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.TelemetryFileExporter
-import org.suppressingfire.wemi.ui.theme.WemoErrorRed
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
@@ -54,6 +57,7 @@ import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 
 internal val MoreCodeSurfaceGray = Color(0xFFF3F6F8)
+private val DestructiveActionRed = Color(0xFFDC2626)
 
 @Composable
 internal fun MasterSwitchControlCard(
@@ -157,7 +161,16 @@ internal fun LocalUpnpEngineCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .toggleable(
+                        value = isDemoShowroomMode,
+                        role = Role.Switch,
+                        onValueChange = onToggleDemoShowroomMode
+                    )
+                    .padding(vertical = 4.dp)
+                    .testTag("demo_showroom_mode_switch"),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -180,11 +193,11 @@ internal fun LocalUpnpEngineCard(
                         color = WemoTextSecondary
                     )
                 }
+                Spacer(modifier = Modifier.width(12.dp))
                 Switch(
                     checked = isDemoShowroomMode,
-                    onCheckedChange = { onToggleDemoShowroomMode(it) },
-                    colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary),
-                    modifier = Modifier.testTag("demo_showroom_mode_switch")
+                    onCheckedChange = null,
+                    colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary)
                 )
             }
 
@@ -231,10 +244,10 @@ internal fun LocalUpnpEngineCard(
                     imageVector = Icons.Default.Restore,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = WemoErrorRed
+                    tint = DestructiveActionRed
                 )
                 Spacer(modifier = Modifier.width(6.dp))
-                Text("Reset Homes, Discovered Switches & Rooms", color = WemoErrorRed)
+                Text("Reset Homes, Discovered Switches & Rooms", color = DestructiveActionRed)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -308,6 +321,7 @@ internal fun SoapPacketLogCard(
     homeNetworks: List<HomeNetworkEntity> = emptyList(),
     setupDebugSnapshot: SetupDebugSnapshot = SetupDebugSnapshot(),
     lanNetworkState: LanNetworkSnapshot = LanNetworkSnapshot(),
+    hardwareRulesByDeviceId: Map<Int, DeviceHardwareRulesSnapshot> = emptyMap(),
     onClearLogs: () -> Unit
 ) {
     val context = LocalContext.current
@@ -346,7 +360,8 @@ internal fun SoapPacketLogCard(
                                 homes = homeNetworks,
                                 devices = devices,
                                 soapLogs = soapLogs,
-                                widgets = org.suppressingfire.wemi.widget.WidgetConfigStore.loadAll(context)
+                                widgets = org.suppressingfire.wemi.widget.WidgetConfigStore.loadAll(context),
+                                hardwareRulesByDeviceId = hardwareRulesByDeviceId
                             )
                             TelemetryFileExporter.copyAndShareTelemetryReport(
                                 context = context,
@@ -367,7 +382,7 @@ internal fun SoapPacketLogCard(
                             onClick = onClearLogs,
                             modifier = Modifier.testTag("clear_soap_logs_button")
                         ) {
-                            Text("Clear", color = WemoErrorRed, fontSize = 12.sp)
+                            Text("Clear", color = DestructiveActionRed, fontSize = 12.sp)
                         }
                     }
                 }
