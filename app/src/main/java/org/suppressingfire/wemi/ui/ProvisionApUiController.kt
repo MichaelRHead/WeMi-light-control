@@ -79,6 +79,20 @@ internal class ProvisionApUiController(
         _showProvisionApDialog.value = false
     }
 
+    fun clearDiagnosticsState() {
+        val activeScan = synchronized(scanLock) {
+            val prior = scanJob
+            scanJob = null
+            _isScanningSetupAp.value = false
+            prior
+        }
+        activeScan?.cancel()
+        _scannedSetupAps.value = emptyList()
+        _detectedSetupDevice.value = null
+        _setupApStatusMessage.value = null
+        _setupDebugSnapshot.value = SetupDebugSnapshot()
+    }
+
     fun scanSetupApNetworks(apHost: String = "10.22.22.1") {
         val job: Job = synchronized(scanLock) {
             if (_isProvisioningAp.value || scanJob?.isActive == true || _isScanningSetupAp.value) {

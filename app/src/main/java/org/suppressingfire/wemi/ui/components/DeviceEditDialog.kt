@@ -287,6 +287,11 @@ fun AddOrEditDeviceDialog(
                     }
                 }
 
+                val trimmedIp = ipAddress.trim()
+                val ipValid = trimmedIp.isEmpty() || org.suppressingfire.wemi.network.LanEndpointPolicy.isAllowedLanHost(trimmedIp)
+                val parsedPortCandidate = portText.toIntOrNull()
+                val portValid = portText.isBlank() || (parsedPortCandidate != null && parsedPortCandidate in 1..65535)
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -295,6 +300,7 @@ fun AddOrEditDeviceDialog(
                         value = ipAddress,
                         onValueChange = { ipAddress = it },
                         label = { Text(stringResource(R.string.label_ip_address)) },
+                        isError = !ipValid,
                         singleLine = true,
                         modifier = Modifier
                             .weight(1.4f)
@@ -304,11 +310,24 @@ fun AddOrEditDeviceDialog(
                         value = portText,
                         onValueChange = { portText = it.filter { ch -> ch.isDigit() } },
                         label = { Text("Port") },
+                        isError = !portValid,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         modifier = Modifier
                             .weight(0.8f)
                             .testTag("device_port_input")
+                    )
+                }
+                if (!ipValid || !portValid) {
+                    Text(
+                        text = if (!ipValid) {
+                            "Enter a private local LAN IPv4 address (192.168.x.x, 10.x.x.x, or 172.16–31.x.x)."
+                        } else {
+                            "Enter a valid TCP port between 1 and 65535 (default 49153)."
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = StatusOfflineRed,
+                        modifier = Modifier.testTag("device_endpoint_validation_error")
                     )
                 }
 
@@ -340,9 +359,12 @@ fun AddOrEditDeviceDialog(
             }
         },
         confirmButton = {
+            val trimmedIpForSave = ipAddress.trim().ifBlank { "192.168.1.115" }
+            val parsedPortForSave = portText.toIntOrNull() ?: 49153
+            val endpointValid = org.suppressingfire.wemi.network.LanEndpointPolicy.isAllowedLanHost(trimmedIpForSave) &&
+                parsedPortForSave in 1..65535
             Button(
                 onClick = {
-                    val parsedPort = portText.toIntOrNull() ?: 49153
                     val finalName = name.trim()
                     val finalRoom = roomName.trim()
                     onSave(
@@ -350,8 +372,8 @@ fun AddOrEditDeviceDialog(
                         finalName,
                         finalRoom,
                         selectedType,
-                        ipAddress.ifBlank { "192.168.1.115" },
-                        parsedPort,
+                        trimmedIpForSave,
+                        parsedPortForSave,
                         brightness.roundToInt(),
                         isReachable,
                         isOn,
@@ -359,6 +381,7 @@ fun AddOrEditDeviceDialog(
                         syncNameToHardware
                     )
                 },
+                enabled = endpointValid,
                 colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
                 modifier = Modifier.testTag("save_device_button")
             ) {

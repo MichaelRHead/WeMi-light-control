@@ -30,6 +30,10 @@ object WidgetActionExecutor {
         widgetMutexes.remove(appWidgetId)
     }
 
+    internal fun clearAllWidgetMutexes() {
+        widgetMutexes.clear()
+    }
+
     internal fun hasMutexFor(appWidgetId: Int): Boolean =
         widgetMutexes.containsKey(appWidgetId)
 

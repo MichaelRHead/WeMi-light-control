@@ -217,9 +217,11 @@ internal class SsdpDiscoveryEngine(
                         val headers = XmlAndSkuParser.parseSsdpHeaders(rawText)
                         if (headers["NTS"].equals("ssdp:byebye", ignoreCase = true)) continue
                         val loc = headers["LOCATION"]
-                        if (!loc.isNullOrEmpty()) {
+                        if (!loc.isNullOrEmpty() &&
+                            LanEndpointPolicy.isAllowedLanUrl(loc, allowLoopback = hasLoopbackTargets || isRobolectric)
+                        ) {
                             LanSubnetHintResolver.extractRfc1918HostIp(loc)?.let { observedSsdpPeerIps.add(it) }
-                            if (!seenLocations.containsKey(loc)) {
+                            if (!seenLocations.containsKey(loc) && seenLocations.size < 64) {
                                 seenLocations[loc] = Triple(headers, elapsed, respPacket.port)
                                 if (hasLoopbackTargets && seenLocations.size >= loopbackPorts.size) {
                                     break

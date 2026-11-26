@@ -189,6 +189,14 @@ class SwitchRepository(
     suspend fun resetLanHomesSwitchesAndRooms(onActiveKeyResolved: ((String) -> Unit)? = null): String {
         val key = setDemoShowroomMode(false, onActiveKeyResolved)
         hardwareRulesClient.clearAllBackups()
+        clearLogs()
+        context?.let { appCtx ->
+            SharedSoapLogStore.clear(appCtx)
+            org.suppressingfire.wemi.network.TelemetryFileExporter.deleteTelemetryFile(appCtx)
+            org.suppressingfire.wemi.widget.WidgetConfigStore.clearAll(appCtx)
+            org.suppressingfire.wemi.widget.WidgetActionExecutor.clearAllWidgetMutexes()
+            org.suppressingfire.wemi.widget.WidgetUpdater.refreshWidgetsForDevices(appCtx, emptyList())
+        }
         return key
     }
 

@@ -3,9 +3,10 @@ package org.suppressingfire.wemi.network
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.EOFException
+import java.io.IOException
 import java.io.InputStream
 import java.net.InetSocketAddress
-import java.net.URI
+import java.net.SocketTimeoutException
 import java.util.Locale
 import javax.net.SocketFactory
 
@@ -38,23 +39,22 @@ internal class LanHttpBinaryResponse(
 /**
  * Lightweight zero-dependency local-LAN HTTP/1.1 & UPnP GENA client built directly on [SocketFactory].
  *
- * Designed specifically for local smart-switch UPnP / SOAP / GENA traffic:
- * - Uses zero-argument `socketFactory.createSocket()` + `connect(InetSocketAddress, timeout)` so
- *   Android Wi-Fi bound [SocketFactory] instances bypass mobile data while keeping `127.0.0.1`
- *   loopback tests unbound.
- * - Supports standard HTTP (`GET`, `POST`) and UPnP GENA (`SUBSCRIBE`, `UNSUBSCRIBE`) methods,
- *   plus byte-exact binary downloads ([getBytes]) for zipped on-device `rules.db` archives.
- * - Frames responses strictly by byte-exact `Content-Length` (or `Transfer-Encoding: chunked`)
- *   before falling back to EOF, avoiding 1000ms+ hangs on embedded switch HTTP daemons that delay TCP `FIN`.
+ * Enforces [LanEndpointPolicy] (`http://` + literal RFC 1918 IPv4 allowlist, strict CR/LF/NUL
+ * rejection on methods, targets, and headers) alongside bounded header counts, total header byte
+ * budgets, wall-clock response deadlines, and strict response-size caps.
  */
 internal class LanHttpClient(
     private val socketFactory: SocketFactory = SocketFactory.getDefault(),
     private val connectTimeoutMs: Int = 750,
-    private val readTimeoutMs: Int = 1200
+    private val readTimeoutMs: Int = 1200,
+    private val allowLoopbackForTests: Boolean = LanRuntimeUtils.isRunningInRobolectric()
 ) {
     companion object {
         private const val MAX_TEXT_RESPONSE_BODY_BYTES = 512 * 1024
         internal const val MAX_BINARY_RESPONSE_BODY_BYTES = 2 * 1024 * 1024
+        private const val MAX_RESPONSE_HEADERS = 64
+        private const val MAX_HEADER_LINE_BYTES = 8192
+        private const val MAX_TOTAL_HEADER_BYTES = 16 * 1024
     }
 
     fun get(
@@ -120,6 +120,12 @@ internal class LanHttpClient(
         )
     }
 
+    private fun checkDeadline(deadlineNs: Long) {
+        if (System.nanoTime() > deadlineNs) {
+            throw SocketTimeoutException("HTTP response exceeded overall wall-clock budget")
+        }
+    }
+
     private fun executeRaw(
         method: String,
         url: String,
@@ -127,26 +133,22 @@ internal class LanHttpClient(
         body: String?,
         maxResponseBytes: Int
     ): LanHttpBinaryResponse {
-        val uri = URI(url)
-        val host = requireNotNull(uri.host?.takeIf { it.isNotBlank() }) {
-            "Missing host in URL: $url"
-        }
-        val port = if (uri.port > 0) uri.port else 80
-        val rawPath = uri.rawPath?.takeIf { it.isNotEmpty() } ?: "/"
-        val requestTarget = if (!uri.rawQuery.isNullOrEmpty()) {
-            "$rawPath?${uri.rawQuery}"
-        } else {
-            rawPath
-        }
+        val safeMethod = LanEndpointPolicy.validateHttpMethod(method)
+        val validated = LanEndpointPolicy.validateLanUrl(url, allowLoopback = allowLoopbackForTests)
+        val host = validated.host
+        val port = validated.port
+        val requestTarget = validated.requestTarget
 
         val bodyBytes = body?.toByteArray(Charsets.UTF_8)
         val requestHeaderText = buildString {
-            append("$method $requestTarget HTTP/1.1\r\n")
+            append("$safeMethod $requestTarget HTTP/1.1\r\n")
             if (headers.keys.none { it.equals("Host", ignoreCase = true) }) {
                 append("Host: $host:$port\r\n")
             }
-            for ((k, v) in headers) {
-                append("$k: $v\r\n")
+            for ((rawName, rawValue) in headers) {
+                val safeName = LanEndpointPolicy.validateHeaderName(rawName)
+                val safeValue = LanEndpointPolicy.validateHeaderValue(rawValue)
+                append("$safeName: $safeValue\r\n")
             }
             if (bodyBytes != null && headers.keys.none { it.equals("Content-Length", ignoreCase = true) }) {
                 append("Content-Length: ${bodyBytes.size}\r\n")
@@ -157,6 +159,7 @@ internal class LanHttpClient(
             append("\r\n")
         }
 
+        val totalBudgetMs = maxOf(readTimeoutMs * 4L, 5_000L)
         return socketFactory.createSocket().use { socket ->
             socket.tcpNoDelay = true
             socket.connect(InetSocketAddress(host, port), connectTimeoutMs)
@@ -169,8 +172,9 @@ internal class LanHttpClient(
             }
             out.flush()
 
+            val deadlineNs = System.nanoTime() + totalBudgetMs * 1_000_000L
             val input = BufferedInputStream(socket.getInputStream(), 8192)
-            val statusLine = readHeaderLine(input)
+            val statusLine = readHeaderLine(input, deadlineNs)
                 ?: throw EOFException("Empty HTTP response from $host:$port")
             val statusParts = statusLine.split(' ', limit = 3)
             val statusCode = statusParts.getOrNull(1)?.toIntOrNull()
@@ -178,9 +182,17 @@ internal class LanHttpClient(
             val statusMessage = statusParts.getOrNull(2).orEmpty()
 
             val responseHeaders = LinkedHashMap<String, String>()
+            var headerCount = 0
+            var totalHeaderBytes = statusLine.length
             while (true) {
-                val line = readHeaderLine(input) ?: break
+                checkDeadline(deadlineNs)
+                val line = readHeaderLine(input, deadlineNs) ?: break
                 if (line.isEmpty()) break
+                headerCount++
+                totalHeaderBytes += line.length + 2
+                if (headerCount > MAX_RESPONSE_HEADERS || totalHeaderBytes > MAX_TOTAL_HEADER_BYTES) {
+                    throw IOException("HTTP response headers exceeded safe limits ($headerCount headers, $totalHeaderBytes bytes)")
+                }
                 val colonIdx = line.indexOf(':')
                 if (colonIdx > 0) {
                     val key = line.substring(0, colonIdx).trim().lowercase(Locale.US)
@@ -192,14 +204,16 @@ internal class LanHttpClient(
             val responseBodyBytes = when {
                 statusCode in 100..199 || statusCode == 204 || statusCode == 304 -> ByteArray(0)
                 responseHeaders["transfer-encoding"]?.contains("chunked", ignoreCase = true) == true ->
-                    readChunkedBody(input, maxResponseBytes)
+                    readChunkedBody(input, maxResponseBytes, deadlineNs)
                 responseHeaders.containsKey("content-length") -> {
-                    val contentLength = responseHeaders["content-length"]
-                        ?.toIntOrNull()
-                        ?.coerceIn(0, maxResponseBytes) ?: 0
-                    readExactBytes(input, contentLength)
+                    val rawLen = responseHeaders["content-length"]?.toLongOrNull()
+                        ?: throw IOException("Malformed HTTP Content-Length header")
+                    if (rawLen < 0L || rawLen > maxResponseBytes.toLong()) {
+                        throw IOException("HTTP response Content-Length ($rawLen) exceeds safe limit ($maxResponseBytes)")
+                    }
+                    readExactBytes(input, rawLen.toInt(), deadlineNs)
                 }
-                else -> readUntilEof(input, maxResponseBytes)
+                else -> readUntilEof(input, maxResponseBytes, deadlineNs)
             }
 
             LanHttpBinaryResponse(
@@ -211,10 +225,11 @@ internal class LanHttpClient(
         }
     }
 
-    private fun readHeaderLine(input: InputStream): String? {
+    private fun readHeaderLine(input: InputStream, deadlineNs: Long): String? {
         val buf = ByteArrayOutputStream(128)
         var sawAnyByte = false
         while (true) {
+            checkDeadline(deadlineNs)
             val b = input.read()
             if (b == -1) {
                 return if (sawAnyByte) buf.toString(Charsets.ISO_8859_1.name()).trimEnd('\r') else null
@@ -223,18 +238,20 @@ internal class LanHttpClient(
             if (b == '\n'.code) {
                 break
             }
-            if (buf.size() < 8192) {
-                buf.write(b)
+            if (buf.size() >= MAX_HEADER_LINE_BYTES) {
+                throw IOException("HTTP header line exceeded $MAX_HEADER_LINE_BYTES byte limit")
             }
+            buf.write(b)
         }
         return buf.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
     }
 
-    private fun readExactBytes(input: InputStream, length: Int): ByteArray {
+    private fun readExactBytes(input: InputStream, length: Int, deadlineNs: Long): ByteArray {
         if (length <= 0) return ByteArray(0)
         val out = ByteArray(length)
         var offset = 0
         while (offset < length) {
+            checkDeadline(deadlineNs)
             val read = input.read(out, offset, length - offset)
             if (read == -1) break
             offset += read
@@ -245,42 +262,51 @@ internal class LanHttpClient(
         return out
     }
 
-    private fun readChunkedBody(input: InputStream, maxResponseBytes: Int): ByteArray {
+    private fun readChunkedBody(input: InputStream, maxResponseBytes: Int, deadlineNs: Long): ByteArray {
         val out = ByteArrayOutputStream()
+        var trailerCount = 0
         while (true) {
-            val sizeLine = readHeaderLine(input)?.trim() ?: break
+            checkDeadline(deadlineNs)
+            val sizeLine = readHeaderLine(input, deadlineNs)?.trim() ?: break
             if (sizeLine.isEmpty()) continue
-            val chunkSize = sizeLine.substringBefore(';').trim().toIntOrNull(16) ?: break
-            if (chunkSize <= 0) {
+            val chunkSize = sizeLine.substringBefore(';').trim().toIntOrNull(16)
+                ?: throw IOException("Malformed HTTP chunk size: $sizeLine")
+            if (chunkSize < 0) throw IOException("Negative HTTP chunk size")
+            if (chunkSize == 0) {
                 while (true) {
-                    val trailer = readHeaderLine(input) ?: break
+                    val trailer = readHeaderLine(input, deadlineNs) ?: break
                     if (trailer.isEmpty()) break
+                    trailerCount++
+                    if (trailerCount > MAX_RESPONSE_HEADERS) {
+                        throw IOException("HTTP chunk trailers exceeded safe limit")
+                    }
                 }
                 break
             }
-            val cappedSize = chunkSize.coerceAtMost(maxResponseBytes - out.size())
-            if (cappedSize > 0) {
-                val chunk = readExactBytes(input, cappedSize)
-                out.write(chunk)
+            if (chunkSize > maxResponseBytes - out.size()) {
+                throw IOException("Chunked HTTP response exceeded $maxResponseBytes byte limit")
             }
-            if (chunkSize > cappedSize) {
-                break
-            }
-            readHeaderLine(input)
+            val chunk = readExactBytes(input, chunkSize, deadlineNs)
+            out.write(chunk)
+            readHeaderLine(input, deadlineNs)
         }
         return out.toByteArray()
     }
 
-    private fun readUntilEof(input: InputStream, maxResponseBytes: Int): ByteArray {
+    private fun readUntilEof(input: InputStream, maxResponseBytes: Int, deadlineNs: Long): ByteArray {
         val out = ByteArrayOutputStream()
         val buf = ByteArray(4096)
-        while (out.size() < maxResponseBytes) {
+        while (true) {
+            checkDeadline(deadlineNs)
             val n = try {
-                input.read(buf, 0, minOf(buf.size, maxResponseBytes - out.size()))
-            } catch (timeout: java.net.SocketTimeoutException) {
+                input.read(buf, 0, buf.size)
+            } catch (timeout: SocketTimeoutException) {
                 if (out.size() > 0) break else throw timeout
             }
             if (n == -1) break
+            if (out.size() + n > maxResponseBytes) {
+                throw IOException("HTTP response exceeded $maxResponseBytes byte limit")
+            }
             out.write(buf, 0, n)
         }
         return out.toByteArray()

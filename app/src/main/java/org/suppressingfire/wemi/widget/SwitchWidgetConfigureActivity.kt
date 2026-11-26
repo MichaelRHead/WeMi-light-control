@@ -1,6 +1,7 @@
 package org.suppressingfire.wemi.widget
 
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
@@ -66,6 +67,7 @@ import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.HomeNetworkEntity
 import org.suppressingfire.wemi.data.SwitchDatabase
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.ui.components.iconForRoom
 import org.suppressingfire.wemi.ui.theme.WeMiDeepSapphireBottom
 import org.suppressingfire.wemi.ui.theme.WeMiDeepTealAccent
@@ -83,6 +85,19 @@ import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 class SwitchWidgetConfigureActivity : ComponentActivity() {
     private var appWidgetId: Int = AppWidgetManager.INVALID_APPWIDGET_ID
 
+    private fun isOwnedAppWidgetId(widgetId: Int): Boolean {
+        if (widgetId <= AppWidgetManager.INVALID_APPWIDGET_ID) return false
+        val manager = AppWidgetManager.getInstance(this) ?: return false
+        val expectedProvider = ComponentName(this, WeMiSwitchWidgetProvider::class.java)
+        val info = manager.getAppWidgetInfo(widgetId)
+        if (info != null) {
+            return info.provider == expectedProvider
+        }
+        val activeIds = manager.getAppWidgetIds(expectedProvider) ?: IntArray(0)
+        if (widgetId in activeIds) return true
+        return LanRuntimeUtils.isRunningInRobolectric() && activeIds.isEmpty()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -94,7 +109,7 @@ class SwitchWidgetConfigureActivity : ComponentActivity() {
             AppWidgetManager.INVALID_APPWIDGET_ID
         ) ?: AppWidgetManager.INVALID_APPWIDGET_ID
 
-        if (appWidgetId <= AppWidgetManager.INVALID_APPWIDGET_ID) {
+        if (!isOwnedAppWidgetId(appWidgetId)) {
             finish()
             return
         }

@@ -410,7 +410,7 @@ class ProvisionerClient(
             success = overallSuccess,
             networkStatusCode = netStatus.coerceAtLeast(0),
             statusMessage = statusDesc,
-            encryptedPasswordPayload = encryptedPwd,
+            encryptedPasswordPayload = "",
             logEntry = SoapLogEntry(
                 timestamp = nowTime(),
                 deviceName = updatedDescriptor?.friendlyName ?: "Setup AP ($apHost)",
@@ -424,7 +424,8 @@ class ProvisionerClient(
             effectiveEncryptionMethod = effectiveMethod,
             addedLengthSuffix = effectiveAddLengths,
             setupDevice = updatedDescriptor,
-            debugTraceLines = traceLines
+            debugTraceLines = traceLines,
+            encryptedPasswordLength = encryptedPwd.length
         )
     }
 }

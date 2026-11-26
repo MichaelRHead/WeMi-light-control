@@ -16,10 +16,13 @@ import java.io.OutputStreamWriter
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.security.MessageDigest
+import java.security.SecureRandom
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.net.SocketFactory
 
@@ -40,16 +43,17 @@ data class GenaSubscriptionRecord(
     val port: Int,
     val sid: String,
     val subscribedAtMs: Long,
-    val expiresAtMs: Long
+    val expiresAtMs: Long,
+    val callbackToken: String = ""
 )
 
 /**
  * Implements UPnP GENA (General Event Notification Architecture) local push subscriptions:
- * - Runs a lightweight embedded HTTP NOTIFY server (port 8989 or ephemeral fallback) on the local LAN.
- * - Subscribes to /upnp/event/basicevent1 with TIMEOUT: Second-300.
- * - Automatically recovers from HTTP 412 Precondition Failed on renewal by issuing a fresh SUBSCRIBE.
- * - Parses <e:propertyset> XML payloads for <BinaryState> and <Brightness>/<brightness> changes
- *   pushed when a physical wall paddle, 3-way traveler, or dimmer bar is flipped.
+ * - Binds a lightweight embedded HTTP NOTIFY server (port 8989 or ephemeral fallback) to the
+ *   active local LAN IPv4 address with bounded concurrency (`Semaphore(8)`), header limits,
+ *   and wall-clock budgets.
+ * - Subscribes to `/upnp/event/basicevent1` using a per-subscription `SecureRandom` callback
+ *   token and verifies source IP, constant-time token match, and active `SID` on every `NOTIFY`.
  */
 class GenaSubscriptionManager(
     private val localIpProvider: () -> String,
@@ -57,6 +61,13 @@ class GenaSubscriptionManager(
     wifiSocketFactory: SocketFactory = SocketFactory.getDefault(),
     private val onNotification: (GenaEventNotification) -> Unit
 ) {
+    companion object {
+        private const val MAX_CONCURRENT_NOTIFY_CONNECTIONS = 8
+        private const val MAX_NOTIFY_HEADERS = 32
+        private const val MAX_NOTIFY_HEADER_LINE_BYTES = 4096
+        private const val NOTIFY_DEADLINE_MS = 2_000L
+    }
+
     private val httpClient = LanHttpClient(
         socketFactory = wifiSocketFactory,
         connectTimeoutMs = 900,
@@ -65,11 +76,14 @@ class GenaSubscriptionManager(
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val isRunning = AtomicBoolean(false)
+    private val secureRandom = SecureRandom()
+    private val notifyConcurrency = Semaphore(MAX_CONCURRENT_NOTIFY_CONNECTIONS)
     private var serverSocket: ServerSocket? = null
     private var acceptJob: Job? = null
 
     private val subscriptionsByDeviceKey = ConcurrentHashMap<String, GenaSubscriptionRecord>()
     private val deviceKeyBySid = ConcurrentHashMap<String, String>()
+    private val pendingTokensByDeviceKey = ConcurrentHashMap<String, Triple<String, String, String>>()
 
     val activeListenPort: Int
         get() = serverSocket?.localPort ?: -1
@@ -80,13 +94,32 @@ class GenaSubscriptionManager(
     internal val activeSidCount: Int
         get() = deviceKeyBySid.size
 
-    private fun nowTime(): String {
-        return SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
+    private fun nowTime(): String = SimpleDateFormat("h:mm:ss a", Locale.US).format(Date())
+
+    private fun generateCallbackToken(): String {
+        val bytes = ByteArray(12)
+        secureRandom.nextBytes(bytes)
+        return buildString(24) {
+            for (b in bytes) {
+                val v = b.toInt() and 0xFF
+                append("0123456789abcdef"[v ushr 4])
+                append("0123456789abcdef"[v and 0x0F])
+            }
+        }
+    }
+
+    private fun bindServerSocket(targetAddr: InetAddress?): ServerSocket {
+        return if (preferredListenPort > 0) {
+            runCatching { ServerSocket(preferredListenPort, 32, targetAddr) }
+                .getOrElse { ServerSocket(0, 32, targetAddr) }
+        } else {
+            ServerSocket(0, 32, targetAddr)
+        }
     }
 
     /**
-     * Starts the embedded HTTP NOTIFY callback server if not already running.
-     * Returns the bound local TCP port, or -1 if binding failed.
+     * Starts the embedded HTTP NOTIFY callback server if not already running, preferring to bind
+     * directly to the active LAN IPv4 interface rather than `0.0.0.0`.
      */
     @Synchronized
     fun startServer(bindAddress: InetAddress? = null): Int {
@@ -97,16 +130,13 @@ class GenaSubscriptionManager(
             runCatching { serverSocket?.close() }
             serverSocket = null
         }
+        val preferredAddr = bindAddress ?: runCatching {
+            val ip = localIpProvider().trim()
+            if (LanEndpointPolicy.parseStrictIpv4Literal(ip) != null) InetAddress.getByName(ip) else null
+        }.getOrNull()
         val socket = try {
-            if (preferredListenPort > 0) {
-                runCatching {
-                    ServerSocket(preferredListenPort, 32, bindAddress)
-                }.getOrElse {
-                    ServerSocket(0, 32, bindAddress)
-                }
-            } else {
-                ServerSocket(0, 32, bindAddress)
-            }
+            runCatching { bindServerSocket(preferredAddr) }
+                .getOrElse { if (preferredAddr != null) bindServerSocket(null) else throw it }
         } catch (_: Exception) {
             return -1
         }
@@ -117,8 +147,23 @@ class GenaSubscriptionManager(
             while (isActive && isRunning.get() && !socket.isClosed) {
                 try {
                     val client = socket.accept()
-                    // Launch on SupervisorJob-backed `scope` so one stalled/reset peer never cancels acceptJob
-                    scope.launch { handleNotifyClient(client) }
+                    if (!notifyConcurrency.tryAcquire()) {
+                        runCatching { client.close() }
+                        continue
+                    }
+                    try {
+                        scope.launch {
+                            try {
+                                handleNotifyClient(client)
+                            } finally {
+                                notifyConcurrency.release()
+                            }
+                        }
+                    } catch (t: Throwable) {
+                        notifyConcurrency.release()
+                        runCatching { client.close() }
+                        if (t is kotlinx.coroutines.CancellationException) throw t
+                    }
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (_: Exception) {
@@ -129,9 +174,7 @@ class GenaSubscriptionManager(
         return socket.localPort
     }
 
-    /**
-     * Stops the embedded HTTP NOTIFY server and clears active subscriptions.
-     */
+    /** Stops the embedded HTTP NOTIFY server and clears active subscriptions. */
     @Synchronized
     fun stopServer() {
         isRunning.set(false)
@@ -141,6 +184,7 @@ class GenaSubscriptionManager(
         serverSocket = null
         subscriptionsByDeviceKey.clear()
         deviceKeyBySid.clear()
+        pendingTokensByDeviceKey.clear()
     }
 
     @Synchronized
@@ -153,26 +197,33 @@ class GenaSubscriptionManager(
         clientSocket.use { sock ->
             try {
                 sock.soTimeout = 1500
+                val deadlineNs = System.nanoTime() + NOTIFY_DEADLINE_MS * 1_000_000L
                 val sourceIp = sock.inetAddress?.hostAddress.orEmpty()
                 val input = BufferedInputStream(sock.getInputStream())
-                val requestLine = readHttpHeaderLine(input) ?: return
-                if (!requestLine.startsWith("NOTIFY", ignoreCase = true)) {
-                    sendHttp200(sock)
+                val requestLine = readHttpHeaderLine(input, deadlineNs) ?: return
+                if (!requestLine.startsWith("NOTIFY ", ignoreCase = true)) {
+                    sendHttpStatus(sock, "405 Method Not Allowed")
                     return
                 }
 
                 val path = requestLine.split(" ").getOrNull(1).orEmpty()
-                val pathDeviceKey = path
-                    .substringAfterLast("/gena/", "")
-                    .substringBefore('?')
-                    .trimEnd('/')
-                    .trim()
+                val pathSuffix = path.substringAfter("/gena/", "").substringBefore('?').trim('/')
+                val pathSegments = pathSuffix.split('/').filter { it.isNotEmpty() }
+                val pathDeviceKey = pathSegments.getOrNull(0).orEmpty()
+                val pathToken = pathSegments.getOrNull(1).orEmpty()
 
                 var contentLength = -1
                 var sidHeader = ""
+                var headerCount = 0
                 while (true) {
-                    val line = readHttpHeaderLine(input) ?: break
+                    if (System.nanoTime() > deadlineNs) return
+                    val line = readHttpHeaderLine(input, deadlineNs) ?: break
                     if (line.isEmpty()) break
+                    headerCount++
+                    if (headerCount > MAX_NOTIFY_HEADERS) {
+                        sendHttpStatus(sock, "431 Request Header Fields Too Large")
+                        return
+                    }
                     val colon = line.indexOf(':')
                     if (colon > 0) {
                         val k = line.substring(0, colon).trim().uppercase(Locale.US)
@@ -184,44 +235,29 @@ class GenaSubscriptionManager(
                     }
                 }
 
-                val xmlBody = when {
-                    contentLength > 0 -> {
-                        val targetBytes = contentLength.coerceAtMost(16384)
-                        val buf = ByteArray(targetBytes)
-                        var readTotal = 0
-                        while (readTotal < targetBytes) {
-                            val n = input.read(buf, readTotal, targetBytes - readTotal)
-                            if (n == -1) break
-                            readTotal += n
-                        }
-                        String(buf, 0, readTotal, Charsets.UTF_8)
-                    }
-                    contentLength == 0 -> ""
-                    else -> {
-                        sock.soTimeout = 150
-                        val out = ByteArrayOutputStream()
-                        val buf = ByteArray(2048)
-                        runCatching {
-                            while (out.size() < 16384) {
-                                val n = input.read(buf)
-                                if (n == -1) break
-                                out.write(buf, 0, n)
-                            }
-                        }
-                        out.toString(Charsets.UTF_8.name())
-                    }
+                val record = subscriptionsByDeviceKey[pathDeviceKey]
+                    ?: deviceKeyBySid[sidHeader]?.let { subscriptionsByDeviceKey[it] }
+                val pending = pendingTokensByDeviceKey[pathDeviceKey]
+                val matchesRecord = record != null &&
+                    record.callbackToken.isNotEmpty() && pathToken.isNotEmpty() &&
+                    MessageDigest.isEqual(pathToken.toByteArray(Charsets.US_ASCII), record.callbackToken.toByteArray(Charsets.US_ASCII)) &&
+                    sourceIp == record.ipAddress && sidHeader.isNotBlank() && sidHeader == record.sid
+                val matchesPending = !matchesRecord && pending != null &&
+                    pathToken.isNotEmpty() &&
+                    MessageDigest.isEqual(pathToken.toByteArray(Charsets.US_ASCII), pending.first.toByteArray(Charsets.US_ASCII)) &&
+                    sourceIp == pending.second && sidHeader.isNotBlank()
+                if (!matchesRecord && !matchesPending) {
+                    sendHttpStatus(sock, "412 Precondition Failed")
+                    return
                 }
 
-                // Always reply HTTP 200 OK immediately so the embedded RTOS socket is freed
-                sendHttp200(sock)
+                val xmlBody = readNotifyBody(sock, input, contentLength, deadlineNs)
+                sendHttpStatus(sock, "200 OK")
 
                 val parsed = parseGenaPropertySetXml(xmlBody)
                 if (parsed.first != null || parsed.second != null) {
-                    val resolvedKey = pathDeviceKey.ifEmpty {
-                        deviceKeyBySid[sidHeader].orEmpty()
-                    }
-                    val record = subscriptionsByDeviceKey[resolvedKey]
-                    val devName = record?.deviceName ?: resolvedKey.ifEmpty { sourceIp }
+                    val resolvedKey = if (matchesRecord) record!!.deviceKey else pathDeviceKey
+                    val resolvedName = if (matchesRecord) record!!.deviceName else pending!!.third
                     val binaryOn = parsed.first
                     val pushedBrightness = parsed.second
                     val pushStatusText = when {
@@ -231,8 +267,8 @@ class GenaSubscriptionManager(
                     }
                     val log = SoapLogEntry(
                         timestamp = nowTime(),
-                        deviceName = devName,
-                        endpoint = "NOTIFY http://${localIpProvider()}:${activeListenPort}$path",
+                        deviceName = resolvedName,
+                        endpoint = "NOTIFY http://${localIpProvider()}:${activeListenPort}/gena/$resolvedKey",
                         soapAction = "GENA PropChange (${sidHeader.take(22)})",
                         statusText = pushStatusText,
                         xmlSnippet = xmlBody.take(260),
@@ -258,10 +294,43 @@ class GenaSubscriptionManager(
         }
     }
 
-    private fun readHttpHeaderLine(input: BufferedInputStream): String? {
+    private fun readNotifyBody(
+        sock: Socket,
+        input: BufferedInputStream,
+        contentLength: Int,
+        deadlineNs: Long
+    ): String = when {
+        contentLength > 0 -> {
+            val targetBytes = contentLength.coerceAtMost(16384)
+            val buf = ByteArray(targetBytes)
+            var readTotal = 0
+            while (readTotal < targetBytes && System.nanoTime() <= deadlineNs) {
+                val n = input.read(buf, readTotal, targetBytes - readTotal)
+                if (n == -1) break
+                readTotal += n
+            }
+            String(buf, 0, readTotal, Charsets.UTF_8)
+        }
+        contentLength == 0 -> ""
+        else -> {
+            sock.soTimeout = 150
+            val out = ByteArrayOutputStream()
+            val buf = ByteArray(2048)
+            runCatching {
+                while (out.size() < 16384 && System.nanoTime() <= deadlineNs) {
+                    val n = input.read(buf)
+                    if (n == -1) break
+                    out.write(buf, 0, n)
+                }
+            }
+            out.toString(Charsets.UTF_8.name())
+        }
+    }
+
+    private fun readHttpHeaderLine(input: BufferedInputStream, deadlineNs: Long): String? {
         val out = ByteArrayOutputStream(128)
         var sawAnyByte = false
-        while (true) {
+        while (System.nanoTime() <= deadlineNs) {
             val b = input.read()
             if (b == -1) {
                 return if (sawAnyByte) out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r') else null
@@ -270,35 +339,30 @@ class GenaSubscriptionManager(
             if (b == '\n'.code) {
                 return out.toString(Charsets.ISO_8859_1.name()).trimEnd('\r')
             }
-            if (out.size() < 8192) {
+            if (out.size() < MAX_NOTIFY_HEADER_LINE_BYTES) {
                 out.write(b)
             }
         }
+        return null
     }
 
-    private fun sendHttp200(socket: Socket) {
+    private fun sendHttpStatus(socket: Socket, status: String) {
         runCatching {
             val writer = OutputStreamWriter(socket.getOutputStream(), Charsets.UTF_8)
-            writer.write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            writer.write("HTTP/1.1 $status\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
             writer.flush()
         }
     }
 
-    /**
-     * Parses a Belkin WeMo GENA <e:propertyset> XML notification body for <BinaryState> and <Brightness>.
-     * Handles both plain and XML-entity-escaped inner payloads.
-     */
     fun parseGenaPropertySetXml(rawXml: String): Pair<Boolean?, Int?> {
         val parsed = XmlAndSkuParser.parseBinaryStatePayload(rawXml, unescapeEntities = true)
         return Pair(parsed.binaryOn, parsed.brightness)
     }
 
-    /**
-     * Resolves a collision-free GENA subscription key for [device], using its hardware
-     * `serialNumber` when real or `"dev_${device.id}"` when blank or a manual placeholder serial.
-     */
-    fun deviceKeyFor(device: DeviceEntity): String =
-        device.serialNumber.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: "dev_${device.id}"
+    fun deviceKeyFor(device: DeviceEntity): String {
+        val raw = device.serialNumber.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: "dev_${device.id}"
+        return LanEndpointPolicy.sanitizeHardwareIdentifier(raw).ifBlank { "dev_${device.id}" }
+    }
 
     private fun evictStalePlaceholderSubscription(device: DeviceEntity, activeDeviceKey: String) {
         if (device.id <= 0) return
@@ -311,10 +375,6 @@ class GenaSubscriptionManager(
         }
     }
 
-    /**
-     * Subscribes or renews a UPnP GENA event subscription on /upnp/event/basicevent1 for [device].
-     * Automatically handles HTTP 412 Precondition Failed by falling back to a fresh SUBSCRIBE.
-     */
     suspend fun subscribeOrRenew(
         device: DeviceEntity,
         timeoutSeconds: Int = 300
@@ -323,7 +383,9 @@ class GenaSubscriptionManager(
         if (device.ipAddress != "127.0.0.1" && LanRuntimeUtils.isCarrierGradeNatIpv4(localIp)) {
             return@withContext null
         }
-        val listenPort = startServer()
+        val listenPort = startServer(
+            bindAddress = if (localIp == "127.0.0.1") InetAddress.getByName("127.0.0.1") else null
+        )
         if (listenPort <= 0) return@withContext null
 
         val deviceKey = deviceKeyFor(device)
@@ -331,32 +393,22 @@ class GenaSubscriptionManager(
         val now = System.currentTimeMillis()
         val endpoint = "http://${device.ipAddress}:${device.port}/upnp/event/basicevent1"
 
-        // If we have an active SID for the same IP:port, attempt renewal first
         if (existing != null && existing.sid.isNotBlank() && existing.ipAddress == device.ipAddress && existing.port == device.port) {
             try {
                 val resp = httpClient.execute(
                     method = "SUBSCRIBE",
                     url = endpoint,
-                    headers = mapOf(
-                        "SID" to existing.sid,
-                        "TIMEOUT" to "Second-$timeoutSeconds"
-                    )
+                    headers = mapOf("SID" to existing.sid, "TIMEOUT" to "Second-$timeoutSeconds")
                 )
                 if (resp.isSuccessful) {
                     val sid = resp.header("SID")?.trim().takeUnless { it.isNullOrEmpty() } ?: existing.sid
-                    if (sid != existing.sid) {
-                        deviceKeyBySid.remove(existing.sid, deviceKey)
-                    }
-                    val updated = existing.copy(
-                        sid = sid,
-                        expiresAtMs = now + timeoutSeconds * 1000L
-                    )
+                    if (sid != existing.sid) deviceKeyBySid.remove(existing.sid, deviceKey)
+                    val updated = existing.copy(sid = sid, expiresAtMs = now + timeoutSeconds * 1000L)
                     subscriptionsByDeviceKey[deviceKey] = updated
                     deviceKeyBySid[sid] = deviceKey
                     evictStalePlaceholderSubscription(device, deviceKey)
                     return@withContext updated
                 }
-                // HTTP 412 Precondition Failed or error -> fall through to fresh SUBSCRIBE
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (_: Exception) {
@@ -364,8 +416,10 @@ class GenaSubscriptionManager(
             }
         }
 
-        // Fresh SUBSCRIBE with CALLBACK and NT: upnp:event
-        val callbackUrl = "<http://$localIp:$listenPort/gena/$deviceKey>"
+        val callbackToken = generateCallbackToken()
+        val callbackUrl = "<http://$localIp:$listenPort/gena/$deviceKey/$callbackToken>"
+        val pendingEntry = Triple(callbackToken, device.ipAddress, device.name)
+        pendingTokensByDeviceKey[deviceKey] = pendingEntry
         try {
             val resp = httpClient.execute(
                 method = "SUBSCRIBE",
@@ -378,9 +432,7 @@ class GenaSubscriptionManager(
             )
             if (resp.isSuccessful) {
                 val sid = resp.header("SID")?.trim().orEmpty().ifEmpty { "uuid:gena-$deviceKey" }
-                if (existing != null && existing.sid != sid) {
-                    deviceKeyBySid.remove(existing.sid, deviceKey)
-                }
+                if (existing != null && existing.sid != sid) deviceKeyBySid.remove(existing.sid, deviceKey)
                 val record = GenaSubscriptionRecord(
                     deviceKey = deviceKey,
                     deviceName = device.name,
@@ -388,7 +440,8 @@ class GenaSubscriptionManager(
                     port = device.port,
                     sid = sid,
                     subscribedAtMs = now,
-                    expiresAtMs = now + timeoutSeconds * 1000L
+                    expiresAtMs = now + timeoutSeconds * 1000L,
+                    callbackToken = callbackToken
                 )
                 subscriptionsByDeviceKey[deviceKey] = record
                 deviceKeyBySid[sid] = deviceKey
@@ -399,13 +452,12 @@ class GenaSubscriptionManager(
             throw e
         } catch (_: Exception) {
             // Device offline or does not accept GENA on this port
+        } finally {
+            pendingTokensByDeviceKey.remove(deviceKey, pendingEntry)
         }
         null
     }
 
-    /**
-     * Unsubscribes an active GENA subscription for [device].
-     */
     suspend fun unsubscribeDevice(device: DeviceEntity) {
         val activeKey = deviceKeyFor(device)
         unsubscribe(activeKey)
@@ -414,9 +466,6 @@ class GenaSubscriptionManager(
         }
     }
 
-    /**
-     * Unsubscribes an active GENA subscription for [deviceKey].
-     */
     suspend fun unsubscribe(deviceKey: String) = withContext(Dispatchers.IO) {
         val record = subscriptionsByDeviceKey.remove(deviceKey) ?: return@withContext
         deviceKeyBySid.remove(record.sid)

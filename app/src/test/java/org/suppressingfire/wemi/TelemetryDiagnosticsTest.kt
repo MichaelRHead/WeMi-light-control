@@ -167,7 +167,11 @@ class TelemetryDiagnosticsTest {
                 SharedSoapLogStore.clear(context)
 
                 WeMiSwitchWidgetProvider.broadcastTimeoutMs = 80L
-                WeMiSwitchWidgetProvider().onReceive(
+                org.robolectric.Shadows.shadowOf(AppWidgetManager.getInstance(context)).bindAppWidgetId(
+                    550,
+                    android.content.ComponentName(context, WeMiSwitchWidgetProvider::class.java)
+                )
+                org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver().onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 550)
@@ -234,10 +238,20 @@ class TelemetryDiagnosticsTest {
         val loadedWidgets = WidgetConfigStore.loadAll(context)
         assertEquals(listOf(601, 602, 603, 604), loadedWidgets.map { it.appWidgetId })
 
-        val report = TelemetryFileExporter.buildFullTelemetryReport(
+        val redactedDefault = TelemetryFileExporter.buildFullTelemetryReport(
             setupSnapshot = SetupDebugSnapshot(timestamp = "9:15:00 AM", phoneLocalIp = "192.168.86.10"),
             homes = listOf(home), devices = listOf(switchOn, unassignedSwitch, patioOffline),
             widgets = loadedWidgets, hardwareRulesByDeviceId = rulesSnapshots
+        )
+        assertFalse("Default report must redact home SSID", redactedDefault.contains("HeadFamily-2.4G"))
+        assertFalse("Default report must redact full serial", redactedDefault.contains("WLS040PAT11"))
+        assertTrue(redactedDefault.contains("sn=***AT11") && redactedDefault.contains("udn=uuid:Socket-1_0-***YS12"))
+
+        val report = TelemetryFileExporter.buildFullTelemetryReport(
+            setupSnapshot = SetupDebugSnapshot(timestamp = "9:15:00 AM", phoneLocalIp = "192.168.86.10"),
+            homes = listOf(home), devices = listOf(switchOn, unassignedSwitch, patioOffline),
+            widgets = loadedWidgets, hardwareRulesByDeviceId = rulesSnapshots,
+            includeSensitiveIdentifiers = true
         )
 
         assertTrue(report.contains("[DEV #11]"))
@@ -282,7 +296,12 @@ class TelemetryDiagnosticsTest {
         )
         val resolvedArc = TelemetryFileExporter.resolveExportSetupSnapshot(SetupDebugSnapshot(), arcLan, isDemoMode = false)
         val unsetHome = HomeNetworkEntity("wifi_lan_chromeos_default", "My Home", "Local LAN", "", "")
-        val report = TelemetryFileExporter.buildFullTelemetryReport(setupSnapshot = resolvedArc, homes = listOf(unsetHome))
+        val redactedArcReport = TelemetryFileExporter.buildFullTelemetryReport(setupSnapshot = resolvedArc, homes = listOf(unsetHome))
+        assertTrue(redactedArcReport.contains("arcVmNat=true dns=<redacted:2>"))
+        assertFalse(redactedArcReport.contains("8.8.8.8"))
+        val report = TelemetryFileExporter.buildFullTelemetryReport(
+            setupSnapshot = resolvedArc, homes = listOf(unsetHome), includeSensitiveIdentifiers = true
+        )
         assertTrue(report.contains("[NET] mode=REAL-LAN ip=100.115.92.6 (eth1) gw=100.115.92.5 setupSubnet=false wifiBound=true arcVmNat=true dns=192.168.86.1,8.8.8.8"))
         assertTrue(report.contains("[HOME] key=wifi_lan_chromeos_default name=\"My Home\" ssid=\"Local LAN\" subnet=unset gw=none"))
         assertFalse(report.contains("subnet=.0/24"))
@@ -420,17 +439,9 @@ class TelemetryDiagnosticsTest {
     fun provisionDebugPanelClassifierAndAutoExpandRecoveryAfterManualHide() {
         // 1. Healthy/in-progress messages must never false-positive (e.g., "Entertainment Center" containing "enter")
         assertFalse(isProvisionStatusWarningOrError(null))
-        assertFalse(
-            isProvisionStatusWarningOrError(
-                "Detected Entertainment Center (WLS040 • Port 49152 • Auto Method 2) • Found 3 nearby 2.4 GHz Wi-Fi network(s)"
-            )
-        )
+        assertFalse(isProvisionStatusWarningOrError("Detected Entertainment Center (WLS040 • Port 49152 • Auto Method 2) • Found 3 nearby 2.4 GHz Wi-Fi network(s)"))
         assertFalse(isProvisionStatusWarningOrError("Provisioning switch on 10.22.22.1 to 'CenterNet'..."))
-        assertFalse(
-            isProvisionStatusWarningOrError(
-                "Provisioned 'Error Lamp' to 'CenterNet' (Status=1, Method 2) • Added to switches"
-            )
-        )
+        assertFalse(isProvisionStatusWarningOrError("Provisioned 'Error Lamp' to 'CenterNet' (Status=1, Method 2) • Added to switches"))
 
         // 2. Real setup failures and validation prompts must classify as warning/error
         assertTrue(isProvisionStatusWarningOrError("No response from Setup AP at 10.22.22.1 (:49152=TCP_TIMEOUT)"))
@@ -441,17 +452,11 @@ class TelemetryDiagnosticsTest {
 
         // 3. ProvisionDebugPanel stays compact while idle, toggles via Details/Hide, and auto-re-expands on new errors/traces
         var snapshot by mutableStateOf(SetupDebugSnapshot(timestamp = "9:00:00 AM", phoneLocalIp = "10.22.22.2"))
-        var status by mutableStateOf<String?>(
-            "Detected Entertainment Center (WLS040 • Port 49152) • Found 2 nearby 2.4 GHz Wi-Fi network(s)"
-        )
+        var status by mutableStateOf<String?>("Detected Entertainment Center (WLS040 • Port 49152) • Found 2 nearby 2.4 GHz Wi-Fi network(s)")
         composeTestRule.setContent {
             ProvisionDebugPanel(
-                debugSnapshot = snapshot,
-                selectedSsid = "CenterNet",
-                keepOpenOnSuccess = false,
-                hasWarningOrError = isProvisionStatusWarningOrError(status),
-                statusMessage = status,
-                onToggleKeepOpen = {}
+                debugSnapshot = snapshot, selectedSsid = "CenterNet", keepOpenOnSuccess = false,
+                hasWarningOrError = isProvisionStatusWarningOrError(status), statusMessage = status, onToggleKeepOpen = {}
             )
         }
         composeTestRule.waitForIdle()

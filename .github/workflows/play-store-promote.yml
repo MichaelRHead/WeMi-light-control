@@ -91,7 +91,7 @@ on:
         default: ""
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: play-store-promote
@@ -101,22 +101,30 @@ jobs:
   play-store:
     name: Google Play Track & Asset Operation
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      promoted: ${{ steps.play.outputs.promoted }}
+      version_code: ${{ steps.play.outputs.version_code }}
+      release_name: ${{ steps.play.outputs.release_name }}
+      from_track: ${{ steps.play.outputs.from_track }}
+      to_track: ${{ steps.play.outputs.to_track }}
     env:
       PYTHONWARNINGS: default
       PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"
 
-      - name: Install Google Auth client
-        run: python -m pip install --quiet --upgrade "google-auth>=2.35.0,<3.0.0" "requests>=2.32.3,<3.0.0"
+      - name: Install hash-locked Google Auth client
+        run: python -m pip install --quiet --require-hashes -r scripts/requirements-play.txt
 
       - name: Materialize Play service account credentials
         id: creds
@@ -274,30 +282,6 @@ jobs:
             python3 scripts/promote_play_release.py "${args[@]}"
           fi
 
-      - name: Record Stage 8 promotion in RELEASE_SIGN_OFF.md
-        if: steps.play.outputs.promoted == 'true' && (github.event_name == 'push' || inputs.update_sign_off == true)
-        env:
-          PROMOTED_VC: ${{ steps.play.outputs.version_code }}
-          PROMOTED_NAME: ${{ steps.play.outputs.release_name }}
-          FROM_TRACK: ${{ steps.play.outputs.from_track }}
-          TO_TRACK: ${{ steps.play.outputs.to_track }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          git config user.name "Antigravity App Promoter Agent"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git checkout -B main origin/main
-          NAME_SUFFIX=""
-          if [ -n "${PROMOTED_NAME}" ]; then
-            NAME_SUFFIX=" release ${PROMOTED_NAME}"
-          fi
-          bash scripts/advance_release_turn.sh promote \
-            "Promoted Play build ${PROMOTED_VC}${NAME_SUFFIX} from ${FROM_TRACK} to ${TO_TRACK} via GitHub Actions run ${RUN_ID}." \
-            --version-code "${PROMOTED_VC}" \
-            --from-track "${FROM_TRACK}" \
-            --track "${TO_TRACK}" \
-            --verified "Play API promotion succeeded; build ${PROMOTED_VC} live on ${TO_TRACK}"
-
       - name: Sync Play Store listing and graphic assets (opt-in inline; default is post-rollout mode=sync-assets)
         if: steps.play.outputs.promoted == 'true' && github.event_name != 'push' && inputs.sync_store_assets == true
         env:
@@ -326,3 +310,39 @@ jobs:
         env:
           KEY_FILE: ${{ steps.creds.outputs.key_file }}
         run: rm -f "$KEY_FILE"
+
+  record-sign-off:
+    name: Record Stage 8 Promotion in RELEASE_SIGN_OFF.md
+    needs: play-store
+    if: needs.play-store.outputs.promoted == 'true' && (github.event_name == 'push' || inputs.update_sign_off == true)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Record Stage 8 promotion in RELEASE_SIGN_OFF.md
+        env:
+          PROMOTED_VC: ${{ needs.play-store.outputs.version_code }}
+          PROMOTED_NAME: ${{ needs.play-store.outputs.release_name }}
+          FROM_TRACK: ${{ needs.play-store.outputs.from_track }}
+          TO_TRACK: ${{ needs.play-store.outputs.to_track }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          git config user.name "Antigravity App Promoter Agent"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout -B main origin/main
+          NAME_SUFFIX=""
+          if [ -n "${PROMOTED_NAME}" ]; then
+            NAME_SUFFIX=" release ${PROMOTED_NAME}"
+          fi
+          bash scripts/advance_release_turn.sh promote \
+            "Promoted Play build ${PROMOTED_VC}${NAME_SUFFIX} from ${FROM_TRACK} to ${TO_TRACK} via GitHub Actions run ${RUN_ID}." \
+            --version-code "${PROMOTED_VC}" \
+            --from-track "${FROM_TRACK}" \
+            --track "${TO_TRACK}" \
+            --verified "Play API promotion succeeded; build ${PROMOTED_VC} live on ${TO_TRACK}"

@@ -138,12 +138,13 @@ object XmlAndSkuParser {
      * Builds a standard UPnP SSDP M-SEARCH UDP multicast payload for Belkin WeMo / WeMi devices.
      */
     fun buildSsdpMSearchPacket(searchTarget: String = URN_BASIC_EVENT): String {
+        val safeTarget = LanEndpointPolicy.sanitizeSingleLineToken(searchTarget).ifEmpty { URN_BASIC_EVENT }
         return buildString {
             append("M-SEARCH * HTTP/1.1\r\n")
             append("HOST: 239.255.255.250:1900\r\n")
             append("MAN: \"ssdp:discover\"\r\n")
             append("MX: 1\r\n")
-            append("ST: $searchTarget\r\n")
+            append("ST: $safeTarget\r\n")
             append("USER-AGENT: Android/16 UPnP/1.1 WeMiSwitchControl/1.0\r\n\r\n")
         }
     }
@@ -213,8 +214,10 @@ object XmlAndSkuParser {
         val friendlyName = FRIENDLY_NAME_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim()
             ?.takeIf { it.isNotEmpty() } ?: "WeMi Smart Switch"
-        val serial = SERIAL_NUMBER_REGEX
+        val rawSerial = SERIAL_NUMBER_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL
+        val serial = LanEndpointPolicy.sanitizeHardwareIdentifier(rawSerial)
+            .ifBlank { LanRuntimeUtils.DEFAULT_LAN_PLACEHOLDER_SERIAL }
         val modelName = MODEL_NAME_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.let(::unescapeXml)?.trim()
             ?.takeIf { it.isNotEmpty() } ?: "LightSwitch"
@@ -224,17 +227,19 @@ object XmlAndSkuParser {
             .find(xml)?.groupValues?.getOrNull(1)?.trim() ?: "WeMo_WW_2.00.11532.PVT"
         val macAddress = MAC_ADDRESS_REGEX
             .find(xml)?.groupValues?.getOrNull(1)?.trim().orEmpty()
-        val udn = LanRuntimeUtils.canonicalHardwareUdn(
-            UDN_REGEX.find(xml)?.groupValues?.getOrNull(1)?.trim()
-                ?: usnHeader.ifEmpty {
-                    if (!LanRuntimeUtils.isPlaceholderSerial(serial)) "uuid:Lightswitch-1_0-$serial" else ""
-                }
+        val udn = LanEndpointPolicy.sanitizeHardwareIdentifier(
+            LanRuntimeUtils.canonicalHardwareUdn(
+                UDN_REGEX.find(xml)?.groupValues?.getOrNull(1)?.trim()
+                    ?: usnHeader.ifEmpty {
+                        if (!LanRuntimeUtils.isPlaceholderSerial(serial)) "uuid:Lightswitch-1_0-$serial" else ""
+                    }
+            )
         )
         val isRtos = RTOS_REGEX.containsMatchIn(xml)
 
-        val hostPortMatch = HOST_PORT_REGEX.find(locationUrl)
-        val ip = hostPortMatch?.groupValues?.getOrNull(1) ?: "192.168.1.101"
-        val port = hostPortMatch?.groupValues?.getOrNull(2)?.toIntOrNull() ?: 49153
+        val parsedHostPort = LanEndpointPolicy.parseHostAndPortOrNull(locationUrl, defaultPort = 80)
+        val ip = parsedHostPort?.first ?: "192.168.1.101"
+        val port = parsedHostPort?.second ?: 49153
 
         val type = when {
             modelName.contains("Sensor", ignoreCase = true) ||

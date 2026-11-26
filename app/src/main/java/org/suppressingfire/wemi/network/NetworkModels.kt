@@ -74,13 +74,14 @@ data class ProvisionResult(
     val success: Boolean,
     val networkStatusCode: Int,
     val statusMessage: String,
-    val encryptedPasswordPayload: String,
+    val encryptedPasswordPayload: String = "",
     val logEntry: SoapLogEntry,
     val closeSetupStatus: String = "",
     val effectiveEncryptionMethod: Int = 1,
     val addedLengthSuffix: Boolean = true,
     val setupDevice: SetupDeviceDescriptor? = null,
-    val debugTraceLines: List<String> = emptyList()
+    val debugTraceLines: List<String> = emptyList(),
+    val encryptedPasswordLength: Int = 0
 )
 
 /**

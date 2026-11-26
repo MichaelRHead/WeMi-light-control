@@ -1,7 +1,5 @@
 package org.suppressingfire.wemi.network
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import java.io.File
@@ -72,17 +70,19 @@ data class SetupDebugSnapshot(
     val isArcVmNatSubnet: Boolean = false,
     val dnsServersIpv4: List<String> = emptyList()
 ) {
-    /**
-     * Formats all setup telemetry into compact, high-signal lines designed to fit inside a single
-     * phone screenshot in `ProvisionApDialog` (`provision_debug_panel`) or clipboard paste.
-     */
-    fun toDisplayLines(selectedSsid: String = targetSsid): List<String> {
+    fun toDisplayLines(selectedSsid: String = targetSsid): List<String> =
+        formatLines(selectedSsid = selectedSsid, redactor = TelemetryRedactionSession(includeSensitiveIdentifiers = true))
+
+    internal fun formatLines(
+        selectedSsid: String = targetSsid,
+        redactor: TelemetryRedactionSession
+    ): List<String> {
         val effectiveSsid = selectedSsid.ifBlank { targetSsid }
         val lines = mutableListOf<String>()
         val modeTag = if (isDemoMode) "DEMO" else "REAL-LAN"
         val effectiveArcVmNat = isArcVmNatSubnet || LanRuntimeUtils.isCarrierGradeNatIpv4(phoneLocalIp)
         val arcVmPart = if (effectiveArcVmNat) " arcVmNat=true" else ""
-        val dnsPart = if (dnsServersIpv4.isNotEmpty()) " dns=${dnsServersIpv4.joinToString(",")}" else ""
+        val dnsPart = redactor.redactDnsList(dnsServersIpv4)
         lines.add(
             "[NET] mode=$modeTag ip=$phoneLocalIp ($phoneInterface) gw=$phoneGatewayIp setupSubnet=$isWemoSetupSubnet wifiBound=$isWifiSocketBound$arcVmPart$dnsPart"
         )
@@ -96,7 +96,7 @@ data class SetupDebugSnapshot(
                 "[FLAGS] rtos=${if (d.isRtos) 1 else 0} iot=${if (d.isIot) 1 else 0} binaryOption=${if (d.binaryOption) 1 else 0} new_algo=${if (d.newAlgo) 1 else 0} -> autoMethod=${d.recommendedEncryptionMethod} autoLen=${d.recommendedAddLengths}"
             )
             lines.add(
-                "[ID] mac=${d.macAddress} sn=${d.serialNumber} (src=${d.macAndSerialSource}) meta=\"${d.rawMetaInfo.ifBlank { "none" }}\""
+                "[ID] mac=${redactor.redactMac(d.macAddress)} sn=${redactor.redactSerial(d.serialNumber)} (src=${d.macAndSerialSource}) meta=\"${redactor.redactMetaInfo(d.rawMetaInfo)}\""
             )
         } else {
             lines.add("[XML/ID] No setup descriptor read from $targetApHost")
@@ -106,35 +106,46 @@ data class SetupDebugSnapshot(
             val match = scannedAps.firstOrNull { it.ssid.equals(effectiveSsid.trim(), ignoreCase = true) }
             if (match != null) {
                 lines.add(
-                    "[TARGET AP] \"${match.ssid}\" found in ApList: Ch=${match.channel} Auth=${match.authMode}/${match.encryptionType} Signal=${match.signalStrengthPercent}%"
+                    "[TARGET AP] \"${redactor.redactSsid(match.ssid)}\" found in ApList: Ch=${match.channel} Auth=${match.authMode}/${match.encryptionType} Signal=${match.signalStrengthPercent}%"
                 )
             } else {
-                val sample = scannedAps.take(4).joinToString(", ") { "${it.ssid}(Ch${it.channel})" }
+                val sample = scannedAps.take(4).joinToString(", ") { "${redactor.redactSsid(it.ssid)}(Ch${it.channel})" }
                 lines.add(
-                    "[TARGET AP] WARN: \"$effectiveSsid\" NOT in ApList! Seen: [$sample]"
+                    "[TARGET AP] WARN: \"${redactor.redactSsid(effectiveSsid)}\" NOT in ApList! Seen: [$sample]"
                 )
             }
         }
         traceLines.forEach { line ->
-            lines.add(line)
+            lines.add(redactor.scrubFreeText(line))
         }
         return lines
     }
 
-    fun toClipboardText(selectedSsid: String = targetSsid): String {
+    fun toClipboardText(
+        selectedSsid: String = targetSsid,
+        includeSensitiveIdentifiers: Boolean = false
+    ): String {
+        val redactor = TelemetryRedactionSession(includeSensitiveIdentifiers).apply {
+            registerContext(this@SetupDebugSnapshot, selectedSsid, emptyList(), emptyList(), emptyList())
+        }
+        val modeDesc = if (includeSensitiveIdentifiers) "FULL" else "REDACTED"
         return buildString {
-            appendLine("=== WeMi Setup AP Diagnostic Report (v${BuildConfig.VERSION_NAME} [${BuildConfig.VERSION_CODE}] • $timestamp) ===")
-            toDisplayLines(selectedSsid).forEach { appendLine(it) }
+            appendLine("=== WeMi Setup AP Diagnostic Report (v${BuildConfig.VERSION_NAME} [${BuildConfig.VERSION_CODE}] • $timestamp • IDs=$modeDesc) ===")
+            formatLines(selectedSsid, redactor).forEach { appendLine(it) }
         }.trim()
     }
 }
 
 /**
- * Builds, persists (`files/wemi-telemetry-latest.txt`), and shares full device, widget & network
- * telemetry reports so users can either take an on-screen screenshot or export a file to share.
+ * Builds, persists (`files/wemi-telemetry-latest.txt`), copies (with Android 13+
+ * `EXTRA_IS_SENSITIVE`), and shares full device, widget & network telemetry reports.
+ *
+ * Exports redact home/neighbor SSIDs, MAC addresses, serial numbers, UDNs, and DNS server IPs by
+ * default (`includeSensitiveIdentifiers = false`) unless the user explicitly enables Full Diagnostics.
  */
 object TelemetryFileExporter {
     const val DEFAULT_TELEMETRY_FILENAME = "wemi-telemetry-latest.txt"
+    private const val MAX_REGEX_INPUT_CHARS = 4096
 
     private val PASSWORD_TAG_REGEX = Regex(
         "(<(?:[a-z0-9_.-]+:)?password\\b[^>]*>)([\\s\\S]*?)(</(?:[a-z0-9_.-]+:)?password>)",
@@ -184,7 +195,8 @@ object TelemetryFileExporter {
     }
 
     fun sanitizeXmlSnippet(raw: String, maxChars: Int = 220): String {
-        val step1 = PASSWORD_TAG_REGEX.replace(raw) { m ->
+        val bounded = if (raw.length > MAX_REGEX_INPUT_CHARS) raw.take(MAX_REGEX_INPUT_CHARS) else raw
+        val step1 = PASSWORD_TAG_REGEX.replace(bounded) { m ->
             redactTagMatch(m.groupValues[1], m.groupValues[2], m.groupValues[3])
         }
         val step2 = ESCAPED_PASSWORD_TAG_REGEX.replace(step1) { m ->
@@ -261,16 +273,21 @@ object TelemetryFileExporter {
         devices: List<DeviceEntity> = emptyList(),
         soapLogs: List<SoapLogEntry> = emptyList(),
         widgets: List<WidgetTargetConfig> = emptyList(),
-        hardwareRulesByDeviceId: Map<Int, DeviceHardwareRulesSnapshot> = emptyMap()
+        hardwareRulesByDeviceId: Map<Int, DeviceHardwareRulesSnapshot> = emptyMap(),
+        includeSensitiveIdentifiers: Boolean = false
     ): String {
         val now = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+        val redactor = TelemetryRedactionSession(includeSensitiveIdentifiers).apply {
+            registerContext(setupSnapshot, selectedSsid, homes, devices, widgets)
+        }
+        val idModeLabel = if (includeSensitiveIdentifiers) "FULL (opt-in diagnostics)" else "REDACTED (default privacy-safe)"
         return buildString {
             appendLine("=== WeMi Light Control Device & Network Telemetry Report ===")
             appendLine("App Version: v${BuildConfig.VERSION_NAME} (versionCode=${BuildConfig.VERSION_CODE}, ${BuildConfig.APPLICATION_ID})")
-            appendLine("Generated: $now")
+            appendLine("Generated: $now | Identifiers: $idModeLabel")
             appendLine()
             appendLine("--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---")
-            setupSnapshot.toDisplayLines(selectedSsid).forEach { appendLine(it) }
+            setupSnapshot.formatLines(selectedSsid, redactor).forEach { appendLine(it) }
             appendLine()
             appendLine("--- [2. REMEMBERED WI-FI HOMES (${homes.size})] ---")
             if (homes.isEmpty()) {
@@ -280,7 +297,7 @@ object TelemetryFileExporter {
                     val subnetLabel = if (h.subnetPrefix.isBlank()) "unset" else "${h.subnetPrefix}.0/24"
                     val gatewayLabel = h.gatewayIp.ifBlank { "none" }
                     appendLine(
-                        "[HOME] key=${h.networkKey} name=\"${h.homeName}\" ssid=\"${h.ssidLabel}\" subnet=$subnetLabel gw=$gatewayLabel"
+                        "[HOME] key=${h.networkKey} name=\"${h.homeName}\" ssid=\"${redactor.redactSsid(h.ssidLabel)}\" subnet=$subnetLabel gw=$gatewayLabel"
                     )
                 }
             }
@@ -300,7 +317,7 @@ object TelemetryFileExporter {
                     } else {
                         ""
                     }
-                    val udnPart = if (d.udn.isNotBlank()) " udn=${d.udn}" else ""
+                    val udnPart = if (d.udn.isNotBlank()) " udn=${redactor.redactUdn(d.udn)}" else ""
                     val rulesMetaPart = buildString {
                         append(" rulesCap=${d.hardwareRulesCapability}")
                         if (d.hardwareRulesLongPressCapable) append(" lp=1")
@@ -309,7 +326,7 @@ object TelemetryFileExporter {
                         }
                     }
                     appendLine(
-                        "[DEV #${d.id}] name=\"${d.name}\" room=\"${d.normalizedRoomName}\" home=${d.networkKey} addr=${d.ipAddress}:${d.port} state=$stateStr$dimmerPart rtt=${d.latencyMs}ms sku=\"${d.hardwareModel}\" fw=\"${d.firmwareVersion}\" sn=${d.serialNumber} mac=${d.macAddress}$udnPart ssid=\"${d.wifiSsid}\"$rulesMetaPart"
+                        "[DEV #${d.id}] name=\"${d.name}\" room=\"${d.normalizedRoomName}\" home=${d.networkKey} addr=${d.ipAddress}:${d.port} state=$stateStr$dimmerPart rtt=${d.latencyMs}ms sku=\"${d.hardwareModel}\" fw=\"${d.firmwareVersion}\" sn=${redactor.redactSerial(d.serialNumber)} mac=${redactor.redactMac(d.macAddress)}$udnPart ssid=\"${redactor.redactSsid(d.wifiSsid)}\"$rulesMetaPart"
                     )
                     val rulesSnap = hardwareRulesByDeviceId[d.id]
                     if (rulesSnap != null) {
@@ -332,10 +349,12 @@ object TelemetryFileExporter {
             } else {
                 soapLogs.forEach { entry ->
                     val okTag = if (entry.isLiveLanSuccess) "OK" else "ERR"
+                    val safeAction = redactor.scrubFreeText(entry.soapAction)
+                    val safeStatus = redactor.scrubFreeText(entry.statusText)
                     appendLine(
-                        "[${entry.timestamp}] [$okTag] ${entry.deviceName} | ${entry.soapAction} | ${entry.endpoint} -> ${entry.statusText}"
+                        "[${entry.timestamp}] [$okTag] ${entry.deviceName} | $safeAction | ${entry.endpoint} -> $safeStatus"
                     )
-                    val snippet = sanitizeXmlSnippet(entry.xmlSnippet)
+                    val snippet = redactor.scrubFreeText(sanitizeXmlSnippet(entry.xmlSnippet))
                     if (snippet.isNotEmpty()) {
                         appendLine("  xml: $snippet")
                     }
@@ -360,9 +379,10 @@ object TelemetryFileExporter {
                             } else {
                                 "ORPHANED (no matching switch)"
                             }
-                            val udnPart = if (w.udn.isNotBlank()) " udn=${w.udn}" else ""
+                            val snDisplay = if (w.serialNumber.isBlank()) "none" else redactor.redactSerial(w.serialNumber)
+                            val udnPart = if (w.udn.isNotBlank()) " udn=${redactor.redactUdn(w.udn)}" else ""
                             appendLine(
-                                "[WIDGET #${w.appWidgetId}] type=DEVICE name=\"${w.displayName}\" devId=${w.deviceId} sn=${w.serialNumber.ifBlank { "none" }}$udnPart room=\"${w.normalizedRoomName()}\" home=${w.networkKey.ifBlank { "none" }} -> $status"
+                                "[WIDGET #${w.appWidgetId}] type=DEVICE name=\"${w.displayName}\" devId=${w.deviceId} sn=$snDisplay$udnPart room=\"${w.normalizedRoomName()}\" home=${w.networkKey.ifBlank { "none" }} -> $status"
                             )
                         }
                         WidgetTargetType.ROOM -> {
@@ -399,16 +419,29 @@ object TelemetryFileExporter {
         return outFile
     }
 
-    fun copyAndShareTelemetryReport(
+    fun deleteTelemetryFile(
+        context: Context,
+        fileName: String = DEFAULT_TELEMETRY_FILENAME
+    ): Boolean = runCatching { latestTelemetryFile(context, fileName).delete() }.getOrDefault(false)
+
+    fun copyTelemetryReportToClipboard(
+        context: Context,
+        reportText: String,
+        label: String = "WeMi Diagnostic Report"
+    ) {
+        TelemetryRedactionSession.copyToClipboard(context, label, reportText, sensitive = true)
+    }
+
+    /**
+     * Saves the diagnostic report to `files/wemi-telemetry-latest.txt` and opens the Android share
+     * sheet WITHOUT silently writing the report to the system clipboard.
+     */
+    fun saveAndShareTelemetryReport(
         context: Context,
         reportText: String,
         subject: String = "WeMi Light Control Telemetry Report"
     ): File {
         val savedFile = saveTelemetryReportToFile(context, reportText)
-        runCatching {
-            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-            clipboard?.setPrimaryClip(ClipData.newPlainText(subject, reportText))
-        }
         runCatching {
             val sendIntent = Intent(Intent.ACTION_SEND).apply {
                 type = "text/plain"
@@ -423,6 +456,12 @@ object TelemetryFileExporter {
         }
         return savedFile
     }
+
+    fun copyAndShareTelemetryReport(
+        context: Context,
+        reportText: String,
+        subject: String = "WeMi Light Control Telemetry Report"
+    ): File = saveAndShareTelemetryReport(context, reportText, subject)
 }
 
 

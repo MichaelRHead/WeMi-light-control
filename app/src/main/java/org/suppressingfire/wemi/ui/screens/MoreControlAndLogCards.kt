@@ -275,7 +275,7 @@ internal fun LocalUpnpEngineCard(
             },
             text = {
                 Text(
-                    text = "This clears all remembered Wi-Fi Homes, discovered switches, and room assignments, then resets your primary LAN profile back to a clean 'My Home'.",
+                    text = "This clears all remembered Wi-Fi Homes, discovered switches, room assignments, Home Screen widget bindings, diagnostic logs, and local rule backups, then resets your primary LAN profile back to a clean 'My Home'.",
                     color = WemoTextSecondary,
                     fontFamily = FontFamily.SansSerif,
                     fontSize = 13.sp
@@ -325,7 +325,8 @@ internal fun SoapPacketLogCard(
     onClearLogs: () -> Unit
 ) {
     val context = LocalContext.current
-    var exportedFeedback by remember(soapLogs.firstOrNull()?.timestamp, soapLogs.size, setupDebugSnapshot.timestamp) {
+    var includeFullIdentifiers by remember { mutableStateOf(false) }
+    var exportedFeedback by remember(soapLogs.firstOrNull()?.timestamp, soapLogs.size, setupDebugSnapshot.timestamp, includeFullIdentifiers) {
         mutableStateOf(false)
     }
 
@@ -361,9 +362,10 @@ internal fun SoapPacketLogCard(
                                 devices = devices,
                                 soapLogs = soapLogs,
                                 widgets = org.suppressingfire.wemi.widget.WidgetConfigStore.loadAll(context),
-                                hardwareRulesByDeviceId = hardwareRulesByDeviceId
+                                hardwareRulesByDeviceId = hardwareRulesByDeviceId,
+                                includeSensitiveIdentifiers = includeFullIdentifiers
                             )
-                            TelemetryFileExporter.copyAndShareTelemetryReport(
+                            TelemetryFileExporter.saveAndShareTelemetryReport(
                                 context = context,
                                 reportText = reportText
                             )
@@ -386,6 +388,47 @@ internal fun SoapPacketLogCard(
                         }
                     }
                 }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .toggleable(
+                        value = includeFullIdentifiers,
+                        role = Role.Switch,
+                        onValueChange = { includeFullIdentifiers = it }
+                    )
+                    .padding(vertical = 4.dp)
+                    .testTag("telemetry_include_full_ids_switch"),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Full Diagnostics in Exported Logs",
+                        fontFamily = FontFamily.SansSerif,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp,
+                        color = WemoTextPrimary
+                    )
+                    Text(
+                        text = if (includeFullIdentifiers) {
+                            "Opt-in ON • Includes full SSIDs, MACs, serials, UDNs & DNS IPs"
+                        } else {
+                            "Privacy default • Redacts SSIDs, MACs, serials, UDNs & DNS IPs"
+                        },
+                        fontFamily = FontFamily.SansSerif,
+                        fontSize = 11.5.sp,
+                        color = WemoTextSecondary
+                    )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Switch(
+                    checked = includeFullIdentifiers,
+                    onCheckedChange = null,
+                    colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary)
+                )
             }
 
             if (soapLogs.isEmpty()) {

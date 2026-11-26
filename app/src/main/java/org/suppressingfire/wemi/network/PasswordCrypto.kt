@@ -48,25 +48,33 @@ object PasswordCrypto {
         val keyBytes = keydata.toByteArray(Charsets.UTF_8)
         val saltBytes = keydata.substring(0, 8).toByteArray(Charsets.UTF_8)
         val ivBytes = keydata.substring(0, 16).toByteArray(Charsets.UTF_8)
-
-        val md5 = MessageDigest.getInstance("MD5")
-        md5.update(keyBytes)
-        md5.update(saltBytes)
-        val derivedKey = md5.digest().copyOfRange(0, 16)
-
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(derivedKey, "AES"), IvParameterSpec(ivBytes))
         val plainBytes = plainPassword.toByteArray(Charsets.UTF_8)
-        val encryptedBytes = cipher.doFinal(plainBytes)
-        val base64Encoded = Base64.Default.encode(encryptedBytes)
+        var derivedKey: ByteArray? = null
+        try {
+            val md5 = MessageDigest.getInstance("MD5")
+            md5.update(keyBytes)
+            md5.update(saltBytes)
+            derivedKey = md5.digest().copyOfRange(0, 16)
 
-        val shouldAddLengths = addPasswordLengths ?: (encryptionMethod != 2)
-        return if (shouldAddLengths) {
-            val encLenHex = String.format(Locale.US, "%02x", base64Encoded.length and 0xFF)
-            val origLenHex = String.format(Locale.US, "%02x", plainBytes.size and 0xFF)
-            base64Encoded + encLenHex + origLenHex
-        } else {
-            base64Encoded
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(derivedKey, "AES"), IvParameterSpec(ivBytes))
+            val encryptedBytes = cipher.doFinal(plainBytes)
+            val base64Encoded = Base64.Default.encode(encryptedBytes)
+
+            val shouldAddLengths = addPasswordLengths ?: (encryptionMethod != 2)
+            return if (shouldAddLengths) {
+                val encLenHex = String.format(Locale.US, "%02x", base64Encoded.length and 0xFF)
+                val origLenHex = String.format(Locale.US, "%02x", plainBytes.size and 0xFF)
+                base64Encoded + encLenHex + origLenHex
+            } else {
+                base64Encoded
+            }
+        } finally {
+            keyBytes.fill(0)
+            saltBytes.fill(0)
+            ivBytes.fill(0)
+            plainBytes.fill(0)
+            derivedKey?.fill(0)
         }
     }
 
@@ -81,20 +89,30 @@ object PasswordCrypto {
         val keyBytes = keydata.toByteArray(Charsets.UTF_8)
         val saltBytes = keydata.substring(0, 8).toByteArray(Charsets.UTF_8)
         val ivBytes = keydata.substring(0, 16).toByteArray(Charsets.UTF_8)
+        var derivedKey: ByteArray? = null
+        var decryptedBytes: ByteArray? = null
+        try {
+            val md5 = MessageDigest.getInstance("MD5")
+            md5.update(keyBytes)
+            md5.update(saltBytes)
+            derivedKey = md5.digest().copyOfRange(0, 16)
 
-        val md5 = MessageDigest.getInstance("MD5")
-        md5.update(keyBytes)
-        md5.update(saltBytes)
-        val derivedKey = md5.digest().copyOfRange(0, 16)
-
-        val base64Part = if (hasLengthSuffix && encryptedPayload.length > 4) {
-            encryptedPayload.substring(0, encryptedPayload.length - 4)
-        } else {
-            encryptedPayload
+            val base64Part = if (hasLengthSuffix && encryptedPayload.length > 4) {
+                encryptedPayload.substring(0, encryptedPayload.length - 4)
+            } else {
+                encryptedPayload
+            }
+            val cipherBytes = Base64.Default.decode(base64Part)
+            val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(derivedKey, "AES"), IvParameterSpec(ivBytes))
+            decryptedBytes = cipher.doFinal(cipherBytes)
+            return String(decryptedBytes, Charsets.UTF_8)
+        } finally {
+            keyBytes.fill(0)
+            saltBytes.fill(0)
+            ivBytes.fill(0)
+            derivedKey?.fill(0)
+            decryptedBytes?.fill(0)
         }
-        val cipherBytes = Base64.Default.decode(base64Part)
-        val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
-        cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(derivedKey, "AES"), IvParameterSpec(ivBytes))
-        return String(cipher.doFinal(cipherBytes), Charsets.UTF_8)
     }
 }

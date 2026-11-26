@@ -32,3 +32,10 @@
 
 # LanRuntimeUtils.isRunningInRobolectric() probes org.robolectric.Robolectric via runCatching.
 -dontwarn org.robolectric.**
+
+# Strip verbose/debug/info Logcat calls from minified release builds while preserving Log.w/Log.e.
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}

@@ -101,8 +101,11 @@ object HardwareRulesDbCodec {
         if (zipBytes.size < 22 || zipBytes.size > MAX_ZIP_BYTES) return null
         return runCatching {
             ZipInputStream(ByteArrayInputStream(zipBytes)).use { zis ->
+                var scannedEntries = 0
                 var entry: ZipEntry? = zis.nextEntry
                 while (entry != null && entry.isDirectory) {
+                    scannedEntries++
+                    if (scannedEntries >= HardwareRulesSchemaGuard.MAX_ZIP_ENTRIES) return null
                     entry = zis.nextEntry
                 }
                 val targetEntry = entry ?: return null
@@ -146,6 +149,7 @@ object HardwareRulesDbCodec {
             SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS
         )
         return try {
+            HardwareRulesSchemaGuard.hardenAndValidateSchema(db, readOnly = true, throwOnViolation = true)
             val integrity = runSingleTextQuery(db, "PRAGMA integrity_check").orEmpty()
             val integrityOk = integrity.equals("ok", ignoreCase = true)
             val tables = listTableNames(db)
@@ -177,7 +181,7 @@ object HardwareRulesDbCodec {
             }
 
             val parsedRules = mutableListOf<HardwareRule>()
-            db.rawQuery("SELECT RuleID, Name, Type, $orderExpr, $stateExpr FROM RULES $orderClause", null)
+            db.rawQuery("SELECT RuleID, Name, Type, $orderExpr, $stateExpr FROM RULES $orderClause LIMIT ${HardwareRulesSchemaGuard.MAX_RULES_ROWS}", null)
                 .use { cursor ->
                     while (cursor.moveToNext()) {
                         val ruleId = cursorInt(cursor, 0) ?: continue
@@ -330,7 +334,7 @@ object HardwareRulesDbCodec {
                    ${colOrNull("OFFMODEOFFSET", "-1")},
                    ${colOrNull("COUNTDOWNTIME", "-1")},
                    ${colOrNull("ENDTIME", "-1")}
-            FROM RULEDEVICES
+            FROM RULEDEVICES LIMIT ${HardwareRulesSchemaGuard.MAX_RULE_DEVICES_ROWS}
         """.trimIndent()
         val map = LinkedHashMap<Int, MutableList<RawRuleDeviceRow>>()
         db.rawQuery(sql, null).use { c ->
@@ -367,7 +371,7 @@ object HardwareRulesDbCodec {
         }
         val orderClause = if (orderParts.isNotEmpty()) " ORDER BY ${orderParts.joinToString(", ")}" else ""
         val map = LinkedHashMap<Int, MutableList<String>>()
-        db.rawQuery("SELECT RuleID, DeviceID FROM TARGETDEVICES$orderClause", null)
+        db.rawQuery("SELECT RuleID, DeviceID FROM TARGETDEVICES$orderClause LIMIT ${HardwareRulesSchemaGuard.MAX_TARGET_DEVICES_ROWS}", null)
             .use { c ->
                 while (c.moveToNext()) {
                     val ruleId = cursorInt(c, 0) ?: continue
@@ -383,7 +387,7 @@ object HardwareRulesDbCodec {
         val cols = listColumnNames(db, "DEVICECOMBINATION")
         if ("RULEID" !in cols || "SENSORID" !in cols) return emptyMap()
         val map = LinkedHashMap<Int, MutableList<String>>()
-        db.rawQuery("SELECT RuleID, SensorID FROM DEVICECOMBINATION", null).use { c ->
+        db.rawQuery("SELECT RuleID, SensorID FROM DEVICECOMBINATION LIMIT ${HardwareRulesSchemaGuard.MAX_DEVICE_COMBINATION_ROWS}", null).use { c ->
             while (c.moveToNext()) {
                 val ruleId = cursorInt(c, 0) ?: continue
                 val sensor = cursorString(c, 1)
@@ -427,8 +431,9 @@ object HardwareRulesDbCodec {
     }
 
     internal fun listColumnNames(db: SQLiteDatabase, tableName: String): Set<String> {
+        val safeTable = HardwareRulesSchemaGuard.validateTableIdentifier(tableName)
         val cols = LinkedHashSet<String>()
-        db.rawQuery("PRAGMA table_info($tableName)", null).use { c ->
+        db.rawQuery("PRAGMA table_info($safeTable)", null).use { c ->
             while (c.moveToNext()) {
                 cursorString(c, 1).takeIf { it.isNotBlank() }?.let { cols.add(it.uppercase(Locale.US)) }
             }

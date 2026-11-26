@@ -1,12 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
    Data extraction rules for API >= 31.
-   Excludes ephemeral diagnostic LAN telemetry exports (wemi-telemetry-latest.txt) and local
-   on-device switch rule backups (hardware_rules_backups) from cloud backup and
-   device-to-device transfer while preserving Room DB and preferences.
+   Strict local-only cloud backup posture: excludes Room databases, SharedPreferences (including
+   Home Screen widget bindings), diagnostic telemetry exports (wemi-telemetry-latest.txt), and
+   local pre-write switch rule backups (hardware_rules_backups) from cloud backup. Direct
+   cable device-to-device transfer preserves homes, switches, and widget bindings while still
+   excluding diagnostic exports and local rule backups.
 -->
 <data-extraction-rules>
     <cloud-backup>
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
         <exclude domain="file" path="wemi-telemetry-latest.txt" />
         <exclude domain="file" path="hardware_rules_backups" />
     </cloud-backup>

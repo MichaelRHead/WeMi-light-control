@@ -474,16 +474,15 @@ class ExampleUnitTest {
             xmlSnippet = "<ConnectHomeNetwork><ssid>Home24</ssid><password>LeakedCipherOrPlaintext!</password></ConnectHomeNetwork>",
             isLiveLanSuccess = false
         )
-        val report = org.suppressingfire.wemi.network.TelemetryFileExporter.buildFullTelemetryReport(
-            setupSnapshot = preserved,
-            devices = listOf(dimmer),
-            soapLogs = listOf(rawLog)
+        val redactedReport = org.suppressingfire.wemi.network.TelemetryFileExporter.buildFullTelemetryReport(
+            setupSnapshot = preserved, devices = listOf(dimmer), soapLogs = listOf(rawLog)
         )
-        assertTrue(report.contains("dim=45% night=1"))
-        assertTrue(report.contains("udn=uuid:Dimmer-2_0-2219DIM77"))
+        assertTrue(redactedReport.contains("dim=45% night=1") && !redactedReport.contains("2219DIM77") && !redactedReport.contains("LeakedCipherOrPlaintext!"))
+        val report = org.suppressingfire.wemi.network.TelemetryFileExporter.buildFullTelemetryReport(
+            setupSnapshot = preserved, devices = listOf(dimmer), soapLogs = listOf(rawLog), includeSensitiveIdentifiers = true
+        )
+        assertTrue(report.contains("dim=45% night=1") && report.contains("udn=uuid:Dimmer-2_0-2219DIM77"))
         assertTrue(report.contains("  xml: <ConnectHomeNetwork><ssid>Home24</ssid><password>[REDACTED encLen=24]</password></ConnectHomeNetwork>"))
         assertFalse(report.contains("LeakedCipherOrPlaintext!"))
     }
 }
-
-

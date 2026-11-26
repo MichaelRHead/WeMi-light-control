@@ -65,7 +65,7 @@ Inside the **Provision New Switch AP (`10.22.22.1`)** dialog:
    - Tap your home Wi-Fi chip under **`Discovered 2.4 GHz Networks`**. WeMi automatically fills in **`Target 2.4 GHz Wi-Fi SSID`**, **`2.4G Ch`**, **`Auth Mode`** (usually `WPA2PSK`), and **`Encrypt`** (usually `AES`).
    - If your network is hidden or didn't show up, you can type the SSID manually.
 3. **Enter Your Home Wi-Fi Password**:
-   - Type your 2.4 GHz Wi-Fi password into **`Wi-Fi Password`**. The field is **masked by default** (tap the eye icon to show or hide your password while typing), encrypted locally on your device, and never leaves your local network or appears in diagnostic logs.
+   - Type your 2.4 GHz Wi-Fi password into **`Wi-Fi Password`**. The field is **masked by default** (tap the eye icon to temporarily reveal it while typing—screenshots are blocked while plaintext is shown, and the password automatically re-masks if you switch apps), held strictly in volatile memory, encrypted locally on your device, and cleared when setup finishes or the dialog closes.
 4. **Name Your Switch & Pick a Room**:
    - Optionally enter a **`Switch Name (Optional)`** (such as `Porch Christmas Tree` or `Bedroom Ceiling Fan`).
    - Watch the live **Icon Category** preview and **Assigned Room** update automatically as you type (defaulting to **`Unassigned`** when no room keyword is detected), or tap any of the **11 Room Preset Chips** (`Living Room`, `Bedroom`, `Kitchen`, `Dining Room`, `Hallway & Landing`, `Ensuite`, `Outdoor`, `Garage`, `Basement`, `Office`, `Unassigned`). *(Need a custom room name outside those 11 presets? You can type any custom room name afterward via **Edit Device**.)*
@@ -88,7 +88,7 @@ Inside the **Provision New Switch AP (`10.22.22.1`)** dialog:
 
 Inside the provisioning dialog, a dark **`SETUP DIAGNOSTICS`** card stays compact while you fill in the form (tap **`Details`** / **`Hide`** to expand or collapse it) and **automatically expands** whenever provisioning runs or an error occurs:
 
-- **One-Tap Sharing**: Tap **`Copy`** to copy the diagnostic trace to your clipboard, or **`Save/Share`** to save `wemi-telemetry-latest.txt` and open Android's share sheet. Your Wi-Fi password is **never** shown or saved.
+- **Privacy-Safe Sharing**: Tap **`Copy`** to copy the diagnostic trace to your clipboard (marked sensitive on Android 13+), or **`Save/Share`** to save `wemi-telemetry-latest.txt` and open Android's share sheet without silently overwriting your clipboard. Wi-Fi passwords are **never** shown or saved, and Wi-Fi SSIDs, MAC addresses, and serial numbers are redacted by default unless you tap **`Full IDs in Export`** ON inside **`Details`**.
 - **Keep Dialog Open After Success**: Tap **`Details`** and toggle **`Keep Dialog Open on Success`** ON before tapping **`Provision Switch`** if you want to review or share the full trace even after setup succeeds.
 - **What's Inside**: Shows your Wi-Fi interface & binding (`[NET]`), setup port probe results (`[PROBE]`), hardware model & encryption flags (`[XML]`, `[FLAGS]`, `[ID]`), 2.4 GHz scan results (`[SCAN]`, `[TARGET AP]`), and step-by-step setup status (`[STEP 1..6]`).
 

@@ -267,7 +267,7 @@ class RuleAndTransportTest {
     }
 
     @Test
-    fun genaServerSurvivesStalledAndResetPeerSocketsWithoutStoppingAcceptLoop() {
+    fun genaServerSurvivesStalledAndResetPeerSocketsWithoutStoppingAcceptLoop() = runBlocking {
         val received = CopyOnWriteArrayList<GenaEventNotification>()
         val delivered = CountDownLatch(1)
         val manager = GenaSubscriptionManager(
@@ -278,45 +278,49 @@ class RuleAndTransportTest {
                 delivered.countDown()
             }
         )
-        try {
-            val port = manager.startServer(InetAddress.getByName("127.0.0.1"))
-            assertTrue("Expected bound ephemeral GENA port", port > 0)
+        FakeUpnpServer(
+            initialFriendlyName = "Resilient Switch",
+            serialNumber = "WLS040SURVIVE"
+        ).use { server ->
+            try {
+                val sub = manager.subscribeOrRenew(
+                    DeviceEntity(
+                        id = 7, name = "Resilient Switch", ipAddress = "127.0.0.1",
+                        port = server.port, serialNumber = "WLS040SURVIVE"
+                    )
+                )
+                assertNotNull("Expected active GENA subscription", sub)
+                val port = manager.activeListenPort
+                assertTrue("Expected bound ephemeral GENA port", port > 0)
 
-            // 1. Peer resets mid-request (RST via SO_LINGER=0)
-            Socket("127.0.0.1", port).use { resetPeer ->
-                resetPeer.setSoLinger(true, 0)
-                resetPeer.getOutputStream().write("NOTIFY /gena/BAD HTTP/1.1\r\nContent-Length: 400\r\n\r\n<part".toByteArray())
-                resetPeer.getOutputStream().flush()
+                // 1. Peer resets mid-request (RST via SO_LINGER=0)
+                Socket("127.0.0.1", port).use { resetPeer ->
+                    resetPeer.setSoLinger(true, 0)
+                    resetPeer.getOutputStream().write("NOTIFY /gena/BAD HTTP/1.1\r\nContent-Length: 400\r\n\r\n<part".toByteArray())
+                    resetPeer.getOutputStream().flush()
+                }
+
+                // 2. Peer opens a silent socket that triggers server read timeout (SocketTimeoutException)
+                Socket("127.0.0.1", port).use { stalledPeer ->
+                    stalledPeer.soTimeout = 3000
+                    assertEquals(-1, stalledPeer.getInputStream().read())
+                }
+
+                // 3. Subsequent authenticated NOTIFY must still be accepted and dispatched cleanly
+                val respLine = server.pushGenaNotify(
+                    callbackPort = port,
+                    deviceKey = "WLS040SURVIVE",
+                    binaryStatePayload = "1",
+                    sid = sub!!.sid
+                )
+                assertEquals("HTTP/1.1 200 OK", respLine)
+
+                assertTrue("GENA accept loop must remain alive after peer reset/timeout", delivered.await(2, TimeUnit.SECONDS))
+                assertEquals("WLS040SURVIVE", received.single().deviceKey)
+                assertEquals(true, received.single().binaryStateOn)
+            } finally {
+                manager.close()
             }
-
-            // 2. Peer opens a silent socket that triggers server read timeout (SocketTimeoutException)
-            Socket("127.0.0.1", port).use { stalledPeer ->
-                stalledPeer.soTimeout = 3000
-                // Wait until server closes socket after its 1500ms soTimeout
-                assertEquals(-1, stalledPeer.getInputStream().read())
-            }
-
-            // 3. Subsequent valid NOTIFY must still be accepted and dispatched cleanly
-            val body = "<e:propertyset><e:property><BinaryState>1</BinaryState></e:property></e:propertyset>"
-            val bodyBytes = body.toByteArray(Charsets.UTF_8)
-            Socket("127.0.0.1", port).use { goodPeer ->
-                goodPeer.soTimeout = 2000
-                val req = "NOTIFY /gena/WLS040SURVIVE HTTP/1.1\r\n" +
-                    "Host: 127.0.0.1:$port\r\n" +
-                    "SID: uuid:gena-survive\r\n" +
-                    "Content-Length: ${bodyBytes.size}\r\n\r\n"
-                goodPeer.getOutputStream().write(req.toByteArray(Charsets.US_ASCII))
-                goodPeer.getOutputStream().write(bodyBytes)
-                goodPeer.getOutputStream().flush()
-                val statusLine = goodPeer.getInputStream().bufferedReader().readLine()
-                assertEquals("HTTP/1.1 200 OK", statusLine)
-            }
-
-            assertTrue("GENA accept loop must remain alive after peer reset/timeout", delivered.await(2, TimeUnit.SECONDS))
-            assertEquals("WLS040SURVIVE", received.single().deviceKey)
-            assertEquals(true, received.single().binaryStateOn)
-        } finally {
-            manager.close()
         }
     }
 

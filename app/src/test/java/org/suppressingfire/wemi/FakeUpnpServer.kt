@@ -11,6 +11,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -58,6 +59,9 @@ class FakeUpnpServer(
     val closeSetupCalled = AtomicBoolean(false)
     val setupDoneCalled = AtomicBoolean(false)
     val lastGenaCallbackPort = AtomicInteger(0)
+    val lastGenaCallbackPath = AtomicReference("")
+    val lastGenaSid = AtomicReference("")
+    val genaSubscriptionsByDeviceKey = ConcurrentHashMap<String, Pair<String, String>>()
     val receivedEncryptedPassword = AtomicReference("")
     val receivedSoapActions = CopyOnWriteArrayList<String>()
     val receivedSsdpSearches = CopyOnWriteArrayList<String>()
@@ -148,6 +152,8 @@ class FakeUpnpServer(
         var contentLength = 0
         var soapAction = ""
         var hasCallback = false
+        var parsedCallbackPort: Int? = null
+        var parsedCallbackPath: String? = null
         while (true) {
             val header = readHttpLine(input) ?: break
             if (header.isEmpty()) break
@@ -160,10 +166,9 @@ class FakeUpnpServer(
                 }
                 header.startsWith("CALLBACK:", ignoreCase = true) -> {
                     hasCallback = true
-                    val parsedPort = Regex(":(\\d+)/").find(header)?.groupValues?.getOrNull(1)?.toIntOrNull()
-                    if (parsedPort != null) {
-                        lastGenaCallbackPort.set(parsedPort)
-                    }
+                    val cbUrl = header.substringAfter(":").trim().removePrefix("<").removeSuffix(">")
+                    parsedCallbackPort = Regex(":(\\d+)/").find(cbUrl)?.groupValues?.getOrNull(1)?.toIntOrNull()
+                    parsedCallbackPath = Regex("http://[^/]+(/[^>\\s]+)").find(cbUrl)?.groupValues?.getOrNull(1)
                 }
             }
         }
@@ -183,11 +188,19 @@ class FakeUpnpServer(
         if (requestLine.startsWith("SUBSCRIBE")) {
             if (!hasCallback && simulate412OnNextGenaRenew.getAndSet(false)) {
                 writer.write("HTTP/1.1 412 Precondition Failed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                writer.flush()
             } else {
                 val nextSid = "uuid:sub-wls0403-${sidSequence.incrementAndGet()}"
+                if (!parsedCallbackPath.isNullOrBlank()) {
+                    lastGenaCallbackPath.set(parsedCallbackPath)
+                    val key = parsedCallbackPath.substringAfter("/gena/", "").substringBefore('/')
+                    if (key.isNotBlank()) genaSubscriptionsByDeviceKey[key] = parsedCallbackPath to nextSid
+                }
+                lastGenaSid.set(nextSid)
                 writer.write("HTTP/1.1 200 OK\r\nSID: $nextSid\r\nTIMEOUT: Second-300\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                writer.flush()
+                if (parsedCallbackPort != null) lastGenaCallbackPort.set(parsedCallbackPort)
             }
-            writer.flush()
             return
         }
 
@@ -433,33 +446,25 @@ class FakeUpnpServer(
         callbackPort: Int,
         deviceKey: String = serialNumber,
         binaryStatePayload: String = "1|78",
-        sid: String = "uuid:sub-wls0403-102",
-        extraPropertyXml: String = ""
+        sid: String = "",
+        extraPropertyXml: String = "",
+        callbackPathOverride: String? = null
     ): String {
-        val propertysetXml = buildString {
-            appendLine("<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\">")
-            appendLine("  <e:property>")
-            appendLine("    <BinaryState>$binaryStatePayload</BinaryState>")
-            appendLine("  </e:property>")
-            if (extraPropertyXml.isNotBlank()) {
-                appendLine("  <e:property>")
-                appendLine("    $extraPropertyXml")
-                appendLine("  </e:property>")
-            }
-            append("</e:propertyset>")
-        }
+        val captured = genaSubscriptionsByDeviceKey[deviceKey]
+            ?: lastGenaCallbackPath.get().takeIf { it.isNotBlank() }?.let { it to lastGenaSid.get() }
+        val targetPath = callbackPathOverride ?: captured?.first ?: "/gena/$deviceKey"
+        val effectiveSid = sid.ifBlank { captured?.second?.ifBlank { "uuid:sub-wls0403-102" } ?: "uuid:sub-wls0403-102" }
+        val extraBlock = if (extraPropertyXml.isNotBlank()) "\n  <e:property>\n    $extraPropertyXml\n  </e:property>" else ""
+        val propertysetXml =
+            "<e:propertyset xmlns:e=\"urn:schemas-upnp-org:event-1-0\">\n  <e:property>\n    <BinaryState>$binaryStatePayload</BinaryState>\n  </e:property>$extraBlock\n</e:propertyset>"
         val bodyBytes = propertysetXml.toByteArray(Charsets.UTF_8)
         Socket("127.0.0.1", callbackPort).use { sock ->
             sock.soTimeout = 1500
             val out = sock.getOutputStream()
             val headerBytes = buildString {
-                append("NOTIFY /gena/$deviceKey HTTP/1.1\r\n")
-                append("HOST: 127.0.0.1:$callbackPort\r\n")
-                append("CONTENT-TYPE: text/xml; charset=\"utf-8\"\r\n")
-                append("NT: upnp:event\r\n")
-                append("NTS: upnp:propchange\r\n")
-                append("SID: $sid\r\n")
-                append("CONTENT-LENGTH: ${bodyBytes.size}\r\n\r\n")
+                append("NOTIFY $targetPath HTTP/1.1\r\nHOST: 127.0.0.1:$callbackPort\r\n")
+                append("CONTENT-TYPE: text/xml; charset=\"utf-8\"\r\nNT: upnp:event\r\nNTS: upnp:propchange\r\n")
+                append("SID: $effectiveSid\r\nCONTENT-LENGTH: ${bodyBytes.size}\r\n\r\n")
             }.toByteArray(Charsets.ISO_8859_1)
             out.write(headerBytes)
             out.write(bodyBytes)

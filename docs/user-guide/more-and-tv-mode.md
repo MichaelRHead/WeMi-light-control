@@ -27,7 +27,7 @@ Inside the **Offline Local UPnP / SOAP Engine** card on the **More** tab:
 
 Other quick actions in this card:
 - **`Scan LAN (SSDP)`**: Opens the live local network discovery scanner.
-- **`Reset Homes, Discovered Switches & Rooms`**: Opens a confirmation prompt (**`Reset & Rescan LAN`**, **`Reset Empty`**, or **`Cancel`**) to wipe saved Wi-Fi Homes, switches, and room assignments back to a clean **`My Home`**.
+- **`Reset Homes, Discovered Switches & Rooms`**: Opens a confirmation prompt (**`Reset & Rescan LAN`**, **`Reset Empty`**, or **`Cancel`**) to wipe saved Wi-Fi Homes, switches, room assignments, Home Screen widget bindings, diagnostic logs, and local rule backups back to a clean **`My Home`**.
 - **`Provision New Switch AP (10.22.22.1)`**: Opens the zero-cloud setup wizard for brand-new or factory-reset switches.
 
 ---
@@ -40,7 +40,7 @@ Below the engine card on the **More** tab, **UPnP / SOAP Packet Log** shows the 
   - **Timestamp** (`h:mm:ss a`, such as `8:15:42 PM`)
   - **Target Local URL** (`POST http://192.168.1.104:49153/upnp/control/basicevent1`)
   - **Result & Response Speed** (`HTTP/1.1 200 OK • <BinaryState>1</BinaryState> (12ms)`)
-- Tap **`Save/Share Log`** to export a full 5-section diagnostic report (`wemi-telemetry-latest.txt` combining your latest `10.22.22.1` setup trace, Wi-Fi Homes, device list, packet log, and Home Screen widgets—never including Wi-Fi passwords), copy it to your clipboard, and open Android's share sheet. See **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)** for details.
+- Tap **`Save/Share Log`** to export a full 5-section diagnostic report (`wemi-telemetry-latest.txt` combining your latest `10.22.22.1` setup trace, Wi-Fi Homes, device list, packet log, and Home Screen widgets—never including Wi-Fi passwords) and open Android's share sheet without silently overwriting your clipboard. By default, exported logs redact Wi-Fi SSIDs, MAC addresses, serial numbers, UDNs, and DNS IPs; switch **`Full Diagnostics in Exported Logs`** ON only if you want to share unredacted identifiers for support. See **[Troubleshooting, Screenshots & Sharing Telemetry Logs](telemetry-and-troubleshooting.md)** for details.
 - Tap **`Clear`** to clear the log list.
 
 ---

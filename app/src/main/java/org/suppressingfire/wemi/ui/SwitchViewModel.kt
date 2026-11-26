@@ -263,10 +263,10 @@ class SwitchViewModel internal constructor(
             hardwareRulesController.dismissAllDialogs()
         }
 
-    fun resetLanHomesSwitchesAndRooms(rediscoverAfterReset: Boolean = true) =
-        homeAndRulesController.resetLanHomesSwitchesAndRooms(rediscoverAfterReset) {
-            refreshDevicesFromNetwork()
-        }
+    fun resetLanHomesSwitchesAndRooms(rediscoverAfterReset: Boolean = true) {
+        provisionApUiController.clearDiagnosticsState()
+        homeAndRulesController.resetLanHomesSwitchesAndRooms(rediscoverAfterReset) { refreshDevicesFromNetwork() }
+    }
 
     fun detectCurrentLanIp(): String = repository.detectCurrentLanIp()
 

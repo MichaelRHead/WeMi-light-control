@@ -24,13 +24,19 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowManager
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -38,12 +44,23 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.suppressingfire.wemi.data.DeviceCategory
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.network.LanEndpointPolicy
 import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDeviceDescriptor
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
+
+private tailrec fun Context.findActivityOrNull(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivityOrNull()
+    else -> null
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -66,7 +83,44 @@ internal fun ProvisionWifiTargetSection(
     onAuthModeChange: (String) -> Unit,
     onEncryptionTypeChange: (String) -> Unit
 ) {
-    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var passwordVisible by remember { mutableStateOf(false) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val view = LocalView.current
+
+    // Always re-mask revealed Wi-Fi passwords when backgrounded or switching apps.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                passwordVisible = false
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // Apply FLAG_SECURE strictly while the user explicitly reveals the plaintext password so
+    // masked Setup Diagnostics screenshots continue working normally.
+    DisposableEffect(view, passwordVisible) {
+        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+        val activityWindow = view.context.findActivityOrNull()?.window
+        val targetWindows = listOfNotNull(dialogWindow, activityWindow).distinct()
+        val previouslySecure = targetWindows.associateWith { w ->
+            (w.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) != 0
+        }
+        if (passwordVisible) {
+            targetWindows.forEach { it.addFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        }
+        onDispose {
+            if (passwordVisible) {
+                previouslySecure.forEach { (w, wasSecure) ->
+                    if (!wasSecure) w.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
+        }
+    }
+
+    val effectiveHost = apHost.trim().ifBlank { "10.22.22.1" }
+    val apHostValid = LanEndpointPolicy.isAllowedLanHost(effectiveHost)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -77,18 +131,27 @@ internal fun ProvisionWifiTargetSection(
             value = apHost,
             onValueChange = onApHostChange,
             label = { Text("Setup AP IP") },
+            isError = !apHostValid,
             singleLine = true,
             modifier = Modifier
                 .weight(1f)
                 .testTag("provision_ap_ip_input")
         )
         OutlinedButton(
-            onClick = { onScanApList(apHost.ifBlank { "10.22.22.1" }) },
-            enabled = !isScanning && !isProvisioning,
+            onClick = { onScanApList(effectiveHost) },
+            enabled = !isScanning && !isProvisioning && apHostValid,
             modifier = Modifier.testTag("scan_setup_ap_button")
         ) {
             Text(if (isScanning) "Scanning..." else "Scan APs")
         }
+    }
+    if (!apHostValid) {
+        Text(
+            text = "Enter a private local LAN IPv4 address (e.g. 10.22.22.1).",
+            style = MaterialTheme.typography.labelSmall,
+            color = StatusOfflineRed,
+            modifier = Modifier.testTag("provision_ap_ip_validation_error")
+        )
     }
 
     if (scannedAps.isNotEmpty()) {

@@ -80,6 +80,21 @@ object HardwareRulesSafetyValidator {
         }
 
         return try {
+            val schemaViolations = HardwareRulesSchemaGuard.hardenAndValidateSchema(
+                db = db,
+                readOnly = true,
+                throwOnViolation = false
+            )
+            if (schemaViolations.isNotEmpty()) {
+                issues += schemaViolations
+                return HardwareRulesValidationResult(
+                    isSafeToStore = false,
+                    issues = issues,
+                    tableNames = emptySet(),
+                    integrityCheckResult = "blocked_untrusted_schema"
+                )
+            }
+
             val integrity = HardwareRulesDbCodec.runSingleTextQuery(db, "PRAGMA integrity_check").orEmpty()
             if (!integrity.equals("ok", ignoreCase = true)) {
                 issues += "PRAGMA integrity_check failed: $integrity"

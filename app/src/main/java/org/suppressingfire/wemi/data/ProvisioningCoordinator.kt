@@ -250,7 +250,7 @@ internal class ProvisioningCoordinator(
                     success = true,
                     networkStatusCode = 1,
                     statusMessage = msg,
-                    encryptedPasswordPayload = encPwd,
+                    encryptedPasswordPayload = "",
                     logEntry = SoapLogEntry(
                         timestamp = nowFormatted(),
                         deviceName = resolvedLabel,
@@ -267,7 +267,8 @@ internal class ProvisioningCoordinator(
                         friendlyName = resolvedLabel,
                         deviceType = deviceType ?: demoDescriptor.deviceType
                     ),
-                    debugTraceLines = trace
+                    debugTraceLines = trace,
+                    encryptedPasswordLength = encPwd.length
                 )
             }
         } else {

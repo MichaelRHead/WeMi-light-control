@@ -2,8 +2,8 @@ package org.suppressingfire.wemi.widget
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -17,53 +17,17 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.suppressingfire.wemi.data.SoapLogEntry
 import org.suppressingfire.wemi.data.SwitchRepository
-import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.SharedSoapLogStore
 
 /**
- * Android Home Screen AppWidgetProvider for one-tap Light & Room power control without opening
- * the app. Uses `goAsync()` with a bounded `8.5s` timeout so local-LAN UPnP SOAP toggles complete
- * cleanly inside the broadcast lifecycle without risking an ANR.
+ * Android Home Screen AppWidgetProvider for standard launcher lifecycle broadcasts
+ * (`APPWIDGET_UPDATE`, `APPWIDGET_DELETED`, `APPWIDGET_RESTORED`).
+ *
+ * Interactive toggle (`ACTION_TOGGLE_WIDGET`) and pin-binding (`ACTION_WIDGET_PINNED`) callbacks
+ * are routed exclusively to the non-exported [WeMiWidgetActionReceiver] so untrusted third-party
+ * apps cannot spoof widget toggles or forge widget bindings.
  */
 class WeMiSwitchWidgetProvider : AppWidgetProvider() {
-
-    private fun runAsyncBroadcast(
-        context: Context,
-        actionLabel: String,
-        block: suspend () -> Unit
-    ) {
-        val customRunner = actionRunnerForTests
-        if (customRunner != null) {
-            customRunner(block)
-            return
-        }
-        val appCtx = context.applicationContext
-        val pendingResult = goAsync()
-        widgetScope.launch {
-            try {
-                val completed = withTimeoutOrNull(broadcastTimeoutMs) {
-                    block()
-                    true
-                }
-                if (completed == null) {
-                    SharedSoapLogStore.append(
-                        context = appCtx,
-                        entry = SoapLogEntry(
-                            timestamp = SimpleDateFormat("h:mm:ss a", Locale.US).format(Date()),
-                            deviceName = "Home Screen Widget",
-                            endpoint = "widget://$actionLabel",
-                            soapAction = "Widget#$actionLabel",
-                            statusText = "Timeout • Exceeded ${broadcastTimeoutMs}ms broadcast budget",
-                            xmlSnippet = "",
-                            isLiveLanSuccess = false
-                        )
-                    )
-                }
-            } finally {
-                pendingResult?.finish()
-            }
-        }
-    }
 
     override fun onUpdate(
         context: Context,
@@ -71,63 +35,12 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
         appWidgetIds: IntArray
     ) {
         if (appWidgetIds.isEmpty()) return
-        runAsyncBroadcast(context, "Refresh(${appWidgetIds.joinToString(",")})") {
+        dispatchAsyncBroadcast(this, context, "Refresh(${appWidgetIds.joinToString(",")})") {
             WidgetActionExecutor.refreshWidgetIds(
                 context = context,
                 appWidgetIds = appWidgetIds,
                 repositoryOverride = repositoryProviderForTests?.invoke(context)
             )
-        }
-    }
-
-    override fun onReceive(context: Context, intent: Intent) {
-        super.onReceive(context, intent)
-        when (intent.action) {
-            ACTION_TOGGLE_WIDGET -> {
-                val appWidgetId = intent.getIntExtra(
-                    AppWidgetManager.EXTRA_APPWIDGET_ID,
-                    AppWidgetManager.INVALID_APPWIDGET_ID
-                )
-                if (appWidgetId <= 0) return
-                runAsyncBroadcast(context, "Toggle($appWidgetId)") {
-                    WidgetActionExecutor.toggleWidgetTarget(
-                        context = context,
-                        appWidgetId = appWidgetId,
-                        repositoryOverride = repositoryProviderForTests?.invoke(context)
-                    )
-                }
-            }
-
-            ACTION_WIDGET_PINNED -> {
-                val appWidgetId = intent.getIntExtra(
-                    AppWidgetManager.EXTRA_APPWIDGET_ID,
-                    AppWidgetManager.INVALID_APPWIDGET_ID
-                )
-                val targetType = WidgetTargetType.fromRaw(intent.getStringExtra(EXTRA_TARGET_TYPE))
-                if (appWidgetId <= 0 || targetType == null) return
-
-                val rawSerial = intent.getStringExtra(EXTRA_SERIAL_NUMBER).orEmpty()
-                val rawUdn = intent.getStringExtra(EXTRA_UDN).orEmpty()
-                val config = WidgetTargetConfig(
-                    appWidgetId = appWidgetId,
-                    targetType = targetType,
-                    deviceId = intent.getIntExtra(EXTRA_DEVICE_ID, 0),
-                    serialNumber = rawSerial.takeUnless { LanRuntimeUtils.isPlaceholderSerial(it) }.orEmpty(),
-                    roomName = intent.getStringExtra(EXTRA_ROOM_NAME).orEmpty(),
-                    networkKey = intent.getStringExtra(EXTRA_NETWORK_KEY).orEmpty(),
-                    displayName = intent.getStringExtra(EXTRA_DISPLAY_NAME).orEmpty(),
-                    udn = LanRuntimeUtils.canonicalHardwareUdn(rawUdn)
-                )
-                WidgetConfigStore.save(context, config)
-
-                runAsyncBroadcast(context, "Pinned($appWidgetId)") {
-                    WidgetActionExecutor.refreshWidgetIds(
-                        context = context,
-                        appWidgetIds = intArrayOf(appWidgetId),
-                        repositoryOverride = repositoryProviderForTests?.invoke(context)
-                    )
-                }
-            }
         }
     }
 
@@ -171,6 +84,45 @@ class WeMiSwitchWidgetProvider : AppWidgetProvider() {
 
         @Volatile
         internal var repositoryProviderForTests: ((Context) -> SwitchRepository)? = null
+
+        internal fun dispatchAsyncBroadcast(
+            receiver: BroadcastReceiver,
+            context: Context,
+            actionLabel: String,
+            block: suspend () -> Unit
+        ) {
+            val customRunner = actionRunnerForTests
+            if (customRunner != null) {
+                customRunner(block)
+                return
+            }
+            val appCtx = context.applicationContext
+            val pendingResult = receiver.goAsync()
+            widgetScope.launch {
+                try {
+                    val completed = withTimeoutOrNull(broadcastTimeoutMs) {
+                        block()
+                        true
+                    }
+                    if (completed == null) {
+                        SharedSoapLogStore.append(
+                            context = appCtx,
+                            entry = SoapLogEntry(
+                                timestamp = SimpleDateFormat("h:mm:ss a", Locale.US).format(Date()),
+                                deviceName = "Home Screen Widget",
+                                endpoint = "widget://$actionLabel",
+                                soapAction = "Widget#$actionLabel",
+                                statusText = "Timeout • Exceeded ${broadcastTimeoutMs}ms broadcast budget",
+                                xmlSnippet = "",
+                                isLiveLanSuccess = false
+                            )
+                        )
+                    }
+                } finally {
+                    pendingResult?.finish()
+                }
+            }
+        }
 
         internal fun cancelAndJoinPendingWorkForTests() {
             val pendingJobs = widgetScope.coroutineContext[Job]?.children?.toList().orEmpty()

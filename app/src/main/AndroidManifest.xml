@@ -56,6 +56,10 @@
                 android:resource="@xml/wemi_switch_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.WeMiWidgetActionReceiver"
+            android:exported="false" />
+
         <activity
             android:name=".widget.SwitchWidgetConfigureActivity"
             android:exported="true"

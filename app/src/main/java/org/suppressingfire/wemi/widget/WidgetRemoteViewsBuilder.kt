@@ -246,7 +246,7 @@ object WidgetRemoteViewsBuilder {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         } else {
-            val toggleIntent = Intent(context, WeMiSwitchWidgetProvider::class.java).apply {
+            val toggleIntent = Intent(context, WeMiWidgetActionReceiver::class.java).apply {
                 action = WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET
                 putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
             }
@@ -394,8 +394,10 @@ object WidgetUpdater {
         }
 
         val provider = ComponentName(appCtx, WeMiSwitchWidgetProvider::class.java)
-        val pinnedCallbackIntent = Intent(appCtx, WeMiSwitchWidgetProvider::class.java).apply {
+        val pinNonce = WeMiWidgetActionReceiver.issuePendingPinNonce()
+        val pinnedCallbackIntent = Intent(appCtx, WeMiWidgetActionReceiver::class.java).apply {
             action = WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED
+            putExtra(WeMiWidgetActionReceiver.EXTRA_PIN_NONCE, pinNonce)
             putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, config.targetType.name)
             putExtra(WeMiSwitchWidgetProvider.EXTRA_DEVICE_ID, config.deviceId)
             putExtra(WeMiSwitchWidgetProvider.EXTRA_SERIAL_NUMBER, config.serialNumber)

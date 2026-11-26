@@ -230,9 +230,9 @@ class LifecycleAndConcurrencyTest {
                 Socket("127.0.0.1", manager.activeListenPort).use { sock ->
                     val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.UTF_8)
                     writer.write(
-                        "NOTIFY /gena/WDS060REAL77/?seq=4 HTTP/1.1\r\n" +
+                        "NOTIFY /gena/WDS060REAL77/${realSub!!.callbackToken}/?seq=4 HTTP/1.1\r\n" +
                             "HOST: 127.0.0.1:${manager.activeListenPort}\r\n" +
-                            "SID: ${realSub!!.sid}\r\n" +
+                            "SID: ${realSub.sid}\r\n" +
                             "CONTENT-LENGTH: ${bytes.size}\r\n\r\n$xml"
                     )
                     writer.flush()

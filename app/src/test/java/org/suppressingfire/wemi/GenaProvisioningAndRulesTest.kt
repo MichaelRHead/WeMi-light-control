@@ -281,9 +281,13 @@ class GenaProvisioningAndRulesTest {
             assertFalse(server.closeSetupCalled.get())
             assertFalse(server.setupDoneCalled.get())
             assertTrue(streamedLines.any { it.contains("[STEP 6 HOLD] NetworkStatus=0") })
+            assertEquals("", result.encryptedPasswordPayload)
+            val sentCiphertext = server.receivedEncryptedPassword.get()
+            assertTrue(sentCiphertext.isNotBlank())
+            assertEquals(sentCiphertext.length, result.encryptedPasswordLength)
             assertFalse(result.logEntry.xmlSnippet.contains("WrongRouterPassword99"))
-            assertFalse(result.logEntry.xmlSnippet.contains(result.encryptedPasswordPayload))
-            assertTrue(result.logEntry.xmlSnippet.contains("[REDACTED encLen=${result.encryptedPasswordPayload.length}]"))
+            assertFalse(result.logEntry.xmlSnippet.contains(sentCiphertext))
+            assertTrue(result.logEntry.xmlSnippet.contains("[REDACTED encLen=${sentCiphertext.length}]"))
 
             // Verify auto-matching from ApList overrode manual Ch=11 with ApList's Ch=6 for HeadFamily-2.4G
             assertTrue(result.debugTraceLines.any { it.contains("Matched \"HeadFamily-2.4G\" in ApList: Ch=6") })

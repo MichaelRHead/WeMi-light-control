@@ -62,10 +62,24 @@ object HardwareRulesDbMutator {
         }
     }
 
+    private fun openHardenedDb(sqliteFile: File, readOnly: Boolean): SQLiteDatabase {
+        val db = SQLiteDatabase.openDatabase(
+            sqliteFile.absolutePath, null, if (readOnly) OPEN_RO_FLAGS else OPEN_RW_FLAGS
+        )
+        try {
+            HardwareRulesSchemaGuard.hardenAndValidateSchema(db, readOnly = readOnly, throwOnViolation = true)
+            if (!readOnly) ensureJournalDeleteMode(db)
+            return db
+        } catch (t: Throwable) {
+            runCatching { db.close() }
+            throw t
+        }
+    }
+
     /** Guards against overwriting/deleting rules owned by another switch or shared across multiple switches. */
     internal fun verifyRuleOwnedExclusivelyBy(sqliteFile: File, ruleId: Int, ownerDeviceUdn: String) {
         val cleanOwner = LanRuntimeUtils.canonicalHardwareUdn(ownerDeviceUdn).ifBlank { ownerDeviceUdn.trim() }.lowercase(Locale.US)
-        val db = SQLiteDatabase.openDatabase(sqliteFile.absolutePath, null, OPEN_RO_FLAGS)
+        val db = openHardenedDb(sqliteFile, readOnly = true)
         try {
             if ("RULEDEVICES" !in HardwareRulesDbCodec.listTableNames(db)) return
             val owners = LinkedHashSet<String>()
@@ -109,9 +123,8 @@ object HardwareRulesDbMutator {
             require(cleanTargets.isNotEmpty()) { "Long Press requires at least one target switch" }
         }
 
-        val db = SQLiteDatabase.openDatabase(sqliteFile.absolutePath, null, OPEN_RW_FLAGS)
+        val db = openHardenedDb(sqliteFile, readOnly = false)
         try {
-            ensureJournalDeleteMode(db)
             val tables = HardwareRulesDbCodec.listTableNames(db).toMutableSet()
             ensureCoreTables(db, tables, needTargets = draft.type == HardwareRuleType.LONG_PRESS)
             ensureRuleDeviceColumns(db, draft.type)
@@ -243,9 +256,8 @@ object HardwareRulesDbMutator {
      * altering its `RULEDEVICES` or `TARGETDEVICES` rows.
      */
     fun toggleRuleEnabled(sqliteFile: File, ruleId: Int, enabled: Boolean): Boolean {
-        val db = SQLiteDatabase.openDatabase(sqliteFile.absolutePath, null, OPEN_RW_FLAGS)
+        val db = openHardenedDb(sqliteFile, readOnly = false)
         return try {
-            ensureJournalDeleteMode(db)
             val tables = HardwareRulesDbCodec.listTableNames(db)
             if ("RULES" !in tables || "STATE" !in HardwareRulesDbCodec.listColumnNames(db, "RULES")) return false
             val cv = ContentValues().apply { put("State", if (enabled) "1" else "0") }
@@ -262,9 +274,8 @@ object HardwareRulesDbMutator {
      * firmware rule tables present in [sqliteFile], leaving all other rules untouched.
      */
     fun deleteRule(sqliteFile: File, ruleId: Int): Boolean {
-        val db = SQLiteDatabase.openDatabase(sqliteFile.absolutePath, null, OPEN_RW_FLAGS)
+        val db = openHardenedDb(sqliteFile, readOnly = false)
         return try {
-            ensureJournalDeleteMode(db)
             val tables = HardwareRulesDbCodec.listTableNames(db)
             db.transaction {
                 val idArg = arrayOf(ruleId.toString())
@@ -316,9 +327,8 @@ object HardwareRulesDbMutator {
         val cleanLat = String.format(Locale.US, "%.4f", latNum)
         val cleanLon = String.format(Locale.US, "%.4f", lonNum)
 
-        val db = SQLiteDatabase.openDatabase(sqliteFile.absolutePath, null, OPEN_RW_FLAGS)
+        val db = openHardenedDb(sqliteFile, readOnly = false)
         try {
-            ensureJournalDeleteMode(db)
             val tables = HardwareRulesDbCodec.listTableNames(db)
             if ("LOCATIONINFO" !in tables) {
                 db.execSQL(

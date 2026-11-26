@@ -282,14 +282,27 @@ if [ -n "$CACHE_DIR" ]; then
   fi
 fi
 
-# 2. Network fallback: Install Temurin JDK 21 if no JDK 21 is available
+# 2. Network fallback: Install pinned Temurin JDK 21 GA with SHA-256 verification if no JDK 21 is available
 if ! is_jdk21 "$JAVA_HOME_DIR"; then
   JAVA_HOME_DIR="$DEFAULT_LOCAL_JDK"
-  echo "[env-setup] Downloading Temurin JDK 21 (${ADOPTIUM_ARCH}) into $JAVA_HOME_DIR..."
+  case "$ADOPTIUM_ARCH" in
+    x64)
+      TEMURIN_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13.1%2B2/OpenJDK21U-jdk_x64_linux_hotspot_21.0.13.1_2.tar.gz"
+      TEMURIN_SHA256="bb8a93f9ae6e7a693b2b721e85dbeff26ae1a77447985a8d7afcdd9c7cf6222e"
+      ;;
+    aarch64)
+      TEMURIN_URL="https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.13.1%2B2/OpenJDK21U-jdk_aarch64_linux_hotspot_21.0.13.1_2.tar.gz"
+      TEMURIN_SHA256="8c72816a6b308842d5ed1f13e5826b69c567da4784f7238d7e800efa71fe54b1"
+      ;;
+  esac
+  echo "[env-setup] Downloading pinned Temurin JDK 21 (${ADOPTIUM_ARCH}) into $JAVA_HOME_DIR..."
   TMP_JDK="$(mktemp /tmp/temurin-jdk21-XXXXXX.tar.gz)"
-  curl -fSL \
-    "https://api.adoptium.net/v3/binary/latest/21/ga/linux/${ADOPTIUM_ARCH}/jdk/hotspot/normal/eclipse" \
-    -o "$TMP_JDK"
+  curl -fSL "$TEMURIN_URL" -o "$TMP_JDK"
+  if ! printf '%s  %s\n' "$TEMURIN_SHA256" "$TMP_JDK" | sha256sum -c - >/dev/null; then
+    echo "[env-setup] ERROR: SHA-256 mismatch for Temurin JDK 21 archive!" >&2
+    rm -f "$TMP_JDK"
+    exit 1
+  fi
   rm -rf "${JAVA_HOME_DIR}.tmp"
   mkdir -p "${JAVA_HOME_DIR}.tmp"
   tar -xzf "$TMP_JDK" -C "${JAVA_HOME_DIR}.tmp" --strip-components=1
@@ -302,11 +315,17 @@ if [ -w "$JAVA_HOME_DIR/lib/security" ] && [ -f "$JAVA_HOME_DIR/lib/security/cac
   cp "$JAVA_HOME_DIR/lib/security/cacerts" "$JAVA_HOME_DIR/lib/security/cacerts.orig"
 fi
 
-# 3. Network fallback: Install Android SDK cmdline-tools if still missing
+# 3. Network fallback: Install Android SDK cmdline-tools with SHA-256 verification if still missing
+CMDLINE_TOOLS_SHA256="7ec965280a073311c339e571cd5de778b9975026cfcbe79f2b1cdcb1e15317ee"
 if [ ! -x "$ANDROID_SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]; then
   echo "[env-setup] Downloading Android SDK command-line tools into $ANDROID_SDK_DIR..."
   TMP_CLI="$(mktemp /tmp/android-cmdline-tools-XXXXXX.zip)"
   curl -fSL "$CMDLINE_TOOLS_URL" -o "$TMP_CLI"
+  if ! printf '%s  %s\n' "$CMDLINE_TOOLS_SHA256" "$TMP_CLI" | sha256sum -c - >/dev/null; then
+    echo "[env-setup] ERROR: SHA-256 mismatch for Android cmdline-tools archive!" >&2
+    rm -f "$TMP_CLI"
+    exit 1
+  fi
   rm -rf "$ANDROID_SDK_DIR/cmdline-tools/latest.tmp"
   mkdir -p "$ANDROID_SDK_DIR/cmdline-tools/latest.tmp"
   unzip -q "$TMP_CLI" -d "$ANDROID_SDK_DIR/cmdline-tools/latest.tmp"

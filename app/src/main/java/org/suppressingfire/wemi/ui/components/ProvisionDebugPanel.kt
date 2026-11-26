@@ -23,10 +23,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -39,11 +37,10 @@ import org.suppressingfire.wemi.network.TelemetryFileExporter
  *
  * Stays compact while idle and auto-expands when AP scanning, provisioning traces, or errors
  * occur, displaying `/setup.xml` / `GetMetaInfo` MAC & serial source, `GetApList` channel/auth
- * match, AES-128-CBC encryption details, and step-by-step trace lines with one-tap `Copy` and
- * `Save/Share` export to `wemi-telemetry-latest.txt`.
+ * match, AES-128-CBC encryption details, and step-by-step trace lines with privacy-safe (redacted
+ * by default, opt-in Full IDs) `Copy` and `Save/Share` export to `wemi-telemetry-latest.txt`.
  */
 @OptIn(ExperimentalLayoutApi::class)
-@Suppress("DEPRECATION")
 @Composable
 internal fun ProvisionDebugPanel(
     debugSnapshot: SetupDebugSnapshot,
@@ -54,9 +51,9 @@ internal fun ProvisionDebugPanel(
     onToggleKeepOpen: () -> Unit
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
-    var copiedFeedback by remember(debugSnapshot, selectedSsid) { mutableStateOf(false) }
-    var sharedFeedback by remember(debugSnapshot, selectedSsid) { mutableStateOf(false) }
+    var includeFullIdentifiers by remember { mutableStateOf(false) }
+    var copiedFeedback by remember(debugSnapshot, selectedSsid, includeFullIdentifiers) { mutableStateOf(false) }
+    var sharedFeedback by remember(debugSnapshot, selectedSsid, includeFullIdentifiers) { mutableStateOf(false) }
     val hasActiveDiagnostics = hasWarningOrError || debugSnapshot.traceLines.isNotEmpty()
     var userExpandedOverride by remember { mutableStateOf<Boolean?>(null) }
     LaunchedEffect(hasWarningOrError, statusMessage) {
@@ -120,8 +117,15 @@ internal fun ProvisionDebugPanel(
                     }
                     OutlinedButton(
                         onClick = {
-                            val reportText = debugSnapshot.toClipboardText(selectedSsid)
-                            clipboardManager.setText(AnnotatedString(reportText))
+                            val reportText = debugSnapshot.toClipboardText(
+                                selectedSsid = selectedSsid,
+                                includeSensitiveIdentifiers = includeFullIdentifiers
+                            )
+                            TelemetryFileExporter.copyTelemetryReportToClipboard(
+                                context = context,
+                                reportText = reportText,
+                                label = "WeMi Setup AP Diagnostic Report"
+                            )
                             runCatching {
                                 TelemetryFileExporter.saveTelemetryReportToFile(context, reportText)
                             }
@@ -143,8 +147,11 @@ internal fun ProvisionDebugPanel(
                     }
                     OutlinedButton(
                         onClick = {
-                            val reportText = debugSnapshot.toClipboardText(selectedSsid)
-                            TelemetryFileExporter.copyAndShareTelemetryReport(
+                            val reportText = debugSnapshot.toClipboardText(
+                                selectedSsid = selectedSsid,
+                                includeSensitiveIdentifiers = includeFullIdentifiers
+                            )
+                            TelemetryFileExporter.saveAndShareTelemetryReport(
                                 context = context,
                                 reportText = reportText,
                                 subject = "WeMi Setup AP Diagnostic Report"
@@ -222,6 +229,28 @@ internal fun ProvisionDebugPanel(
                         selectedLabelColor = Color(0xFFBBF7D0)
                     ),
                     modifier = Modifier.testTag("keep_provision_dialog_open_chip")
+                )
+
+                FilterChip(
+                    selected = includeFullIdentifiers,
+                    onClick = { includeFullIdentifiers = !includeFullIdentifiers },
+                    label = {
+                        Text(
+                            text = if (includeFullIdentifiers) {
+                                "Full IDs in Export: ON (unredacted SSID/MAC/SN)"
+                            } else {
+                                "Full IDs in Export: OFF (redacts SSID/MAC/SN)"
+                            },
+                            fontSize = 10.5.sp
+                        )
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = Color(0xFF1E293B),
+                        labelColor = Color(0xFFCBD5E1),
+                        selectedContainerColor = Color(0xFF1E3A5F),
+                        selectedLabelColor = Color(0xFFBAE6FD)
+                    ),
+                    modifier = Modifier.testTag("provision_include_full_ids_chip")
                 )
             }
         }

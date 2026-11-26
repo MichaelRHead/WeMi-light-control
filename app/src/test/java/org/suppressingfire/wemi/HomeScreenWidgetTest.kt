@@ -403,14 +403,20 @@ class HomeScreenWidgetTest {
                 assertEquals("Offline • Room", offlineRoomState.subtitle)
 
                 val provider = WeMiSwitchWidgetProvider()
+                val actionReceiver = org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver()
+                val providerComponent = android.content.ComponentName(context, WeMiSwitchWidgetProvider::class.java)
+                val shadowWidgetMgr = org.robolectric.Shadows.shadowOf(AppWidgetManager.getInstance(context))
+                shadowWidgetMgr.bindAppWidgetId(702, providerComponent)
+                shadowWidgetMgr.bindAppWidgetId(701, providerComponent)
                 WeMiSwitchWidgetProvider.actionRunnerForTests = { block -> runBlocking { block() } }
                 WeMiSwitchWidgetProvider.repositoryProviderForTests = { repo }
 
                 // Non-positive widget IDs must be ignored cleanly
-                provider.onReceive(
+                actionReceiver.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -5)
+                        putExtra(org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.EXTRA_PIN_NONCE, org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.issuePendingPinNonce())
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.ROOM.name)
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
                     }
@@ -418,10 +424,11 @@ class HomeScreenWidgetTest {
                 assertTrue(WidgetConfigStore.allConfiguredWidgetIds(context).isEmpty())
 
                 // Pin a Room widget via ACTION_WIDGET_PINNED broadcast (with stale homeKey)
-                provider.onReceive(
+                actionReceiver.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 702)
+                        putExtra(org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.EXTRA_PIN_NONCE, org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.issuePendingPinNonce())
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.ROOM.name)
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_ROOM_NAME, "Garage")
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_NETWORK_KEY, DEFAULT_MAIN_HOME_KEY)
@@ -431,7 +438,7 @@ class HomeScreenWidgetTest {
                 assertEquals("Garage", WidgetConfigStore.load(context, 702)?.normalizedRoomName())
 
                 // Tap the offline Room widget via ACTION_TOGGLE_WIDGET -> wakes offline switch ON & heals networkKey
-                provider.onReceive(
+                actionReceiver.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 702)
@@ -443,10 +450,11 @@ class HomeScreenWidgetTest {
                 assertEquals("wifi_lan_192_168_86", WidgetConfigStore.load(context, 702)?.networkKey)
 
                 // Pin a Device widget with placeholder serial "UNKNOWN" -> strips placeholder, heals on toggle OFF
-                provider.onReceive(
+                actionReceiver.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_WIDGET_PINNED).apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 701)
+                        putExtra(org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.EXTRA_PIN_NONCE, org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver.issuePendingPinNonce())
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_TARGET_TYPE, WidgetTargetType.DEVICE.name)
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_DEVICE_ID, savedId)
                         putExtra(WeMiSwitchWidgetProvider.EXTRA_SERIAL_NUMBER, "UNKNOWN")
@@ -456,7 +464,7 @@ class HomeScreenWidgetTest {
                     }
                 )
                 assertEquals("", WidgetConfigStore.load(context, 701)?.serialNumber)
-                provider.onReceive(
+                actionReceiver.onReceive(
                     context,
                     Intent(WeMiSwitchWidgetProvider.ACTION_TOGGLE_WIDGET).apply {
                         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, 701)

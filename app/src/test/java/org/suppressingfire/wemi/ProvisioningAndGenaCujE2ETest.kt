@@ -295,11 +295,27 @@ class ProvisioningAndGenaCujE2ETest {
             }
             composeTestRule.onNodeWithText("Stairway 3-Way Switch").assertIsDisplayed()
 
-            // 7. Export full 4-section telemetry from More -> Save/Share Log and verify session setup trace + homes + redaction
+            // 7. Export default redacted telemetry from More -> Save/Share Log, then opt in to Full Diagnostics and verify full IDs
             composeTestRule.onNodeWithTag("nav_tab_more").performClick()
             composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag("more_screen_list")
                 .performScrollToNode(hasTestTag("export_telemetry_file_button"))
+            composeTestRule.onNodeWithTag("export_telemetry_file_button").performClick()
+            composeTestRule.waitForIdle()
+
+            val redactedMoreExport = telemetryFile.readText()
+            assertFalse("Default export must redact home SSID", redactedMoreExport.contains("HeadFamily-2.4G"))
+            assertFalse("Default export must redact full serial/UDN", redactedMoreExport.contains("WLS0403PROV88"))
+            assertTrue(redactedMoreExport.contains("[TARGET AP] \"SSID#"))
+            assertTrue(redactedMoreExport.contains("[STEP 6 CLOSE] CloseSetup -> success"))
+            assertTrue(redactedMoreExport.contains("udn=uuid:Lightswitch-3_0-***OV88"))
+            assertTrue(redactedMoreExport.contains("[REDACTED encLen="))
+            assertFalse(redactedMoreExport.contains("HomeRouterSecret99"))
+
+            composeTestRule.onNodeWithTag("more_screen_list")
+                .performScrollToNode(hasTestTag("telemetry_include_full_ids_switch"))
+            composeTestRule.onNodeWithTag("telemetry_include_full_ids_switch").performClick()
+            composeTestRule.waitForIdle()
             composeTestRule.onNodeWithTag("export_telemetry_file_button").performClick()
             composeTestRule.waitForIdle()
 
