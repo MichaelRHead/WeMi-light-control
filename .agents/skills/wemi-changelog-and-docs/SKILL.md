@@ -19,6 +19,7 @@ Use this skill whenever you land a feature, bug fix, UI change, or architectural
 >   - [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) *(Owned Exclusively by the Google AI Studio Agent — Read-Only for other agents)*
 >   - [`DEBUGGING_AND_SUPPORT.md`](../../../DEBUGGING_AND_SUPPORT.md) *(Owned Exclusively by the Antigravity Debugging & Support Agent — Read-Only for other agents)*
 >   - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../../DISCOVERY_AND_ROOM_GROUPING.md) *(Owned Exclusively by the Antigravity Device Discovery & Room Grouping Agent — Read-Only for other agents)*
+>   - [`SECURITY_AND_PRIVACY.md`](../../../SECURITY_AND_PRIVACY.md) *(Owned Exclusively by the Antigravity Security & Privacy Agent — Read-Only for other agents)*
 >   - [`LICENSE_GOVERNANCE.md`](../../../LICENSE_GOVERNANCE.md) *(Owned Exclusively by the Antigravity License & Brand Governance Agent — Read-Only for other agents)*
 >   - [`RELEASE_PROCESS.md`](../../../RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](../../../RELEASE_SIGN_OFF.md)
 >   - [`IMPLEMENTED.md`](../../../IMPLEMENTED.md)
@@ -30,7 +31,7 @@ Use this skill whenever you land a feature, bug fix, UI change, or architectural
 | File Path | Role & Format |
 | :--- | :--- |
 | [`IMPLEMENTED.md`](../../../IMPLEMENTED.md) | **Reverse-Chronological Feature Change Log**: Records every completed feature, bug fix, and improvement from **newest at the top to oldest at the bottom**, including the PST timestamp, version/commit reference, summary table row, and detailed bullet points. |
-| [`RELEASE_PROCESS.md`](../../../RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](../../../RELEASE_SIGN_OFF.md) | **6-Agent / 7-Stage Autonomous Release Process & Sign-Off Ledger**: Coordinates autonomous release reviews (`ai_studio_ux_cuj` → `discovery_and_grouping` → `telemetry_and_debugging` → `code_quality_and_testing` → `license_governance` → `ai_studio_ux_cuj` → `app_promoter`). |
+| [`RELEASE_PROCESS.md`](../../../RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](../../../RELEASE_SIGN_OFF.md) | **7-Agent / 8-Stage Autonomous Release Process & Sign-Off Ledger**: Coordinates autonomous release reviews (`ai_studio_ux_cuj` → `discovery_and_grouping` → `telemetry_and_debugging` → `security_and_privacy` → `code_quality_and_testing` → `license_governance` → `ai_studio_ux_cuj` → `app_promoter`). |
 | [`docs/user-guide/release-notes.md`](../../../docs/user-guide/release-notes.md) | **User-Facing Google Play Store Release Notes**: High-level, non-technical summary of major user-facing features and improvements introduced in each Play Store release version (`v1.0` → `v36.0+`). |
 | [`UPCOMING_FEATURES.md`](../../../UPCOMING_FEATURES.md) | **Upcoming Features Roadmap**: Lists planned/unimplemented features and engineering tracks. When an upcoming feature is implemented, remove it from `UPCOMING_FEATURES.md` and prepend it to `IMPLEMENTED.md`. |
 | [`USER_GUIDE.md`](../../../USER_GUIDE.md) | **User Guide Index**: Summarizes each user-facing feature in a table and links to detailed guides under [`docs/user-guide/`](../../../docs/user-guide/). |

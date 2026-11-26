@@ -28,11 +28,14 @@ Use this skill whenever multiple agent conversations or external tools (such as 
 6. **Respect Exclusive Ownership of `DISCOVERY_AND_ROOM_GROUPING.md` & `wemi-discovery-and-room-grouping`**:
    - [`DISCOVERY_AND_ROOM_GROUPING.md`](../../../DISCOVERY_AND_ROOM_GROUPING.md) and [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md) are **owned exclusively by the Antigravity Device Discovery & Room Grouping Agent**.
    - Other agents must read and follow those files to preserve the SSDP/unicast discovery orchestration, 3-tier hardware identity resolution (`matchesDiscoveredDevice`), and automatic room inference/migration (`inferRoomFromName` & `resolveDeviceRoomAssignment`) invariants, **but must never edit, overwrite, or delete them**.
-7. **Respect Exclusive Ownership of `LICENSE_GOVERNANCE.md`, `wemi-license-governance` & `LicenseAndBrandGovernanceTest.kt`**:
+7. **Respect Exclusive Ownership of `SECURITY_AND_PRIVACY.md` & `wemi-security-and-privacy`**:
+   - [`SECURITY_AND_PRIVACY.md`](../../../SECURITY_AND_PRIVACY.md) and [`.agents/skills/wemi-security-and-privacy/SKILL.md`](../wemi-security-and-privacy/SKILL.md) are **owned exclusively by the Antigravity Security & Privacy Agent (`security_and_privacy`)**.
+   - Other agents must read and follow those files to preserve Android IPC, local-LAN SSRF/CRLF/DoS, untrusted SQLite `rules.db`, Wi-Fi credential lifecycle, backup/Privacy-Policy parity, and CI/CD supply-chain invariants, **but must never edit, overwrite, or delete them**.
+8. **Respect Exclusive Ownership of `LICENSE_GOVERNANCE.md`, `wemi-license-governance` & `LicenseAndBrandGovernanceTest.kt`**:
    - [`LICENSE_GOVERNANCE.md`](../../../LICENSE_GOVERNANCE.md), [`.agents/skills/wemi-license-governance/SKILL.md`](../wemi-license-governance/SKILL.md), and [`LicenseAndBrandGovernanceTest.kt`](../../../app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt) are **owned exclusively by the Antigravity License & Brand Governance Agent**.
    - Other agents must read and follow those files to preserve MIT license parity, the permissive dependency allowlist, `org.suppressingfire.wemi` namespace/filename hygiene, and Play Store trademark boundaries, **but must never edit, overwrite, or delete them**.
-8. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
-   - All `ALL_CAPS.md` files (`AGENTS.md`, `ARCHITECTURE.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `LICENSE_GOVERNANCE.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) live **exclusively at the repository root (`/`)**.
+9. **Single-Source Documentation Layout (`ALL_CAPS.md` at Root Only, User Guides in `docs/user-guide/`)**:
+   - All `ALL_CAPS.md` files (`AGENTS.md`, `ARCHITECTURE.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `SECURITY_AND_PRIVACY.md`, `LICENSE_GOVERNANCE.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) live **exclusively at the repository root (`/`)**.
    - The `docs/` directory is dedicated **only** to the human-focused user guides (`docs/user-guide/*.md` — including `docs/user-guide/release-notes.md` — and `docs/README.md`). Never duplicate or copy `ALL_CAPS.md` files into `docs/`, and never recreate root `RELEASE_NOTES.md`.
 
 ---
@@ -87,7 +90,7 @@ If Git reports a conflict in any file:
 ### Step 4: Verify Documentation Organization & Skill Synchronization
 Before committing or pushing your integrated changes:
 1. **Verify Single-Source Root `ALL_CAPS.md` Layout**:
-   - Confirm that all `ALL_CAPS.md` files (`AGENTS.md`, `ARCHITECTURE.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `LICENSE_GOVERNANCE.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) exist only at the repository root (`/`) and are **not** duplicated inside `docs/`.
+   - Confirm that all `ALL_CAPS.md` files (`AGENTS.md`, `ARCHITECTURE.md`, `UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DEBUGGING_AND_SUPPORT.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `SECURITY_AND_PRIVACY.md`, `LICENSE_GOVERNANCE.md`, `RELEASE_PROCESS.md`, `RELEASE_SIGN_OFF.md`, `IMPLEMENTED.md`, `UPCOMING_FEATURES.md`, `USER_GUIDE.md`) exist only at the repository root (`/`) and are **not** duplicated inside `docs/`.
    - Do not modify files exclusively owned by another agent.
 2. **Sync Repository Skills (`.agents/skills/`) with Persistent Agent Skills**:
    - Whenever any `.agents/skills/<skill-name>/SKILL.md` is added or updated in the repository, also call `save_skill(overwrite = true, skill_dir = "/home/antigravity/MichaelRHead/WeMi-light-control/.agents/skills/<skill-name>")` so the persistent skill registry stays in lockstep with GitHub.

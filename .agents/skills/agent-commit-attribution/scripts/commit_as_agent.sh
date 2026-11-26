@@ -40,8 +40,8 @@ Options:
 
 Roles:
   ai_studio_ux_cuj | discovery_and_grouping | telemetry_and_debugging |
-  code_quality_and_testing | license_governance | app_promoter |
-  antigravity_general
+  security_and_privacy | code_quality_and_testing | license_governance |
+  app_promoter | antigravity_general
 EOF
   exit 2
 }
@@ -129,6 +129,9 @@ case "${ROLE_ID}" in
   telemetry_and_debugging)
     CANONICAL_NAME="Antigravity Telemetry & Debugging Agent"
     ;;
+  security_and_privacy)
+    CANONICAL_NAME="Antigravity Security & Privacy Agent"
+    ;;
   code_quality_and_testing)
     CANONICAL_NAME="Antigravity Code Quality & E2E Testing Agent"
     ;;
@@ -143,7 +146,7 @@ case "${ROLE_ID}" in
     ;;
   *)
     echo "[ERROR] Unknown role_id '${ROLE_ID}'." >&2
-    echo "Expected one of: ai_studio_ux_cuj, discovery_and_grouping, telemetry_and_debugging, code_quality_and_testing, license_governance, app_promoter, antigravity_general" >&2
+    echo "Expected one of: ai_studio_ux_cuj, discovery_and_grouping, telemetry_and_debugging, security_and_privacy, code_quality_and_testing, license_governance, app_promoter, antigravity_general" >&2
     exit 2
     ;;
 esac

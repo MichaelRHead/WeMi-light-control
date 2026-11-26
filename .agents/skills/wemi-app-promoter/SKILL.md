@@ -1,13 +1,13 @@
 ---
 name: wemi-app-promoter
-description: Stage 7 Play Store track promotion (internal to Closed testing) and Play Store listing/graphic asset sync via GitHub Actions and scripts.
+description: Stage 8 Play Store track promotion (internal to Closed testing) and Play Store listing/graphic asset sync via GitHub Actions and scripts.
 ---
 
 # WeMi App Promoter & Play Store Asset Sync (`wemi-app-promoter`)
 
 Use this skill when acting as the **Antigravity App Promoter Agent (`app_promoter`)** for `MichaelRHead/WeMi-light-control` (`com.aistudio.wemiswitch.kxpqzr`) to:
 - Inspect Google Play tracks (`list-tracks`) or compare repo assets against Google Play (`diff-assets`) read-only.
-- Promote Google Play releases across tracks (`auto-promote` for Stage 7 `internal` → `alpha`, or manual `promote` to any track).
+- Promote Google Play releases across tracks (`auto-promote` for Stage 8 `internal` → `alpha`, or manual `promote` to any track).
 - Keep `play_store_assets/` (Store Listing text and PNG graphics/screenshots) synced cleanly and idempotently to Google Play Console (`sync-assets`).
 
 ---
@@ -15,9 +15,9 @@ Use this skill when acting as the **Antigravity App Promoter Agent (`app_promote
 ## 1. Security & Ownership Guardrails (Mandatory)
 
 1. **Never commit, print, or echo secret key material**: All Google Play Developer API calls run inside GitHub Actions using repository secret `PLAY_SERVICE_ACCOUNT_JSON` (written to `${RUNNER_TEMP}` with `chmod 600` and deleted in `if: always()`).
-2. **Respect Exclusive Agent Ownership**: Never modify files owned exclusively by `ai_studio_ux_cuj` (`UX_DESIGN*.md`), `discovery_and_grouping`, `telemetry_and_debugging`, or `license_governance` (`LICENSE_GOVERNANCE.md`, `LicenseAndBrandGovernanceTest.kt`). Never alter `signingConfigs` or add Gradle dependencies in `app/build.gradle.kts`.
+2. **Respect Exclusive Agent Ownership**: Never modify files owned exclusively by `ai_studio_ux_cuj` (`UX_DESIGN*.md`), `discovery_and_grouping`, `telemetry_and_debugging`, `security_and_privacy` (`SECURITY_AND_PRIVACY.md`), or `license_governance` (`LICENSE_GOVERNANCE.md`, `LicenseAndBrandGovernanceTest.kt`). Never alter `signingConfigs` or add Gradle dependencies in `app/build.gradle.kts`.
 3. **Trademark & Play Limit Hygiene**: Before syncing `play_store_assets/`, validate locally with `python3 scripts/sync_play_assets.py validate-local` (`title <= 30`, `shortDescription <= 80`, `fullDescription <= 4000`, `<= 8` screenshots per slot, valid PNG headers, zero `"WeMo"` / `"Wemo"` word-boundary leaks).
-4. **Zero Idle Polling**: Never run `scripts/await_release_turn.sh` for `app_promoter` — Stage 7 triggers automatically on `push` to `main` touching `app/build.gradle.kts` at zero Antigravity LLM quota cost.
+4. **Zero Idle Polling**: Never run `scripts/await_release_turn.sh` for `app_promoter` — Stage 8 triggers automatically on `push` to `main` touching `app/build.gradle.kts` or `RELEASE_SIGN_OFF.md` at zero Antigravity LLM quota cost.
 5. **Commit Attribution**: Always commit via `bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh app_promoter ...` (`Agent: Antigravity App Promoter Agent (app_promoter)`).
 6. **Proactive CI, Runtime & API Deprecation Hygiene**: After GitHub Actions runs, check job annotations (`gh api repos/MichaelRHead/WeMi-light-control/check-runs/<job_id>/annotations`) and logs for runner, Node.js, GitHub Action, Python (`python3 -W default`), `google-auth`/`requests`, or `androidpublisher/v3` deprecation warnings, and proactively upgrade `.github/workflows/play-store-promote.yml` and `scripts/*.py` when deprecations appear.
 
@@ -89,7 +89,7 @@ gh workflow run play-store-promote.yml --ref main -f mode=sync-assets -f changes
 gh workflow run play-store-promote.yml --ref main -f mode=sync-assets -f asset_image_types=phoneScreenshots,tvScreenshots
 ```
 
-### Stage 7 Release Promotion & Decoupled Asset Sync (Mandatory Two-Phase Sequence)
+### Stage 8 Release Promotion & Decoupled Asset Sync (Mandatory Two-Phase Sequence)
 Never run `sync-assets` in the same Play review window as track promotion (`sync_store_assets` defaults to `false` in `.github/workflows/play-store-promote.yml`) so binary track promotion and Store Listing/graphic updates never collide or step on each other in Google Play Console:
 
 1. **Phase 1 — Binary Track Promotion (`internal` → `alpha`) & Rollout Watch**:

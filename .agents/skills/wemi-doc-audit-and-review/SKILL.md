@@ -21,11 +21,12 @@ This skill complements [`wemi-changelog-and-docs`](../wemi-changelog-and-docs/SK
      - Its own exclusively-owned files: [`DEBUGGING_AND_SUPPORT.md`](../../../DEBUGGING_AND_SUPPORT.md), [`docs/user-guide/telemetry-and-troubleshooting.md`](../../../docs/user-guide/telemetry-and-troubleshooting.md), and [`.agents/skills/wemi-device-telemetry-debug/SKILL.md`](../wemi-device-telemetry-debug/SKILL.md).
      - All shared user guides & indexes: [`USER_GUIDE.md`](../../../USER_GUIDE.md), [`docs/README.md`](../../../docs/README.md), and non-owned [`docs/user-guide/*.md`](../../../docs/user-guide/) (`main-screen.md`, `switch-discovery.md`, `fresh-device-setup.md`, `room-grouping.md`, `home-screen-widgets.md`, `editing-and-managing-devices.md`, `wifi-homes.md`, `rules-and-timers.md`, `more-and-tv-mode.md`).
      - Shared engineering/operational docs & skills when stale against real app behavior: [`CHROMEOS_ARCVM_DISCOVERY_DESIGN.md`](../../../CHROMEOS_ARCVM_DISCOVERY_DESIGN.md), [`IMPLEMENTED.md`](../../../IMPLEMENTED.md), [`UPCOMING_FEATURES.md`](../../../UPCOMING_FEATURES.md), [`play_store_assets/DATA_SAFETY_GUIDE.md`](../../../play_store_assets/DATA_SAFETY_GUIDE.md), and shared `.agents/skills/*/SKILL.md` files (syncing any modified skill via `save_skill(overwrite = true, ...)`).
-   - **STRICT READ-ONLY (Audit & Report Only — Never Modify)**:
-     - `ai_studio_ux_cuj`: [`UX_DESIGN.md`](../../../UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md), [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md).
-     - `discovery_and_grouping`: [`DISCOVERY_AND_ROOM_GROUPING.md`](../../../DISCOVERY_AND_ROOM_GROUPING.md), [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md).
-     - `license_governance`: [`LICENSE_GOVERNANCE.md`](../../../LICENSE_GOVERNANCE.md), [`.agents/skills/wemi-license-governance/SKILL.md`](../wemi-license-governance/SKILL.md), [`LicenseAndBrandGovernanceTest.kt`](../../../app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt).
-     - *(If an agent other than `telemetry_and_debugging` invokes this skill on demand, treat `telemetry_and_debugging`'s 3 owned files as read-only as well.)*
+    - **STRICT READ-ONLY (Audit & Report Only — Never Modify)**:
+      - `ai_studio_ux_cuj`: [`UX_DESIGN.md`](../../../UX_DESIGN.md), [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md), [`.agents/skills/wemi-ux-design-and-experience/SKILL.md`](../wemi-ux-design-and-experience/SKILL.md).
+      - `discovery_and_grouping`: [`DISCOVERY_AND_ROOM_GROUPING.md`](../../../DISCOVERY_AND_ROOM_GROUPING.md), [`.agents/skills/wemi-discovery-and-room-grouping/SKILL.md`](../wemi-discovery-and-room-grouping/SKILL.md).
+      - `security_and_privacy`: [`SECURITY_AND_PRIVACY.md`](../../../SECURITY_AND_PRIVACY.md), [`.agents/skills/wemi-security-and-privacy/SKILL.md`](../wemi-security-and-privacy/SKILL.md).
+      - `license_governance`: [`LICENSE_GOVERNANCE.md`](../../../LICENSE_GOVERNANCE.md), [`.agents/skills/wemi-license-governance/SKILL.md`](../wemi-license-governance/SKILL.md), [`LicenseAndBrandGovernanceTest.kt`](../../../app/src/test/java/org/suppressingfire/wemi/LicenseAndBrandGovernanceTest.kt).
+      - *(If an agent other than `telemetry_and_debugging` invokes this skill on demand, treat `telemetry_and_debugging`'s 3 owned files as read-only as well.)*
 3. **Trademark & Play Store Hygiene**:
    - Active `docs/user-guide/*.md` guides (excluding `release-notes.md`) must never reintroduce removed legacy brand UI labels checked by `LicenseAndBrandGovernanceTest`.
    - `play_store_assets/*` must contain zero standalone brand-name leaks (`scripts/sync_play_assets.py validate-local`).
@@ -71,7 +72,7 @@ Review [`USER_GUIDE.md`](../../../USER_GUIDE.md), [`docs/README.md`](../../../do
 - Keep troubleshooting steps concrete and actionable (what the user sees, why it happens, and what to tap next), reserving wire-level protocol internals for `ARCHITECTURE.md`, `DEBUGGING_AND_SUPPORT.md`, and `wemo-upnp-protocol.md`.
 
 ### Step 4: Version Numbers, Counts & Relative Link Integrity
-1. Check current release version (`v<X.0>`), pipeline stage count (`6-Agent / 7-Stage`), `.kt` file count, and test counts across [`USER_GUIDE.md`](../../../USER_GUIDE.md), [`docs/README.md`](../../../docs/README.md), and editable docs/skills.
+1. Check current release version (`v<X.0>`), pipeline stage count (`7-Agent / 8-Stage`), `.kt` file count, and test counts across [`USER_GUIDE.md`](../../../USER_GUIDE.md), [`docs/README.md`](../../../docs/README.md), and editable docs/skills.
 2. Verify all relative Markdown links in modified docs and skills resolve to real files (remember `.agents/skills/<name>/SKILL.md` is 3 directories below repo root and must use `../../../` for root files, not `../../`):
    ```bash
    python3 - <<'PY'
@@ -104,7 +105,7 @@ Review [`USER_GUIDE.md`](../../../USER_GUIDE.md), [`docs/README.md`](../../../do
 3. Whenever editing any `.agents/skills/<name>/SKILL.md` you are allowed to edit, sync it to the persistent registry via `save_skill(overwrite = true, skill_dir = "...")`.
 
 ### Step 5: Report Drift in Peer-Owned Read-Only Docs Without Editing Them
-1. Inspect peer-owned specs (`UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `LICENSE_GOVERNANCE.md`, and their `SKILL.md` files) read-only for factual drift or broken relative links.
+1. Inspect peer-owned specs (`UX_DESIGN.md`, `UX_DESIGN_AND_EXPERIENCE.md`, `DISCOVERY_AND_ROOM_GROUPING.md`, `SECURITY_AND_PRIVACY.md`, `LICENSE_GOVERNANCE.md`, and their `SKILL.md` files) read-only for factual drift or broken relative links.
 2. **Never edit peer-owned files.** Record any stale items concisely in your Stage 3 sign-off summary or handoff note (citing exact file and line numbers) so the owning specialist agent can resolve them cleanly on its turn.
 
 ### Step 6: Verify, Log & Advance Stage 3

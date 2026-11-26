@@ -39,6 +39,7 @@ Every agent must identify itself in the `Agent:` trailer using its canonical nam
 | **UX, Design, Assets & Release Init/Conclude** | `ai_studio_ux_cuj` | `Agent: Google AI Studio Agent (ai_studio_ux_cuj)` |
 | **SSDP/Unicast Discovery, Identity & Room Grouping** | `discovery_and_grouping` | `Agent: Antigravity Device Discovery & Room Grouping Agent (discovery_and_grouping)` |
 | **10.22.22.1 Setup Telemetry, SOAP Logs & Support** | `telemetry_and_debugging` | `Agent: Antigravity Telemetry & Debugging Agent (telemetry_and_debugging)` |
+| **Security Architecture, Privacy & CI Supply Chain** | `security_and_privacy` | `Agent: Antigravity Security & Privacy Agent (security_and_privacy)` |
 | **Modularity, Build Hygiene & Hermetic/E2E Testing** | `code_quality_and_testing` | `Agent: Antigravity Code Quality & E2E Testing Agent (code_quality_and_testing)` |
 | **MIT License Parity, Dependencies & Brand Hygiene** | `license_governance` | `Agent: Antigravity License & Brand Governance Agent (license_governance)` |
 | **Play Store Track Promotion (Closed Testing)** | `app_promoter` | `Agent: Antigravity App Promoter Agent (app_promoter)` |

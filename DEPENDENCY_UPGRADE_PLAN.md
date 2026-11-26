@@ -86,7 +86,7 @@ Execute each wave as an isolated commit so any regression or AI Studio incompati
   bash scripts/setup_dev_env.sh --save-caches
   ```
   *(Because [`scripts/setup_dev_env.sh`](scripts/setup_dev_env.sh) fingerprints `gradle-wrapper.properties`, `libs.versions.toml`, `settings.gradle.kts`, `build.gradle.kts`, and `app/build.gradle.kts`, saving caches keeps fresh VM startups fast.)*
-- Run the full 6-agent / 7-stage release review ring ([`RELEASE_PROCESS.md`](RELEASE_PROCESS.md)) before shipping any upgraded release to Google Play.
+- Run the full 7-agent / 8-stage release review ring ([`RELEASE_PROCESS.md`](RELEASE_PROCESS.md)) before shipping any upgraded release to Google Play.
 
 ---
 

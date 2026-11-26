@@ -2,7 +2,7 @@
 """Inspect Google Play tracks and promote releases between tracks via androidpublisher v3.
 
 Supports read-only track inspection (`list-tracks`), manual track-to-track promotion
-(`promote`), and guarded event-driven promotion (`auto-promote`, Stage 7 `app_promoter`
+(`promote`), and guarded event-driven promotion (`auto-promote`, Stage 8 `app_promoter`
 workflow for `internal` -> `alpha` Closed testing after `APPROVED_FOR_PLAY_STORE`)
 without needing the Android upload signing keystore.
 """
@@ -805,7 +805,7 @@ def run_auto_promote(
     changes_not_sent_for_review: bool,
     sleep_fn: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
-    """Run Stage 7 guarded automatic promotion from internal to Closed testing (alpha)."""
+    """Run Stage 8 guarded automatic promotion from internal to Closed testing (alpha)."""
     skip_reason = check_auto_promote_preconditions(
         current_version_code=current_version_code,
         previous_version_code=previous_version_code,
@@ -857,7 +857,7 @@ def run_auto_promote(
             )
             sleep_fn(poll_interval_sec)
 
-    # Case B: post-upload bump or Stage 6 sign-off trigger (source matches previous_vc or RELEASE_SIGN_OFF VERSION_CODE)
+    # Case B: post-upload bump or Stage 7 sign-off trigger (source matches previous_vc or RELEASE_SIGN_OFF VERSION_CODE)
     if candidate_vc is None:
         matches_previous_bump = (
             previous_version_code is not None and source_vc is not None and source_vc >= previous_version_code
@@ -974,7 +974,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     auto_parser = subparsers.add_parser(
         "auto-promote",
-        help="Stage 7 guarded promotion from internal to Closed testing after APPROVED_FOR_PLAY_STORE.",
+        help="Stage 8 guarded promotion from internal to Closed testing after APPROVED_FOR_PLAY_STORE.",
     )
     auto_parser.add_argument("--from-track", default="internal")
     auto_parser.add_argument("--to-track", default="alpha")

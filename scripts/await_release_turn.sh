@@ -10,7 +10,7 @@
 #   1. Immediate exit (no background loop, DO NOT RE-ARM) when RELEASE_STATUS is
 #      APPROVED_FOR_PLAY_STORE, PROMOTED_TO_CLOSED_TESTING, or CURRENT_TURN is NONE.
 #   2. Immediate exit (DO NOT RE-ARM) as soon as <agent_role> has SIGNED_OFF the
-#      current (RELEASE_VERSION, ROUND_NUMBER), or for event-driven Stage 7
+#      current (RELEASE_VERSION, ROUND_NUMBER), or for event-driven Stage 8
 #      (`app_promoter`, triggered automatically via GitHub Actions).
 #   3. Clamps MAX_WAIT_SEC <= 510s (8.5m) so exebox never hits its 9m50s RPC
 #      deadline crash, and caps consecutive upstream idle waits to MAX_IDLE_REARMS=2
@@ -27,15 +27,15 @@ MAX_WAIT_SEC="${3:-510}"
 MAX_IDLE_REARMS="${MAX_IDLE_REARMS:-2}"
 
 if [[ -z "${ROLE}" ]]; then
-  echo "Usage: $0 <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj|app_promoter> [poll_interval_sec] [max_wait_sec]" >&2
+  echo "Usage: $0 <discovery_and_grouping|telemetry_and_debugging|security_and_privacy|code_quality_and_testing|license_governance|ai_studio_ux_cuj|app_promoter> [poll_interval_sec] [max_wait_sec]" >&2
   exit 2
 fi
 
 case "${ROLE}" in
-  discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj)
+  discovery_and_grouping|telemetry_and_debugging|security_and_privacy|code_quality_and_testing|license_governance|ai_studio_ux_cuj)
     ;;
   app_promoter)
-    echo "[RELEASE COORDINATOR] Role 'app_promoter' (Stage 7) is event-driven via .github/workflows/play-store-promote.yml on push to app/build.gradle.kts or RELEASE_SIGN_OFF.md."
+    echo "[RELEASE COORDINATOR] Role 'app_promoter' (Stage 8) is event-driven via .github/workflows/play-store-promote.yml on push to app/build.gradle.kts or RELEASE_SIGN_OFF.md."
     echo "[QUOTA GUARD] DO NOT RE-ARM await_release_turn.sh for app_promoter. Promotion runs automatically in GitHub Actions at zero LLM quota cost."
     exit 0
     ;;
@@ -102,6 +102,7 @@ role_signoff_key() {
   case "$1" in
     discovery_and_grouping)   echo "SIGN_OFF_DISCOVERY_AND_GROUPING" ;;
     telemetry_and_debugging)  echo "SIGN_OFF_TELEMETRY_AND_DEBUGGING" ;;
+    security_and_privacy)     echo "SIGN_OFF_SECURITY_AND_PRIVACY" ;;
     code_quality_and_testing) echo "SIGN_OFF_CODE_QUALITY_AND_TESTING" ;;
     license_governance)       echo "SIGN_OFF_LICENSE_GOVERNANCE" ;;
     ai_studio_ux_cuj)         echo "SIGN_OFF_AI_STUDIO_UX_CUJ" ;;

@@ -3,8 +3,8 @@
 # WeMi Light Control — Release State Machine Transition (advance_release_turn.sh)
 # ==============================================================================
 # Atomically updates RELEASE_SIGN_OFF.md, commits, rebases against origin/main,
-# and pushes to GitHub to advance the 6-agent / 7-stage release process
-# (Stages 1-6 review ring + Stage 7 automated Closed testing promotion).
+# and pushes to GitHub to advance the 7-agent / 8-stage release process
+# (Stages 1-7 review ring + Stage 8 automated Closed testing promotion).
 #
 # Usage:
 #   bash scripts/advance_release_turn.sh initiate "<summary>" [--verified "<checks>"] [--no-push]
@@ -22,7 +22,7 @@ ACTION="${1:-}"
 if [[ -z "${ACTION}" ]]; then
   echo "Usage:" >&2
   echo "  $0 initiate \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
-  echo "  $0 sign_off <discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj> \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
+  echo "  $0 sign_off <discovery_and_grouping|telemetry_and_debugging|security_and_privacy|code_quality_and_testing|license_governance|ai_studio_ux_cuj> \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
   echo "  $0 conclude \"<summary>\" [--verified \"<checks>\"] [--no-push]" >&2
   echo "  $0 promote \"<summary>\" [--version-code \"<vc>\"] [--from-track \"<track>\"] [--track \"<track>\"] [--verified \"<checks>\"] [--no-push]" >&2
   echo "  $0 request_rereview <from_role> <target_role> \"<reason>\" [--no-push]" >&2
@@ -188,6 +188,7 @@ if action == "initiate":
     text = set_state(text, "SIGN_OFF_AI_STUDIO_UX_CUJ", f"SIGNED_OFF ({head_sha} @ {pst_now})")
     text = set_state(text, "SIGN_OFF_DISCOVERY_AND_GROUPING", "PENDING")
     text = set_state(text, "SIGN_OFF_TELEMETRY_AND_DEBUGGING", "PENDING")
+    text = set_state(text, "SIGN_OFF_SECURITY_AND_PRIVACY", "PENDING")
     text = set_state(text, "SIGN_OFF_CODE_QUALITY_AND_TESTING", "PENDING")
     text = set_state(text, "SIGN_OFF_LICENSE_GOVERNANCE", "PENDING")
     text = set_state(text, "SIGN_OFF_APP_PROMOTER", "PENDING")
@@ -206,10 +207,11 @@ if action == "initiate":
     text = update_table_row(text, "1 (Initiate)", "SIGNED_OFF", head_sha, pst_now, summary)
     text = update_table_row(text, "2 (Review 1)", "PENDING", "-", "-", "Awaiting Discovery & Room Grouping Agent review.")
     text = update_table_row(text, "3 (Review 2)", "PENDING", "-", "-", "Awaiting Telemetry & Debugging Agent review.")
-    text = update_table_row(text, "4 (Review 3)", "PENDING", "-", "-", "Awaiting Code Quality & E2E Testing Agent review.")
-    text = update_table_row(text, "5 (Review 4)", "PENDING", "-", "-", "Awaiting License & Brand Governance Agent review.")
-    text = update_table_row(text, "6 (Conclude)", "PENDING", "-", "-", "Awaiting Stages 1-5 sign-off.")
-    text = update_table_row(text, "7 (Promote)", "PENDING", "-", "-", "Awaiting Stage 6 approval and AI Studio internal testing upload.")
+    text = update_table_row(text, "4 (Review 3)", "PENDING", "-", "-", "Awaiting Security & Privacy Agent review.")
+    text = update_table_row(text, "5 (Review 4)", "PENDING", "-", "-", "Awaiting Code Quality & E2E Testing Agent review.")
+    text = update_table_row(text, "6 (Review 5)", "PENDING", "-", "-", "Awaiting License & Brand Governance Agent review.")
+    text = update_table_row(text, "7 (Conclude)", "PENDING", "-", "-", "Awaiting Stages 1-6 sign-off.")
+    text = update_table_row(text, "8 (Promote)", "PENDING", "-", "-", "Awaiting Stage 7 approval and AI Studio internal testing upload.")
     text = append_audit_row(text, "1", "ai_studio_ux_cuj", "INITIATED_RELEASE", "discovery_and_grouping", head_sha, summary)
 
 elif action == "sign_off":
@@ -221,9 +223,10 @@ elif action == "sign_off":
     transitions = {
         "ai_studio_ux_cuj": ("SIGN_OFF_AI_STUDIO_UX_CUJ", "1 (Initiate)", "discovery_and_grouping", "IN_REVIEW"),
         "discovery_and_grouping": ("SIGN_OFF_DISCOVERY_AND_GROUPING", "2 (Review 1)", "telemetry_and_debugging", "IN_REVIEW"),
-        "telemetry_and_debugging": ("SIGN_OFF_TELEMETRY_AND_DEBUGGING", "3 (Review 2)", "code_quality_and_testing", "IN_REVIEW"),
-        "code_quality_and_testing": ("SIGN_OFF_CODE_QUALITY_AND_TESTING", "4 (Review 3)", "license_governance", "IN_REVIEW"),
-        "license_governance": ("SIGN_OFF_LICENSE_GOVERNANCE", "5 (Review 4)", "ai_studio_ux_cuj", "AWAITING_FINAL_CONCLUSION"),
+        "telemetry_and_debugging": ("SIGN_OFF_TELEMETRY_AND_DEBUGGING", "3 (Review 2)", "security_and_privacy", "IN_REVIEW"),
+        "security_and_privacy": ("SIGN_OFF_SECURITY_AND_PRIVACY", "4 (Review 3)", "code_quality_and_testing", "IN_REVIEW"),
+        "code_quality_and_testing": ("SIGN_OFF_CODE_QUALITY_AND_TESTING", "5 (Review 4)", "license_governance", "IN_REVIEW"),
+        "license_governance": ("SIGN_OFF_LICENSE_GOVERNANCE", "6 (Review 5)", "ai_studio_ux_cuj", "AWAITING_FINAL_CONCLUSION"),
     }
     if role not in transitions:
         sys.exit(f"Unknown role: {role}")
@@ -240,6 +243,7 @@ elif action == "conclude":
         ("ai_studio_ux_cuj", "SIGN_OFF_AI_STUDIO_UX_CUJ"),
         ("discovery_and_grouping", "SIGN_OFF_DISCOVERY_AND_GROUPING"),
         ("telemetry_and_debugging", "SIGN_OFF_TELEMETRY_AND_DEBUGGING"),
+        ("security_and_privacy", "SIGN_OFF_SECURITY_AND_PRIVACY"),
         ("code_quality_and_testing", "SIGN_OFF_CODE_QUALITY_AND_TESTING"),
         ("license_governance", "SIGN_OFF_LICENSE_GOVERNANCE"),
     )
@@ -250,11 +254,11 @@ elif action == "conclude":
     ]
     if missing_sign_offs:
         sys.exit(
-            "Cannot conclude release before all 5 review stages are SIGNED_OFF. Pending/missing: "
+            "Cannot conclude release before all 6 review stages are SIGNED_OFF. Pending/missing: "
             + ", ".join(missing_sign_offs)
         )
 
-    summary = raw_args[1] if len(raw_args) > 1 else f"All 5 agents signed off; {gradle_ver_name} approved for Google Play Store release."
+    summary = raw_args[1] if len(raw_args) > 1 else f"All 6 agents signed off; {gradle_ver_name} approved for Google Play Store release."
     text = set_state(text, "RELEASE_STATUS", "APPROVED_FOR_PLAY_STORE")
     text = set_state(text, "CURRENT_TURN", "NONE")
     text = set_state(text, "FINAL_RELEASE_SHA", head_sha)
@@ -263,8 +267,8 @@ elif action == "conclude":
     text = set_state(text, "PROMOTED_VERSION_CODE", "NONE")
     text = set_state(text, "PROMOTED_TRACK", "NONE")
     text = set_state(text, "PROMOTED_AT", "NONE")
-    text = update_table_row(text, "6 (Conclude)", "SIGNED_OFF", head_sha, pst_now, summary)
-    text = update_table_row(text, "7 (Promote)", "PENDING", "-", "-", "Ready for automatic Closed testing promotion once AI Studio pushes internal build and version bump.")
+    text = update_table_row(text, "7 (Conclude)", "SIGNED_OFF", head_sha, pst_now, summary)
+    text = update_table_row(text, "8 (Promote)", "PENDING", "-", "-", "Ready for automatic Closed testing promotion once AI Studio pushes internal build and version bump.")
     text = append_audit_row(text, round_num, "ai_studio_ux_cuj", "APPROVED_FOR_PLAY_STORE", "NONE", head_sha, summary)
 
 elif action == "promote":
@@ -291,7 +295,7 @@ elif action == "promote":
     text = set_state(text, "PROMOTED_VERSION_CODE", promo_vc)
     text = set_state(text, "PROMOTED_TRACK", promo_track)
     text = set_state(text, "PROMOTED_AT", pst_now)
-    text = update_table_row(text, "7 (Promote)", "PROMOTED", head_sha, pst_now, summary)
+    text = update_table_row(text, "8 (Promote)", "PROMOTED", head_sha, pst_now, summary)
     text = append_audit_row(text, round_num, "app_promoter", promo_status, "NONE", head_sha, summary)
 
 elif action == "request_rereview":
@@ -305,6 +309,7 @@ elif action == "request_rereview":
         "ai_studio_ux_cuj",
         "discovery_and_grouping",
         "telemetry_and_debugging",
+        "security_and_privacy",
         "code_quality_and_testing",
         "license_governance",
     ]
@@ -312,8 +317,9 @@ elif action == "request_rereview":
         "ai_studio_ux_cuj": ("SIGN_OFF_AI_STUDIO_UX_CUJ", "1 (Initiate)"),
         "discovery_and_grouping": ("SIGN_OFF_DISCOVERY_AND_GROUPING", "2 (Review 1)"),
         "telemetry_and_debugging": ("SIGN_OFF_TELEMETRY_AND_DEBUGGING", "3 (Review 2)"),
-        "code_quality_and_testing": ("SIGN_OFF_CODE_QUALITY_AND_TESTING", "4 (Review 3)"),
-        "license_governance": ("SIGN_OFF_LICENSE_GOVERNANCE", "5 (Review 4)"),
+        "security_and_privacy": ("SIGN_OFF_SECURITY_AND_PRIVACY", "4 (Review 3)"),
+        "code_quality_and_testing": ("SIGN_OFF_CODE_QUALITY_AND_TESTING", "5 (Review 4)"),
+        "license_governance": ("SIGN_OFF_LICENSE_GOVERNANCE", "6 (Review 5)"),
     }
     if from_role not in key_map:
         sys.exit(f"Invalid from_role '{from_role}'. Expected one of: {', '.join(order)}")
@@ -339,8 +345,8 @@ elif action == "request_rereview":
         k, stg = key_map[r]
         text = set_state(text, k, "PENDING")
         text = update_table_row(text, stg, "PENDING", "-", "-", f"Re-review requested in Round {new_round} by {from_role}.")
-    text = update_table_row(text, "6 (Conclude)", "PENDING", "-", "-", f"Awaiting Round {new_round} re-review sign-offs.")
-    text = update_table_row(text, "7 (Promote)", "PENDING", "-", "-", f"Awaiting Round {new_round} re-review and Stage 6 approval.")
+    text = update_table_row(text, "7 (Conclude)", "PENDING", "-", "-", f"Awaiting Round {new_round} re-review sign-offs.")
+    text = update_table_row(text, "8 (Promote)", "PENDING", "-", "-", f"Awaiting Round {new_round} re-review and Stage 7 approval.")
     text = append_audit_row(text, new_round, from_role, "REQUESTED_REREVIEW", target_role, head_sha, reason)
 else:
     sys.exit(f"Unknown action: {action}")
@@ -390,37 +396,43 @@ round_num = state_val("ROUND_NUMBER", "1")
 ROLE_META = {
     "ai_studio_ux_cuj": {
         "short": "UX & design review",
-        "stage": "Stage 1 of 7",
+        "stage": "Stage 1 of 8",
         "next": "Discovery & Room Grouping",
         "default_bullet": "Verified UX layouts, accessibility, user journeys, and Play Store release notes.",
     },
     "discovery_and_grouping": {
         "short": "discovery review",
-        "stage": "Stage 2 of 7",
+        "stage": "Stage 2 of 8",
         "next": "Telemetry & Debugging",
         "default_bullet": "Verified switch discovery, device identity matching, and automatic room grouping.",
     },
     "telemetry_and_debugging": {
         "short": "telemetry review",
-        "stage": "Stage 3 of 7",
-        "next": "Code Quality & Testing",
+        "stage": "Stage 3 of 8",
+        "next": "Security & Privacy",
         "default_bullet": "Verified local setup diagnostics, telemetry export, and password redaction.",
+    },
+    "security_and_privacy": {
+        "short": "security & privacy review",
+        "stage": "Stage 4 of 8",
+        "next": "Code Quality & Testing",
+        "default_bullet": "Verified security boundaries, privacy controls, backup rules, and CI supply-chain hygiene.",
     },
     "code_quality_and_testing": {
         "short": "quality & test review",
-        "stage": "Stage 4 of 7",
+        "stage": "Stage 5 of 8",
         "next": "License & Brand Governance",
         "default_bullet": "Verified code modularity, lifecycle safety, script permissions, and full test suite.",
     },
     "license_governance": {
         "short": "license & brand review",
-        "stage": "Stage 5 of 7",
+        "stage": "Stage 6 of 8",
         "next": "Google AI Studio for final release approval",
         "default_bullet": "Verified in-app MIT license parity, permissive dependencies, and Play Store trademark compliance.",
     },
     "app_promoter": {
         "short": "closed testing promotion",
-        "stage": "Stage 7 of 7",
+        "stage": "Stage 8 of 8",
         "next": "Closed testing testers on Google Play",
         "default_bullet": "Promoted internal Play Store build to Closed testing via Google Play Developer API.",
     },
@@ -502,7 +514,7 @@ elif action == "conclude":
     acting_role = "ai_studio_ux_cuj"
     raw_summary = args[1] if len(args) > 1 else ""
     subject = f"chore(release): approve {rel_ver} for Play Store"
-    lead = f"All 5 review stages passed for {rel_ver} (versionCode {ver_code}). Release is approved for Google Play Store."
+    lead = f"All 6 review stages passed for {rel_ver} (versionCode {ver_code}). Release is approved for Google Play Store."
     bullets = make_bullets(raw_summary, "Confirmed all stage sign-offs and final release notes are ready for publishing.")
     verified = extract_verified(raw_summary)
 elif action == "promote":
@@ -522,7 +534,7 @@ elif action == "promote":
         subject = f"chore(release): promote {rel_ver} to {track_label}"
     if len(subject) > 72:
         subject = f"chore(release): promote build {promo_vc} to {track_label}"
-    lead = f"Completed Stage 7 of 7 for {rel_ver}. Promoted Play build {promo_vc} from {promo_from_track} to {track_label}."
+    lead = f"Completed Stage 8 of 8 for {rel_ver}. Promoted Play build {promo_vc} from {promo_from_track} to {track_label}."
     bullets = make_bullets(
         raw_summary,
         f"Promoted build {promo_vc} from {promo_from_track} to {track_label} via Google Play Developer API.",

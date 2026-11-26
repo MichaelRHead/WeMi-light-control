@@ -87,6 +87,7 @@ CANONICAL_ROLE_IDS = (
     "ai_studio_ux_cuj",
     "discovery_and_grouping",
     "telemetry_and_debugging",
+    "security_and_privacy",
     "code_quality_and_testing",
     "license_governance",
     "app_promoter",
@@ -421,6 +422,7 @@ if errors:
         "  - Google AI Studio Agent (ai_studio_ux_cuj)\n"
         "  - Antigravity Device Discovery & Room Grouping Agent (discovery_and_grouping)\n"
         "  - Antigravity Telemetry & Debugging Agent (telemetry_and_debugging)\n"
+        "  - Antigravity Security & Privacy Agent (security_and_privacy)\n"
         "  - Antigravity Code Quality & E2E Testing Agent (code_quality_and_testing)\n"
         "  - Antigravity License & Brand Governance Agent (license_governance)\n"
         "  - Antigravity App Promoter Agent (app_promoter)\n"
