@@ -15,10 +15,10 @@ RELEASE_VERSION: v38.0
 VERSION_CODE: 38
 ROUND_NUMBER: 1
 RELEASE_STATUS: IN_REVIEW
-CURRENT_TURN: discovery_and_grouping
+CURRENT_TURN: telemetry_and_debugging
 CANDIDATE_BASE_SHA: v38.0-rc
 SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (v38.0-rc @ 2026-11-26 15:00 PST)
-SIGN_OFF_DISCOVERY_AND_GROUPING: PENDING
+SIGN_OFF_DISCOVERY_AND_GROUPING: SIGNED_OFF (46e9024 @ 2026-11-26 15:58 PST)
 SIGN_OFF_TELEMETRY_AND_DEBUGGING: PENDING
 SIGN_OFF_SECURITY_AND_PRIVACY: PENDING
 SIGN_OFF_CODE_QUALITY_AND_TESTING: PENDING
@@ -39,7 +39,7 @@ PROMOTED_AT: NONE
 | Stage | Role ID | Agent | Status | Verified Commit SHA | Timestamp (PST) | Verification Summary |
 | :---: | :--- | :--- | :---: | :---: | :---: | :--- |
 | **1 (Initiate)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (UX & CUJs)** | `SIGNED_OFF` | `v38.0-rc` | `2026-11-26 15:00 PST` | Completed Stage 1 UX & CUJ audit for v38.0 (versionCode = 38): audited the Context-Aware Android TV Top-Bar OK Action Chip (TvFocusModel.kt, TvScreen.kt, TvHeadersAndScenes.kt) and existing surfaces (139/139 .kt files <500L max 496L, zero dead controls or trademark leaks); bumped app/build.gradle.kts to 38.0 (versionCode 38) and prepended v38.0 to ReleaseHistoryCatalog.kt; regenerated Play Store & TV PNG assets (16 API-synced PNGs across 7 slots); updated RELEASE_NOTES.txt (449/500), STORE_LISTING.md (19/30, 75/80, 3698/4000), docs/user-guide/release-notes.md, UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md (0 broken links), and IMPLEMENTED.md; verified 156/156 Kotlin tests across 30 suites (--rerun), 28/28 Python Play tests, sync_play_assets.py validate-local, and clean AI Studio compile_applet build. |
-| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `PENDING` | `-` | `-` | Awaiting Discovery & Room Grouping Agent review. |
+| **2 (Review 1)** | `discovery_and_grouping` | **Antigravity Discovery & Room Grouping Agent** | `SIGNED_OFF` | `46e9024` | `2026-11-26 15:58 PST` | Audited v38.0 discovery, room grouping, on-device rules, household sync, and TV focus; fixed Android TV canonical room header focus preservation and vanished-room focus recovery with unit and Compose E2E tests and synced v38.0 discovery docs (0 broken links). |
 | **3 (Review 2)** | `telemetry_and_debugging` | **Antigravity Telemetry & Debugging Agent** | `PENDING` | `-` | `-` | Awaiting Telemetry & Debugging Agent review. |
 | **4 (Review 3)** | `security_and_privacy` | **Antigravity Security & Privacy Agent** | `PENDING` | `-` | `-` | Awaiting Security & Privacy Agent review. |
 | **5 (Review 4)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `PENDING` | `-` | `-` | Awaiting Code Quality & E2E Testing Agent review. |
@@ -151,4 +151,5 @@ PROMOTED_AT: NONE
 | 2026-11-26 11:23 PST | `1` | `ai_studio_ux_cuj` | `APPROVED_FOR_PLAY_STORE` | `NONE` | `v37.0-rc` | Concluded v37.0 (versionCode = 37, org.suppressingfire.wemi) 7-agent release review: all 6 stages signed off Round 1 (ai_studio_ux_cuj a385155, discovery_and_grouping cf273ea, telemetry_and_debugging 4e71935, security_and_privacy c684037 SPAKE2 Group 14 + AAD + FLAG_SECURE, code_quality_and_testing 1721e7f 138/138 .kt <500L & 156/156 Kotlin tests across 30 suites, license_governance 78952e6); synced UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md, docs/user-guide/release-notes.md, and IMPLEMENTED.md (0 broken links); verified 138/138 .kt <500L (max 496L), 28/28 Python Play tests, sync_play_assets validate-local (19/30 title, 75/80 short, 3776/4000 full, 484/500 release notes, 16 PNGs across 7 slots), and clean AI Studio compile_applet build. Approved for Google Play Store upload and Stage 8 promotion. |
 | 2026-11-26 11:56 PST | `1` | `app_promoter` | `PROMOTED_TO_CLOSED_TESTING` | `NONE` | `5c35203` | Promoted Play build 37 release 0.0.0.37 from internal to alpha via GitHub Actions run 45887283856. |
 | 2026-11-26 15:00 PST | `1` | `ai_studio_ux_cuj` | `INITIATED_RELEASE` | `discovery_and_grouping` | `v38.0-rc` | Completed Stage 1 UX & CUJ audit for v38.0 (versionCode = 38): audited the Context-Aware Android TV Top-Bar OK Action Chip (TvFocusModel.kt, TvScreen.kt, TvHeadersAndScenes.kt) and existing surfaces (139/139 .kt files <500L max 496L, zero dead controls or trademark leaks); bumped app/build.gradle.kts to 38.0 (versionCode 38) and prepended v38.0 to ReleaseHistoryCatalog.kt; regenerated Play Store & TV PNG assets (16 API-synced PNGs across 7 slots); updated RELEASE_NOTES.txt (449/500), STORE_LISTING.md (19/30, 75/80, 3698/4000), docs/user-guide/release-notes.md, UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md (0 broken links), and IMPLEMENTED.md; verified 156/156 Kotlin tests across 30 suites (--rerun), 28/28 Python Play tests, sync_play_assets.py validate-local, and clean AI Studio compile_applet build. |
+| 2026-11-26 15:58 PST | `1` | `discovery_and_grouping` | `SIGNED_OFF` | `telemetry_and_debugging` | `46e9024` | Audited v38.0 discovery, room grouping, on-device rules, household sync, and TV focus; fixed Android TV canonical room header focus preservation and vanished-room focus recovery with unit and Compose E2E tests and synced v38.0 discovery docs (0 broken links). |
 <!-- AUDIT_LOG_END -->
