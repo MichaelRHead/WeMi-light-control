@@ -125,26 +125,6 @@ internal class HomeAndRulesUiController(
         }
     }
 
-    fun updateWifiHomeNetwork(
-        networkKey: String,
-        homeName: String,
-        ssidLabel: String,
-        subnetPrefix: String
-    ) {
-        scope.launch {
-            val updated = repository.saveOrUpdateHomeNetwork(
-                existingKey = networkKey,
-                homeName = homeName,
-                ssidLabel = ssidLabel,
-                subnetPrefix = subnetPrefix
-            )
-            _activeNetworkKey.value = updated.networkKey
-            onShowTransientStatus(
-                "Updated Home '${updated.homeName}' (${updated.ssidLabel} • ${updated.subnetPrefix}.0/24)"
-            )
-        }
-    }
-
     fun resetLanHomesSwitchesAndRooms(
         rediscoverAfterReset: Boolean,
         onTriggerNetworkRefresh: () -> Unit

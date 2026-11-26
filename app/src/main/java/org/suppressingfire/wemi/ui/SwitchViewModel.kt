@@ -195,7 +195,7 @@ class SwitchViewModel internal constructor(
             viewModelScope.launch {
                 if (snapshot.isWemoSetupApSubnet) {
                     showTransientStatus(
-                        "Connected to Smart Switch Setup AP (10.22.22.1) • Tap 'Provision New Setup AP' to join Home Wi-Fi"
+                        "Connected to Smart Switch Setup AP (10.22.22.1) • Tap 'Smart Switch Setup AP Detected' to join Home Wi-Fi"
                     )
                 } else if (!isDemoShowroomMode.value) {
                     val matchedHome = repository.resolveOrCreateHomeForSubnet(
@@ -246,7 +246,10 @@ class SwitchViewModel internal constructor(
     }
 
     fun selectHomeNetwork(networkKey: String) =
-        homeAndRulesController.selectHomeNetwork(networkKey) { _selectedRoomFilter.value = null }
+        homeAndRulesController.selectHomeNetwork(networkKey) {
+            _selectedRoomFilter.value = null
+            hardwareRulesController.dismissAllDialogs()
+        }
 
     fun reconnectCurrentHomeNetwork() = homeAndRulesController.reconnectCurrentHomeNetwork()
 
@@ -257,10 +260,8 @@ class SwitchViewModel internal constructor(
     fun addWifiHomeNetwork(homeName: String, ssidLabel: String, subnetPrefix: String) =
         homeAndRulesController.addWifiHomeNetwork(homeName, ssidLabel, subnetPrefix) {
             _selectedRoomFilter.value = null
+            hardwareRulesController.dismissAllDialogs()
         }
-
-    fun updateWifiHomeNetwork(networkKey: String, homeName: String, ssidLabel: String, subnetPrefix: String) =
-        homeAndRulesController.updateWifiHomeNetwork(networkKey, homeName, ssidLabel, subnetPrefix)
 
     fun resetLanHomesSwitchesAndRooms(rediscoverAfterReset: Boolean = true) =
         homeAndRulesController.resetLanHomesSwitchesAndRooms(rediscoverAfterReset) {
@@ -364,7 +365,10 @@ class SwitchViewModel internal constructor(
         isReachable, isOn, autoOffMinutes, syncFriendlyNameToHardware
     )
 
-    fun deleteDevice(device: DeviceEntity) = deviceActionsController.deleteDevice(device)
+    fun deleteDevice(device: DeviceEntity) {
+        hardwareRulesController.dismissDialogsForDevice(device.id)
+        deviceActionsController.deleteDevice(device)
+    }
 
     fun moveDevice(device: DeviceEntity, moveUp: Boolean) = deviceActionsController.moveDevice(
         device = device,
@@ -401,13 +405,9 @@ class SwitchViewModel internal constructor(
     fun dismissHardwareRuleDialogs() = hardwareRulesController.dismissAllDialogs()
 
     fun toggleDimmerNightMode(device: DeviceEntity) = deviceActionsController.toggleDimmerNightMode(device)
-
     fun openProvisionApDialog() = provisionApUiController.openProvisionApDialog()
-
     fun closeProvisionApDialog() = provisionApUiController.closeProvisionApDialog()
-
-    fun scanSetupApNetworks(apHost: String = "10.22.22.1") =
-        provisionApUiController.scanSetupApNetworks(apHost)
+    fun scanSetupApNetworks(apHost: String = "10.22.22.1") = provisionApUiController.scanSetupApNetworks(apHost)
 
     fun provisionSetupAp(
         apHost: String = "10.22.22.1",
@@ -429,14 +429,18 @@ class SwitchViewModel internal constructor(
     )
 
     fun toggleDemoShowroomMode(enabled: Boolean = !isDemoShowroomMode.value) =
-        homeAndRulesController.toggleDemoShowroomMode(enabled) { _selectedRoomFilter.value = null }
+        homeAndRulesController.toggleDemoShowroomMode(enabled) {
+            _selectedRoomFilter.value = null
+            hardwareRulesController.dismissAllDialogs()
+        }
 
     fun resetToClassicScreenshotDevices() =
-        homeAndRulesController.resetToClassicScreenshotDevices { _selectedRoomFilter.value = null }
+        homeAndRulesController.resetToClassicScreenshotDevices {
+            _selectedRoomFilter.value = null
+            hardwareRulesController.dismissAllDialogs()
+        }
 
-    fun clearSoapLogs() {
-        repository.clearLogs()
-    }
+    fun clearSoapLogs() = repository.clearLogs()
 
     fun dismissBanner() {
         statusBannerJob?.cancel()
@@ -457,8 +461,9 @@ class SwitchViewModel internal constructor(
     internal fun showTransientStatus(message: String) {
         statusBannerJob?.cancel()
         _statusBannerMessage.value = message
+        val durationMs = if (isErrorStatusMessage(message)) 5500L else 3200L
         statusBannerJob = viewModelScope.launch {
-            delay(3200)
+            delay(durationMs)
             if (_statusBannerMessage.value == message) {
                 _statusBannerMessage.value = null
             }
@@ -466,6 +471,15 @@ class SwitchViewModel internal constructor(
     }
 
     companion object {
+        private val ERROR_STATUS_KEYWORDS = listOf(
+            "failed", "could not", "blocked", "error", "unreachable", "cannot", "rejected"
+        )
+
+        fun isErrorStatusMessage(message: String?): Boolean {
+            val text = message?.trim().orEmpty()
+            return text.isNotEmpty() && ERROR_STATUS_KEYWORDS.any { text.contains(it, ignoreCase = true) }
+        }
+
         val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
                 if (modelClass.isAssignableFrom(SwitchViewModel::class.java)) {

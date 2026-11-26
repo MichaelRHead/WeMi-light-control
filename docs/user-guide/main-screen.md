@@ -97,7 +97,7 @@ Inside an expanded drawer, controls appear in this order:
    - Tap **`Configure IP`** to open the **Edit** dialog for renaming, changing rooms, or updating the IP address.
 4. **On-Device Rules (Switches, Dimmers & Plugs)**:
    - Displays whether the switch supports built-in hardware rules (**`On-Device Rules: ...`**, plus **`• Long Press`** on compatible wall switches and 1st-Gen dimmers).
-   - Tap **`Inspect Rules`** (changes to **`Refresh`** once read) to verify capability, see the stored database version (`DB v...`) and any **`Switch clock needs sync`** alert, tap **`Add Rule`** or **`Sync Clock`** right from the drawer, and preview up to 4 structured `trigger → action` rule cards inline (showing **`• Paused`** for disabled rules and a **`+N more rule(s) in Rules tab`** cue when more rules exist). See [On-Device Switch Rules, Timers & Schedules](rules-and-timers.md) for full management, Solar Location, and Backup Restore.
+   - Tap **`Inspect Rules`** (changes to **`Refresh`** once read) to verify capability, see the stored database version (`DB v...`) and any **`Switch clock needs sync`** alert, tap **`Add Rule`**, **`Sync Clock`**, or **`Manage Rules`** right from the drawer, and preview up to 4 structured `trigger → action` rule cards inline (showing **`• Paused`** for disabled rules and a clickable **`+N more rule(s) in Rules tab`** link when more rules exist). See [On-Device Switch Rules, Timers & Schedules](rules-and-timers.md) for full management, Solar Location, and Backup Restore.
 
 ---
 

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -41,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -59,10 +61,13 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 
+private val NeutralPillText = Color(0xFF475569)
+
 /**
  * Interactive row for a single native rule stored inside a switch's `rules.db` archive, providing
  * live enable/disable toggling, editing (for supported types), and backup-protected deletion.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun HardwareRuleSummaryRow(
     deviceId: Int,
@@ -102,7 +107,7 @@ internal fun HardwareRuleSummaryRow(
                         Icon(
                             imageVector = iconForHardwareRuleType(rule.type),
                             contentDescription = null,
-                            tint = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary,
+                            tint = if (rule.isEnabled) WemoGreenDark else NeutralPillText,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -132,12 +137,29 @@ internal fun HardwareRuleSummaryRow(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HardwareRuleBadgePill(
-                    text = if (rule.isEnabled) rule.type.displayLabel else "${rule.type.displayLabel} • Paused",
-                    bgColor = if (rule.isEnabled) WemoGreenSoft else Color(0xFFE5E7EB),
-                    textColor = if (rule.isEnabled) WemoGreenDark else WemoTextSecondary,
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier.weight(1f, fill = false)
-                )
+                ) {
+                    HardwareRuleBadgePill(
+                        text = if (rule.isEnabled) rule.type.displayLabel else "${rule.type.displayLabel} • Paused",
+                        bgColor = if (rule.isEnabled) WemoGreenSoft else Color(0xFFE5E7EB),
+                        textColor = if (rule.isEnabled) WemoGreenDark else NeutralPillText
+                    )
+                    if (!rule.isEditableInApp) {
+                        val readOnlyTag = when {
+                            rule.isSharedMultiSwitch -> "Shared rule"
+                            !rule.isOwnedByInspectedSwitch -> "Target"
+                            else -> "View only"
+                        }
+                        HardwareRuleBadgePill(
+                            text = readOnlyTag,
+                            bgColor = Color(0xFFE2E8F0),
+                            textColor = NeutralPillText
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.width(6.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -150,7 +172,7 @@ internal fun HardwareRuleSummaryRow(
                             Icon(
                                 imageVector = Icons.Default.Edit,
                                 contentDescription = "Edit ${rule.name}",
-                                tint = if (controlsEnabled) WemoGreenDark else WemoTextSecondary,
+                                tint = if (controlsEnabled) WemoGreenDark else WemoTextSecondary.copy(alpha = 0.38f),
                                 modifier = Modifier.size(19.dp)
                             )
                         }
@@ -163,7 +185,7 @@ internal fun HardwareRuleSummaryRow(
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = "Delete ${rule.name}",
-                            tint = WemoTextSecondary,
+                            tint = if (controlsEnabled) WemoTextSecondary else WemoTextSecondary.copy(alpha = 0.38f),
                             modifier = Modifier.size(19.dp)
                         )
                     }
@@ -205,6 +227,8 @@ internal fun ExpandedDrawerHardwareRulesSection(
     val rules = snapshot?.rules?.filter { it.appliesToInspectedSwitch }.orEmpty()
     val canAdd = device.isReachable && cap != HardwareRulesCapability.VERIFIED_UNSUPPORTED && onAddHardwareRule != null
     val needsClockSync = snapshot?.deviceTimeInfo?.needsTimeSync == true
+    val showManageRules = cap != HardwareRulesCapability.VERIFIED_UNSUPPORTED && onOpenRulesTab != null
+    val hasInspectionError = snapshot != null && (snapshot.hasInspectionError || !snapshot.integrityOk)
 
     Surface(
         color = Color.White,
@@ -237,12 +261,19 @@ internal fun ExpandedDrawerHardwareRulesSection(
                         fontSize = 12.sp
                     )
                     val subtitle = when {
+                        snapshot != null && hasInspectionError -> snapshot.diagnosticMessage.ifBlank {
+                            "Could not inspect on-device rules — tap Refresh to retry"
+                        }
                         snapshot != null && cap == HardwareRulesCapability.VERIFIED_SUPPORTED ->
                             "${rules.size} rule(s) stored on switch (DB v${snapshot.dbVersion})"
                         snapshot != null -> snapshot.diagnosticMessage
                         else -> "Manage stored schedules, auto-off delays & long-press targets"
                     }
-                    Text(text = subtitle, color = WemoTextSecondary, fontSize = 11.sp)
+                    Text(
+                        text = subtitle,
+                        color = if (hasInspectionError) StatusOfflineRed else WemoTextSecondary,
+                        fontSize = 11.sp
+                    )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
                 AssistChip(
@@ -263,7 +294,7 @@ internal fun ExpandedDrawerHardwareRulesSection(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Memory,
-                            contentDescription = "Inspect on-device rules for ${device.name}",
+                            contentDescription = null,
                             modifier = Modifier.size(15.dp)
                         )
                     },
@@ -275,7 +306,7 @@ internal fun ExpandedDrawerHardwareRulesSection(
                 )
             }
 
-            if (canAdd || (needsClockSync && onSyncDeviceClock != null) || (rules.isNotEmpty() && onOpenRulesTab != null)) {
+            if (canAdd || (needsClockSync && onSyncDeviceClock != null) || showManageRules) {
                 Spacer(modifier = Modifier.height(4.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (canAdd) {
@@ -284,7 +315,7 @@ internal fun ExpandedDrawerHardwareRulesSection(
                             enabled = !isInspecting,
                             label = { Text("Add Rule", fontSize = 11.sp, maxLines = 1, softWrap = false) },
                             leadingIcon = {
-                                Icon(Icons.Default.Add, contentDescription = "Add on-device rule for ${device.name}", modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(14.dp))
                             },
                             colors = AssistChipDefaults.assistChipColors(
                                 leadingIconContentColor = WemoGreenDark,
@@ -299,7 +330,7 @@ internal fun ExpandedDrawerHardwareRulesSection(
                             enabled = !isInspecting,
                             label = { Text("Sync Clock", fontSize = 11.sp, maxLines = 1, softWrap = false) },
                             leadingIcon = {
-                                Icon(Icons.Default.AccessTime, contentDescription = "Sync clock on ${device.name}", modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(14.dp))
                             },
                             colors = AssistChipDefaults.assistChipColors(
                                 containerColor = Color(0xFFFEF3C7),
@@ -309,20 +340,20 @@ internal fun ExpandedDrawerHardwareRulesSection(
                             modifier = Modifier.testTag("drawer_sync_clock_${device.id}")
                         )
                     }
-                    if (rules.isNotEmpty() && onOpenRulesTab != null) {
+                    if (showManageRules) {
                         AssistChip(
-                            onClick = onOpenRulesTab,
+                            onClick = { onOpenRulesTab?.invoke() },
                             label = { Text("Manage Rules", fontSize = 11.sp, maxLines = 1, softWrap = false) },
                             leadingIcon = {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.OpenInNew,
-                                    contentDescription = "Manage on-device rules in Rules tab",
+                                    contentDescription = null,
                                     modifier = Modifier.size(14.dp)
                                 )
                             },
                             colors = AssistChipDefaults.assistChipColors(
-                                leadingIconContentColor = WemoTextSecondary,
-                                labelColor = WemoTextSecondary
+                                leadingIconContentColor = NeutralPillText,
+                                labelColor = NeutralPillText
                             ),
                             modifier = Modifier.testTag("drawer_open_rules_tab_${device.id}")
                         )
@@ -391,19 +422,30 @@ internal fun ExpandedDrawerHardwareRulesSection(
                         }
                     }
                     if (rules.size > 4) {
-                        Text(
-                            text = "+${rules.size - 4} more rule(s) in Rules tab",
-                            color = WemoGreenDark,
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 11.sp,
-                            modifier = if (onOpenRulesTab != null) {
-                                Modifier
-                                    .clickable(onClick = onOpenRulesTab)
-                                    .padding(vertical = 2.dp)
-                            } else {
-                                Modifier
+                        if (onOpenRulesTab != null) {
+                            Box(
+                                contentAlignment = Alignment.CenterStart,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp)
+                                    .clickable(role = Role.Button, onClick = onOpenRulesTab)
+                                    .testTag("drawer_more_rules_link_${device.id}")
+                            ) {
+                                Text(
+                                    text = "+${rules.size - 4} more rule(s) in Rules tab",
+                                    color = WemoGreenDark,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.sp
+                                )
                             }
-                        )
+                        } else {
+                            Text(
+                                text = "+${rules.size - 4} more rule(s) in Rules tab",
+                                color = WemoGreenDark,
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }

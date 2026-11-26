@@ -1,10 +1,13 @@
 package org.suppressingfire.wemi
 
+import android.content.Context
+import android.database.sqlite.SQLiteDatabase
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -12,7 +15,9 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.ViewModelProvider
+import androidx.test.core.app.ApplicationProvider
 import java.io.File
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -20,6 +25,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.suppressingfire.wemi.network.HardwareRulesDbCodec
+import org.suppressingfire.wemi.network.HardwareRulesSafetyValidator
 import org.suppressingfire.wemi.ui.SwitchViewModel
 
 /**
@@ -28,7 +35,7 @@ import org.suppressingfire.wemi.ui.SwitchViewModel
  * Away Mode rules plus a year-2000 drifted clock) and a loopback RTOS Dimmer V2, inspects rules,
  * creates/toggles/edits/deletes native on-device rules with automatic `timesync1#TimeSync`, updates
  * Solar Location (`LOCATIONINFO`), restores a saved pre-write backup, and verifies the expanded
- * Devices-tab diagnostics drawer readout.
+ * Devices-tab diagnostics drawer readout, validation guards, shared RuleID keys, and error states.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [36])
@@ -36,6 +43,14 @@ class HardwareRulesE2ETest {
 
     @get:Rule
     val composeTestRule = createAndroidComposeRule<MainActivity>()
+
+    @After
+    fun tearDown() {
+        val ctx = ApplicationProvider.getApplicationContext<Context>()
+        File(ctx.cacheDir, "e2e_hw_rules_step2").deleteRecursively()
+        File(ctx.cacheDir, "e2e_hw_rules_shared").deleteRecursively()
+        File(ctx.filesDir, "hardware_rules_backups").deleteRecursively()
+    }
 
     private fun awaitLoopbackIo(timeoutMs: Long = 6_000L, condition: () -> Boolean) =
         composeTestRule.awaitLoopbackIo(timeoutMs, condition)
@@ -241,7 +256,7 @@ class HardwareRulesE2ETest {
     }
 
     @Test
-    fun `E2E Rules UX guards empty home plus tap, Go to Devices bridge, schedule time steppers and negative coordinates`() {
+    fun `E2E Rules UX guards empty home plus tap, Go to Devices bridge, schedule ±1m steppers, solar validation, and negative coordinates`() {
         composeTestRule.waitForIdle()
         val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
         vm.toggleDemoShowroomMode(false)
@@ -263,7 +278,7 @@ class HardwareRulesE2ETest {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("devices_list").assertIsDisplayed()
 
-        // 3. Add a loopback switch, open New Rule -> Schedule -> test -15m/+5m steppers and negative coordinates
+        // 3. Add a loopback switch, verify negative coordinates, ±1m off-grid steppers, and identical solar anchor validation
         val openWrtUdn = "uuid:Lightswitch-3_0-WLS0403UX01"
         FakeHardwareRulesServer(
             initialFriendlyName = "Patio Entry Switch",
@@ -298,7 +313,7 @@ class HardwareRulesE2ETest {
                 vm.hardwareRulesByDeviceId.value[switchId]?.locationInfo?.longitude == "-122.4194"
             }
 
-            // Open Schedule editor and verify -15m/+5m steppers update time cleanly
+            // Open Schedule editor -> verify -15m/+5m/+1m/-1m steppers and identical solar anchor rejection + clear on edit
             awaitRulesListNode("add_hardware_rule_button", isTag = true)
             composeTestRule.onNodeWithTag("add_hardware_rule_button").performClick()
             composeTestRule.waitForIdle()
@@ -307,8 +322,112 @@ class HardwareRulesE2ETest {
             composeTestRule.onNodeWithText("6:15 PM").assertExists()
             composeTestRule.onNodeWithTag("start_step_5").performScrollTo().performClick()
             composeTestRule.onNodeWithText("6:20 PM").assertExists()
+            composeTestRule.onNodeWithTag("start_step_1").performScrollTo().performClick()
+            composeTestRule.onNodeWithText("6:21 PM").assertExists()
+            composeTestRule.onNodeWithTag("start_step_-1").performScrollTo().performClick()
+            composeTestRule.onNodeWithText("6:20 PM").assertExists()
+
+            composeTestRule.onNodeWithTag("start_anchor_SUNSET").performScrollTo().performClick()
+            composeTestRule.onNodeWithTag("end_anchor_SUNSET").performScrollTo().performClick()
+            composeTestRule.onNodeWithTag("save_hardware_rule_button").performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("hardware_rule_validation_error").assertIsDisplayed()
+            composeTestRule.onNodeWithText("Start time and end time must be different").assertIsDisplayed()
+
+            composeTestRule.onNodeWithTag("end_offset_15").performScrollTo().performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("hardware_rule_validation_error").assertDoesNotExist()
             composeTestRule.onNodeWithText("Cancel").performClick()
             composeTestRule.waitForIdle()
+        }
+    }
+
+    @Test
+    fun `E2E multi-switch shared RuleID renders without LazyColumn duplicate key crash and drawer surfaces inspection errors`() {
+        composeTestRule.waitForIdle()
+        val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
+        vm.toggleDemoShowroomMode(false)
+        awaitLoopbackIo { !vm.isDemoShowroomMode.value && vm.devices.value.isEmpty() }
+
+        val workDir = File(composeTestRule.activity.cacheDir, "e2e_hw_rules_shared").apply { mkdirs() }
+        val ownerUdn = "uuid:Lightswitch-3_0-WLS0403SHR01"
+        val peerUdn = "uuid:Lightswitch-3_0-WLS0403SHR02"
+        val sharedZip = buildSharedRuleIdZip(ownerUdn, peerUdn, workDir)
+
+        FakeHardwareRulesServer(
+            initialFriendlyName = "Shared Hall Switch",
+            modelName = "WLS0403",
+            serialNumber = "WLS0403SHR01",
+            firmwareVersion = "WeMo_WW_2.00.11573.PVT-OWRT-LIGHTV2",
+            udn = ownerUdn,
+            macAddress = "EC1A59EE3301",
+            isRtos = false,
+            supportsRulesDb = true,
+            initialDbVersion = 2,
+            initialRulesZipBytes = sharedZip
+        ).use { sharedServer ->
+            FakeHardwareRulesServer(
+                initialFriendlyName = "Corrupt Rules Switch",
+                modelName = "WLS0403",
+                serialNumber = "WLS0403ERR02",
+                firmwareVersion = "WeMo_WW_2.00.11573.PVT-OWRT-LIGHTV2",
+                udn = peerUdn,
+                macAddress = "EC1A59EE3302",
+                isRtos = false,
+                supportsRulesDb = true,
+                initialDbVersion = 2,
+                initialRulesZipBytes = "not-a-valid-zip".toByteArray()
+            ).use { corruptServer ->
+                addLoopbackSwitch(sharedServer.port)
+                awaitLoopbackIo { vm.devices.value.any { it.serialNumber == "WLS0403SHR01" } }
+                val sharedId = vm.devices.value.first { it.serialNumber == "WLS0403SHR01" }.id
+
+                addLoopbackSwitch(corruptServer.port)
+                awaitLoopbackIo { vm.devices.value.any { it.serialNumber == "WLS0403ERR02" } }
+                val corruptId = vm.devices.value.first { it.serialNumber == "WLS0403ERR02" }.id
+
+                // Read all rules on Rules tab: shared RuleID renders without LazyColumn duplicate-key crash
+                composeTestRule.onNodeWithTag("nav_tab_rules").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("scan_hardware_rules_button").performClick()
+                awaitLoopbackIo {
+                    vm.hardwareRulesByDeviceId.value[sharedId] != null &&
+                        vm.hardwareRulesByDeviceId.value[corruptId] != null
+                }
+                awaitRulesListNode("Shared Entry Schedule", isTag = false)
+                composeTestRule.onAllNodes(hasText("Shared Entry Schedule")).onFirst().assertIsDisplayed()
+
+                // Expand Corrupt Rules Switch in Devices tab: drawer surfaces diagnostic error instead of '0 rule(s) stored'
+                composeTestRule.onNodeWithTag("nav_tab_devices").performClick()
+                composeTestRule.waitForIdle()
+                composeTestRule.onNodeWithTag("devices_list")
+                    .performScrollToNode(hasText("Corrupt Rules Switch"))
+                composeTestRule.onNodeWithText("Corrupt Rules Switch").performClick()
+                composeTestRule.waitForIdle()
+
+                composeTestRule.onNodeWithText("not a valid rules.db ZIP", substring = true).assertExists()
+                composeTestRule.onNodeWithText("0 rule(s) stored on switch", substring = true).assertDoesNotExist()
+                composeTestRule.onNodeWithTag("drawer_open_rules_tab_$corruptId").assertExists()
+            }
+        }
+    }
+
+    private fun buildSharedRuleIdZip(ownerUdn: String, peerUdn: String, workDir: File): ByteArray {
+        val dbFile = File.createTempFile("shared_rules_", ".db", workDir.apply { mkdirs() })
+        return try {
+            HardwareRulesSafetyValidator.createEmptyBelkinSchemaDb(dbFile)
+            val db = SQLiteDatabase.openDatabase(dbFile.absolutePath, null, SQLiteDatabase.OPEN_READWRITE)
+            try {
+                db.execSQL("INSERT INTO RULES VALUES (10, 'Shared Entry Schedule', 'Time Interval', 0, '12201982', '12201982', '1', 0)")
+                db.execSQL("INSERT INTO RULEDEVICES (RuleID, DeviceID, GroupID, DayID, StartTime, RuleDuration, StartAction, EndAction, SensorDuration, Type, Value, Level, OnModeOffset, OffModeOffset, CountdownTime, EndTime) VALUES (10, '$ownerUdn', 0, 1, 64800, 14400, 1.0, 0.0, -1, -1, -1, -1, 0, 0, -1, 79200)")
+                db.execSQL("INSERT INTO RULEDEVICES (RuleID, DeviceID, GroupID, DayID, StartTime, RuleDuration, StartAction, EndAction, SensorDuration, Type, Value, Level, OnModeOffset, OffModeOffset, CountdownTime, EndTime) VALUES (10, '$peerUdn', 0, 1, 64800, 14400, 1.0, 0.0, -1, -1, -1, -1, 0, 0, -1, 79200)")
+                db.execSQL("INSERT INTO TARGETDEVICES (RuleID, DeviceID, DeviceIndex) VALUES (10, '$ownerUdn', 0)")
+            } finally {
+                db.close()
+            }
+            HardwareRulesDbCodec.packFileToZipBytes(dbFile)
+        } finally {
+            runCatching { dbFile.delete() }
         }
     }
 

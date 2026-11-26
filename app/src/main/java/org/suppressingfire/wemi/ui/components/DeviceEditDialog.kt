@@ -34,12 +34,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -47,9 +49,9 @@ import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.data.SwitchRepository
+import org.suppressingfire.wemi.data.UNASSIGNED_ROOM
 import org.suppressingfire.wemi.data.classifyDeviceCategory
 import org.suppressingfire.wemi.data.inferRoomFromName
-import org.suppressingfire.wemi.ui.theme.WemoErrorRed
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
@@ -79,18 +81,19 @@ fun AddOrEditDeviceDialog(
 ) {
     val isEditing = initialDevice != null
     val formKey = initialDevice?.id
-    var name by remember(formKey) { mutableStateOf(initialDevice?.name ?: "") }
-    var roomName by remember(formKey) { mutableStateOf(initialDevice?.roomName ?: "Unassigned") }
-    var selectedType by remember(formKey) {
+    var name by rememberSaveable(formKey) { mutableStateOf(initialDevice?.name ?: "") }
+    var roomName by rememberSaveable(formKey) { mutableStateOf(initialDevice?.roomName ?: UNASSIGNED_ROOM) }
+    var userEditedRoom by rememberSaveable(formKey) { mutableStateOf(isEditing) }
+    var selectedType by rememberSaveable(formKey) {
         mutableStateOf(initialDevice?.parsedType ?: DeviceType.SWITCH_PLUG)
     }
-    var ipAddress by remember(formKey) { mutableStateOf(initialDevice?.ipAddress ?: "192.168.1.115") }
-    var portText by remember(formKey) { mutableStateOf((initialDevice?.port ?: 49153).toString()) }
-    var brightness by remember(formKey) { mutableFloatStateOf((initialDevice?.brightness ?: 100).toFloat()) }
+    var ipAddress by rememberSaveable(formKey) { mutableStateOf(initialDevice?.ipAddress ?: "192.168.1.115") }
+    var portText by rememberSaveable(formKey) { mutableStateOf((initialDevice?.port ?: 49153).toString()) }
+    var brightness by rememberSaveable(formKey) { mutableFloatStateOf((initialDevice?.brightness ?: 100).toFloat()) }
     val isReachable = initialDevice?.isReachable ?: true
     val isOn = initialDevice?.isOn ?: true
     val preservedAutoOffMinutes = initialDevice?.autoOffMinutes ?: 0
-    var syncNameToHardware by remember(formKey) { mutableStateOf(true) }
+    var syncNameToHardware by rememberSaveable(formKey) { mutableStateOf(true) }
     val detectedCategory = classifyDeviceCategory(
         name = name.ifBlank { "Switch" },
         deviceType = selectedType
@@ -150,7 +153,7 @@ fun AddOrEditDeviceDialog(
                     value = name,
                     onValueChange = {
                         name = it
-                        if (!isEditing) {
+                        if (!isEditing && !userEditedRoom) {
                             roomName = inferRoomFromName(it)
                         }
                     },
@@ -216,7 +219,9 @@ fun AddOrEditDeviceDialog(
                         checked = syncNameToHardware,
                         onCheckedChange = { syncNameToHardware = it },
                         colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary),
-                        modifier = Modifier.testTag("sync_hardware_name_switch")
+                        modifier = Modifier
+                            .semantics { contentDescription = "Sync name to switch hardware" }
+                            .testTag("sync_hardware_name_switch")
                     )
                 }
 
@@ -231,7 +236,10 @@ fun AddOrEditDeviceDialog(
                     SwitchRepository.DEFAULT_ROOMS.forEach { presetRoom ->
                         FilterChip(
                             selected = roomName.equals(presetRoom, ignoreCase = true),
-                            onClick = { roomName = presetRoom },
+                            onClick = {
+                                roomName = presetRoom
+                                userEditedRoom = true
+                            },
                             label = { Text(presetRoom) },
                             colors = FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = WemoGreenSoft,
@@ -242,7 +250,10 @@ fun AddOrEditDeviceDialog(
                 }
                 OutlinedTextField(
                     value = roomName,
-                    onValueChange = { roomName = it },
+                    onValueChange = {
+                        roomName = it
+                        userEditedRoom = true
+                    },
                     label = { Text("Room Name (or type a custom room)") },
                     singleLine = true,
                     modifier = Modifier
@@ -323,7 +334,7 @@ fun AddOrEditDeviceDialog(
                         onClick = { onDelete(initialDevice) },
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Remove Device from List", color = WemoErrorRed)
+                        Text("Remove Device from List", color = StatusOfflineRed)
                     }
                 }
             }
@@ -348,7 +359,7 @@ fun AddOrEditDeviceDialog(
                         syncNameToHardware
                     )
                 },
-                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
                 modifier = Modifier.testTag("save_device_button")
             ) {
                 Text(stringResource(R.string.action_save))

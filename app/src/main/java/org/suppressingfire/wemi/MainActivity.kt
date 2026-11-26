@@ -37,6 +37,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -108,6 +111,8 @@ fun WeMiSwitchApp(
     val isEditMode by viewModel.isEditMode.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val showSsdpScannerSheet by viewModel.showSsdpScannerSheet.collectAsStateWithLifecycle()
+    val showAddDeviceDialog by viewModel.showAddDeviceDialog.collectAsStateWithLifecycle()
+    val editingDevice by viewModel.editingDevice.collectAsStateWithLifecycle()
     val showAddHomeDialog by viewModel.showAddHomeDialog.collectAsStateWithLifecycle()
     val showProvisionApDialog by viewModel.showProvisionApDialog.collectAsStateWithLifecycle()
     val hardwareRuleEditorRequest by viewModel.hardwareRuleEditorRequest.collectAsStateWithLifecycle()
@@ -154,6 +159,8 @@ fun WeMiSwitchApp(
     BackHandler(
         enabled = showReleaseHistoryDialog ||
             hasHardwareRuleDialog ||
+            showAddDeviceDialog ||
+            editingDevice != null ||
             showSsdpScannerSheet ||
             showAddHomeDialog ||
             showProvisionApDialog ||
@@ -164,6 +171,10 @@ fun WeMiSwitchApp(
         when {
             showReleaseHistoryDialog -> showReleaseHistoryDialog = false
             hasHardwareRuleDialog -> viewModel.dismissHardwareRuleDialogs()
+            showAddDeviceDialog || editingDevice != null -> {
+                viewModel.closeAddDeviceDialog()
+                viewModel.closeEditDeviceDialog()
+            }
             showSsdpScannerSheet -> viewModel.closeSsdpScanner()
             showAddHomeDialog -> viewModel.closeAddHomeDialog()
             showProvisionApDialog -> viewModel.closeProvisionApDialog()
@@ -382,6 +393,7 @@ fun WeMiSwitchApp(
                                 homeNetworks = homeNetworks,
                                 setupDebugSnapshot = setupDebugSnapshot,
                                 lanNetworkState = lanNetworkState,
+                                hardwareRulesByDeviceId = hardwareRulesByDeviceId,
                                 onTurnAllOn = { viewModel.turnAllSwitches(true) },
                                 onTurnAllOff = { viewModel.turnAllSwitches(false) },
                                 onScanNetwork = { viewModel.openSsdpScannerAndScan() },
@@ -407,12 +419,18 @@ fun WeMiSwitchApp(
                     .align(Alignment.BottomCenter)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
+                val isErrorBanner = SwitchViewModel.isErrorStatusMessage(statusBannerMessage)
                 Box(
                     modifier = Modifier
                         .background(
-                            color = WemoGreenDark.copy(alpha = 0.95f),
+                            color = if (isErrorBanner) {
+                                Color(0xFFB91C1C).copy(alpha = 0.96f)
+                            } else {
+                                WemoGreenDark.copy(alpha = 0.95f)
+                            },
                             shape = RoundedCornerShape(24.dp)
                         )
+                        .semantics { liveRegion = LiveRegionMode.Polite }
                         .testTag("status_feedback_banner")
                 ) {
                     Text(

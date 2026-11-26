@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -35,7 +35,7 @@ import org.suppressingfire.wemi.ui.components.HardwareRulesHeaderCard
 import org.suppressingfire.wemi.ui.components.buildUdnToFriendlyNameMap
 import org.suppressingfire.wemi.ui.theme.WemoBackgroundGray
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
-import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
+import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
@@ -121,7 +121,7 @@ fun RulesScreen(
                             Spacer(modifier = Modifier.height(12.dp))
                             Button(
                                 onClick = onOpenDevicesTab,
-                                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
                                 modifier = Modifier
                                     .heightIn(min = 48.dp)
                                     .testTag("rules_empty_go_to_devices_button")
@@ -157,10 +157,10 @@ fun RulesScreen(
                 }
 
                 if (effectiveCap != HardwareRulesCapability.VERIFIED_UNSUPPORTED && deviceRules.isNotEmpty()) {
-                    items(
+                    itemsIndexed(
                         items = deviceRules,
-                        key = { rule -> "hw_rule_${device.id}_${rule.ruleId}" }
-                    ) { rule ->
+                        key = { idx, rule -> "hw_rule_${device.id}_${rule.ruleId}_${rule.ownerDeviceUdn}_$idx" }
+                    ) { _, rule ->
                         org.suppressingfire.wemi.ui.components.HardwareRuleSummaryRow(
                             deviceId = device.id,
                             rule = rule,

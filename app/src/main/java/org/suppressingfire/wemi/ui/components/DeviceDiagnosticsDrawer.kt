@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
@@ -40,6 +39,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -125,6 +127,10 @@ internal fun ExpandedDrawer(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .semantics {
+                        contentDescription = "Brightness level for ${device.name}"
+                        stateDescription = "${sliderVal.roundToInt()} percent"
+                    }
                     .testTag("brightness_slider_${device.id}")
             )
 
@@ -145,9 +151,7 @@ internal fun ExpandedDrawer(
                             selectedContainerColor = WemoGreenSoft,
                             selectedLabelColor = WemoGreenDark
                         ),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .testTag("brightness_preset_${device.id}_$preset")
+                        modifier = Modifier.testTag("brightness_preset_${device.id}_$preset")
                     )
                 }
                 if (onToggleNightMode != null) {
@@ -159,9 +163,7 @@ internal fun ExpandedDrawer(
                             selectedContainerColor = WemoGreenSoft,
                             selectedLabelColor = WemoGreenDark
                         ),
-                        modifier = Modifier
-                            .height(28.dp)
-                            .testTag("night_mode_chip_${device.id}")
+                        modifier = Modifier.testTag("night_mode_chip_${device.id}")
                     )
                 }
             }
@@ -210,7 +212,7 @@ internal fun ExpandedDrawer(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.NetworkCheck,
-                            contentDescription = "Ping ${device.name} latency",
+                            contentDescription = null,
                             modifier = Modifier.size(15.dp)
                         )
                     },
@@ -285,7 +287,7 @@ internal fun ExpandedDrawer(
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen,
-                                contentDescription = "Add ${device.name} widget to Home Screen",
+                                contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
                         },

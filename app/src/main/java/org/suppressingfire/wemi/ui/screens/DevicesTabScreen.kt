@@ -26,6 +26,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -127,6 +128,7 @@ fun DevicesTabScreen(
     modifier: Modifier = Modifier
 ) {
     val pullToRefreshState = rememberPullToRefreshState()
+    val udnToName = remember(state.homeDevices) { buildUdnToFriendlyNameMap(state.homeDevices) }
     PullToRefreshBox(
         isRefreshing = state.isRefreshing,
         onRefresh = actions.onRefreshDevices,
@@ -250,6 +252,7 @@ fun DevicesTabScreen(
                                 device = device,
                                 state = state,
                                 actions = actions,
+                                udnToName = udnToName,
                                 modifier = Modifier.padding(start = 10.dp)
                             )
                         }
@@ -263,7 +266,8 @@ fun DevicesTabScreen(
                     BoundDeviceRow(
                         device = device,
                         state = state,
-                        actions = actions
+                        actions = actions,
+                        udnToName = udnToName
                     )
                 }
             }
@@ -276,9 +280,9 @@ private fun BoundDeviceRow(
     device: DeviceEntity,
     state: DevicesTabUiState,
     actions: DevicesTabActions,
+    udnToName: Map<String, String>,
     modifier: Modifier = Modifier
 ) {
-    val udnToName = buildUdnToFriendlyNameMap(state.homeDevices)
     DeviceRow(
         device = device,
         isExpanded = device.id in state.expandedDeviceIds,

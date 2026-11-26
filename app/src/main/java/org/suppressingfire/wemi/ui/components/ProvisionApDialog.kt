@@ -19,7 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,14 +29,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.suppressingfire.wemi.R
 import org.suppressingfire.wemi.data.DeviceType
+import org.suppressingfire.wemi.data.UNASSIGNED_ROOM
 import org.suppressingfire.wemi.data.classifyDeviceCategory
 import org.suppressingfire.wemi.data.inferRoomFromName
 import org.suppressingfire.wemi.network.ScannedAp
 import org.suppressingfire.wemi.network.SetupDebugSnapshot
 import org.suppressingfire.wemi.network.SetupDeviceDescriptor
-import org.suppressingfire.wemi.ui.theme.WemoErrorRed
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
-import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 
 @Composable
@@ -75,24 +74,27 @@ fun ProvisionApDialog(
     ) -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
-    var apHost by remember { mutableStateOf("10.22.22.1") }
-    var ssid by remember { mutableStateOf(defaultSsid) }
-    var password by remember { mutableStateOf("") }
-    var channelText by remember { mutableStateOf("6") }
-    var authMode by remember { mutableStateOf("WPA2PSK") }
-    var encryptionType by remember { mutableStateOf("AES") }
+    var apHost by rememberSaveable { mutableStateOf("10.22.22.1") }
+    var ssid by rememberSaveable { mutableStateOf(defaultSsid) }
+    var password by rememberSaveable { mutableStateOf("") }
+    var channelText by rememberSaveable { mutableStateOf("6") }
+    var authMode by rememberSaveable { mutableStateOf("WPA2PSK") }
+    var encryptionType by rememberSaveable { mutableStateOf("AES") }
     // 0 = Auto-Detect from /setup.xml (<rtos>, <iot>, <binaryOption>, <new_algo>), 1 = Method 1, 2 = Method 2, 3 = Method 3
-    var encryptionMethod by remember { mutableIntStateOf(0) }
+    var encryptionMethod by rememberSaveable { mutableIntStateOf(0) }
     // null = Auto (true for Method 1/3, false for Method 2), true = Append +4 hex lengths, false = No length suffix
-    var addPasswordLengthsOverride by remember { mutableStateOf<Boolean?>(null) }
-    var keepDialogOpenOnSuccess by remember { mutableStateOf(false) }
-    var customDeviceName by remember { mutableStateOf(detectedDevice?.friendlyName.orEmpty()) }
-    var selectedRoom by remember { mutableStateOf("Living Room") }
+    var addPasswordLengthsOverride by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    var keepDialogOpenOnSuccess by rememberSaveable { mutableStateOf(false) }
+    var customDeviceName by rememberSaveable { mutableStateOf(detectedDevice?.friendlyName.orEmpty()) }
+    var selectedRoom by rememberSaveable { mutableStateOf(UNASSIGNED_ROOM) }
+    var userEditedRoom by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(detectedDevice) {
         if (detectedDevice != null && customDeviceName.isBlank()) {
             customDeviceName = detectedDevice.friendlyName
-            selectedRoom = inferRoomFromName(detectedDevice.friendlyName)
+            if (!userEditedRoom) {
+                selectedRoom = inferRoomFromName(detectedDevice.friendlyName)
+            }
         }
     }
 
@@ -195,13 +197,16 @@ fun ProvisionApDialog(
                     customDeviceName = customDeviceName,
                     onCustomDeviceNameChange = {
                         customDeviceName = it
-                        if (it.isNotBlank()) {
-                            selectedRoom = inferRoomFromName(it)
+                        if (!userEditedRoom) {
+                            selectedRoom = if (it.isNotBlank()) inferRoomFromName(it) else UNASSIGNED_ROOM
                         }
                     },
                     previewCategory = previewCategory,
                     selectedRoom = selectedRoom,
-                    onSelectRoom = { selectedRoom = it }
+                    onSelectRoom = {
+                        selectedRoom = it
+                        userEditedRoom = true
+                    }
                 )
 
                 ProvisionCryptoOptionsSection(
@@ -222,7 +227,7 @@ fun ProvisionApDialog(
                     val resolvedAuth = authMode.ifBlank { "WPA2PSK" }
                     val resolvedEnc = encryptionType.ifBlank { "AES" }
                     val resolvedName = customDeviceName.trim()
-                    val resolvedRoom = selectedRoom.ifBlank { "Living Room" }
+                    val resolvedRoom = selectedRoom.ifBlank { UNASSIGNED_ROOM }
 
                     if (onProvisionAdvanced != null) {
                         onProvisionAdvanced(
@@ -253,7 +258,7 @@ fun ProvisionApDialog(
                     }
                 },
                 enabled = !isProvisioning,
-                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
                 modifier = Modifier.testTag("confirm_provision_ap_button")
             ) {
                 Text(if (isProvisioning) "Provisioning..." else "Provision Switch")
@@ -331,7 +336,7 @@ private fun ProvisionSetupStatusBanner(
                 Text(
                     text = displayStatus,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (isWarningOrError) WemoErrorRed else WemoGreenDark
+                    color = if (isWarningOrError) StatusOfflineRed else WemoGreenDark
                 )
             }
         }

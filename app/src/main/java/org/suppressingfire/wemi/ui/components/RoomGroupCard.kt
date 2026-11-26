@@ -54,8 +54,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -127,40 +131,17 @@ fun RoomFilterBar(
         FilterChip(
             selected = selectedRoomFilter == null,
             onClick = { onSelectRoomFilter(null) },
-            label = {
-                Text(
-                    text = "All Rooms (${rooms.size})",
-                    fontFamily = FontFamily.SansSerif,
-                    fontSize = 12.sp
-                )
-            },
-            colors = FilterChipDefaults.filterChipColors(
-                selectedContainerColor = WemoGreenSoft,
-                selectedLabelColor = WemoGreenDark
-            ),
+            label = { Text(text = "All Rooms (${rooms.size})", fontFamily = FontFamily.SansSerif, fontSize = 12.sp) },
+            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = WemoGreenSoft, selectedLabelColor = WemoGreenDark),
             modifier = Modifier.testTag("room_filter_All")
         )
 
         rooms.forEach { room ->
             FilterChip(
                 selected = selectedRoomFilter == room,
-                onClick = {
-                    onSelectRoomFilter(if (selectedRoomFilter == room) null else room)
-                },
-                leadingIcon = {
-                    Icon(
-                        imageVector = iconForRoom(room),
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp)
-                    )
-                },
-                label = {
-                    Text(
-                        text = room,
-                        fontFamily = FontFamily.SansSerif,
-                        fontSize = 12.sp
-                    )
-                },
+                onClick = { onSelectRoomFilter(if (selectedRoomFilter == room) null else room) },
+                leadingIcon = { Icon(imageVector = iconForRoom(room), contentDescription = null, modifier = Modifier.size(15.dp)) },
+                label = { Text(text = room, fontFamily = FontFamily.SansSerif, fontSize = 12.sp) },
                 colors = FilterChipDefaults.filterChipColors(
                     selectedContainerColor = WemoGreenSoft,
                     selectedLabelColor = WemoGreenDark,
@@ -190,26 +171,21 @@ fun RoomGroupHeaderCard(
     onPinRoomWidget: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    val controllableSwitches = roomDevices.filter {
-        it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR
-    }
-    val dimmableBulbs = roomDevices.filter {
-        it.isReachable && it.parsedType == DeviceType.LIGHTBULB_DIMMER
-    }
+    val controllableSwitches = roomDevices.filter { it.isReachable && it.parsedType != DeviceType.MOTION_SENSOR }
+    val dimmableBulbs = roomDevices.filter { it.isReachable && it.parsedType == DeviceType.LIGHTBULB_DIMMER }
     val activeCount = controllableSwitches.count { it.isOn }
     val totalControllable = controllableSwitches.size
     val isAnySwitchOn = activeCount > 0
-
-    val avgBrightness = if (dimmableBulbs.isNotEmpty()) {
-        dimmableBulbs.map { it.brightness }.average().roundToInt()
-    } else {
-        100
+    val avgBrightness = if (dimmableBulbs.isNotEmpty()) dimmableBulbs.map { it.brightness }.average().roundToInt() else 100
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val actionBtnWidth = when {
+        screenWidthDp >= 400 -> 44.dp
+        screenWidthDp >= 360 -> 40.dp
+        else -> 36.dp
     }
 
     var showRoomDimmer by remember { mutableStateOf(false) }
-    var roomSliderVal by remember(avgBrightness) {
-        mutableFloatStateOf(avgBrightness.toFloat())
-    }
+    var roomSliderVal by remember(avgBrightness) { mutableFloatStateOf(avgBrightness.toFloat()) }
 
     Surface(
         color = WemoRowSurface,
@@ -231,23 +207,16 @@ fun RoomGroupHeaderCard(
                     .background(
                         brush = Brush.horizontalGradient(
                             colors = if (isAnySwitchOn) {
-                                listOf(
-                                    WemoGreenSoft.copy(alpha = 0.75f),
-                                    Color.White
-                                )
+                                listOf(WemoGreenSoft.copy(alpha = 0.75f), Color.White)
                             } else {
-                                listOf(
-                                    Color(0xFFF8FAFC),
-                                    Color.White
-                                )
+                                listOf(Color(0xFFF8FAFC), Color.White)
                             }
                         )
                     )
                     .clickable(onClick = onToggleCollapse)
-                    .padding(start = 14.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
+                    .padding(start = 12.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Room Icon Badge
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = if (isAnySwitchOn) WemoGreenPrimary else Color(0xFFCBD5E1),
@@ -265,7 +234,6 @@ fun RoomGroupHeaderCard(
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                // Room Name (Top Line) + Active Lights Badge & Telemetry (Second Line)
                 Column(modifier = Modifier.weight(1f)) {
                     AutoResizingDeviceNameText(
                         text = roomName,
@@ -282,19 +250,11 @@ fun RoomGroupHeaderCard(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     val onlineDevices = roomDevices.filter { it.isReachable && it.latencyMs > 0 }
-                    val avgLatency = if (onlineDevices.isNotEmpty()) {
-                        onlineDevices.map { it.latencyMs }.average().roundToInt()
-                    } else {
-                        0
-                    }
+                    val avgLatency = if (onlineDevices.isNotEmpty()) onlineDevices.map { it.latencyMs }.average().roundToInt() else 0
                     val roomSubtitle = buildString {
                         append("${onlineDevices.size}/${roomDevices.size} Active")
-                        if (avgLatency > 0) {
-                            append(" • Avg ${avgLatency}ms")
-                        }
-                        if (dimmableBulbs.isNotEmpty()) {
-                            append(" • ${avgBrightness}% dim")
-                        }
+                        if (avgLatency > 0) append(" • Avg ${avgLatency}ms")
+                        if (dimmableBulbs.isNotEmpty()) append(" • ${avgBrightness}% dim")
                     }
 
                     Row(
@@ -307,12 +267,8 @@ fun RoomGroupHeaderCard(
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
-                                text = if (totalControllable > 0) {
-                                    "$activeCount/$totalControllable ON"
-                                } else {
-                                    "${roomDevices.size} Device(s)"
-                                },
-                                color = if (isAnySwitchOn) Color.White else WemoTextSecondary,
+                                text = if (totalControllable > 0) "$activeCount/$totalControllable ON" else "${roomDevices.size} Device(s)",
+                                color = if (isAnySwitchOn) Color.White else Color(0xFF475569),
                                 fontFamily = FontFamily.SansSerif,
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 11.sp,
@@ -335,29 +291,27 @@ fun RoomGroupHeaderCard(
                     }
                 }
 
-                // Optional Room Dimmer button if the room has dimmable lightbulbs
                 if (dimmableBulbs.isNotEmpty()) {
                     IconButton(
                         onClick = { showRoomDimmer = !showRoomDimmer },
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(width = actionBtnWidth, height = 48.dp)
                             .testTag("room_dimmer_button_$roomName")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Tune,
                             contentDescription = "Adjust room brightness for $roomName",
-                            tint = if (showRoomDimmer) WemoGreenPrimary else WemoTextSecondary,
+                            tint = if (showRoomDimmer) WemoGreenDark else WemoTextSecondary,
                             modifier = Modifier.size(19.dp)
                         )
                     }
                 }
 
-                // Optional one-tap Home Screen widget pin action for the room
                 if (onPinRoomWidget != null && totalControllable > 0) {
                     IconButton(
                         onClick = onPinRoomWidget,
                         modifier = Modifier
-                            .size(34.dp)
+                            .size(width = actionBtnWidth, height = 48.dp)
                             .testTag("room_pin_widget_button_$roomName")
                     ) {
                         Icon(
@@ -372,21 +326,16 @@ fun RoomGroupHeaderCard(
                 IconButton(
                     onClick = onToggleCollapse,
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(width = actionBtnWidth, height = 48.dp)
                         .testTag("room_collapse_button_$roomName")
                 ) {
                     Icon(
-                        imageVector = if (isCollapsed) {
-                            Icons.Default.KeyboardArrowDown
-                        } else {
-                            Icons.Default.KeyboardArrowUp
-                        },
+                        imageVector = if (isCollapsed) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
                         contentDescription = if (isCollapsed) "Expand $roomName" else "Collapse $roomName",
                         tint = WemoTextSecondary
                     )
                 }
 
-                // Master Room Power Ring Toggle (Toggles all lights in the room at once!)
                 if (totalControllable > 0) {
                     PowerRingButton(
                         isOn = isAnySwitchOn,
@@ -400,7 +349,6 @@ fun RoomGroupHeaderCard(
                 }
             }
 
-            // Expandable Room Master Dimmer Drawer
             AnimatedVisibility(
                 visible = showRoomDimmer && dimmableBulbs.isNotEmpty(),
                 enter = expandVertically() + fadeIn(),
@@ -449,9 +397,7 @@ fun RoomGroupHeaderCard(
                     Slider(
                         value = roomSliderVal,
                         onValueChange = { roomSliderVal = it },
-                        onValueChangeFinished = {
-                            onRoomBrightnessChange(roomSliderVal.roundToInt())
-                        },
+                        onValueChangeFinished = { onRoomBrightnessChange(roomSliderVal.roundToInt()) },
                         valueRange = 1f..100f,
                         colors = SliderDefaults.colors(
                             thumbColor = WemoGreenPrimary,
@@ -460,6 +406,10 @@ fun RoomGroupHeaderCard(
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
+                            .semantics {
+                                contentDescription = "$roomName master brightness"
+                                stateDescription = "${roomSliderVal.roundToInt()} percent"
+                            }
                             .testTag("room_dimmer_slider_$roomName")
                     )
                 }

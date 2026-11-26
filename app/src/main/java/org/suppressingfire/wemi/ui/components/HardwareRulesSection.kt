@@ -49,14 +49,13 @@ import org.suppressingfire.wemi.network.HardwareRulesCapability
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
-import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
 import org.suppressingfire.wemi.ui.theme.WemoTextPrimary
 import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 
 private val CapabilityUnsupportedBg = Color(0xFFF3F4F6)
-private val CapabilityUnsupportedText = Color(0xFF4B5563)
+private val CapabilityUnsupportedText = Color(0xFF475569)
 private val ClockWarningBg = Color(0xFFFEF3C7)
 private val ClockWarningText = Color(0xFF92400E)
 
@@ -68,12 +67,8 @@ fun buildUdnToFriendlyNameMap(devices: List<DeviceEntity>): Map<String, String> 
     val map = LinkedHashMap<String, String>()
     for (dev in devices) {
         val cleanUdn = LanRuntimeUtils.canonicalHardwareUdn(dev.udn)
-        if (cleanUdn.isNotEmpty()) {
-            map[cleanUdn.lowercase(Locale.US)] = dev.name
-        }
-        if (dev.udn.isNotBlank()) {
-            map[dev.udn.trim().lowercase(Locale.US)] = dev.name
-        }
+        if (cleanUdn.isNotEmpty()) map[cleanUdn.lowercase(Locale.US)] = dev.name
+        if (dev.udn.isNotBlank()) map[dev.udn.trim().lowercase(Locale.US)] = dev.name
     }
     return map
 }
@@ -90,12 +85,10 @@ fun HardwareRulesHeaderCard(
 ) {
     val controllable = devices.filter { it.parsedType != DeviceType.MOTION_SENSOR }
     val readyCount = controllable.count { dev ->
-        val cap = snapshotsByDeviceId[dev.id]?.capability ?: dev.parsedHardwareRulesCapability
-        cap.isSupportedOrLikely
+        (snapshotsByDeviceId[dev.id]?.capability ?: dev.parsedHardwareRulesCapability).isSupportedOrLikely
     }
     val unsupportedCount = controllable.count { dev ->
-        val cap = snapshotsByDeviceId[dev.id]?.capability ?: dev.parsedHardwareRulesCapability
-        cap.isUnsupportedOrLikely
+        (snapshotsByDeviceId[dev.id]?.capability ?: dev.parsedHardwareRulesCapability).isUnsupportedOrLikely
     }
     val canCreateRule = controllable.any { dev ->
         val cap = snapshotsByDeviceId[dev.id]?.capability ?: dev.parsedHardwareRulesCapability
@@ -165,16 +158,12 @@ fun HardwareRulesHeaderCard(
                     Button(
                         onClick = onAddRuleClick,
                         enabled = canCreateRule,
-                        colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
+                        colors = ButtonDefaults.buttonColors(containerColor = WemoGreenDark),
                         modifier = Modifier
                             .heightIn(min = 48.dp)
                             .testTag("add_hardware_rule_button")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(text = "New Rule", maxLines = 1, softWrap = false)
                     }
@@ -234,6 +223,7 @@ fun HardwareRulesDeviceCard(
     val canManage = device.isReachable && effectiveCap != HardwareRulesCapability.VERIFIED_UNSUPPORTED
     val needsClockSync = snapshot?.deviceTimeInfo?.needsTimeSync == true
     val backupCount = snapshot?.availableBackups?.size ?: 0
+    val hasInspectionError = snapshot != null && (snapshot.hasInspectionError || !snapshot.integrityOk)
 
     Surface(
         color = WemoRowSurface,
@@ -292,17 +282,9 @@ fun HardwareRulesDeviceCard(
                     },
                     leadingIcon = {
                         if (isInspecting) {
-                            CircularProgressIndicator(
-                                strokeWidth = 2.dp,
-                                color = WemoGreenDark,
-                                modifier = Modifier.size(14.dp)
-                            )
+                            CircularProgressIndicator(strokeWidth = 2.dp, color = WemoGreenDark, modifier = Modifier.size(14.dp))
                         } else {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = "Read rules from ${device.name}",
-                                modifier = Modifier.size(15.dp)
-                            )
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
                         }
                     },
                     colors = AssistChipDefaults.assistChipColors(
@@ -337,26 +319,18 @@ fun HardwareRulesDeviceCard(
                     textColor = badgeTextColor,
                     modifier = Modifier.testTag("hardware_rules_capability_badge_${device.id}")
                 )
-                if (snapshot != null && effectiveCap == HardwareRulesCapability.VERIFIED_SUPPORTED) {
+                if (snapshot != null && effectiveCap == HardwareRulesCapability.VERIFIED_SUPPORTED && !hasInspectionError) {
                     HardwareRuleBadgePill(
                         text = "DB v${snapshot.dbVersion} • ${deviceRules.size} rule(s)",
-                        bgColor = Color(0xFFF1F5F9),
-                        textColor = WemoTextSecondary
+                        bgColor = Color(0xFFE2E8F0),
+                        textColor = CapabilityUnsupportedText
                     )
                 }
                 if (!device.isReachable) {
-                    HardwareRuleBadgePill(
-                        text = "Offline",
-                        bgColor = StatusOfflineSoftBg,
-                        textColor = StatusOfflineRed
-                    )
+                    HardwareRuleBadgePill(text = "Offline", bgColor = StatusOfflineSoftBg, textColor = StatusOfflineRed)
                 }
                 if (needsClockSync) {
-                    HardwareRuleBadgePill(
-                        text = "Switch clock needs sync",
-                        bgColor = ClockWarningBg,
-                        textColor = ClockWarningText
-                    )
+                    HardwareRuleBadgePill(text = "Switch clock needs sync", bgColor = ClockWarningBg, textColor = ClockWarningText)
                 }
             }
 
@@ -370,13 +344,8 @@ fun HardwareRulesDeviceCard(
                         onClick = onAddRuleForDevice,
                         enabled = !isInspecting,
                         label = { Text("Add Rule", fontSize = 11.5.sp, maxLines = 1, softWrap = false) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Add, contentDescription = "Add on-device rule for ${device.name}", modifier = Modifier.size(15.dp))
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            leadingIconContentColor = WemoGreenDark,
-                            labelColor = WemoGreenDark
-                        ),
+                        leadingIcon = { Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(15.dp)) },
+                        colors = AssistChipDefaults.assistChipColors(leadingIconContentColor = WemoGreenDark, labelColor = WemoGreenDark),
                         modifier = Modifier.testTag("add_device_hardware_rule_${device.id}")
                     )
                     if (needsClockSync || effectiveCap == HardwareRulesCapability.VERIFIED_SUPPORTED) {
@@ -391,13 +360,11 @@ fun HardwareRulesDeviceCard(
                                     softWrap = false
                                 )
                             },
-                            leadingIcon = {
-                                Icon(Icons.Default.AccessTime, contentDescription = "Sync clock on ${device.name}", modifier = Modifier.size(15.dp))
-                            },
+                            leadingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null, modifier = Modifier.size(15.dp)) },
                             colors = AssistChipDefaults.assistChipColors(
                                 containerColor = if (needsClockSync) ClockWarningBg else Color.Transparent,
-                                leadingIconContentColor = if (needsClockSync) ClockWarningText else WemoTextSecondary,
-                                labelColor = if (needsClockSync) ClockWarningText else WemoTextSecondary
+                                leadingIconContentColor = if (needsClockSync) ClockWarningText else CapabilityUnsupportedText,
+                                labelColor = if (needsClockSync) ClockWarningText else CapabilityUnsupportedText
                             ),
                             modifier = Modifier.testTag("sync_device_clock_${device.id}")
                         )
@@ -407,12 +374,10 @@ fun HardwareRulesDeviceCard(
                             onClick = onEditSolarLocation,
                             enabled = !isInspecting,
                             label = { Text("Solar Location", fontSize = 11.5.sp, maxLines = 1, softWrap = false) },
-                            leadingIcon = {
-                                Icon(Icons.Default.LocationOn, contentDescription = "Set solar location on ${device.name}", modifier = Modifier.size(15.dp))
-                            },
+                            leadingIcon = { Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(15.dp)) },
                             colors = AssistChipDefaults.assistChipColors(
-                                leadingIconContentColor = WemoTextSecondary,
-                                labelColor = WemoTextSecondary
+                                leadingIconContentColor = CapabilityUnsupportedText,
+                                labelColor = CapabilityUnsupportedText
                             ),
                             modifier = Modifier.testTag("edit_solar_location_${device.id}")
                         )
@@ -422,13 +387,8 @@ fun HardwareRulesDeviceCard(
                             onClick = onOpenBackups,
                             enabled = !isInspecting,
                             label = { Text("Backups ($backupCount)", fontSize = 11.5.sp, maxLines = 1, softWrap = false) },
-                            leadingIcon = {
-                                Icon(Icons.Default.History, contentDescription = "Restore backup for ${device.name}", modifier = Modifier.size(15.dp))
-                            },
-                            colors = AssistChipDefaults.assistChipColors(
-                                leadingIconContentColor = WemoGreenDark,
-                                labelColor = WemoGreenDark
-                            ),
+                            leadingIcon = { Icon(Icons.Default.History, contentDescription = null, modifier = Modifier.size(15.dp)) },
+                            colors = AssistChipDefaults.assistChipColors(leadingIconContentColor = WemoGreenDark, labelColor = WemoGreenDark),
                             modifier = Modifier.testTag("open_backup_restore_${device.id}")
                         )
                     }
@@ -440,9 +400,7 @@ fun HardwareRulesDeviceCard(
                     Spacer(modifier = Modifier.height(6.dp))
                     val dimmerHint = if (device.parsedType == DeviceType.LIGHTBULB_DIMMER) {
                         " Dimmer Night Mode is still stored on-device."
-                    } else {
-                        ""
-                    }
+                    } else ""
                     Text(
                         text = "Firmware does not expose on-device rules storage.$dimmerHint",
                         color = WemoTextSecondary,
@@ -465,6 +423,14 @@ fun HardwareRulesDeviceCard(
                         fontSize = 12.sp
                     )
                 }
+                hasInspectionError -> {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = snapshot.diagnosticMessage.ifBlank { "Could not inspect on-device rules — tap Refresh to retry." },
+                        color = StatusOfflineRed,
+                        fontSize = 12.sp
+                    )
+                }
                 deviceRules.isEmpty() -> {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
@@ -476,11 +442,7 @@ fun HardwareRulesDeviceCard(
             }
             snapshot?.locationInfo?.formatSummary()?.takeIf { it.isNotBlank() }?.let { loc ->
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Solar location on switch: $loc",
-                    color = WemoTextSecondary,
-                    fontSize = 11.sp
-                )
+                Text(text = "Solar location on switch: $loc", color = WemoTextSecondary, fontSize = 11.sp)
             }
         }
     }

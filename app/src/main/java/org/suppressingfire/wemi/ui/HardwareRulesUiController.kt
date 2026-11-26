@@ -1,6 +1,8 @@
 package org.suppressingfire.wemi.ui
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,11 +51,23 @@ internal class HardwareRulesUiController(
     private val _pendingDeleteRule = MutableStateFlow<Pair<DeviceEntity, HardwareRule>?>(null)
     val pendingDeleteRule: StateFlow<Pair<DeviceEntity, HardwareRule>?> = _pendingDeleteRule.asStateFlow()
 
+    private val scanAllLock = Any()
+
+    @Volatile
+    private var scanAllJob: Job? = null
+
     fun dismissAllDialogs() {
         _editorRequest.value = null
         _locationDialogDevice.value = null
         _backupDialogDevice.value = null
         _pendingDeleteRule.value = null
+    }
+
+    fun dismissDialogsForDevice(deviceId: Int) {
+        if (_editorRequest.value?.preselectedDeviceId == deviceId) _editorRequest.value = null
+        if (_locationDialogDevice.value?.id == deviceId) _locationDialogDevice.value = null
+        if (_backupDialogDevice.value?.id == deviceId) _backupDialogDevice.value = null
+        if (_pendingDeleteRule.value?.first?.id == deviceId) _pendingDeleteRule.value = null
     }
 
     fun inspectDeviceHardwareRules(device: DeviceEntity, forceRecheck: Boolean = false) {
@@ -67,18 +81,33 @@ internal class HardwareRulesUiController(
 
     fun inspectAllHomeHardwareRules(forceRecheck: Boolean = false) {
         val targetKey = activeNetworkKeyProvider()
-        scope.launch {
-            val results = repository.inspectAllHomeHardwareRules(targetKey, forceRecheck)
-            if (results.isEmpty()) {
-                onShowTransientStatus("No reachable switches to read — reconnect offline switches on the Devices tab")
-                return@launch
+        val job: Job
+        synchronized(scanAllLock) {
+            if (scanAllJob?.isActive == true || isScanningAllDeviceRules.value) return
+            job = scope.launch(start = CoroutineStart.LAZY) {
+                val self = coroutineContext[Job]
+                try {
+                    val results = repository.inspectAllHomeHardwareRules(targetKey, forceRecheck)
+                    if (results.isEmpty()) {
+                        onShowTransientStatus("No reachable switches to read — reconnect offline switches on the Devices tab")
+                        return@launch
+                    }
+                    val supportedCount = results.count { it.capability == HardwareRulesCapability.VERIFIED_SUPPORTED }
+                    val totalRules = results.sumOf { snap -> snap.rules.count { it.appliesToInspectedSwitch } }
+                    onShowTransientStatus(
+                        "Scanned ${results.size} switch(es): $supportedCount on-device ready • $totalRules rule(s) read"
+                    )
+                } finally {
+                    synchronized(scanAllLock) {
+                        if (scanAllJob === self) {
+                            scanAllJob = null
+                        }
+                    }
+                }
             }
-            val supportedCount = results.count { it.capability == HardwareRulesCapability.VERIFIED_SUPPORTED }
-            val totalRules = results.sumOf { snap -> snap.rules.count { it.appliesToInspectedSwitch } }
-            onShowTransientStatus(
-                "Scanned ${results.size} switch(es): $supportedCount on-device ready • $totalRules rule(s) read"
-            )
+            scanAllJob = job
         }
+        job.start()
     }
 
     fun openAddHardwareRuleDialog(device: DeviceEntity? = null) {
@@ -90,7 +119,12 @@ internal class HardwareRulesUiController(
 
     fun openEditHardwareRuleDialog(device: DeviceEntity, rule: HardwareRule) {
         if (!rule.isEditableInApp) {
-            onShowTransientStatus("Toggle or delete '${rule.name}' directly; only Long Press, Auto-Off & Schedules can be edited")
+            val reason = when {
+                rule.isSharedMultiSwitch -> "'${rule.name}' is shared across multiple switches; toggle or delete it directly"
+                !rule.isOwnedByInspectedSwitch -> "'${rule.name}' is controlled by another switch; edit it on its owner switch"
+                else -> "Toggle or delete '${rule.name}' directly; only Long Press, Auto-Off & Schedules can be edited"
+            }
+            onShowTransientStatus(reason)
             return
         }
         _editorRequest.value = HardwareRuleEditorRequest(

@@ -4,30 +4,212 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.network.HardwareLongPressAction
+import org.suppressingfire.wemi.network.HardwareRule
+import org.suppressingfire.wemi.network.HardwareRuleType
 import org.suppressingfire.wemi.network.HardwareTimeAnchor
 import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
+import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoGreenSoft
+import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 
 private val DAY_LABELS = listOf(1 to "Sun", 2 to "Mon", 3 to "Tue", 4 to "Wed", 5 to "Thu", 6 to "Fri", 7 to "Sat")
 private val OFFSET_PRESETS = listOf(-60, -30, -15, 0, 15, 30, 60)
+private val COUNTDOWN_PRESETS = listOf(5, 15, 30, 60, 120)
+
+internal val IntSetSaver: Saver<Set<Int>, String> = Saver(
+    save = { set -> set.sorted().joinToString(",") },
+    restore = { raw ->
+        raw.split(",").mapNotNull { it.trim().toIntOrNull() }.toSet()
+            .ifEmpty { setOf(1, 2, 3, 4, 5, 6, 7) }
+    }
+)
+
+internal val StringListSaver: Saver<List<String>, String> = Saver(
+    save = { list -> list.joinToString("\n") },
+    restore = { raw -> if (raw.isEmpty()) emptyList() else raw.split("\n").filter { it.isNotBlank() } }
+)
+
+internal fun normalizedUdnKey(raw: String): String =
+    LanRuntimeUtils.canonicalHardwareUdn(raw).ifBlank { raw.trim() }.lowercase(Locale.US)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun RuleTypeSelector(
+    ruleType: HardwareRuleType,
+    editingRule: HardwareRule?,
+    ownerLongPressCapable: Boolean,
+    hasOwnerSnapshot: Boolean,
+    onSelectType: (HardwareRuleType) -> Unit
+) {
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = WemoGreenSoft,
+        selectedLabelColor = WemoGreenDark
+    )
+    Text("Rule Type", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        val types = listOf(
+            Triple(HardwareRuleType.LONG_PRESS, "Long Press", "hardware_rule_type_long_press"),
+            Triple(HardwareRuleType.COUNTDOWN_TIMER, "Auto-Off Delay", "hardware_rule_type_countdown"),
+            Triple(HardwareRuleType.SCHEDULE_INTERVAL, "Schedule", "hardware_rule_type_schedule"),
+            Triple(HardwareRuleType.SIMPLE_TIMER, "Timed Action", "hardware_rule_type_simple")
+        )
+        types.forEach { (type, label, tag) ->
+            val enabledChoice = type != HardwareRuleType.LONG_PRESS || ownerLongPressCapable
+            FilterChip(
+                selected = ruleType == type,
+                enabled = enabledChoice && (editingRule == null || editingRule.type == type),
+                onClick = { onSelectType(type) },
+                label = { Text(label, fontSize = 12.sp) },
+                colors = chipColors,
+                modifier = Modifier.testTag(tag)
+            )
+        }
+    }
+    if (editingRule == null && !ownerLongPressCapable) {
+        Text(
+            text = if (!hasOwnerSnapshot) {
+                "Tap Refresh on this switch to check Long Press support"
+            } else {
+                "Long Press is not supported on this switch model"
+            },
+            color = WemoTextSecondary,
+            fontSize = 11.5.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.testTag("long_press_disabled_hint")
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun CountdownRuleFields(
+    countdownMinutesText: String,
+    isCountdownInvalid: Boolean,
+    selectedDays: Set<Int>,
+    onMinutesChange: (String) -> Unit,
+    onDaysChanged: (Set<Int>) -> Unit
+) {
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = WemoGreenSoft,
+        selectedLabelColor = WemoGreenDark
+    )
+    Text("Turn OFF Automatically After", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        COUNTDOWN_PRESETS.forEach { mins ->
+            val label = if (mins >= 60) "${mins / 60}h" else "${mins}m"
+            FilterChip(
+                selected = countdownMinutesText.toIntOrNull() == mins,
+                onClick = { onMinutesChange(mins.toString()) },
+                label = { Text(label, fontSize = 12.sp) },
+                colors = chipColors,
+                modifier = Modifier.testTag("countdown_preset_$mins")
+            )
+        }
+    }
+    OutlinedTextField(
+        value = countdownMinutesText,
+        onValueChange = { raw -> onMinutesChange(raw.filter { it.isDigit() }.take(4)) },
+        label = { Text("Delay (minutes, 1–1440)") },
+        isError = isCountdownInvalid,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        singleLine = true,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("countdown_minutes_input")
+    )
+    DaysOfWeekPicker(selectedDays = selectedDays, onDaysChanged = onDaysChanged)
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun LongPressRuleFields(
+    longPressAction: HardwareLongPressAction,
+    controllable: List<DeviceEntity>,
+    preservedExtraUdns: List<String>,
+    selectedTargetUdns: List<String>,
+    onActionChange: (HardwareLongPressAction) -> Unit,
+    onToggleTargetUdn: (String) -> Unit
+) {
+    val chipColors = FilterChipDefaults.filterChipColors(
+        selectedContainerColor = WemoGreenSoft,
+        selectedLabelColor = WemoGreenDark
+    )
+    val selectedKeys = remember(selectedTargetUdns) {
+        selectedTargetUdns.mapTo(HashSet()) { normalizedUdnKey(it) }
+    }
+
+    Text("Hold Wall Paddle (2s) Action", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(
+            HardwareLongPressAction.TOGGLE,
+            HardwareLongPressAction.TURN_OFF,
+            HardwareLongPressAction.TURN_ON
+        ).forEach { act ->
+            FilterChip(
+                selected = longPressAction == act,
+                onClick = { onActionChange(act) },
+                label = { Text(act.label, fontSize = 12.sp) },
+                colors = chipColors,
+                modifier = Modifier.testTag("lp_action_${act.name}")
+            )
+        }
+    }
+
+    Text("Target Switches", style = MaterialTheme.typography.labelMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        controllable.forEach { dev ->
+            val targetUdn = canonicalOrSyntheticUdn(dev)
+            val isSelected = normalizedUdnKey(targetUdn) in selectedKeys
+            FilterChip(
+                selected = isSelected,
+                onClick = { onToggleTargetUdn(targetUdn) },
+                label = { Text(dev.name, fontSize = 12.sp) },
+                colors = chipColors,
+                modifier = Modifier.testTag("lp_target_chip_${dev.id}")
+            )
+        }
+        preservedExtraUdns.forEach { extraUdn ->
+            val isSelected = normalizedUdnKey(extraUdn) in selectedKeys
+            FilterChip(
+                selected = isSelected,
+                onClick = { onToggleTargetUdn(extraUdn) },
+                label = { Text(extraUdn.substringAfterLast('-').ifBlank { extraUdn }, fontSize = 12.sp) },
+                colors = chipColors
+            )
+        }
+    }
+}
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -93,7 +275,9 @@ internal fun TimePointPickerSection(
     offsetMinutes: Int,
     onAnchorChange: (HardwareTimeAnchor) -> Unit,
     onTimeChange: (Int, Int) -> Unit,
-    onOffsetChange: (Int) -> Unit
+    onOffsetChange: (Int) -> Unit,
+    initialCustomOffset: Int? = null,
+    isNextDay: Boolean = false
 ) {
     val chipColors = FilterChipDefaults.filterChipColors(
         selectedContainerColor = WemoGreenSoft,
@@ -115,13 +299,27 @@ internal fun TimePointPickerSection(
             }
         }
         if (anchor == HardwareTimeAnchor.FIXED_TIME) {
-            Text(
-                text = formatClockTime(hour24, minute),
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 15.sp,
-                color = WemoGreenDark,
-                modifier = Modifier.testTag("${tagPrefix}_time_value")
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(
+                    text = formatClockTime(hour24, minute),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp,
+                    color = WemoGreenDark,
+                    modifier = Modifier.testTag("${tagPrefix}_time_value")
+                )
+                if (isNextDay) {
+                    Text(
+                        text = "(next day)",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = WemoTextSecondary,
+                        modifier = Modifier.testTag("${tagPrefix}_next_day_cue")
+                    )
+                }
+            }
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -132,7 +330,9 @@ internal fun TimePointPickerSection(
                     Triple(-15, "-15m", "Subtract 15 minutes"),
                     Triple(15, "+15m", "Add 15 minutes"),
                     Triple(-5, "-5m", "Subtract 5 minutes"),
-                    Triple(5, "+5m", "Add 5 minutes")
+                    Triple(5, "+5m", "Add 5 minutes"),
+                    Triple(-1, "-1m", "Subtract 1 minute"),
+                    Triple(1, "+1m", "Add 1 minute")
                 )
                 steps.forEach { (deltaMin, label, desc) ->
                     AssistChip(
@@ -161,10 +361,12 @@ internal fun TimePointPickerSection(
                 color = WemoGreenDark,
                 modifier = Modifier.testTag("${tagPrefix}_solar_value")
             )
-            val options = if (offsetMinutes in OFFSET_PRESETS) {
-                OFFSET_PRESETS
-            } else {
-                (OFFSET_PRESETS + offsetMinutes).sorted()
+            val options = remember(offsetMinutes, initialCustomOffset) {
+                buildSet {
+                    addAll(OFFSET_PRESETS)
+                    initialCustomOffset?.let(::add)
+                    add(offsetMinutes)
+                }.sorted()
             }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 options.forEach { off ->
@@ -209,10 +411,10 @@ internal fun RuleSwitchRow(
     testTagName: String,
     onCheckedChange: (Boolean) -> Unit
 ) {
-    androidx.compose.foundation.layout.Row(
+    Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
@@ -220,12 +422,10 @@ internal fun RuleSwitchRow(
             fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
         )
-        androidx.compose.material3.Switch(
+        Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = androidx.compose.material3.SwitchDefaults.colors(
-                checkedTrackColor = org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
-            ),
+            colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary),
             modifier = Modifier
                 .semantics { contentDescription = contentDesc }
                 .testTag(testTagName)
@@ -237,7 +437,7 @@ internal fun RuleSwitchRow(
 internal fun SolarLocationTipText() {
     Text(
         text = "Tip: Set Solar Location on this switch so Sunrise/Sunset times match your city.",
-        color = androidx.compose.ui.graphics.Color(0xFF92400E),
+        color = Color(0xFF92400E),
         fontSize = 11.5.sp
     )
 }

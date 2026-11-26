@@ -351,7 +351,11 @@ internal fun TvDeviceCard(
                                         type == DeviceType.MOTION_SENSOR -> Icons.Default.Sensors
                                         else -> Icons.Default.PowerSettingsNew
                                     },
-                                    contentDescription = "Toggle ${device.name}",
+                                    contentDescription = when {
+                                        !device.isReachable -> "Reconnect ${device.name}"
+                                        type == DeviceType.MOTION_SENSOR -> "Refresh motion for ${device.name}"
+                                        else -> "Toggle ${device.name}"
+                                    },
                                     tint = when {
                                         !device.isReachable -> Color(0xFFFCA5A5)
                                         device.isOn -> TvDeepBackground

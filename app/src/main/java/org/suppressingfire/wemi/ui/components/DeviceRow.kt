@@ -53,7 +53,6 @@ import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.network.DeviceHardwareRulesSnapshot
 import org.suppressingfire.wemi.ui.theme.WemoDividerGray
-import org.suppressingfire.wemi.ui.theme.WemoErrorRed
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
 import org.suppressingfire.wemi.ui.theme.WemoRowSurface
@@ -298,7 +297,7 @@ fun DeviceRow(
                         IconButton(
                             onClick = onMoveUp,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(width = 40.dp, height = 48.dp)
                                 .testTag("move_up_${device.id}")
                         ) {
                             Icon(
@@ -311,7 +310,7 @@ fun DeviceRow(
                         IconButton(
                             onClick = onMoveDown,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(width = 40.dp, height = 48.dp)
                                 .testTag("move_down_${device.id}")
                         ) {
                             Icon(
@@ -324,7 +323,7 @@ fun DeviceRow(
                         IconButton(
                             onClick = onEditDevice,
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(width = 44.dp, height = 48.dp)
                                 .testTag("edit_device_${device.id}")
                         ) {
                             Icon(
@@ -336,13 +335,13 @@ fun DeviceRow(
                         IconButton(
                             onClick = onDeleteDevice,
                             modifier = Modifier
-                                .size(44.dp)
+                                .size(width = 44.dp, height = 48.dp)
                                 .testTag("delete_device_${device.id}")
                         ) {
                             Icon(
                                 imageVector = Icons.Default.DeleteOutline,
                                 contentDescription = "Delete ${device.name}",
-                                tint = WemoErrorRed
+                                tint = StatusOfflineRed
                             )
                         }
                     }

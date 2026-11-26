@@ -396,14 +396,25 @@ internal fun WidgetConfigureScreen(
                             contentPadding = PaddingValues(bottom = 24.dp)
                         ) {
                             items(roomsWithDevices, key = { it.first }) { (roomName, roomDevices) ->
+                                val reachableCount = roomDevices.count { it.isReachable }
+                                val allOffline = roomDevices.isNotEmpty() && reachableCount == 0
                                 val activeCount = roomDevices.count { it.isReachable && it.isOn }
                                 val anyOn = activeCount > 0
                                 val homeKey = roomDevices.firstOrNull()?.networkKey ?: selectedHomeKey
                                 WidgetSelectableCard(
                                     title = roomName,
-                                    subtitle = "$activeCount/${roomDevices.size} ON • Toggle entire room",
+                                    subtitle = if (allOffline) {
+                                        "0/${roomDevices.size} Online • Reconnect on tap"
+                                    } else {
+                                        "$activeCount/${roomDevices.size} ON • Toggle entire room"
+                                    },
                                     isOn = anyOn,
-                                    stateLabel = if (anyOn) "$activeCount ON" else "OFF",
+                                    isReachable = !allOffline,
+                                    stateLabel = when {
+                                        allOffline -> "OFFLINE"
+                                        anyOn -> "$activeCount ON"
+                                        else -> "OFF"
+                                    },
                                     leadingIcon = iconForRoom(roomName),
                                     testTag = "widget_config_room_$roomName",
                                     onClick = { onSelectRoom(roomName, homeKey) }
@@ -432,6 +443,7 @@ internal fun WidgetConfigureScreen(
                                     title = device.name,
                                     subtitle = "${device.normalizedRoomName} • ${device.ipAddress}",
                                     isOn = device.isReachable && device.isOn,
+                                    isReachable = device.isReachable,
                                     stateLabel = stateLabel,
                                     leadingIcon = Icons.Default.Lightbulb,
                                     testTag = "widget_config_device_${device.id}",

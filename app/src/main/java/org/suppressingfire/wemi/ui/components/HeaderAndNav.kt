@@ -177,11 +177,11 @@ fun TopHeader(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(6.dp),
-                                color = Color.White.copy(alpha = 0.09f)
+                                color = Color.White.copy(alpha = 0.14f)
                             ) {
                                 Text(
                                     text = versionLabel,
-                                    color = Color.White.copy(alpha = 0.62f),
+                                    color = Color.White.copy(alpha = 0.85f),
                                     fontFamily = FontFamily.SansSerif,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 10.sp,
@@ -233,11 +233,11 @@ fun TopHeader(
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(5.dp),
-                                color = Color.White.copy(alpha = 0.09f)
+                                color = Color.White.copy(alpha = 0.14f)
                             ) {
                                 Text(
                                     text = versionLabel,
-                                    color = Color.White.copy(alpha = 0.62f),
+                                    color = Color.White.copy(alpha = 0.85f),
                                     fontFamily = FontFamily.SansSerif,
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 9.5.sp,

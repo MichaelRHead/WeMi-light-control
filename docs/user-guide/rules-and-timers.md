@@ -31,8 +31,8 @@ You can create, edit, pause/resume, and delete four native rule types directly o
 | :--- | :--- | :--- |
 | **Long Press** | Hold the physical wall paddle for ~2 seconds to control one or more switches on your home Wi-Fi. *(Available on compatible wall switches and 1st-Gen dimmers.)* | Action (**`Toggle`**, **`Turn Off`**, **`Turn On`**) and one or more **Target Switches** (shown by friendly switch name). |
 | **Auto-Off Delay** | Automatically turns the switch **OFF** after it stays **ON** for your chosen duration—whether turned on from the wall, a widget, or the app. | Delay from **`1` to `1440` minutes** (quick presets: `5m`, `15m`, `30m`, `1h`, `2h`) and active days (`Every Day`, `Weekdays`, `Weekends`, or individual days). |
-| **Schedule** | Turns the switch **ON → OFF** (or **OFF → ON**) across a daily or weekly time window. | Fixed clock times (`-1h`, `+1h`, `+15m`) or on-device **`Sunrise`** / **`Sunset`** with offsets (`-30m`, `-15m`, `Exact`, `+15m`, `+30m`), plus active days. |
-| **Timed Action** | Runs a single **Turn ON** or **Turn OFF** action at a chosen time. | Fixed clock time or **`Sunrise`** / **`Sunset`** with offsets, **`Turn Switch ON`** / **`Turn Switch OFF`**, and active days. |
+| **Schedule** | Turns the switch **ON → OFF** (`Mode: Turn ON → then OFF`) or **OFF → ON** (`Mode: Turn OFF → then ON`) across a daily or weekly time window. | Fixed clock times with wrapping steppers (`-1h`, `+1h`, `-15m`, `+15m`, `-5m`, `+5m`, plus fine `-1m` / `+1m`) or on-device **`Sunrise`** / **`Sunset`** with 7 offset presets (`-60m`, `-30m`, `-15m`, `Exact`, `+15m`, `+30m`, `+60m` — preserving any custom firmware offset), distinct fixed start/end time check, and active days. |
+| **Timed Action** | Runs a single **Turn ON** or **Turn OFF** action at a chosen time. | Fixed clock time steppers or **`Sunrise`** / **`Sunset`** with 7 offset presets (`-60m`..`+60m`), **`Action: Turn Switch ON`** / **`Action: Turn Switch OFF`**, and active days. |
 
 *(Pre-existing firmware rules such as **`Away Mode`** or **`Motion / Sensor`** rules already stored on a switch are preserved safely in switch memory and can be paused/resumed or deleted right alongside your other rules.)*
 
@@ -41,14 +41,15 @@ You can create, edit, pause/resume, and delete four native rule types directly o
 ## 3. Reading, Creating, Editing & Managing Rules
 
 ### Reading Existing Rules
+- **No Switches Yet**: If your active Wi-Fi Home has no switches yet, tap **`Go to Devices`** right from the **Rules** tab to discover or add switches first.
 - **Read Every Switch at Once**: Open the **Rules** tab and tap **`Read Rules`** (changes to **`Refresh All`** once snapshots are loaded) to read stored rules from all reachable switches on your active Wi-Fi Home. Switches with stored rules sort to the top automatically.
-- **Read a Single Switch**: Tap **`Read`** (or **`Refresh`**) on any reachable switch card on the **Rules** tab—or expand a switch row on the **Devices** tab and tap **`Inspect Rules`** to preview up to 4 rule cards, **`Add Rule`**, or **`Sync Clock`** inline.
+- **Read a Single Switch**: Tap **`Read`** (or **`Refresh`**) on any reachable switch card on the **Rules** tab—or expand a switch row on the **Devices** tab and tap **`Inspect Rules`** to preview up to 4 rule cards, tap **`Add Rule`**, **`Sync Clock`**, **`Manage Rules`**, or tap the clickable **`+N more rule(s) in Rules tab`** link to jump straight to full rule management.
 
 ### Creating or Editing an On-Device Rule
 1. Tap **`New Rule`** at the top of the **Rules** tab, tap **`+`** in the top header while on the **Rules** tab, or tap **`Add Rule`** on a specific switch card (or inside a switch's expanded drawer on the **Devices** tab).
    - To edit an existing rule, tap the **`✎` (Edit)** icon on its rule card.
 2. Choose the **Switch** (when opened from the top button), enter a **`Rule Name`**, and pick a **`Rule Type`** (**`Long Press`**, **`Auto-Off Delay`**, **`Schedule`**, or **`Timed Action`**).
-3. Configure the action, target switches, delay minutes, or start/end times and active days, then choose **`Rule Active on Switch`** or **`Rule Paused`**.
+3. Configure the action (`Action: Turn Switch ON` / `Action: Turn Switch OFF`, `Mode: Turn ON → then OFF` / `Mode: Turn OFF → then ON`, or Long Press `Toggle` / `Turn Off` / `Turn On`), target switches, delay minutes, or start/end times and active days, then choose **`Rule Active on Switch`** or **`Rule Paused`**.
 4. Tap **`Save to Switch`**.
 
 ### Pausing, Resuming & Deleting Rules
@@ -63,7 +64,7 @@ Because Belkin's cloud servers are discontinued, a switch that loses power can b
 
 - **Automatic Clock Sync**: Whenever WeMi detects clock drift (`Switch clock needs sync`) and you save a rule or update Solar Location, WeMi automatically syncs your phone's local UTC time and timezone offset to the switch first.
 - **Manual Clock Sync**: Tap **`Sync Clock`** (or **`Clock Sync`**) on any compatible switch card—or inside its expanded drawer on the **Devices** tab—to sync the switch's clock immediately without editing rules.
-- **Offline Solar Location (No Location Permission Needed)**: For accurate on-device **`Sunrise`** and **`Sunset`** schedules, tap **`Solar Location`** on a switch card, pick one of the built-in city presets (e.g., *San Francisco*, *Seattle*, *New York*, *London*, *Sydney*) or enter your latitude/longitude manually, and tap **`Save Location`**.
+- **Offline Solar Location (No Location Permission Needed)**: For accurate on-device **`Sunrise`** and **`Sunset`** schedules, tap **`Solar Location`** on a switch card, pick one of the **10 built-in city presets** (*San Francisco*, *Los Angeles*, *Seattle*, *Denver*, *Austin*, *Chicago*, *New York*, *Toronto*, *London*, *Sydney*) or enter signed latitude (`-90` to `90`) and longitude (`-180` to `180`, including negative `-` coordinates for Western and Southern hemispheres), and tap **`Save Location`**.
 
 ---
 
@@ -73,6 +74,6 @@ Every write to a switch's on-device rules archive follows a strict safety pipeli
 
 1. **Automatic Pre-Write Backup**: Before changing anything, WeMi saves an untouched copy of the switch's current rules archive on your Android device (retaining up to **5** recent backups per switch).
 2. **In-Place Preservation**: WeMi modifies only the targeted rule rows while keeping all other rules, pre-existing firmware tables, and the switch's original archive filename intact.
-3. **Pre-Upload Safety Gate**: Before sending data to the switch, WeMi sanitizes text fields, checks SQLite database integrity, enforces flash size limits and valid day/time ranges, and blocks invalid payloads automatically.
+3. **Pre-Upload Safety Gate**: Before sending data to the switch, WeMi sanitizes text fields, checks SQLite database integrity and rollback journal mode, enforces flash size limits and valid day/time ranges, and blocks invalid payloads automatically.
 4. **Post-Upload Verification**: After uploading, WeMi reads the switch's live rules database version back to confirm the switch accepted and reloaded the new version cleanly.
-5. **One-Tap Restore**: Tap **`Backups (<count>)`** on any switch card to inspect saved pre-write snapshots (with database version and timestamp) and tap **`Restore`** to roll a switch back safely anytime.
+5. **One-Tap Restore (With Pre-Restore Backup)**: Tap **`Backups (<count>)`** on any switch card to inspect saved snapshots (with database version and timestamp) and tap **`Restore`** anytime—WeMi automatically backs up your switch's current rules first, validates SQLite integrity, and increments the database version safely.

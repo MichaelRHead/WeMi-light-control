@@ -115,18 +115,22 @@ When a SOAP request to a known device fails:
 - **`GetMetaInfo`**:
   - Returns `<MetaInfo>MAC|SerialNumber|DeviceSKU|FirmwareVersion|AccessPointSSID|ModelName</MetaInfo>`.
 
-### 5.3 `rules1` & `timesync1` — On-Device Rules & Switch Clock (`HardwareRulesClient.kt` & `HardwareRulesSafetyValidator.kt`)
+### 5.3 `rules1` & `timesync1` — On-Device Rules & Switch Clock (`HardwareRulesClient.kt`, `HardwareRulesWriteEngine.kt`, `HardwareRulesDbMutator.kt` & `HardwareRulesSafetyValidator.kt`)
 - **Capability Probing (`/rulesservice.xml` + `/upnp/control/rules1`, `urn:Belkin:service:rules:1`)**:
   - Tier-1 zero-RTT hints are inferred directly from `/setup.xml` (`<serviceList>` + firmware/UDN), noting that late OpenWrt builds (`PVT-OWRT-SNS`) may emit `<rtos>1</rtos>` while still running `rules.db`.
   - Tier-2 lazy verification fetches `/rulesservice.xml` and checks for `<name>FetchRules</name>` (fast-rejecting RTOS models like `WDS060`/`WSP080` that omit it) before invoking `rules1#FetchRules`.
-- **`FetchRules` & Binary `rules.db` Archive**:
-  - Returns `<ruleDbPath>` (e.g. `http://<ip>:<port>/rules.db`) and `<ruleDbVersion>`.
-  - Downloading `<ruleDbPath>` returns a ZIP archive containing an embedded SQLite database (typically `temppluginRules.db`, decoded in `HardwareRulesDbCodec.kt`) holding `RULES`, `RULEDEVICES` (Belkin `DayID` `1..7` or `-1`; fixed times `seconds % 10 == 0`; native Sunrise `% 10 == 1` & Sunset `% 10 == 2` + offset), `TARGETDEVICES` (Long Press targets), and `LOCATIONINFO`.
-  - HTTP `404` on `/rules.db` on a switch whose `/rulesservice.xml` exposes `FetchRules` indicates an empty initial rules DB (still `VERIFIED_SUPPORTED`).
-- **`StoreRules` Anti-Brick Guardrails (`HardwareRulesSafetyValidator.kt`)**:
-  - Enforce `<= 512 KiB` SQLite / `<= 128 KiB` ZIP, `PRAGMA integrity_check`, SQL-literal character safety against firmware C `snprintf` queries, valid `DayID` (`1..7` or `-1`) and non-zero durations, rotating raw-ZIP backups (5 newest per switch), `<errorInfo> == "Successful"`, and post-store `FetchRules` read-back confirmation.
+- **`FetchRules`, Binary `rules.db` Archive & In-Place Mutation Quirks (`HardwareRulesDbCodec.kt` & `HardwareRulesDbMutator.kt`)**:
+  - `FetchRules` returns `<ruleDbPath>` (e.g. `http://<ip>:<port>/rules.db`) and `<ruleDbVersion>`. Downloading `<ruleDbPath>` returns a ZIP archive containing an embedded SQLite database (typically `temppluginRules.db`) holding `RULES`, `RULEDEVICES`, `TARGETDEVICES`, and `LOCATIONINFO`.
+  - HTTP `404` on `/rules.db` on a switch whose `/rulesservice.xml` exposes `FetchRules` indicates an empty initial rules DB (`version = 0`, still `VERIFIED_SUPPORTED`) bootstrapped with Belkin's full 9-table schema before the first write.
+  - **Solar Start & End Encoding (`StartTime % 10` & `RuleDuration % 10`)**: Fixed clock times have `% 10 == 0`; native **Sunrise** (`% 10 == 1`) and **Sunset** (`% 10 == 2`) anchors are encoded in `StartTime % 10` for the start point and `RuleDuration % 10` for the `Time Interval` end point, paired with signed second offsets in `OnModeOffset` and `OffModeOffset`.
+  - **Typeless `RULES.RuleID` Column**: Belkin firmware defines `RuleID PRIMARY KEY` without SQLite type affinity (rows can store integer or text values). Always match `RuleID` using `CAST(RuleID AS INTEGER) = CAST(? AS INTEGER)` on reads, updates, and deletes so no duplicate or orphaned rows remain.
+  - **Preventing `android_metadata` Injection (`NO_LOCALIZED_COLLATORS`)**: Always open the switch's `rules.db` on Android with `SQLiteDatabase.NO_LOCALIZED_COLLATORS` so Android does not automatically create an extraneous `android_metadata` table inside the switch's flash database.
+  - **Legacy Rollback Journal Mode (SQLite Header Bytes `18` & `19`)**: Embedded OpenWrt SQLite builds reject WAL-mode databases. Switch `PRAGMA journal_mode=DELETE` via `rawQuery`, delete `-journal`/`-wal`/`-shm` sidecars, and verify SQLite header bytes `18` and `19` are `1` (rollback journal, not `2`/WAL) before packing the ZIP archive.
+- **`StoreRules` Anti-Brick Guardrails (`HardwareRulesSafetyValidator.kt` & `HardwareRulesWriteEngine.kt`)**:
+  - Enforce `<= 512 KiB` SQLite / `<= 128 KiB` ZIP, SQLite magic & header rollback journal bytes (`18/19 == 1`), `PRAGMA integrity_check`, SQL-literal character safety against firmware C `snprintf` queries, valid `DayID` (`1..7` or `-1` exclusively for `Long Press`) and non-zero durations, rotating raw-ZIP backups (5 newest per switch, plus automatic pre-restore backup before any restore), `<errorInfo> == "Successful"`, and post-store `FetchRules` read-back version confirmation.
 - **`timesync1` (`/upnp/control/timesync1`, `urn:Belkin:service:timesync:1`)**:
-  - `GetDeviceTime` reads the switch's UTC clock to flag drift (`Switch clock needs sync` when NTP failed after cloud shutdown); `TimeSync` pushes local UTC + timezone offset.
+  - `GetDeviceTime` reads the switch's UTC clock to flag drift (`Switch clock needs sync` when NTP failed after cloud shutdown).
+  - **`TimeSync` Standard `rawOffset` + Inverted `<dst>` Quirk**: Belkin firmware expects `<TimeZone>` to be the **standard non-DST `rawOffset`** (e.g. `-08.00` for US Pacific year-round) and uses an **inverted `<dst>` flag** (`<dst>0</dst>` when Daylight Saving Time IS active, `<dst>1</dst>` when in Standard Time), alongside `<UTC>` and `<DstSupported>`.
 
 ---
 
@@ -175,7 +179,7 @@ To receive instant push notifications when a physical wall switch, 3-way switch,
   1. **Never flood a device during reconnect**: Sending 7+ rapid `/setup.xml` and SCPD requests when a single poll times out can exhaust the device's tiny socket pool and wedge its UPnP server. Always serialize requests per device (`Mutex`) and cap LAN-wide concurrency (`Semaphore(3)`).
   2. **Always close TCP sockets (`Connection: close`)**: Persistent keep-alive sockets starve the embedded HTTP listener.
   3. **Confirm-Read Race After `SetBinaryState`**: On some firmwares, calling `GetBinaryState` within `100–1500 ms` after `SetBinaryState` returns the *pre-transition* state while the relay or dimmer fader is still ramping. Trust the HTTP 200 `SetBinaryState` result immediately and wait at least `1.5–2.0 s` before any follow-up `GetBinaryState` verification poll.
-  4. **Dimmer V2 (`WDS060`) Rules DB Limitation**: RTOS-based `WDS060` returns `HTTP 404` on `/rules.db` (`FetchRules`/`StoreRules` are unsupported), so schedules/timers for `WDS060` must be executed by the controller or via `basicevent1` (`ConfigureNightMode`, `SetBinaryState`).
+  4. **Dimmer V2 (`WDS060`) Rules DB Limitation**: RTOS-based `WDS060` omits `FetchRules`/`StoreRules` on `/rulesservice.xml` (and returns `HTTP 404` on `/rules.db`), so it does not support on-device `rules.db` schedules/timers and instead uses direct hardware `basicevent1` actions (`ConfigureNightMode` for on-device `20%` Night Mode and `SetBinaryState` for power and brightness).
 
 ### 7.2 Post-2026 Cloud Shutdown & Blinking Amber Status LED
 - Belkin discontinued cloud servers on January 31, 2026. All local UPnP/SSDP/SOAP discovery and control operate 100% offline on the LAN without cloud authentication.
