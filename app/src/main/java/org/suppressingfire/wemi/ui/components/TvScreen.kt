@@ -111,7 +111,7 @@ fun TvDashboardScreen(
         buildMap {
             var currentGridIndex = 0
             groupedByRoom.forEach { (roomName, roomDevices) ->
-                put(TvFocusTarget.RoomHeader(roomName), currentGridIndex)
+                put(TvFocusTarget.RoomHeader.forRoom(roomName), currentGridIndex)
                 currentGridIndex += 1
                 roomDevices.forEach { device ->
                     put(TvFocusTarget.DeviceToggle(device.id), currentGridIndex)
@@ -135,9 +135,18 @@ fun TvDashboardScreen(
     var lastFocusedColumn by remember { mutableIntStateOf(0) }
     var didRequestInitialGridFocus by remember { mutableStateOf(false) }
     var previousHasHolidayDevices by remember { mutableStateOf(hasHolidayDevices) }
-    // Capture synchronously during composition before BoxWithConstraints detaches the Holiday ON chip
+    // Capture synchronously during composition before Compose detaches a vanished chip, room header, or card
     val holidayChipVanishedWhileFocused =
         previousHasHolidayDevices && !hasHolidayDevices && activeFocusTarget == TvFocusTarget.TopAction(1)
+    val focusedRoomVanishedWhileFocused =
+        (activeFocusTarget as? TvFocusTarget.RoomHeader)?.let { focusedRoom ->
+            groupedByRoom.none { TvFocusTarget.RoomHeader.forRoom(it.first) == focusedRoom }
+        } == true
+    val focusedDeviceVanishedWhileFocused = when (val target = activeFocusTarget) {
+        is TvFocusTarget.DeviceToggle -> orderedDevices.none { it.id == target.deviceId }
+        is TvFocusTarget.DeviceSlider -> orderedDevices.none { it.id == target.deviceId }
+        else -> false
+    }
 
     val navigateTo: (TvFocusTarget?) -> Boolean = { target ->
         if (target != null) {
@@ -164,66 +173,33 @@ fun TvDashboardScreen(
         true
     }
 
-    // Stabilize hardware D-Pad focus across initial launch, empty-home Rescan, room filter changes, holiday chip changes, and offline dimmer transitions
-    LaunchedEffect(orderedDevices, selectedRoomFilter, hasHolidayDevices) {
+    // Stabilize hardware D-Pad focus across initial launch, empty-home Rescan, room changes, holiday chip changes, and offline dimmer transitions
+    LaunchedEffect(groupedByRoom, orderedDevices, selectedRoomFilter, hasHolidayDevices) {
         previousHasHolidayDevices = hasHolidayDevices
-        if (orderedDevices.isEmpty()) {
-            didRequestInitialGridFocus = false
-            lastFocusedDeviceId = null
-            val scanTarget = TvFocusTarget.TopAction(3)
-            activeFocusTarget = scanTarget
-            runCatching { requesterFor(scanTarget).requestFocus() }
-            return@LaunchedEffect
-        }
-
-        if (holidayChipVanishedWhileFocused ||
-            (!hasHolidayDevices && activeFocusTarget == TvFocusTarget.TopAction(1))
-        ) {
-            if (lastFocusedDeviceId == null || orderedDevices.none { it.id == lastFocusedDeviceId }) {
-                lastFocusedDeviceId = orderedDevices.first().id
+        val reconciled = reconcileTvFocusState(
+            activeFocusTarget = activeFocusTarget,
+            lastFocusedDeviceId = lastFocusedDeviceId,
+            didRequestInitialGridFocus = didRequestInitialGridFocus,
+            groupedByRoom = groupedByRoom,
+            orderedDevices = orderedDevices,
+            hasHolidayDevices = hasHolidayDevices,
+            holidayChipVanishedWhileFocused = holidayChipVanishedWhileFocused,
+            focusedRoomVanishedWhileFocused = focusedRoomVanishedWhileFocused,
+            focusedDeviceVanishedWhileFocused = focusedDeviceVanishedWhileFocused
+        )
+        didRequestInitialGridFocus = reconciled.nextDidRequestInitialGridFocus
+        lastFocusedDeviceId = reconciled.nextLastFocusedDeviceId
+        activeFocusTarget = reconciled.nextActiveTarget
+        if (reconciled.shouldRequestFocus) {
+            val gridIdx = gridIndexByTarget[reconciled.nextActiveTarget]
+            val visibleItems = gridState.layoutInfo.visibleItemsInfo
+            if (gridIdx != null && visibleItems.isNotEmpty() && visibleItems.none { it.index == gridIdx }) {
+                gridState.scrollToItem(gridIdx)
+                withFrameNanos { }
+            } else if (reconciled.awaitFrameBeforeFocus) {
+                withFrameNanos { }
             }
-            val fallback = TvFocusTarget.TopAction(0)
-            activeFocusTarget = fallback
-            withFrameNanos { }
-            runCatching { requesterFor(fallback).requestFocus() }
-            return@LaunchedEffect
-        }
-
-        val currentSliderId = (activeFocusTarget as? TvFocusTarget.DeviceSlider)?.deviceId
-        if (currentSliderId != null) {
-            val sliderDevice = orderedDevices.firstOrNull { it.id == currentSliderId }
-            if (sliderDevice == null) {
-                val fallbackId = orderedDevices.first().id
-                lastFocusedDeviceId = fallbackId
-                val fallback = TvFocusTarget.DeviceToggle(fallbackId)
-                activeFocusTarget = fallback
-                runCatching { requesterFor(fallback).requestFocus() }
-                return@LaunchedEffect
-            } else if (!sliderDevice.isReachable || sliderDevice.parsedType != DeviceType.LIGHTBULB_DIMMER) {
-                val fallback = TvFocusTarget.DeviceToggle(sliderDevice.id)
-                activeFocusTarget = fallback
-                runCatching { requesterFor(fallback).requestFocus() }
-                return@LaunchedEffect
-            }
-        }
-
-        if (!didRequestInitialGridFocus ||
-            lastFocusedDeviceId == null ||
-            orderedDevices.none { it.id == lastFocusedDeviceId }
-        ) {
-            val wasAlreadyInitialized = didRequestInitialGridFocus
-            didRequestInitialGridFocus = true
-            val initialId = orderedDevices.first().id
-            lastFocusedDeviceId = initialId
-            val currentFocus = activeFocusTarget
-            val keepTopBarFocus = wasAlreadyInitialized &&
-                currentFocus is TvFocusTarget.TopAction &&
-                (hasHolidayDevices || currentFocus.index != 1)
-            if (!keepTopBarFocus) {
-                val initialTarget = TvFocusTarget.DeviceToggle(initialId)
-                activeFocusTarget = initialTarget
-                runCatching { requesterFor(initialTarget).requestFocus() }
-            }
+            runCatching { requesterFor(reconciled.nextActiveTarget).requestFocus() }
         }
     }
 
@@ -277,7 +253,7 @@ fun TvDashboardScreen(
             onSelectTopActionFocus = { idx -> activeFocusTarget = TvFocusTarget.TopAction(idx) },
             onNavigateDownFromTopBar = {
                 val firstRoom = groupedByRoom.firstOrNull()?.first
-                if (firstRoom != null) navigateTo(TvFocusTarget.RoomHeader(firstRoom)) else true
+                if (firstRoom != null) navigateTo(TvFocusTarget.RoomHeader.forRoom(firstRoom)) else true
             },
             onNavigateTopActionHorizontal = { targetIdx ->
                 val resolvedIdx = if (!hasHolidayDevices && targetIdx == 1) 2 else targetIdx.coerceIn(0, 4)
@@ -325,14 +301,14 @@ fun TvDashboardScreen(
                     }
                 }
 
+                val roomTarget = TvFocusTarget.RoomHeader.forRoom(roomName)
                 item(
-                    key = "room_header_$roomName",
+                    key = "room_header_${roomTarget.canonicalRoomKey}",
                     span = { GridItemSpan(maxLineSpan) }
                 ) {
                     val roomDimmers = roomDevices.filter {
                         it.parsedType == DeviceType.LIGHTBULB_DIMMER && it.isReachable
                     }
-                    val roomTarget = TvFocusTarget.RoomHeader(roomName)
                     val upFromRoomTarget: TvFocusTarget = if (roomIndex > 0) {
                         val prevRows = groupedByRoom[roomIndex - 1].second.chunked(3)
                         val prevLastRow = prevRows.lastOrNull().orEmpty()
@@ -346,7 +322,7 @@ fun TvDashboardScreen(
                                 TvFocusTarget.DeviceToggle(targetDev.id)
                             }
                         } else {
-                            TvFocusTarget.RoomHeader(groupedByRoom[roomIndex - 1].first)
+                            TvFocusTarget.RoomHeader.forRoom(groupedByRoom[roomIndex - 1].first)
                         }
                     } else {
                         TvFocusTarget.TopAction(0)
@@ -360,7 +336,7 @@ fun TvDashboardScreen(
                         when {
                             targetDev != null -> TvFocusTarget.DeviceToggle(targetDev.id)
                             roomIndex + 1 < groupedByRoom.size ->
-                                TvFocusTarget.RoomHeader(groupedByRoom[roomIndex + 1].first)
+                                TvFocusTarget.RoomHeader.forRoom(groupedByRoom[roomIndex + 1].first)
                             else -> null
                         }
                     }
@@ -369,7 +345,7 @@ fun TvDashboardScreen(
                         roomName = roomName,
                         roomDevices = roomDevices,
                         isFocusedByRemote = activeFocusTarget == roomTarget,
-                        isTogglingRoom = togglingRooms.contains(roomName),
+                        isTogglingRoom = togglingRooms.any { it.equals(roomName, ignoreCase = true) },
                         focusRequester = requesterFor(roomTarget),
                         onSelectRoomFocus = { activeFocusTarget = roomTarget },
                         onNavigateUp = { navigateTo(upFromRoomTarget) },
@@ -416,7 +392,7 @@ fun TvDashboardScreen(
                             TvFocusTarget.DeviceToggle(aboveDev.id)
                         }
                     } else {
-                        TvFocusTarget.RoomHeader(roomName)
+                        roomTarget
                     }
                     val downBelowCardTarget: TvFocusTarget? = when {
                         rowIndex + 1 < roomRows.size -> {
@@ -425,7 +401,7 @@ fun TvDashboardScreen(
                             TvFocusTarget.DeviceToggle(belowDev.id)
                         }
                         roomIndex + 1 < groupedByRoom.size ->
-                            TvFocusTarget.RoomHeader(groupedByRoom[roomIndex + 1].first)
+                            TvFocusTarget.RoomHeader.forRoom(groupedByRoom[roomIndex + 1].first)
                         else -> null
                     }
 

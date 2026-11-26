@@ -1,12 +1,15 @@
 package org.suppressingfire.wemi
 
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
 import androidx.lifecycle.ViewModelProvider
 import org.junit.Assert.assertEquals
@@ -17,6 +20,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.suppressingfire.wemi.data.DeviceEntity
+import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.ui.SwitchViewModel
 
 /**
@@ -344,6 +349,104 @@ class TvNavigationAndScenesE2ETest {
             assertEquals(80, dimmerServer.dimmerBrightness.get())
             assertEquals(80, vm.devices.value.first { it.id == insertedId }.brightness)
         }
+    }
+
+    @Test
+    fun `verify Android TV Room Header preserves focus across case-variant upgrade and recovers when room disappears`() {
+        composeTestRule.waitForIdle()
+        val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
+        val dao = org.suppressingfire.wemi.data.SwitchDatabase.getDatabase(composeTestRule.activity.application).switchDao()
+
+        composeTestRule.runOnUiThread {
+            vm.resetLanHomesSwitchesAndRooms(rediscoverAfterReset = false)
+        }
+        awaitLoopbackIo {
+            !vm.isDemoShowroomMode.value && vm.devices.value.isEmpty() && !vm.isRefreshing.value
+        }
+
+        val activeKey = vm.activeNetworkKey.value
+        val (livingId, lowerKitchenId) = kotlinx.coroutines.runBlocking {
+            val living = dao.insertDevice(
+                DeviceEntity(
+                    name = "Living Room Switch",
+                    roomName = "Living Room",
+                    networkKey = activeKey,
+                    deviceType = DeviceType.SWITCH_PLUG.name,
+                    ipAddress = "127.0.0.1",
+                    port = 49153,
+                    isOn = false,
+                    isReachable = true,
+                    serialNumber = "WLS0403TVROOM1",
+                    sortOrder = 0
+                )
+            ).toInt()
+            val kitchen = dao.insertDevice(
+                DeviceEntity(
+                    name = "Pantry Plug",
+                    roomName = "kitchen",
+                    networkKey = activeKey,
+                    deviceType = DeviceType.SWITCH_PLUG.name,
+                    ipAddress = "127.0.0.1",
+                    port = 49154,
+                    isOn = false,
+                    isReachable = true,
+                    serialNumber = "WSP080TVROOM2",
+                    sortOrder = 1
+                )
+            ).toInt()
+            living to kitchen
+        }
+        awaitLoopbackIo { vm.devices.value.size == 2 }
+        composeTestRule.waitForIdle()
+
+        // Focus lowercase "kitchen" Room Header while lastFocusedDeviceId remains livingId
+        composeTestRule.onNodeWithTag("tv_room_header_kitchen")
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.RequestFocus)
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("tv_room_header_kitchen").assertIsFocused()
+        composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+            .assertTextContains("kitchen", substring = true)
+            .assertTextContains("OK Toggle Room", substring = true)
+
+        // Adopt a capitalized "Kitchen" switch -> canonical header upgrades to "Kitchen" without losing focus
+        val upperKitchenId = kotlinx.coroutines.runBlocking {
+            dao.insertDevice(
+                DeviceEntity(
+                    name = "Kitchen Island",
+                    roomName = "Kitchen",
+                    networkKey = activeKey,
+                    deviceType = DeviceType.SWITCH_PLUG.name,
+                    ipAddress = "127.0.0.1",
+                    port = 49155,
+                    isOn = true,
+                    isReachable = true,
+                    serialNumber = "WLS0403TVROOM3",
+                    sortOrder = 2
+                )
+            ).toInt()
+        }
+        awaitLoopbackIo { vm.devices.value.size == 3 }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("tv_room_header_Kitchen").assertIsDisplayed().assertIsFocused()
+        composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+            .assertTextContains("Kitchen", substring = true)
+            .assertTextContains("OK Toggle Room", substring = true)
+
+        // Remove all Kitchen switches while Kitchen Room Header holds focus -> focus must recover to Living Room Switch
+        kotlinx.coroutines.runBlocking {
+            dao.deleteDeviceById(lowerKitchenId)
+            dao.deleteDeviceById(upperKitchenId)
+        }
+        awaitLoopbackIo { vm.devices.value.size == 1 }
+        composeTestRule.waitForIdle()
+
+        composeTestRule.onNodeWithTag("tv_room_header_Kitchen").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("tv_device_card_$livingId").assertIsDisplayed().assertIsFocused()
+        composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+            .assertTextContains("Living Room Switch", substring = true)
+            .assertTextContains("OK Toggle", substring = true)
     }
 }
 

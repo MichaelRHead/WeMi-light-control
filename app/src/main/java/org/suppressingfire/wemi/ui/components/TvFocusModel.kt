@@ -24,15 +24,164 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
+import org.suppressingfire.wemi.data.normalizeRoomName
 import org.suppressingfire.wemi.ui.theme.WemoGreenTop
 
 internal sealed interface TvFocusTarget {
     data class TopAction(val index: Int) : TvFocusTarget
-    data class RoomHeader(val roomName: String) : TvFocusTarget
+    data class RoomHeader(val canonicalRoomKey: String) : TvFocusTarget {
+        companion object {
+            fun forRoom(roomName: String): RoomHeader =
+                RoomHeader(normalizeRoomName(roomName).lowercase(Locale.US))
+        }
+    }
     data class DeviceToggle(val deviceId: Int) : TvFocusTarget
     data class DeviceSlider(val deviceId: Int) : TvFocusTarget
+}
+
+/**
+ * Reconciled Android TV D-Pad focus state after discovery, room grouping, filter, or
+ * reachability changes so focus never strands on a detached room header, slider, or chip.
+ */
+internal data class TvFocusReconciliation(
+    val nextActiveTarget: TvFocusTarget,
+    val nextLastFocusedDeviceId: Int?,
+    val nextDidRequestInitialGridFocus: Boolean,
+    val shouldRequestFocus: Boolean,
+    val awaitFrameBeforeFocus: Boolean = false
+)
+
+internal fun reconcileTvFocusState(
+    activeFocusTarget: TvFocusTarget?,
+    lastFocusedDeviceId: Int?,
+    didRequestInitialGridFocus: Boolean,
+    groupedByRoom: List<Pair<String, List<DeviceEntity>>>,
+    orderedDevices: List<DeviceEntity>,
+    hasHolidayDevices: Boolean,
+    holidayChipVanishedWhileFocused: Boolean,
+    focusedRoomVanishedWhileFocused: Boolean = false,
+    focusedDeviceVanishedWhileFocused: Boolean = false
+): TvFocusReconciliation {
+    if (orderedDevices.isEmpty()) {
+        return TvFocusReconciliation(
+            nextActiveTarget = TvFocusTarget.TopAction(3),
+            nextLastFocusedDeviceId = null,
+            nextDidRequestInitialGridFocus = false,
+            shouldRequestFocus = true
+        )
+    }
+
+    val firstDeviceId = orderedDevices.first().id
+    val validLastDeviceId = lastFocusedDeviceId?.takeIf { id -> orderedDevices.any { it.id == id } }
+    val fallbackDeviceId = validLastDeviceId ?: firstDeviceId
+
+    if (holidayChipVanishedWhileFocused ||
+        (!hasHolidayDevices && activeFocusTarget == TvFocusTarget.TopAction(1))
+    ) {
+        return TvFocusReconciliation(
+            nextActiveTarget = TvFocusTarget.TopAction(0),
+            nextLastFocusedDeviceId = fallbackDeviceId,
+            nextDidRequestInitialGridFocus = didRequestInitialGridFocus,
+            shouldRequestFocus = true,
+            awaitFrameBeforeFocus = true
+        )
+    }
+
+    if (focusedRoomVanishedWhileFocused || focusedDeviceVanishedWhileFocused) {
+        return TvFocusReconciliation(
+            nextActiveTarget = TvFocusTarget.DeviceToggle(fallbackDeviceId),
+            nextLastFocusedDeviceId = fallbackDeviceId,
+            nextDidRequestInitialGridFocus = true,
+            shouldRequestFocus = true,
+            awaitFrameBeforeFocus = true
+        )
+    }
+
+    val currentSliderId = (activeFocusTarget as? TvFocusTarget.DeviceSlider)?.deviceId
+    if (currentSliderId != null) {
+        val sliderDevice = orderedDevices.firstOrNull { it.id == currentSliderId }
+        if (sliderDevice == null) {
+            return TvFocusReconciliation(
+                nextActiveTarget = TvFocusTarget.DeviceToggle(firstDeviceId),
+                nextLastFocusedDeviceId = firstDeviceId,
+                nextDidRequestInitialGridFocus = true,
+                shouldRequestFocus = true,
+                awaitFrameBeforeFocus = true
+            )
+        } else if (!sliderDevice.isReachable || sliderDevice.parsedType != DeviceType.LIGHTBULB_DIMMER) {
+            return TvFocusReconciliation(
+                nextActiveTarget = TvFocusTarget.DeviceToggle(sliderDevice.id),
+                nextLastFocusedDeviceId = sliderDevice.id,
+                nextDidRequestInitialGridFocus = true,
+                shouldRequestFocus = true
+            )
+        }
+    }
+
+    if (activeFocusTarget is TvFocusTarget.RoomHeader) {
+        val roomStillExists = groupedByRoom.any {
+            TvFocusTarget.RoomHeader.forRoom(it.first) == activeFocusTarget
+        }
+        return if (roomStillExists) {
+            TvFocusReconciliation(
+                nextActiveTarget = activeFocusTarget,
+                nextLastFocusedDeviceId = fallbackDeviceId,
+                nextDidRequestInitialGridFocus = true,
+                shouldRequestFocus = false
+            )
+        } else {
+            TvFocusReconciliation(
+                nextActiveTarget = TvFocusTarget.DeviceToggle(fallbackDeviceId),
+                nextLastFocusedDeviceId = fallbackDeviceId,
+                nextDidRequestInitialGridFocus = true,
+                shouldRequestFocus = true,
+                awaitFrameBeforeFocus = true
+            )
+        }
+    }
+
+    if (activeFocusTarget is TvFocusTarget.DeviceToggle &&
+        orderedDevices.none { it.id == activeFocusTarget.deviceId }
+    ) {
+        return TvFocusReconciliation(
+            nextActiveTarget = TvFocusTarget.DeviceToggle(fallbackDeviceId),
+            nextLastFocusedDeviceId = fallbackDeviceId,
+            nextDidRequestInitialGridFocus = true,
+            shouldRequestFocus = true,
+            awaitFrameBeforeFocus = true
+        )
+    }
+
+    if (!didRequestInitialGridFocus || validLastDeviceId == null) {
+        val keepTopBarFocus = didRequestInitialGridFocus &&
+            activeFocusTarget is TvFocusTarget.TopAction &&
+            (hasHolidayDevices || activeFocusTarget.index != 1)
+        return if (keepTopBarFocus) {
+            TvFocusReconciliation(
+                nextActiveTarget = activeFocusTarget,
+                nextLastFocusedDeviceId = firstDeviceId,
+                nextDidRequestInitialGridFocus = true,
+                shouldRequestFocus = false
+            )
+        } else {
+            TvFocusReconciliation(
+                nextActiveTarget = TvFocusTarget.DeviceToggle(firstDeviceId),
+                nextLastFocusedDeviceId = firstDeviceId,
+                nextDidRequestInitialGridFocus = true,
+                shouldRequestFocus = true
+            )
+        }
+    }
+
+    return TvFocusReconciliation(
+        nextActiveTarget = activeFocusTarget ?: TvFocusTarget.DeviceToggle(firstDeviceId),
+        nextLastFocusedDeviceId = validLastDeviceId,
+        nextDidRequestInitialGridFocus = didRequestInitialGridFocus,
+        shouldRequestFocus = false
+    )
 }
 
 /**
@@ -68,7 +217,7 @@ internal fun resolveTvFocusedBannerTarget(
     return when (activeFocusTarget) {
         is TvFocusTarget.RoomHeader -> {
             val roomEntry = groupedByRoom.firstOrNull {
-                it.first.equals(activeFocusTarget.roomName, ignoreCase = true)
+                TvFocusTarget.RoomHeader.forRoom(it.first) == activeFocusTarget
             }
             if (roomEntry != null) {
                 val hasDimmers = roomEntry.second.any {
@@ -79,7 +228,9 @@ internal fun resolveTvFocusedBannerTarget(
                     hasReachableDimmers = hasDimmers
                 )
             } else {
-                orderedDevices.firstOrNull()?.let { TvFocusedBannerTarget.Device(it, isDimming = false) }
+                val fallback = orderedDevices.firstOrNull { it.id == lastFocusedDeviceId }
+                    ?: orderedDevices.firstOrNull()
+                fallback?.let { TvFocusedBannerTarget.Device(it, isDimming = false) }
             }
         }
         is TvFocusTarget.DeviceSlider -> {
