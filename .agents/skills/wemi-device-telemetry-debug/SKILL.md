@@ -151,7 +151,7 @@ Format:
 [WIDGET #401] type=DEVICE name="Patio Lights" devId=7 sn=WLS040PATIO01 udn=uuid:Lightswitch-3_0-WLS040PATIO01 room="Patio" home=wifi_home_192_168_1 -> resolved=#7 "Patio Lights" (OFFLINE)
 ```
 - **Step 2 On-Device Rules Diagnostics (`HardwareRulesClient.kt` / `HardwareRulesWriteEngine.kt` / `HardwareRulesProtocol.kt`)**:
-  - `  rules: dbV=... rules=... integrity=... driftSec=... needsSync=... backups=... solarLoc=set/unset`: confirms DB version, integrity check, clock drift (`needsSync=true` -> tap **Sync Clock**), retained raw-ZIP backup count in local `files/hardware_rules_backups`, and Solar Location status without ever exposing exact lat/lon.
+  - `  rules: dbV=... rules=... integrity=... driftSec=... needsSync=... backups=... solarLoc=set/unset`: confirms DB version, integrity check, clock drift (`needsSync=true` -> tap **Sync Clock**), retained raw-ZIP backup count in device-local `noBackupFilesDir/hardware_rules_backups` (with legacy `files/hardware_rules_backups` migrated and excluded in backup XML), and Solar Location status without ever exposing exact lat/lon.
   - `rules1#StoreRules (Blocked)` / `(Prep Failed)` / `(Mutation Rejected)`: the anti-brick validator or prep blocked an unsafe write before touching switch flash (read `xml:` for the exact validation reason).
   - `rules1#StoreRules(v<n>)` -> `Read-back verification failed` or `Rejected`: switch rejected `<ruleDbBody>` or failed to bump `ruleDbVersion` on post-store `FetchRules`; retry or use **Backups** (`rules1#RestoreBackup`) to restore a verified pre-write raw ZIP.
   - `timesync1#TimeSync(<tz>)`: verifies switch clock sync (automatically invoked before writes when drifted > 120s or pre-2020 epoch).

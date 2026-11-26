@@ -34,7 +34,7 @@ You can create, edit, pause/resume, and delete four native rule types directly o
 | **Schedule** | Turns the switch **ON → OFF** (`Mode: Turn ON → then OFF`) or **OFF → ON** (`Mode: Turn OFF → then ON`) across a daily or weekly time window. | Fixed clock times with wrapping steppers (`-1h`, `+1h`, `-15m`, `+15m`, `-5m`, `+5m`, plus fine `-1m` / `+1m`) or on-device **`Sunrise`** / **`Sunset`** with 7 offset presets (`-60m`, `-30m`, `-15m`, `Exact`, `+15m`, `+30m`, `+60m` — preserving any custom firmware offset), distinct fixed start/end time check, and active days. |
 | **Timed Action** | Runs a single **Turn ON** or **Turn OFF** action at a chosen time. | Fixed clock time steppers or **`Sunrise`** / **`Sunset`** with 7 offset presets (`-60m`..`+60m`), **`Action: Turn Switch ON`** / **`Action: Turn Switch OFF`**, and active days. |
 
-*(Pre-existing firmware rules such as **`Away Mode`** or **`Motion / Sensor`** rules already stored on a switch are preserved safely in switch memory and can be paused/resumed or deleted right alongside your other rules.)*
+*(Pre-existing single-switch firmware rules such as **`Away Mode`** or **`Motion / Sensor`** rules show a **`View only`** badge, stay preserved safely in switch memory, and can be paused/resumed or deleted directly. Rules marked **`Shared rule`** (spanning multiple switches) or **`Target`** (controlled by another switch) are shown **read-only** with their edit, delete, and toggle controls disabled on that switch card so single-switch writes never corrupt multi-switch rules; manage **`Target`** rules from their owner switch.)*
 
 ---
 
@@ -53,8 +53,9 @@ You can create, edit, pause/resume, and delete four native rule types directly o
 4. Tap **`Save to Switch`**.
 
 ### Pausing, Resuming & Deleting Rules
-- **Enable / Disable Switch**: Toggle any rule ON or OFF directly on the switch; paused rules display a **`• Paused`** badge.
+- **Enable / Disable Switch**: Toggle any single-switch rule owned by that switch ON or OFF directly; paused rules display a **`• Paused`** badge.
 - **`🗑` (Delete)**: Opens a confirmation dialog before removing the rule from switch flash memory.
+- **Shared & Target Rules (`Shared rule` / `Target`)**: Multi-switch rules and rules owned by another switch stay read-only on that switch card (with toggle and delete controls disabled) to prevent accidental cross-switch corruption.
 
 ---
 
@@ -72,7 +73,7 @@ Because Belkin's cloud servers are discontinued, a switch that loses power can b
 
 Every write to a switch's on-device rules archive follows a strict safety pipeline designed to protect older flash hardware:
 
-1. **Automatic Pre-Write Backup**: Before changing anything, WeMi saves an untouched copy of the switch's current rules archive on your Android device (retaining up to **5** recent backups per switch).
+1. **Automatic Pre-Write Backup**: Before changing anything, WeMi saves an untouched copy of the switch's current rules archive strictly locally on your Android device (outside Android cloud Auto-Backup, retaining up to **5** recent backups per switch).
 2. **In-Place Preservation**: WeMi modifies only the targeted rule rows while keeping all other rules, pre-existing firmware tables, and the switch's original archive filename intact.
 3. **Pre-Upload Safety Gate**: Before sending data to the switch, WeMi sanitizes text fields, checks SQLite database integrity and rollback journal mode, enforces flash size limits and valid day/time ranges, and blocks invalid payloads automatically.
 4. **Post-Upload Verification**: After uploading, WeMi reads the switch's live rules database version back to confirm the switch accepted and reloaded the new version cleanly.

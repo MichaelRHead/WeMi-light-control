@@ -11,7 +11,7 @@ Whenever you need help troubleshooting `10.22.22.1` Wi-Fi setup, switch discover
 2. **Export or copy the recorded telemetry file (`wemi-telemetry-latest.txt`)** with a single tap on **`Save/Share`** or **`Copy`**.
 
 > [!NOTE]
-> **Privacy & Local-Only Storage Protection**: The Wi-Fi password input in the `10.22.22.1` setup wizard is masked by default (with an eye icon to show/hide it), and neither the on-screen debug panel nor the exported `wemi-telemetry-latest.txt` file ever displays or records your plaintext or encrypted Wi-Fi password (only `Method 1/2/3`, `addLengths`, and `plainLen` / `encLen` are logged). Any `<password>` or raw base64 `<ruleDbBody>` XML payloads in SOAP log summaries are automatically redacted before export, and optional Sunrise/Sunset Solar Location coordinates are never written to telemetry exports (only `solarLoc=set` or `solarLoc=unset`). In addition, both `wemi-telemetry-latest.txt` and local pre-write switch rule backups (`hardware_rules_backups`) are explicitly excluded from Android cloud Auto-Backup and device-to-device transfer so LAN metadata and switch backups stay strictly on your device.
+> **Privacy & Local-Only Storage Protection**: The Wi-Fi password input in the `10.22.22.1` setup wizard is masked by default (with an eye icon to show/hide it), and neither the on-screen debug panel nor the exported `wemi-telemetry-latest.txt` file ever displays or records your plaintext or encrypted Wi-Fi password (only `Method 1/2/3`, `addLengths`, and `plainLen` / `encLen` are logged). Any `<password>` or raw base64 `<ruleDbBody>` XML payloads in SOAP log summaries are automatically redacted before export, and optional Sunrise/Sunset Solar Location coordinates are never written to telemetry exports (only `solarLoc=set` or `solarLoc=unset`). In addition, local pre-write switch rule backups (`hardware_rules_backups`) are stored in device-local non-backed-up storage, and both `wemi-telemetry-latest.txt` and `hardware_rules_backups` are explicitly excluded from Android cloud Auto-Backup and device-to-device transfer so LAN metadata and switch backups stay strictly on your device.
 
 ---
 
@@ -36,7 +36,7 @@ You can take a standard Android screenshot (**Power + Volume Down**) of any of t
 ### A3. Per-Switch Hardware, Latency & On-Device Rules Drawer (`Devices` Tab)
 1. On the **`Devices`** tab, tap the body of any reachable switch row (outside the right-side power ring) to expand its inline diagnostics drawer.
 2. Tap **`Ping RTT`** to run a live `GetBinaryState` + `GetMetaInfo` check.
-3. For switches, dimmers, and plugs, check the **`On-Device Rules`** section at the bottom of the drawer (`HardwareRuleRowItems`) and tap **`Inspect Rules`** (or **`Refresh`** once inspected) to preview the switch's stored database version (`DB v...`), any **`Switch clock needs sync`** alert with a one-tap **`Sync Clock`** chip, quick **`Add Rule`** and **`Manage Rules`** shortcuts, and up to 4 decoded `trigger → action` rule cards (with **`• Paused`** badges and a `+N more rule(s) in Rules tab` overflow link).
+3. For switches, dimmers, and plugs, check the **`On-Device Rules`** section at the bottom of the drawer and tap **`Inspect Rules`** (or **`Refresh`** once inspected) to preview the switch's stored database version (`DB v...`), any **`Switch clock needs sync`** alert with a one-tap **`Sync Clock`** chip, quick **`Add Rule`** and **`Manage Rules`** shortcuts, and up to 4 decoded `trigger → action` rule cards (with **`• Paused`** badges and a `+N more rule(s) in Rules tab` overflow link).
 4. Take a screenshot showing the switch's `Endpoint (IP:Port)`, `SN`, `Firmware`, live SOAP round-trip latency badge, and **`On-Device Rules`** card.
 
 ---
@@ -52,13 +52,13 @@ Inside the **`SETUP DIAGNOSTICS`** header bar in the **Provision New Switch AP (
   2. Copies the entire report to your Android clipboard.
   3. Opens Android's **Share Sheet (`Save or Share WeMi Telemetry`)** so you can save `wemi-telemetry-latest.txt` to **Files / Google Drive**, email it, or send it directly to chat.
 - **Tap `Copy`**:
-  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v35.0 [35] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
+  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v36.0 [36] • ...) ===` block to your clipboard and updates `files/wemi-telemetry-latest.txt`.
   2. Paste the copied text directly into your chat message or issue report.
 
 ### B2. Exporting from the `More` Tab (`Save/Share Log`)
 In the header of the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
 - **Tap `Save/Share Log`**:
-  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v35.0 (versionCode=35, com.aistudio.wemiswitch.kxpqzr)`) containing:
+  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v36.0 (versionCode=36, com.aistudio.wemiswitch.kxpqzr)`) containing:
      - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt (keeping `[NET]` subnet/Wi-Fi-binding/ChromeOS VM flags consistent with the captured session).
      - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, `ssid`, `/24` subnet — or `subnet=unset gw=none` on a fresh Chromebook before the first switch is discovered — and gateway IP).
      - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its normalized room, Wi-Fi Home (`home=<networkKey>`), IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), dimmer brightness/Night Mode (`dim=<n>%`, `night=1`), latency (`ms`), hardware SKU, firmware, serial number, MAC, canonical UPnP `UDN`, cached on-device rules capability (`rulesCap=...`, optional `lp=1` and `rulesFw=...`), and — when inspected — a privacy-safe `  rules:` summary (`dbV=...`, rule count, SQLite integrity, clock drift, `needsSync`, local backup count, and `solarLoc=set/unset` without exact coordinates).

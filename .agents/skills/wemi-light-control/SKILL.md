@@ -22,7 +22,7 @@ For detailed UPnP/SSDP/SOAP/GENA/`rules1`/`timesync1` wire formats, device model
   ```bash
   sh gradlew assembleDebug
   ```
-- **Package / Namespace**: `org.suppressingfire.wemi` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "35.0"`, `versionCode = 35`).
+- **Package / Namespace**: `org.suppressingfire.wemi` (`applicationId = "com.aistudio.wemiswitch.kxpqzr"`, `versionName = "36.0"`, `versionCode = 36`).
 
 ---
 
@@ -39,7 +39,7 @@ The user's real hardware fleet (`192.168.86.0/24`, 17–18 switches across 9 roo
 
 ---
 
-## 3. Codebase Map (`post-v35.0` — `org.suppressingfire.wemi`, `100%` of `116` `.kt` Files `< 500` Lines)
+## 3. Codebase Map (`v36.0` — `org.suppressingfire.wemi`, `100%` of `116` `.kt` Files `< 500` Lines)
 
 ### Data Layer (`app/src/main/java/org/suppressingfire/wemi/data/`)
 - **`DeviceEntities.kt` & `RoomAndCategoryRules.kt`**:

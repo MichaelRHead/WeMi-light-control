@@ -65,10 +65,10 @@ Inside the **Provision New Switch AP (`10.22.22.1`)** dialog:
    - Tap your home Wi-Fi chip under **`Discovered 2.4 GHz Networks`**. WeMi automatically fills in **`Target 2.4 GHz Wi-Fi SSID`**, **`2.4G Ch`**, **`Auth Mode`** (usually `WPA2PSK`), and **`Encrypt`** (usually `AES`).
    - If your network is hidden or didn't show up, you can type the SSID manually.
 3. **Enter Your Home Wi-Fi Password**:
-   - Type your 2.4 GHz Wi-Fi password into **`Wi-Fi Password`**. *(Your password is encrypted locally on your device and never leaves your local network or appears in diagnostic logs.)*
+   - Type your 2.4 GHz Wi-Fi password into **`Wi-Fi Password`**. The field is **masked by default** (tap the eye icon to show or hide your password while typing), encrypted locally on your device, and never leaves your local network or appears in diagnostic logs.
 4. **Name Your Switch & Pick a Room**:
    - Optionally enter a **`Switch Name (Optional)`** (such as `Porch Christmas Tree` or `Bedroom Ceiling Fan`).
-   - Watch the live **Icon Category** preview and **Assigned Room** update automatically as you type, or tap any of the **11 Room Preset Chips** (`Living Room`, `Bedroom`, `Kitchen`, `Dining Room`, `Hallway & Landing`, `Ensuite`, `Outdoor`, `Garage`, `Basement`, `Office`, `Unassigned`). *(Need a custom room name outside those 11 presets? You can type any custom room name afterward via **Edit Device**.)*
+   - Watch the live **Icon Category** preview and **Assigned Room** update automatically as you type (defaulting to **`Unassigned`** when no room keyword is detected), or tap any of the **11 Room Preset Chips** (`Living Room`, `Bedroom`, `Kitchen`, `Dining Room`, `Hallway & Landing`, `Ensuite`, `Outdoor`, `Garage`, `Basement`, `Office`, `Unassigned`). *(Need a custom room name outside those 11 presets? You can type any custom room name afterward via **Edit Device**.)*
 5. **Encryption Options (Leave on Auto Unless Troubleshooting)**:
    - Leave **`Hardware AES-128-CBC Key Derivation`** on **`Auto-Detect from /setup.xml`** and **`Password Length Suffix (xxyy hex)`** on **`Auto (M1/M3=Yes, M2=No)`**. WeMi inspects your switch's firmware automatically to pick the right encryption:
      - **`Method 1: Gen 1 OpenWrt (F7C030/059/063)`** — 1st-Gen Switches, Dimmers, and Mini Plugs.
