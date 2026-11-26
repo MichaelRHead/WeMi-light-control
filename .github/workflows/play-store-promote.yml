@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "app/build.gradle.kts"
+      - "RELEASE_SIGN_OFF.md"
   workflow_dispatch:
     inputs:
       mode:
@@ -100,6 +101,9 @@ jobs:
   play-store:
     name: Google Play Track & Asset Operation
     runs-on: ubuntu-latest
+    env:
+      PYTHONWARNINGS: default
+      PYTHONDONTWRITEBYTECODE: "1"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -112,7 +116,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Google Auth client
-        run: python -m pip install --quiet --upgrade google-auth requests
+        run: python -m pip install --quiet --upgrade "google-auth>=2.35.0,<3.0.0" "requests>=2.32.3,<3.0.0"
 
       - name: Materialize Play service account credentials
         id: creds
@@ -210,8 +214,17 @@ jobs:
               if [ -z "$BEFORE_REF" ] || [ "$BEFORE_REF" = "0000000000000000000000000000000000000000" ]; then
                 BEFORE_REF="HEAD~1"
               fi
+              SIGN_OFF_CHANGED="false"
+              if git diff --name-only "$BEFORE_REF" HEAD -- RELEASE_SIGN_OFF.md 2>/dev/null | grep -qx "RELEASE_SIGN_OFF.md"; then
+                SIGN_OFF_CHANGED="true"
+              fi
               if PREV_GRADLE="$(git show "${BEFORE_REF}:app/build.gradle.kts" 2>/dev/null)"; then
-                PREV_VC="$(printf '%s' "$PREV_GRADLE" | python3 -c 'import sys; sys.path.insert(0, "scripts"); import promote_play_release as m; v = m.parse_gradle_version_code(sys.stdin.read()); print("" if v is None else v)')"
+                RAW_PREV_VC="$(printf '%s' "$PREV_GRADLE" | python3 -c 'import sys; sys.path.insert(0, "scripts"); import promote_play_release as m; v = m.parse_gradle_version_code(sys.stdin.read()); print("" if v is None else v)')"
+                if [ -n "$RAW_PREV_VC" ]; then
+                  if [ "$SIGN_OFF_CHANGED" != "true" ] || { [ -n "$CURR_VC" ] && [ "$RAW_PREV_VC" -lt "$CURR_VC" ]; }; then
+                    PREV_VC="$RAW_PREV_VC"
+                  fi
+                fi
               fi
             fi
 
@@ -262,7 +275,7 @@ jobs:
           fi
 
       - name: Record Stage 7 promotion in RELEASE_SIGN_OFF.md
-        if: steps.play.outputs.promoted == 'true' && (github.event_name == 'push' || inputs.mode == 'auto-promote' || inputs.update_sign_off == true)
+        if: steps.play.outputs.promoted == 'true' && (github.event_name == 'push' || inputs.update_sign_off == true)
         env:
           PROMOTED_VC: ${{ steps.play.outputs.version_code }}
           PROMOTED_NAME: ${{ steps.play.outputs.release_name }}
@@ -281,6 +294,7 @@ jobs:
           bash scripts/advance_release_turn.sh promote \
             "Promoted Play build ${PROMOTED_VC}${NAME_SUFFIX} from ${FROM_TRACK} to ${TO_TRACK} via GitHub Actions run ${RUN_ID}." \
             --version-code "${PROMOTED_VC}" \
+            --from-track "${FROM_TRACK}" \
             --track "${TO_TRACK}" \
             --verified "Play API promotion succeeded; build ${PROMOTED_VC} live on ${TO_TRACK}"
 
@@ -288,25 +302,21 @@ jobs:
         if: steps.play.outputs.promoted == 'true' && github.event_name != 'push' && inputs.sync_store_assets == true
         env:
           KEY_FILE: ${{ steps.creds.outputs.key_file }}
-          EVENT_NAME: ${{ github.event_name }}
           INPUT_RELEASE_NOTES_LANGUAGE: ${{ inputs.release_notes_language }}
           INPUT_CHANGES_NOT_SENT_FOR_REVIEW: ${{ inputs.changes_not_sent_for_review }}
           INPUT_ASSET_IMAGE_TYPES: ${{ inputs.asset_image_types }}
         run: |
           LANG="${INPUT_RELEASE_NOTES_LANGUAGE:-en-US}"
-          if [ "$EVENT_NAME" = "push" ]; then
-            LANG="en-US"
-          fi
           args=(
             --credentials "$KEY_FILE"
             --github-output "$GITHUB_OUTPUT"
             sync-assets
             --language "$LANG"
           )
-          if [ "$EVENT_NAME" != "push" ] && [ -n "$INPUT_ASSET_IMAGE_TYPES" ]; then
+          if [ -n "$INPUT_ASSET_IMAGE_TYPES" ]; then
             args+=(--image-types "$INPUT_ASSET_IMAGE_TYPES")
           fi
-          if [ "$EVENT_NAME" != "push" ] && [ "$INPUT_CHANGES_NOT_SENT_FOR_REVIEW" = "true" ]; then
+          if [ "$INPUT_CHANGES_NOT_SENT_FOR_REVIEW" = "true" ]; then
             args+=(--changes-not-sent-for-review)
           fi
           python3 scripts/sync_play_assets.py "${args[@]}"

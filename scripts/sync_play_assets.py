@@ -32,9 +32,11 @@ if str(SCRIPT_DIR) not in sys.path:
 
 from promote_play_release import (  # noqa: E402
     DEFAULT_PACKAGE_NAME,
+    MAX_RELEASE_NOTES_CHARS,
     PlayApiError,
     PlayPublisherClient,
     build_authorized_session,
+    handled_cli_exceptions,
     validate_service_account_file,
     write_github_output,
     write_step_summary,
@@ -42,6 +44,7 @@ from promote_play_release import (  # noqa: E402
 
 DEFAULT_ASSETS_DIR = "play_store_assets"
 DEFAULT_LISTING_FILE = "play_store_assets/STORE_LISTING.md"
+DEFAULT_RELEASE_NOTES_FILENAME = "RELEASE_NOTES.txt"
 DEFAULT_LANGUAGE = "en-US"
 
 MAX_TITLE_CHARS = 30
@@ -49,7 +52,7 @@ MAX_SHORT_DESCRIPTION_CHARS = 80
 MAX_FULL_DESCRIPTION_CHARS = 4000
 MAX_SCREENSHOTS_PER_TYPE = 8
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
-TRADEMARK_GUARD_RE = re.compile(r"\bWeMo\b|\bWemo\b")
+TRADEMARK_GUARD_RE = re.compile(r"\bWeMo\b", re.IGNORECASE)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -159,6 +162,23 @@ def parse_store_listing_markdown(listing_path: Path, language: str = DEFAULT_LAN
         short_description=short_description,
         full_description=full_description,
     )
+
+
+def validate_release_notes_file(notes_path: Path) -> str:
+    """Validate Play Store RELEASE_NOTES.txt existence, <= 500-char limit, and trademark boundary."""
+    if not notes_path.is_file():
+        raise ValueError(f"Play Store release notes file not found: {notes_path}")
+    text = notes_path.read_text(encoding="utf-8").strip()
+    if not text:
+        raise ValueError(f"Play Store release notes file is empty: {notes_path}")
+    if TRADEMARK_GUARD_RE.search(text):
+        raise ValueError(f"Trademark boundary check failed in {notes_path}; aborting Play Store validation.")
+    if len(text) > MAX_RELEASE_NOTES_CHARS:
+        raise ValueError(
+            f"Release notes in {notes_path} exceed Google Play's {MAX_RELEASE_NOTES_CHARS}-char "
+            f"limit ({len(text)} chars)."
+        )
+    return text
 
 
 def _hash_image_file(image_path: Path) -> LocalImageAsset:
@@ -526,6 +546,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         sub.add_argument("--no-sync-listing", action="store_true")
         sub.add_argument("--no-sync-images", action="store_true")
         sub.add_argument("--image-types", default="", help="Comma-separated subset of AppImageType values.")
+        if cmd == "validate-local":
+            sub.add_argument(
+                "--release-notes-file",
+                default="",
+                help="Path to RELEASE_NOTES.txt (defaults to <assets-dir>/RELEASE_NOTES.txt).",
+            )
         if cmd == "sync-assets":
             sub.add_argument("--changes-not-sent-for-review", action="store_true")
             sub.add_argument("--dry-run", action="store_true")
@@ -552,6 +578,12 @@ def main(argv: list[str] | None = None) -> int:
                     f"Listing OK ({language}): title={len(spec.title)}/{MAX_TITLE_CHARS}, "
                     f"short={len(spec.short_description)}/{MAX_SHORT_DESCRIPTION_CHARS}, "
                     f"full={len(spec.full_description)}/{MAX_FULL_DESCRIPTION_CHARS}"
+                )
+                raw_notes_file = str(getattr(args, "release_notes_file", "") or "").strip()
+                notes_path = Path(raw_notes_file) if raw_notes_file else (assets_dir / DEFAULT_RELEASE_NOTES_FILENAME)
+                notes_text = validate_release_notes_file(notes_path)
+                print(
+                    f"Release Notes OK ({notes_path}): {len(notes_text)}/{MAX_RELEASE_NOTES_CHARS} chars"
                 )
             if sync_images:
                 found = discover_local_image_assets(assets_dir, selected_types=selected_types)
@@ -592,7 +624,7 @@ def main(argv: list[str] | None = None) -> int:
             },
         )
         return 0
-    except (ValueError, PlayApiError) as exc:
+    except handled_cli_exceptions() as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 

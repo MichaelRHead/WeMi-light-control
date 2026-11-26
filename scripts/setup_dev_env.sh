@@ -629,18 +629,13 @@ else
   mv -f "$TMP_INIT" "$GRADLE_INIT_SCRIPT"
 fi
 
-# 5. Persist resolved environment variables & proxy sync hook idempotently in ~/.bashrc
+# 5. Persist resolved environment variables & proxy sync hook idempotently at the
+#    top of ~/.bashrc (ahead of any interactive-only 'case $- in' guard) without
+#    deleting or rewriting the user's existing ~/.bashrc logic.
 touch "$HOME/.bashrc"
-sed -i '/case \$- in/,/esac/d' "$HOME/.bashrc" 2>/dev/null || true
 
 TMP_BASHRC="$HOME/.bashrc.tmp.$$"
-awk '
-  /^# BEGIN WEMI-ENV-SETUP$/ { skip = 1; next }
-  /^# END WEMI-ENV-SETUP$/ { skip = 0; next }
-  !skip { print }
-' "$HOME/.bashrc" > "$TMP_BASHRC"
-
-cat <<EOF >> "$TMP_BASHRC"
+cat <<EOF > "$TMP_BASHRC"
 # BEGIN WEMI-ENV-SETUP
 export JAVA_HOME="$JAVA_HOME_DIR"
 export ANDROID_HOME="$ANDROID_SDK_DIR"
@@ -661,6 +656,11 @@ fi
 [ -f "$HOME/.gradle/proxy.env" ] && . "$HOME/.gradle/proxy.env"
 # END WEMI-ENV-SETUP
 EOF
+awk '
+  /^# BEGIN WEMI-ENV-SETUP$/ { skip = 1; next }
+  /^# END WEMI-ENV-SETUP$/ { skip = 0; next }
+  !skip { print }
+' "$HOME/.bashrc" >> "$TMP_BASHRC"
 if cmp -s "$TMP_BASHRC" "$HOME/.bashrc"; then
   rm -f "$TMP_BASHRC"
 else
@@ -725,6 +725,14 @@ GRADLE_VER="$(sed -n 's/.*gradle-\([0-9.]*\)-bin\.zip.*/\1/p' "$REPO_ROOT/gradle
 if [ -f "$REPO_ROOT/gradlew" ]; then
   if [ "$SAVE_CACHES" -eq 1 ] && { [ -z "$GRADLE_VER" ] || [ ! -d "$GRADLE_DIR/wrapper/dists/gradle-${GRADLE_VER}-bin" ]; }; then
     (cd "$REPO_ROOT" && sh ./gradlew --version --no-daemon >/dev/null)
+  fi
+fi
+
+# 7b. Idempotently install local commit-msg attribution hook when inside a git checkout
+COMMIT_VALIDATOR="$REPO_ROOT/.agents/skills/agent-commit-attribution/scripts/validate_commit_msg.sh"
+if [ -d "$REPO_ROOT/.git" ] && [ -f "$COMMIT_VALIDATOR" ]; then
+  if [ ! -x "$REPO_ROOT/.git/hooks/commit-msg" ] || ! grep -q "validate_commit_msg.sh" "$REPO_ROOT/.git/hooks/commit-msg" 2>/dev/null; then
+    (cd "$REPO_ROOT" && bash "$COMMIT_VALIDATOR" --install-hook >/dev/null 2>&1) || true
   fi
 fi
 

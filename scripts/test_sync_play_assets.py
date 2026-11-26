@@ -93,6 +93,10 @@ def _create_sample_assets_tree(root: Path) -> tuple[Path, Path, dict[str, list[t
         "1. Ignored section below Full Description.\n",
         encoding="utf-8",
     )
+    (assets_dir / "RELEASE_NOTES.txt").write_text(
+        "WeMi Switch Control release updates.\n",
+        encoding="utf-8",
+    )
 
     hashes: dict[str, list[tuple[str, str]]] = {}
     hashes["icon"] = [_write_fake_png(assets_dir / "play_store_icon_512x512.png", b"icon-bytes")]
@@ -393,6 +397,89 @@ class SyncPlayAssetsTests(unittest.TestCase):
             ]
         )
         self.assertEqual(exit_code, 0)
+
+    def test_trademark_guard_is_case_insensitive_for_listing_and_release_notes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            for variant in ("wemo", "WEMO", "WeMo", "Wemo"):
+                with self.subTest(variant=variant):
+                    listing = Path(tmp) / f"listing_{variant}.md"
+                    listing.write_text(
+                        "- **App Title:** `WeMi Switch Control`\n"
+                        f"## Short Description\nLocal {variant} switch app\n"
+                        "## Full Description\nBody\n",
+                        encoding="utf-8",
+                    )
+                    with self.assertRaisesRegex(ValueError, "Trademark"):
+                        spa.parse_store_listing_markdown(listing)
+
+                    notes = Path(tmp) / f"notes_{variant}.txt"
+                    notes.write_text(f"WeMi update for {variant} switches.\n", encoding="utf-8")
+                    with self.assertRaisesRegex(ValueError, "Trademark"):
+                        spa.validate_release_notes_file(notes)
+
+    def test_validate_local_checks_release_notes_length_and_trademark(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            assets_dir, listing_path, _ = _create_sample_assets_tree(Path(tmp))
+            notes_path = assets_dir / "RELEASE_NOTES.txt"
+
+            # Valid tree passes
+            self.assertEqual(
+                spa.main(
+                    [
+                        "validate-local",
+                        "--assets-dir",
+                        str(assets_dir),
+                        "--listing-file",
+                        str(listing_path),
+                    ]
+                ),
+                0,
+            )
+
+            # Overflow > 500 chars fails validate-local
+            notes_path.write_text("x" * 501, encoding="utf-8")
+            self.assertEqual(
+                spa.main(
+                    [
+                        "validate-local",
+                        "--assets-dir",
+                        str(assets_dir),
+                        "--listing-file",
+                        str(listing_path),
+                    ]
+                ),
+                1,
+            )
+
+            # Lowercase trademark leak fails validate-local
+            notes_path.write_text("Updated wemo local controls.\n", encoding="utf-8")
+            self.assertEqual(
+                spa.main(
+                    [
+                        "validate-local",
+                        "--assets-dir",
+                        str(assets_dir),
+                        "--listing-file",
+                        str(listing_path),
+                    ]
+                ),
+                1,
+            )
+
+            # Missing RELEASE_NOTES.txt fails validate-local
+            notes_path.unlink()
+            self.assertEqual(
+                spa.main(
+                    [
+                        "validate-local",
+                        "--assets-dir",
+                        str(assets_dir),
+                        "--listing-file",
+                        str(listing_path),
+                    ]
+                ),
+                1,
+            )
 
 
 if __name__ == "__main__":

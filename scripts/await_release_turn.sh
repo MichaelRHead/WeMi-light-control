@@ -35,7 +35,7 @@ case "${ROLE}" in
   discovery_and_grouping|telemetry_and_debugging|code_quality_and_testing|license_governance|ai_studio_ux_cuj)
     ;;
   app_promoter)
-    echo "[RELEASE COORDINATOR] Role 'app_promoter' (Stage 7) is event-driven via .github/workflows/play-store-promote.yml on push to app/build.gradle.kts."
+    echo "[RELEASE COORDINATOR] Role 'app_promoter' (Stage 7) is event-driven via .github/workflows/play-store-promote.yml on push to app/build.gradle.kts or RELEASE_SIGN_OFF.md."
     echo "[QUOTA GUARD] DO NOT RE-ARM await_release_turn.sh for app_promoter. Promotion runs automatically in GitHub Actions at zero LLM quota cost."
     exit 0
     ;;
@@ -44,6 +44,19 @@ case "${ROLE}" in
     exit 2
     ;;
 esac
+
+if ! [[ "${POLL_INTERVAL_SEC}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[ERROR] poll_interval_sec must be a positive integer, got '${POLL_INTERVAL_SEC}'." >&2
+  exit 2
+fi
+if ! [[ "${MAX_WAIT_SEC}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "[ERROR] max_wait_sec must be a positive integer, got '${MAX_WAIT_SEC}'." >&2
+  exit 2
+fi
+if ! [[ "${MAX_IDLE_REARMS}" =~ ^[0-9]+$ ]]; then
+  echo "[ERROR] MAX_IDLE_REARMS must be a non-negative integer, got '${MAX_IDLE_REARMS}'." >&2
+  exit 2
+fi
 
 # Clamp MAX_WAIT_SEC below exebox's ~590s (9m50s) BidiExecuteUvm RPC ceiling
 if (( MAX_WAIT_SEC > 510 )); then
@@ -67,12 +80,22 @@ if [[ -f "${PID_FILE}" ]]; then
   fi
 fi
 echo "$$" > "${PID_FILE}"
-trap 'rm -f "${PID_FILE}"' EXIT
+trap 'if [[ "$(cat "${PID_FILE}" 2>/dev/null || true)" == "$$" ]]; then rm -f "${PID_FILE}"; fi' EXIT
 
 extract_field() {
   local content="$1"
   local key="$2"
-  awk -F': *' -v k="${key}" '!found && $1 == k { gsub(/\r$/, "", $2); print $2; found=1 }' <<< "${content}"
+  awk -v k="${key}" '
+    /<!-- *RELEASE_STATE_BEGIN *-->/ { in_block=1; next }
+    /<!-- *RELEASE_STATE_END *-->/   { in_block=0; next }
+    in_block && !found && index($0, k ":") == 1 {
+      line = $0
+      sub(/^[^:]+:[ \t]*/, "", line)
+      gsub(/\r$/, "", line)
+      print line
+      found = 1
+    }
+  ' <<< "${content}"
 }
 
 role_signoff_key() {
@@ -87,12 +110,25 @@ role_signoff_key() {
 
 STATE_DIR="/home/antigravity/.gemini/usage/watcher_state"
 mkdir -p "${STATE_DIR}" 2>/dev/null || STATE_DIR="/tmp"
+REARM_FILE="${STATE_DIR}/rearms_${ROLE}_fallback.count"
 
 START_TS="$(date +%s)"
 FIRST_PASS=1
+FETCH_FAILURES=0
+MAX_FETCH_FAILURES=3
 
 while true; do
-  git fetch origin main --quiet 2>/dev/null || true
+  if git fetch origin main --quiet 2>/dev/null; then
+    FETCH_FAILURES=0
+  else
+    FETCH_FAILURES=$(( FETCH_FAILURES + 1 ))
+    echo "[RELEASE COORDINATOR] Warning: git fetch origin main failed (${FETCH_FAILURES}/${MAX_FETCH_FAILURES})." >&2
+    if (( FETCH_FAILURES >= MAX_FETCH_FAILURES )); then
+      echo "[RELEASE COORDINATOR] Aborting watcher after ${FETCH_FAILURES} consecutive git fetch failures."
+      echo "[QUOTA GUARD] DO NOT RE-ARM await_release_turn.sh until GitHub connectivity is restored."
+      exit 1
+    fi
+  fi
 
   if SIGN_OFF_CONTENT="$(git show origin/main:RELEASE_SIGN_OFF.md 2>/dev/null)"; then
     REL_VER="$(extract_field "${SIGN_OFF_CONTENT}" "RELEASE_VERSION")"
@@ -142,7 +178,7 @@ while true; do
     fi
 
     # 3. Quota Guard A: No active release review in progress -> STOP IMMEDIATELY
-    if [[ "${REL_STATUS}" == "APPROVED_FOR_PLAY_STORE" || "${REL_STATUS}" == "PROMOTED_TO_CLOSED_TESTING" || "${CUR_TURN}" == "NONE" || "${REL_STATUS}" == "AWAITING_AI_STUDIO_INITIATION" ]]; then
+    if [[ "${REL_STATUS}" == "APPROVED_FOR_PLAY_STORE" || "${REL_STATUS}" == "PROMOTED_TO_CLOSED_TESTING" || "${REL_STATUS}" == PROMOTED_TO_* || "${CUR_TURN}" == "NONE" || "${REL_STATUS}" == "AWAITING_AI_STUDIO_INITIATION" || ( "${ROLE}" != "ai_studio_ux_cuj" && "${REL_STATUS}" == "AWAITING_FINAL_CONCLUSION" ) ]]; then
       rm -f "${REARM_FILE}" 2>/dev/null || true
       echo "[RELEASE COORDINATOR] No active review in progress (${REL_VER}: RELEASE_STATUS=${REL_STATUS}, CURRENT_TURN=${CUR_TURN})."
       echo "[QUOTA GUARD] DO NOT RE-ARM await_release_turn.sh between releases. End your turn cleanly now to preserve 5-hour quota."

@@ -3,11 +3,16 @@
 
 from __future__ import annotations
 
+import io
 import json
+import sys
 import tempfile
+import types
 import unittest
+from contextlib import redirect_stderr
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import promote_play_release as mod
 
@@ -279,10 +284,11 @@ class PromotePlayReleaseTests(unittest.TestCase):
             self.assertEqual(state["RELEASE_STATUS"], "APPROVED_FOR_PLAY_STORE")
             self.assertEqual(state["CURRENT_TURN"], "NONE")
 
-    def _write_sign_off(self, tmpdir: str, status: str) -> Path:
+    def _write_sign_off(self, tmpdir: str, status: str, version_code: int | None = None) -> Path:
         path = Path(tmpdir) / "RELEASE_SIGN_OFF.md"
+        vc_line = f"VERSION_CODE: {version_code}\n" if version_code is not None else ""
         path.write_text(
-            f"<!-- RELEASE_STATE_BEGIN -->\nRELEASE_STATUS: {status}\nCURRENT_TURN: NONE\n<!-- RELEASE_STATE_END -->\n",
+            f"<!-- RELEASE_STATE_BEGIN -->\n{vc_line}RELEASE_STATUS: {status}\nCURRENT_TURN: NONE\n<!-- RELEASE_STATE_END -->\n",
             encoding="utf-8",
         )
         return path
@@ -658,6 +664,160 @@ class PromotePlayReleaseTests(unittest.TestCase):
         self.assertEqual(result["lifecycle_state"], "RELEASE_LIFECYCLE_STATE_PUBLISHED")
         self.assertTrue(result["is_terminal"])
         self.assertEqual(sleeps, [10.0])
+
+    def test_auto_promote_case_b_recovers_sign_off_version_code_without_previous_vc(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sign_off = self._write_sign_off(tmpdir, "APPROVED_FOR_PLAY_STORE", version_code=35)
+            session = FakeSession(
+                [
+                    ("POST", "/edits", FakeResponse(200, {"id": "poll-b"})),
+                    (
+                        "GET",
+                        "/edits/poll-b/tracks/internal",
+                        FakeResponse(200, {"track": "internal", "releases": [{"name": "0.0.0.35", "status": "completed", "versionCodes": ["35"]}]}),
+                    ),
+                    (
+                        "GET",
+                        "/edits/poll-b/tracks/alpha",
+                        FakeResponse(200, {"track": "alpha", "releases": [{"name": "0.0.0.34", "status": "completed", "versionCodes": ["34"]}]}),
+                    ),
+                    ("DELETE", "/edits/poll-b", FakeResponse(204)),
+                    ("POST", "/edits", FakeResponse(200, {"id": "promo-b"})),
+                    ("GET", "/edits/promo-b/tracks", FakeResponse(200, {"tracks": [{"track": "internal"}, {"track": "alpha"}]})),
+                    (
+                        "GET",
+                        "/edits/promo-b/tracks/internal",
+                        FakeResponse(200, {"track": "internal", "releases": [{"name": "0.0.0.35", "status": "completed", "versionCodes": ["35"]}]}),
+                    ),
+                    (
+                        "GET",
+                        "/edits/promo-b/tracks/alpha",
+                        FakeResponse(200, {"track": "alpha", "releases": [{"name": "0.0.0.34", "status": "completed", "versionCodes": ["34"]}]}),
+                    ),
+                    ("PUT", "/edits/promo-b/tracks/alpha", FakeResponse(200, {"track": "alpha"})),
+                    ("POST", "/edits/promo-b:commit", FakeResponse(200, {"id": "promo-b"})),
+                ]
+            )
+            client = mod.PlayPublisherClient("com.aistudio.wemiswitch.kxpqzr", session=session)
+            result = mod.run_auto_promote(
+                client,
+                from_track="internal",
+                to_track="alpha",
+                current_version_code=36,
+                previous_version_code=None,
+                sign_off_path=sign_off,
+                require_approved=True,
+                poll_attempts=1,
+                poll_interval_sec=0.0,
+                status="completed",
+                notes_source="none",
+                notes_file=Path(tmpdir) / "RELEASE_NOTES.txt",
+                notes_language="en-US",
+                changes_not_sent_for_review=False,
+            )
+            self.assertTrue(result["promoted"])
+            self.assertEqual(result["version_code"], "35")
+            self.assertEqual(result["release_name"], "0.0.0.35")
+
+    def test_promote_in_progress_preserves_existing_completed_release_on_target_track(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            existing_completed = {
+                "name": "0.0.0.34",
+                "status": "completed",
+                "versionCodes": ["34"],
+            }
+            session = FakeSession(
+                [
+                    ("POST", "/edits", FakeResponse(200, {"id": "edit-rollout"})),
+                    ("GET", "/edits/edit-rollout/tracks", FakeResponse(200, {"tracks": [{"track": "alpha"}, {"track": "production"}]})),
+                    (
+                        "GET",
+                        "/edits/edit-rollout/tracks/alpha",
+                        FakeResponse(200, {"track": "alpha", "releases": [{"name": "0.0.0.35", "status": "completed", "versionCodes": ["35"]}]}),
+                    ),
+                    (
+                        "GET",
+                        "/edits/edit-rollout/tracks/production",
+                        FakeResponse(
+                            200,
+                            {
+                                "track": "production",
+                                "releases": [
+                                    existing_completed,
+                                    {"name": "0.0.0.33", "status": "draft", "versionCodes": ["33"]},
+                                ],
+                            },
+                        ),
+                    ),
+                    ("PUT", "/edits/edit-rollout/tracks/production", FakeResponse(200, {"track": "production"})),
+                    ("POST", "/edits/edit-rollout:commit", FakeResponse(200, {"id": "edit-rollout"})),
+                ]
+            )
+            client = mod.PlayPublisherClient("com.aistudio.wemiswitch.kxpqzr", session=session)
+            promoted = mod.run_promote(
+                client,
+                from_track="alpha",
+                to_track="production",
+                version_code="35",
+                status="inProgress",
+                user_fraction=0.2,
+                notes_source="none",
+                notes_file=Path(tmpdir) / "RELEASE_NOTES.txt",
+                notes_language="en-US",
+                release_name_override="",
+                changes_not_sent_for_review=False,
+                allow_same_version=False,
+            )
+            self.assertEqual(promoted["status"], "inProgress")
+            self.assertEqual(promoted["userFraction"], 0.2)
+            put_call = [c for c in session.calls if c["method"] == "PUT"][0]
+            sent_releases = put_call["json"]["releases"]
+            self.assertEqual(len(sent_releases), 2)
+            self.assertEqual(sent_releases[0]["versionCodes"], ["35"])
+            self.assertEqual(sent_releases[0]["status"], "inProgress")
+            self.assertEqual(sent_releases[1], existing_completed)
+
+    def test_main_catches_requests_request_exception_cleanly(self) -> None:
+        class FakeRequestException(Exception):
+            pass
+
+        class FakeConnectionError(FakeRequestException):
+            pass
+
+        fake_requests = types.ModuleType("requests")
+        fake_requests.RequestException = FakeRequestException  # type: ignore[attr-defined]
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            key_file = Path(tmpdir) / "sa.json"
+            synthetic_pem = (
+                "-----BEGIN " + "PRIVATE KEY-----\n"
+                "SYNTHETIC_UNIT_TEST_VALUE\n"
+                "-----END " + "PRIVATE KEY-----\n"
+            )
+            key_file.write_text(
+                json.dumps(
+                    {
+                        "type": "service_account",
+                        "client_email": "bot@example.iam.gserviceaccount.com",
+                        "private_key": synthetic_pem,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            stderr_buf = io.StringIO()
+            with (
+                mock.patch.dict(sys.modules, {"requests": fake_requests}),
+                mock.patch.object(
+                    mod,
+                    "build_authorized_session",
+                    side_effect=FakeConnectionError("Play API network timeout"),
+                ),
+                redirect_stderr(stderr_buf),
+            ):
+                rc = mod.main(["--credentials", str(key_file), "list-tracks"])
+
+            self.assertEqual(rc, 1)
+            self.assertIn("ERROR: Play API network timeout", stderr_buf.getvalue())
 
 
 if __name__ == "__main__":

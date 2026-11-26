@@ -83,7 +83,18 @@ SUBJECT_AGENT_TAG_RE = re.compile(r"\[[^\[\]]*\bAgent\b[^\[\]]*\]", re.IGNORECAS
 SCISSOR_RE = re.compile(r"^# -+ >8 -+\s*$")
 TRAILER_RE = re.compile(r"^[A-Za-z][A-Za-z0-9-]*:[ \t]+\S.*$")
 AGENT_TRAILER_KEY_RE = re.compile(r"^Agent:[ \t]*(.*)$")
-AGENT_TRAILER_VALID_RE = re.compile(r"^Agent:[ \t]+.+Agent[ \t]+\([a-z0-9_]+\)[ \t]*$")
+CANONICAL_ROLE_IDS = (
+    "ai_studio_ux_cuj",
+    "discovery_and_grouping",
+    "telemetry_and_debugging",
+    "code_quality_and_testing",
+    "license_governance",
+    "app_promoter",
+    "antigravity_general",
+)
+AGENT_TRAILER_VALID_RE = re.compile(
+    r"^Agent:[ \t]+.+Agent[ \t]+\((" + "|".join(CANONICAL_ROLE_IDS) + r")\)[ \t]*$"
+)
 VERIFIED_TRAILER_RE = re.compile(r"^Verified:[ \t]*(.*)$", re.IGNORECASE)
 MARKDOWN_DECORATION_RE = re.compile(r"(\*\*[^*\n]+\*\*|`[^`\n]+`)")
 URL_RE = re.compile(r"https?://\S+")
@@ -106,7 +117,7 @@ DOTTED_SYMBOL_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_().
 CAMEL_SYMBOL_RE = re.compile(r"^(?:[a-z]+[A-Z][A-Za-z0-9]*|[A-Z][a-z]+[A-Z][A-Za-z0-9]*)$")
 SNAKE_SYMBOL_RE = re.compile(r"^[A-Za-z0-9]+_[A-Za-z0-9_]+$")
 CLI_FLAG_RE = re.compile(r"^--[a-z][a-z0-9-]+$")
-METRIC_TAG_RE = re.compile(r"^(?:max=\d+L?|100755|\d+/\d+L)$")
+METRIC_TAG_RE = re.compile(r"^(?:max=\d+L?|100644|100755|\d+/\d+L)$")
 
 
 def count_code_tokens(line: str) -> int:
@@ -385,6 +396,9 @@ else:
                 "Invalid 'Agent:' trailer format. Expected: 'Agent: <Canonical Agent Name> (<role_id>)'."
             )
 
+for tip in warnings:
+    sys.stderr.write(f"[agent-commit-attribution] Tip: {tip}\n")
+
 if errors:
     sys.stderr.write(
         "==============================================================================\n"
@@ -414,9 +428,6 @@ if errors:
         "==============================================================================\n"
     )
     sys.exit(1)
-
-for tip in warnings:
-    sys.stderr.write(f"[agent-commit-attribution] Tip: {tip}\n")
 
 sys.exit(0)
 PYEOF

@@ -745,7 +745,17 @@ def run_promote(
         if status == "inProgress" and user_fraction is not None:
             promoted_release["userFraction"] = user_fraction
 
-        client.update_track(edit_id, to_track, [promoted_release])
+        releases_payload: list[dict[str, Any]] = [promoted_release]
+        if status == "inProgress":
+            promoted_code_set = set(version_codes)
+            for existing_rel in target_track_data.get("releases") or []:
+                if existing_rel.get("status") != "completed":
+                    continue
+                existing_codes = [str(vc) for vc in existing_rel.get("versionCodes", [])]
+                if existing_codes and not (set(existing_codes) & promoted_code_set):
+                    releases_payload.append(existing_rel)
+
+        client.update_track(edit_id, to_track, releases_payload)
         client.commit_edit(
             edit_id,
             changes_not_sent_for_review=changes_not_sent_for_review,
@@ -805,6 +815,12 @@ def run_auto_promote(
     if skip_reason:
         return _emit_auto_promote_skip(client.package_name, skip_reason, from_track, to_track)
 
+    sign_off_state = read_release_sign_off_state(sign_off_path)
+    raw_sign_off_vc = sign_off_state.get("VERSION_CODE", "").strip()
+    sign_off_version_code = (
+        int(raw_sign_off_vc) if raw_sign_off_vc.isdigit() and int(raw_sign_off_vc) > 0 else None
+    )
+
     attempts = max(1, int(poll_attempts))
     source_vc: int | None = None
     target_vc: int | None = None
@@ -841,12 +857,17 @@ def run_auto_promote(
             )
             sleep_fn(poll_interval_sec)
 
-    # Case B: post-upload version bump convention (AI Studio uploaded previous_vc, then bumped)
+    # Case B: post-upload bump or Stage 6 sign-off trigger (source matches previous_vc or RELEASE_SIGN_OFF VERSION_CODE)
     if candidate_vc is None:
+        matches_previous_bump = (
+            previous_version_code is not None and source_vc is not None and source_vc >= previous_version_code
+        )
+        matches_sign_off_vc = (
+            sign_off_version_code is not None and source_vc is not None and source_vc == sign_off_version_code
+        )
         if (
             source_vc is not None
-            and previous_version_code is not None
-            and source_vc >= previous_version_code
+            and (matches_previous_bump or matches_sign_off_vc)
             and (target_vc is None or source_vc > target_vc)
         ):
             candidate_vc = str(source_vc)
@@ -854,7 +875,8 @@ def run_auto_promote(
             return _emit_auto_promote_skip(
                 client.package_name,
                 f"No promotable newer release on '{from_track}' yet "
-                f"(from={source_vc}, to={target_vc}, expected>={current_version_code}). "
+                f"(from={source_vc}, to={target_vc}, expected>={current_version_code}, "
+                f"sign_off={sign_off_version_code}). "
                 "Re-run workflow_dispatch with mode=auto-promote once Play upload finishes.",
                 from_track,
                 to_track,
@@ -1120,9 +1142,23 @@ def main(argv: list[str] | None = None) -> int:
             },
         )
         return 0
-    except (ValueError, PlayApiError) as exc:
+    except handled_cli_exceptions() as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
+
+
+def handled_cli_exceptions() -> tuple[type[BaseException], ...]:
+    """Return handled CLI error types including requests.RequestException when available."""
+    exc_types: list[type[BaseException]] = [ValueError, PlayApiError]
+    try:
+        import requests  # type: ignore[import-not-found]
+
+        req_exc = getattr(requests, "RequestException", None)
+        if isinstance(req_exc, type) and issubclass(req_exc, BaseException):
+            exc_types.append(req_exc)
+    except ImportError:
+        pass
+    return tuple(exc_types)
 
 
 if __name__ == "__main__":
