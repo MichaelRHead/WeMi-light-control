@@ -297,7 +297,7 @@ class HardwareRulesTest {
             // Valid DB succeeds and increments version with mandatory read-back check
             val safeDb = File(workDir, "safe_rules.db")
             HardwareRulesSafetyValidator.createEmptyBelkinSchemaDb(safeDb)
-            SQLiteDatabase.openDatabase(safeDb.absolutePath, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+            SQLiteDatabase.openDatabase(safeDb.absolutePath, null, SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.NO_LOCALIZED_COLLATORS).use { db ->
                 db.execSQL("INSERT INTO RULES VALUES (1, 'Auto Off 20m', 'Countdown Rule', 0, '12201982', '12201982', '1', 0)")
                 db.execSQL("INSERT INTO RULEDEVICES (RuleID, DeviceID, DayID, StartTime, RuleDuration, StartAction, EndAction, CountdownTime) VALUES (1, '${server.udn}', 1, 0, 86400, 1.0, 0.0, 1200)")
             }
@@ -306,59 +306,94 @@ class HardwareRulesTest {
             assertEquals(3, okRes.verifiedVersion)
             assertEquals(1, server.storeRulesCalls.get())
 
-            // Read-back stale version detection catches silent firmware drop
+            // C1: "Storing of rules DB Unsuccessful!" MUST be rejected (not matched by substring "successful")
+            assertFalse(HardwareRulesProtocol.isStoreRulesSuccess("Storing of rules DB Unsuccessful!"))
+            assertFalse(HardwareRulesProtocol.isStoreRulesSuccess("Failed to store"))
+            assertFalse(HardwareRulesProtocol.isStoreRulesSuccess("<s:Fault><faultcode>s:Client</faultcode></s:Fault>"))
+            assertTrue(HardwareRulesProtocol.isStoreRulesSuccess("Storing of rules DB Successful!"))
+            assertTrue(HardwareRulesProtocol.isStoreRulesSuccess(""))
+            server.customStoreRulesErrorInfo.set("Storing of rules DB Unsuccessful!")
+            val unsuccRes = client.storeValidatedRulesDb(dev, safeDb, HardwareRulesDbCodec.DEFAULT_ZIP_ENTRY_NAME, 3)
+            assertFalse("Unsuccessful! errorInfo must fail StoreRules", unsuccRes.success)
+
+            // C2: DHCP identity mismatch aborts BOTH storeValidatedRulesDb and syncDeviceTime with zero LAN calls
+            val wrongSwitchDev = dev.copy(serialNumber = "OTHER_SWITCH_999", udn = "uuid:Lightswitch-3_0-OTHER999")
+            val callsBeforeMismatch = server.storeRulesCalls.get()
+            val tsBeforeMismatch = server.timeSyncCalls.get()
+            assertFalse(client.storeValidatedRulesDb(wrongSwitchDev, safeDb, HardwareRulesDbCodec.DEFAULT_ZIP_ENTRY_NAME, 3).success)
+            assertFalse(client.syncDeviceTime(wrongSwitchDev).isLiveLanSuccess)
+            assertEquals("DHCP mismatch must not call StoreRules", callsBeforeMismatch, server.storeRulesCalls.get())
+            assertEquals("DHCP mismatch must not call TimeSync", tsBeforeMismatch, server.timeSyncCalls.get())
+
+            // Read-back stale version detection catches silent firmware drop and logs expected/got versions
             server.simulateReadBackStaleVersion.set(true)
             val staleRes = client.storeValidatedRulesDb(dev, safeDb, HardwareRulesDbCodec.DEFAULT_ZIP_ENTRY_NAME, 3)
             assertFalse(staleRes.success)
-            assertTrue(staleRes.errorInfo.contains("Read-back mismatch"))
+            assertTrue(staleRes.errorInfo.contains("expected >= v4"))
+            assertTrue(staleRes.logEntry.statusText.contains("expected >= v4"))
 
-            // TimeSync formats timezone offsets accurately and updates switch clock
+            // TimeSync sends standard rawOffset (-08.00) in BOTH PST and PDT with Belkin's inverted <dst> (1 in PST, 0 in PDT)
             assertEquals("-08.00", HardwareRulesProtocol.formatFirmwareTimezoneOffset(-480))
             assertEquals("05.50", HardwareRulesProtocol.formatFirmwareTimezoneOffset(330))
-            val tsLog = client.syncDeviceTime(dev, nowUtcMillis = 1_750_000_000_000L, timeZone = TimeZone.getTimeZone("GMT-08:00"))
-            assertTrue(tsLog.isLiveLanSuccess)
+            val laTz = TimeZone.getTimeZone("America/Los_Angeles")
+            val pstMillis = 1_768_478_400_000L // 2026-01-15 UTC (PST, not in DST)
+            val pdtMillis = 1_784_116_800_000L // 2026-07-15 UTC (PDT, in DST)
+            val pstLog = client.syncDeviceTime(dev, nowUtcMillis = pstMillis, timeZone = laTz)
+            assertTrue(pstLog.isLiveLanSuccess)
             assertEquals("-08.00", server.lastTimeSyncTimezone.get())
-            assertEquals(1_750_000_000L, server.deviceTimeUtc.get())
+            assertEquals("1", server.lastTimeSyncDst.get())
+            assertEquals("1", server.lastTimeSyncDstSupported.get())
+            val pdtLog = client.syncDeviceTime(dev, nowUtcMillis = pdtMillis, timeZone = laTz)
+            assertTrue(pdtLog.isLiveLanSuccess)
+            assertEquals("-08.00", server.lastTimeSyncTimezone.get())
+            assertEquals("0", server.lastTimeSyncDst.get())
+            assertEquals(pdtMillis / 1000L, server.deviceTimeUtc.get())
+
+            // Protocol hardening: empty <ruleDbVersion/> -> 0, SSRF-safe resolveRuleDbUrl, generic 500 non-caching, /Lightsetup.xml longPress=false
+            server.emptyVersionTagInFetchRules.set(true)
+            assertEquals(0, HardwareRulesProtocol.parseFetchRulesResponse("<u:FetchRulesResponse><ruleDbVersion/><ruleDbPath>/rules.db</ruleDbPath></u:FetchRulesResponse>")?.ruleDbVersion)
+            assertEquals("http://192.168.1.50:49153/rules.db", HardwareRulesProtocol.resolveRuleDbUrl("192.168.1.50", 49153, "https://evil.example.com:8443/rules.db"))
+            server.simulateGenericFetchRules500.set(true)
+            val (err500Snap, _) = client.fetchDeviceRulesSnapshot(dev.copy(hardwareRulesCapability = HardwareRulesCapability.LIKELY_SUPPORTED.name))
+            assertEquals("Generic HTTP 500 must not cache VERIFIED_UNSUPPORTED", HardwareRulesCapability.LIKELY_SUPPORTED, err500Snap.capability)
+            assertTrue(err500Snap.hasInspectionError)
+            server.serveLightSetupXmlOnly.set(true)
+            val (lightSetupSnap, _) = client.fetchDeviceRulesSnapshot(dev.copy(hardwareRulesCapability = HardwareRulesCapability.LIKELY_SUPPORTED.name, hardwareRulesLongPressCapable = false))
+            assertFalse("/Lightsetup.xml must not override longPressCapable to true", lightSetupSnap.longPressCapable)
+            assertEquals(HardwareRulesCapability.LIKELY_UNSUPPORTED, XmlAndSkuParser.inferRulesCapabilityFromSetupXml("<root><serviceList><service><serviceType>urn:Belkin:service:rules:1</serviceType></service></serviceList></root>", "http://192.168.1.10:49153/setup.xml", "uuid:Socket-1_0-X", "WeMo_WW_4.00.20102901.PVT-RTOS").capability)
         }
 
-        // 4. Backup rotation retains only the newest maxRetainedPerDevice ZIPs
+        // 4. Backup rotation & refresh deduplication: identical consecutive refreshes never evict older distinct backups
         val backupDir = File(workDir, "backups_rotation").apply { deleteRecursively(); mkdirs() }
+        val distinctA = byteArrayOf(1, 2, 3, 10)
+        val distinctB = byteArrayOf(1, 2, 3, 20)
+        val savedA = HardwareRulesDbCodec.saveRawZipBackup(backupDir, "DEV_DEDUP", 1, distinctA, maxRetainedPerDevice = 3)
+        savedA?.setLastModified(1_700_000_001_000L)
+        repeat(5) {
+            HardwareRulesDbCodec.saveRawZipBackup(backupDir, "DEV_DEDUP", 2, distinctB, maxRetainedPerDevice = 3)
+        }
+        val dedupFiles = File(backupDir, "DEV_DEDUP").listFiles()?.filter { it.extension == "zip" }.orEmpty()
+        assertEquals("5 identical refreshes must deduplicate to 1 file while retaining prior distinct backup", 2, dedupFiles.size)
+
         repeat(7) { idx ->
             val saved = HardwareRulesDbCodec.saveRawZipBackup(backupDir, "DEV_ROTATE", idx + 1, byteArrayOf(1, 2, 3, idx.toByte()), maxRetainedPerDevice = 3)
             saved?.setLastModified(1_700_000_000_000L + idx * 1000L)
         }
-        val remaining = File(backupDir, "DEV_ROTATE").listFiles()?.filter { it.extension == "zip" }.orEmpty()
-        assertEquals(3, remaining.size)
+        assertEquals(3, File(backupDir, "DEV_ROTATE").listFiles()?.filter { it.extension == "zip" }.orEmpty().size)
     }
 
     @Test
     fun `Room MIGRATION_5_6 preserves existing devices and adds default hardware rules columns`() {
         val dbFile = File(appContext().cacheDir, "migration_5_6_test.db").apply { delete() }
         val helper = FrameworkSQLiteOpenHelperFactory().create(
-            SupportSQLiteOpenHelper.Configuration.builder(appContext())
-                .name(dbFile.absolutePath)
+            SupportSQLiteOpenHelper.Configuration.builder(appContext()).name(dbFile.absolutePath)
                 .callback(object : SupportSQLiteOpenHelper.Callback(5) {
                     override fun onCreate(db: SupportSQLiteDatabase) {
-                        db.execSQL(
-                            """
-                            CREATE TABLE wemo_devices (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-                                name TEXT NOT NULL,
-                                type TEXT NOT NULL,
-                                ipAddress TEXT NOT NULL,
-                                port INTEGER NOT NULL,
-                                isOn INTEGER NOT NULL,
-                                brightness INTEGER NOT NULL,
-                                isReachable INTEGER NOT NULL
-                            )
-                            """.trimIndent()
-                        )
+                        db.execSQL("CREATE TABLE wemo_devices (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, name TEXT NOT NULL, type TEXT NOT NULL, ipAddress TEXT NOT NULL, port INTEGER NOT NULL, isOn INTEGER NOT NULL, brightness INTEGER NOT NULL, isReachable INTEGER NOT NULL)")
                         db.execSQL("INSERT INTO wemo_devices (id, name, type, ipAddress, port, isOn, brightness, isReachable) VALUES (1, 'Kitchen Lights', 'SWITCH_PLUG', '192.168.1.40', 49153, 1, 100, 1)")
                     }
-
                     override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
-                })
-                .build()
+                }).build()
         )
         try {
             val db = helper.writableDatabase
@@ -379,54 +414,38 @@ class HardwareRulesTest {
     @Test
     fun `HardwareRulesCoordinator caches VERIFIED_UNSUPPORTED per firmware and skips repeat probes unless forced`() = runBlocking {
         FakeHardwareRulesServer(
-            initialFriendlyName = "RTOS Dimmer",
-            modelName = "WDS060",
-            firmwareVersion = "WeMo_WW_2.00.11564.PVT-RTOS-DimmerV2",
-            udn = "uuid:Dimmer-2_0-CACHE01",
-            isRtos = true,
-            supportsRulesDb = false
+            initialFriendlyName = "RTOS Dimmer", modelName = "WDS060",
+            firmwareVersion = "WeMo_WW_2.00.11564.PVT-RTOS-DimmerV2", udn = "uuid:Dimmer-2_0-CACHE01",
+            isRtos = true, supportsRulesDb = false
         ).use { rtosServer ->
             val db = SwitchDatabase.getDatabase(appContext())
             val dao = db.switchDao()
             dao.deleteAllDevices()
             val insertedId = dao.insertDevice(
                 DeviceEntity(
-                    name = "RTOS Dimmer",
-                    deviceType = DeviceType.LIGHTBULB_DIMMER.name,
-                    ipAddress = "127.0.0.1",
-                    port = rtosServer.port,
-                    udn = rtosServer.udn,
+                    name = "RTOS Dimmer", deviceType = DeviceType.LIGHTBULB_DIMMER.name,
+                    ipAddress = "127.0.0.1", port = rtosServer.port, udn = rtosServer.udn,
                     firmwareVersion = rtosServer.firmwareVersion,
                     hardwareRulesCapability = HardwareRulesCapability.LIKELY_UNSUPPORTED.name
                 )
             ).toInt()
             val saved = dao.getDeviceById(insertedId)!!
             val coordinator = org.suppressingfire.wemi.data.HardwareRulesCoordinator(
-                dao = dao,
-                hardwareRulesClient = HardwareRulesClient(appContext = appContext()),
+                dao = dao, hardwareRulesClient = HardwareRulesClient(appContext = appContext()),
                 lanSemaphore = kotlinx.coroutines.sync.Semaphore(3),
                 deviceMutexes = java.util.concurrent.ConcurrentHashMap(),
-                isDemoShowroomMode = { false },
-                appendLog = {},
-                nowFormatted = { "12:00:00 PM" }
+                isDemoShowroomMode = { false }, appendLog = {}, nowFormatted = { "12:00:00 PM" }
             )
-            // First call probes /rulesservice.xml and persists VERIFIED_UNSUPPORTED + firmware
-            val first = coordinator.inspectDeviceHardwareRules(saved, forceRecheck = false)
-            assertEquals(HardwareRulesCapability.VERIFIED_UNSUPPORTED, first.capability)
+            assertEquals(HardwareRulesCapability.VERIFIED_UNSUPPORTED, coordinator.inspectDeviceHardwareRules(saved, false).capability)
             assertEquals(1, rtosServer.scpdFetches.get())
 
-            // Second call with refreshed Room row skips network probe completely
             val persisted = dao.getDeviceById(insertedId)!!
             assertTrue(persisted.isHardwareRulesCapabilityFresh)
-            val second = coordinator.inspectDeviceHardwareRules(persisted, forceRecheck = false)
-            assertEquals(HardwareRulesCapability.VERIFIED_UNSUPPORTED, second.capability)
+            assertEquals(HardwareRulesCapability.VERIFIED_UNSUPPORTED, coordinator.inspectDeviceHardwareRules(persisted, false).capability)
             assertEquals("Cached firmware verdict must skip LAN probe", 1, rtosServer.scpdFetches.get())
-
-            // Explicit forceRecheck=true re-probes the switch
             coordinator.inspectDeviceHardwareRules(persisted, forceRecheck = true)
             assertEquals(2, rtosServer.scpdFetches.get())
 
-            // HomeProfileSanitizer preserves verified verdicts on unchanged firmware, preserves Tier-1 hints on UNKNOWN, and invalidates on firmware change
             val sanitizer = org.suppressingfire.wemi.data.HomeProfileSanitizer(dao, { false }, { "12:00:00 PM" })
             val sameFwUnknownHint = org.suppressingfire.wemi.data.SsdpDiscoveredDevice(
                 name = "RTOS Dimmer", ipAddress = "127.0.0.1", port = rtosServer.port,
@@ -440,23 +459,15 @@ class HardwareRulesTest {
             assertTrue(keptVerified.isHardwareRulesCapabilityFresh)
 
             val upgradedFw = sanitizer.mergeDiscoveredMetadata(
-                base = keptVerified,
-                discovered = sameFwUnknownHint.copy(firmwareVersion = "WeMo_WW_3.00.99999.PVT"),
-                ipAddress = "127.0.0.1", port = rtosServer.port, isOn = false, brightness = 100,
-                latencyMs = 5, checkedAt = "12:01:00 PM", demoMode = false
+                keptVerified, sameFwUnknownHint.copy(firmwareVersion = "WeMo_WW_3.00.99999.PVT"),
+                "127.0.0.1", rtosServer.port, false, 100, 5, "12:01:00 PM", false
             )
             assertEquals(HardwareRulesCapability.UNKNOWN, upgradedFw.parsedHardwareRulesCapability)
             assertEquals("", upgradedFw.hardwareRulesVerifiedFirmware)
 
-            val tier1Base = persisted.copy(
-                hardwareRulesCapability = HardwareRulesCapability.LIKELY_SUPPORTED.name,
-                hardwareRulesLongPressCapable = true,
-                hardwareRulesVerifiedFirmware = ""
-            )
+            val tier1Base = persisted.copy(hardwareRulesCapability = HardwareRulesCapability.LIKELY_SUPPORTED.name, hardwareRulesLongPressCapable = true, hardwareRulesVerifiedFirmware = "")
             val keptTier1 = sanitizer.mergeDiscoveredMetadata(
-                base = tier1Base, discovered = sameFwUnknownHint,
-                ipAddress = "127.0.0.1", port = rtosServer.port, isOn = false, brightness = 100,
-                latencyMs = 5, checkedAt = "12:02:00 PM", demoMode = false
+                tier1Base, sameFwUnknownHint, "127.0.0.1", rtosServer.port, false, 100, 5, "12:02:00 PM", false
             )
             assertEquals(HardwareRulesCapability.LIKELY_SUPPORTED, keptTier1.parsedHardwareRulesCapability)
             assertTrue(keptTier1.hardwareRulesLongPressCapable)

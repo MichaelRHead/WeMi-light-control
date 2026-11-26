@@ -5,8 +5,6 @@ import android.database.sqlite.SQLiteDatabase
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -95,9 +93,7 @@ object HardwareRulesDbCodec {
             )
         } finally {
             runCatching { tempDbFile.delete() }
-            runCatching { File("${tempDbFile.path}-journal").delete() }
-            runCatching { File("${tempDbFile.path}-wal").delete() }
-            runCatching { File("${tempDbFile.path}-shm").delete() }
+            HardwareRulesDbMutator.cleanupSqliteSidecars(tempDbFile)
         }
     }
 
@@ -144,7 +140,11 @@ object HardwareRulesDbCodec {
         zipEntryName: String,
         inspectedDeviceUdn: String
     ): UnpackedRulesDbResult {
-        val db = SQLiteDatabase.openDatabase(sqliteFile.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+        val db = SQLiteDatabase.openDatabase(
+            sqliteFile.absolutePath,
+            null,
+            SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS
+        )
         return try {
             val integrity = runSingleTextQuery(db, "PRAGMA integrity_check").orEmpty()
             val integrityOk = integrity.equals("ok", ignoreCase = true)
@@ -166,8 +166,18 @@ object HardwareRulesDbCodec {
             val locationInfo = readLocationInfo(db, tables)
             val cleanInspectedUdn = LanRuntimeUtils.canonicalHardwareUdn(inspectedDeviceUdn)
 
+            val rulesCols = listColumnNames(db, "RULES")
+            val hasRuleOrder = "RULEORDER" in rulesCols
+            val orderExpr = if (hasRuleOrder) "RuleOrder" else "0"
+            val stateExpr = if ("STATE" in rulesCols) "State" else "'1'"
+            val orderClause = if (hasRuleOrder) {
+                "ORDER BY RuleOrder ASC, CAST(RuleID AS INTEGER) ASC"
+            } else {
+                "ORDER BY CAST(RuleID AS INTEGER) ASC"
+            }
+
             val parsedRules = mutableListOf<HardwareRule>()
-            db.rawQuery("SELECT RuleID, Name, Type, RuleOrder, State FROM RULES ORDER BY RuleOrder ASC, RuleID ASC", null)
+            db.rawQuery("SELECT RuleID, Name, Type, $orderExpr, $stateExpr FROM RULES $orderClause", null)
                 .use { cursor ->
                     while (cursor.moveToNext()) {
                         val ruleId = cursorInt(cursor, 0) ?: continue
@@ -179,14 +189,21 @@ object HardwareRulesDbCodec {
                         val groupedByDevice = if (rows.isEmpty()) {
                             mapOf("" to emptyList())
                         } else {
-                            rows.groupBy { it.deviceId }
+                            rows.groupBy { row ->
+                                LanRuntimeUtils.canonicalHardwareUdn(row.deviceId)
+                                    .ifBlank { row.deviceId.trim() }
+                                    .lowercase(Locale.US)
+                            }
                         }
-                        for ((ownerUdn, deviceRows) in groupedByDevice) {
+                        val isSharedMultiSwitch = groupedByDevice.size > 1
+                        for ((_, deviceRows) in groupedByDevice) {
                             val first = deviceRows.firstOrNull()
-                            val cleanOwner = LanRuntimeUtils.canonicalHardwareUdn(ownerUdn).ifBlank { ownerUdn }
-                            val appliesToSelf = cleanInspectedUdn.isBlank() ||
+                            val rawOwner = first?.deviceId.orEmpty()
+                            val cleanOwner = LanRuntimeUtils.canonicalHardwareUdn(rawOwner).ifBlank { rawOwner.trim() }
+                            val isOwnedByInspectedSwitch = cleanInspectedUdn.isBlank() ||
                                 cleanOwner.isBlank() ||
-                                cleanOwner.equals(cleanInspectedUdn, ignoreCase = true) ||
+                                cleanOwner.equals(cleanInspectedUdn, ignoreCase = true)
+                            val appliesToSelf = isOwnedByInspectedSwitch ||
                                 targetsByRuleId[ruleId].orEmpty().any {
                                     LanRuntimeUtils.canonicalHardwareUdn(it).equals(cleanInspectedUdn, ignoreCase = true)
                                 }
@@ -195,9 +212,17 @@ object HardwareRulesDbCodec {
                             val startPoint = st?.takeIf { it >= 0 }?.let {
                                 HardwareRuleTimePoint(it, first.onModeOffset?.takeIf { o -> o != -1 } ?: 0)
                             }
-                            val rawEnd = first?.endTime?.takeIf { it > 0 }
+                            val rawEnd = first?.endTime?.takeIf { it >= 0 }
                                 ?: if (st != null && dur != null && st >= 0 && dur > 0) {
-                                    (st + dur) % 86400
+                                    when (val durTag = dur % 10) {
+                                        1 -> 21601
+                                        2 -> 64802
+                                        else -> {
+                                            val baseStart = st - (st % 10)
+                                            val baseDur = dur - durTag
+                                            (baseStart + baseDur) % 86400
+                                        }
+                                    }
                                 } else {
                                     null
                                 }
@@ -222,7 +247,9 @@ object HardwareRulesDbCodec {
                                 sensorDurationSeconds = first?.sensorDuration?.coerceAtLeast(0) ?: 0,
                                 targetDeviceUdns = targetsByRuleId[ruleId].orEmpty(),
                                 sensorDeviceUdns = sensorsByRuleId[ruleId].orEmpty(),
-                                appliesToInspectedSwitch = appliesToSelf
+                                appliesToInspectedSwitch = appliesToSelf,
+                                isOwnedByInspectedSwitch = isOwnedByInspectedSwitch,
+                                isSharedMultiSwitch = isSharedMultiSwitch
                             )
                         }
                     }
@@ -251,8 +278,9 @@ object HardwareRulesDbCodec {
     }
 
     /**
-     * Saves an untouched raw `/rules.db` ZIP snapshot before inspection/mutation, retaining the
-     * newest [maxRetainedPerDevice] backups per switch so a known-good state can always be recovered.
+     * Saves an untouched raw `/rules.db` ZIP snapshot before inspection/mutation, deduplicating
+     * identical consecutive snapshots and atomically retaining the newest [maxRetainedPerDevice]
+     * backups per switch so a known-good state can always be recovered.
      */
     fun saveRawZipBackup(
         backupRootDir: File,
@@ -260,21 +288,19 @@ object HardwareRulesDbCodec {
         dbVersion: Int,
         rawZipBytes: ByteArray,
         maxRetainedPerDevice: Int = 5
-    ): File? {
-        if (rawZipBytes.isEmpty()) return null
-        val sanitizedKey = deviceKey.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "unknown_switch" }
-        val deviceDir = File(backupRootDir, sanitizedKey).apply { mkdirs() }
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        val outFile = File(deviceDir, "rules_v${dbVersion}_$stamp.zip")
-        return runCatching {
-            outFile.writeBytes(rawZipBytes)
-            val existing = deviceDir.listFiles { f -> f.isFile && f.extension == "zip" }
-                .orEmpty()
-                .sortedByDescending { it.lastModified() }
-            existing.drop(maxRetainedPerDevice.coerceAtLeast(1)).forEach { stale -> runCatching { stale.delete() } }
-            outFile
-        }.getOrNull()
-    }
+    ): File? = HardwareRulesBackupStore.saveRawZipBackup(
+        backupRootDir = backupRootDir,
+        deviceKey = deviceKey,
+        dbVersion = dbVersion,
+        rawZipBytes = rawZipBytes,
+        maxRetainedPerDevice = maxRetainedPerDevice
+    )
+
+    /**
+     * Lists retained raw `/rules.db` ZIP backups for [deviceKey], deterministically newest first.
+     */
+    fun listBackupsForDevice(backupRootDir: File, deviceKey: String): List<HardwareRulesBackupEntry> =
+        HardwareRulesBackupStore.listBackupsForDevice(backupRootDir, deviceKey)
 
     private data class RawRuleDeviceRow(
         val ruleId: Int,
@@ -296,7 +322,9 @@ object HardwareRulesDbCodec {
         val cols = listColumnNames(db, "RULEDEVICES")
         fun colOrNull(name: String, fallback: String = "NULL"): String = if (name in cols) name else fallback
         val sql = """
-            SELECT RuleID, DeviceID, DayID, StartTime, RuleDuration, StartAction, EndAction,
+            SELECT RuleID, DeviceID, DayID, StartTime, RuleDuration,
+                   ${colOrNull("STARTACTION", "NULL")},
+                   ${colOrNull("ENDACTION", "NULL")},
                    ${colOrNull("SENSORDURATION", "-1")},
                    ${colOrNull("ONMODEOFFSET", "-1")},
                    ${colOrNull("OFFMODEOFFSET", "-1")},
@@ -331,8 +359,15 @@ object HardwareRulesDbCodec {
 
     private fun readTargetDevices(db: SQLiteDatabase, tables: Set<String>): Map<Int, List<String>> {
         if ("TARGETDEVICES" !in tables) return emptyMap()
+        val cols = listColumnNames(db, "TARGETDEVICES")
+        if ("RULEID" !in cols || "DEVICEID" !in cols) return emptyMap()
+        val orderParts = buildList {
+            if ("DEVICEINDEX" in cols) add("DeviceIndex ASC")
+            if ("TARGETDEVICESPK" in cols) add("TargetDevicesPK ASC")
+        }
+        val orderClause = if (orderParts.isNotEmpty()) " ORDER BY ${orderParts.joinToString(", ")}" else ""
         val map = LinkedHashMap<Int, MutableList<String>>()
-        db.rawQuery("SELECT RuleID, DeviceID FROM TARGETDEVICES ORDER BY DeviceIndex ASC, TargetDevicesPK ASC", null)
+        db.rawQuery("SELECT RuleID, DeviceID FROM TARGETDEVICES$orderClause", null)
             .use { c ->
                 while (c.moveToNext()) {
                     val ruleId = cursorInt(c, 0) ?: continue
@@ -345,6 +380,8 @@ object HardwareRulesDbCodec {
 
     private fun readSensorCombinations(db: SQLiteDatabase, tables: Set<String>): Map<Int, List<String>> {
         if ("DEVICECOMBINATION" !in tables) return emptyMap()
+        val cols = listColumnNames(db, "DEVICECOMBINATION")
+        if ("RULEID" !in cols || "SENSORID" !in cols) return emptyMap()
         val map = LinkedHashMap<Int, MutableList<String>>()
         db.rawQuery("SELECT RuleID, SensorID FROM DEVICECOMBINATION", null).use { c ->
             while (c.moveToNext()) {
@@ -358,18 +395,25 @@ object HardwareRulesDbCodec {
 
     private fun readLocationInfo(db: SQLiteDatabase, tables: Set<String>): HardwareLocationInfo? {
         if ("LOCATIONINFO" !in tables) return null
-        return db.rawQuery("SELECT cityName, region, countryName, latitude, longitude FROM LOCATIONINFO LIMIT 1", null)
-            .use { c ->
-                if (!c.moveToFirst()) return@use null
-                val info = HardwareLocationInfo(
-                    cityName = cursorString(c, 0),
-                    region = cursorString(c, 1),
-                    countryName = cursorString(c, 2),
-                    latitude = cursorString(c, 3),
-                    longitude = cursorString(c, 4)
-                )
-                info.takeIf { it.cityName.isNotBlank() || it.latitude.isNotBlank() }
-            }
+        val cols = listColumnNames(db, "LOCATIONINFO")
+        fun colOrEmpty(name: String): String = if (name.uppercase(Locale.US) in cols) name else "''"
+        val sql = """
+            SELECT ${colOrEmpty("cityName")}, ${colOrEmpty("region")}, ${colOrEmpty("countryName")},
+                   ${colOrEmpty("latitude")}, ${colOrEmpty("longitude")}, ${colOrEmpty("countryCode")}
+            FROM LOCATIONINFO LIMIT 1
+        """.trimIndent()
+        return db.rawQuery(sql, null).use { c ->
+            if (!c.moveToFirst()) return@use null
+            val info = HardwareLocationInfo(
+                cityName = cursorString(c, 0),
+                region = cursorString(c, 1),
+                countryName = cursorString(c, 2),
+                latitude = cursorString(c, 3),
+                longitude = cursorString(c, 4),
+                countryCode = cursorString(c, 5)
+            )
+            info.takeIf { it.cityName.isNotBlank() || it.latitude.isNotBlank() || it.longitude.isNotBlank() }
+        }
     }
 
     internal fun listTableNames(db: SQLiteDatabase): Set<String> {

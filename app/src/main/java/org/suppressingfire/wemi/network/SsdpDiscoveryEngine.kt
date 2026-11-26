@@ -53,7 +53,8 @@ internal class SsdpDiscoveryEngine(
     suspend fun scanSubnetUnicast(
         subnetPrefix: String,
         searchTarget: String = XmlAndSkuParser.URN_BASIC_EVENT,
-        skipIps: Set<String> = emptySet()
+        skipIps: Set<String> = emptySet(),
+        probeSemaphore: Semaphore = Semaphore(3)
     ): List<SsdpDiscoveredDevice> = coroutineScope {
         val cleanPrefix = LanRuntimeUtils.normalizeSubnetPrefixOrNull(subnetPrefix)
             ?.takeIf { LanRuntimeUtils.isPrivateRfc1918Ipv4(it) }
@@ -73,17 +74,25 @@ internal class SsdpDiscoveryEngine(
                                 s.connect(InetSocketAddress(ip, port), 180)
                             }
                             val rtt = (System.currentTimeMillis() - start).coerceAtLeast(1L)
-                            for (path in listOf("/setup.xml", "/Lightsetup.xml")) {
-                                val locUrl = "http://$ip:$port$path"
-                                val desc = fetchLiveDeviceDescriptor(
-                                    locUrl,
-                                    "",
-                                    searchTarget,
-                                    rtt,
-                                    false
-                                )
-                                if (desc != null) return@withPermit desc
+                            val desc = probeSemaphore.withPermit {
+                                var matched: SsdpDiscoveredDevice? = null
+                                for (path in listOf("/setup.xml", "/Lightsetup.xml")) {
+                                    val locUrl = "http://$ip:$port$path"
+                                    val candidate = fetchLiveDeviceDescriptor(
+                                        locUrl,
+                                        "",
+                                        searchTarget,
+                                        rtt,
+                                        false
+                                    )
+                                    if (candidate != null) {
+                                        matched = candidate
+                                        break
+                                    }
+                                }
+                                matched
                             }
+                            if (desc != null) return@withPermit desc
                         } catch (e: CancellationException) {
                             throw e
                         } catch (_: ConnectException) {
@@ -352,7 +361,12 @@ internal class SsdpDiscoveryEngine(
                     add(localIp)
                     liveDiscovered.forEach { add(it.ipAddress) }
                 }
-                val swept = scanSubnetUnicast(prefix, searchTarget, skipIps = skipIps)
+                val swept = scanSubnetUnicast(
+                    subnetPrefix = prefix,
+                    searchTarget = searchTarget,
+                    skipIps = skipIps,
+                    probeSemaphore = probeSemaphore
+                )
                 for (desc in swept) {
                     if (liveDiscovered.none { it.matchesEndpointOrSerial(desc) }) {
                         liveDiscovered.add(desc)

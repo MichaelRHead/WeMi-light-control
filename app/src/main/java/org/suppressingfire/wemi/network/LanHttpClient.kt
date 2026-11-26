@@ -239,7 +239,10 @@ internal class LanHttpClient(
             if (read == -1) break
             offset += read
         }
-        return if (offset == length) out else out.copyOf(offset)
+        if (offset < length) {
+            throw EOFException("Truncated HTTP response body: expected $length bytes, received $offset")
+        }
+        return out
     }
 
     private fun readChunkedBody(input: InputStream, maxResponseBytes: Int): ByteArray {

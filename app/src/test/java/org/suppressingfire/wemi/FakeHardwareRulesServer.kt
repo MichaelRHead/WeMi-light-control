@@ -44,7 +44,12 @@ class FakeHardwareRulesServer(
     val currentRulesZipBytes = AtomicReference<ByteArray?>(initialRulesZipBytes)
     val deviceTimeUtc = AtomicLong(initialDeviceTimeUtc)
     val rejectNextStoreRules = AtomicBoolean(false)
+    val customStoreRulesErrorInfo = AtomicReference<String?>(null)
     val simulateReadBackStaleVersion = AtomicBoolean(false)
+    val simulateGenericFetchRules500 = AtomicBoolean(false)
+    val emptyVersionTagInFetchRules = AtomicBoolean(false)
+    val serveLightSetupXmlOnly = AtomicBoolean(false)
+    val failNextRulesDbDownload = AtomicBoolean(false)
 
     val scpdFetches = AtomicInteger(0)
     val fetchRulesCalls = AtomicInteger(0)
@@ -53,6 +58,8 @@ class FakeHardwareRulesServer(
     val getDeviceTimeCalls = AtomicInteger(0)
     val timeSyncCalls = AtomicInteger(0)
     val lastTimeSyncTimezone = AtomicReference("")
+    val lastTimeSyncDst = AtomicReference("")
+    val lastTimeSyncDstSupported = AtomicReference("")
     val receivedPaths = CopyOnWriteArrayList<String>()
 
     private val running = AtomicBoolean(true)
@@ -99,6 +106,10 @@ class FakeHardwareRulesServer(
         val out = sock.getOutputStream()
         if (requestLine.startsWith("GET /rules.db")) {
             rulesDbDownloads.incrementAndGet()
+            if (failNextRulesDbDownload.getAndSet(false)) {
+                writeResponse(out, "503 Service Unavailable", "text/plain", "Busy".toByteArray())
+                return
+            }
             val zip = currentRulesZipBytes.get()
             if (zip == null) {
                 writeResponse(out, "404 Not Found", "text/plain", "Not Found".toByteArray())
@@ -110,7 +121,15 @@ class FakeHardwareRulesServer(
 
         var status = "200 OK"
         val xml = when {
-            requestLine.startsWith("GET /setup.xml") -> buildSetupXml()
+            requestLine.startsWith("GET /setup.xml") -> {
+                if (serveLightSetupXmlOnly.get()) {
+                    status = "404 Not Found"
+                    "Not Found"
+                } else {
+                    buildSetupXml()
+                }
+            }
+            requestLine.startsWith("GET /Lightsetup.xml") -> buildSetupXml()
             requestLine.startsWith("GET /rulesservice.xml") -> {
                 scpdFetches.incrementAndGet()
                 buildRulesScpdXml()
@@ -120,14 +139,17 @@ class FakeHardwareRulesServer(
                 if (!supportsRulesDb) {
                     status = "500 Internal Server Error"
                     """<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode>s:Client</faultcode><faultstring>UPnPError</faultstring><detail><errorCode>401</errorCode><errorDescription>Invalid Action</errorDescription></detail></s:Fault></s:Body></s:Envelope>"""
+                } else if (simulateGenericFetchRules500.getAndSet(false)) {
+                    status = "500 Internal Server Error"
+                    """<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><s:Fault><faultcode>s:Server</faultcode><faultstring>UPnPError</faultstring><detail><errorCode>501</errorCode><errorDescription>Action Failed</errorDescription></detail></s:Fault></s:Body></s:Envelope>"""
                 } else {
-                    val ver = currentDbVersion.get()
+                    val verTag = if (emptyVersionTagInFetchRules.get()) "<ruleDbVersion/>" else "<ruleDbVersion>${currentDbVersion.get()}</ruleDbVersion>"
                     """
                     <s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/">
                       <s:Body>
                         <u:FetchRulesResponse xmlns:u="urn:Belkin:service:rules:1">
                           <ruleDbPath>http://127.0.0.1:$port/rules.db</ruleDbPath>
-                          <ruleDbVersion>$ver</ruleDbVersion>
+                          $verTag
                           <errorInfo></errorInfo>
                         </u:FetchRulesResponse>
                       </s:Body>
@@ -137,7 +159,10 @@ class FakeHardwareRulesServer(
             }
             soapAction.contains("StoreRules") -> {
                 storeRulesCalls.incrementAndGet()
-                if (rejectNextStoreRules.getAndSet(false)) {
+                val customErr = customStoreRulesErrorInfo.getAndSet(null)
+                if (customErr != null) {
+                    """<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:StoreRulesResponse xmlns:u="urn:Belkin:service:rules:1"><errorInfo>$customErr</errorInfo></u:StoreRulesResponse></s:Body></s:Envelope>"""
+                } else if (rejectNextStoreRules.getAndSet(false)) {
                     """<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:StoreRulesResponse xmlns:u="urn:Belkin:service:rules:1"><errorInfo>DB write error</errorInfo></u:StoreRulesResponse></s:Body></s:Envelope>"""
                 } else {
                     val newVer = Regex("<ruleDbVersion>(\\d+)</ruleDbVersion>").find(reqBody)?.groupValues?.getOrNull(1)?.toIntOrNull()
@@ -168,6 +193,8 @@ class FakeHardwareRulesServer(
                 timeSyncCalls.incrementAndGet()
                 Regex("<UTC>(\\d+)</UTC>").find(reqBody)?.groupValues?.getOrNull(1)?.toLongOrNull()?.let { deviceTimeUtc.set(it) }
                 Regex("<TimeZone>([^<]+)</TimeZone>").find(reqBody)?.groupValues?.getOrNull(1)?.let { lastTimeSyncTimezone.set(it) }
+                Regex("<dst>([^<]+)</dst>").find(reqBody)?.groupValues?.getOrNull(1)?.let { lastTimeSyncDst.set(it) }
+                Regex("<DstSupported>([^<]+)</DstSupported>").find(reqBody)?.groupValues?.getOrNull(1)?.let { lastTimeSyncDstSupported.set(it) }
                 """<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Body><u:TimeSyncResponse xmlns:u="urn:Belkin:service:timesync:1"><Status>0</Status></u:TimeSyncResponse></s:Body></s:Envelope>"""
             }
             soapAction.contains("GetBinaryState") -> {
@@ -289,7 +316,11 @@ class FakeHardwareRulesServer(
             val dbFile = File.createTempFile("sample_rules_", ".db", workDir.apply { mkdirs() })
             return try {
                 HardwareRulesSafetyValidator.createEmptyBelkinSchemaDb(dbFile)
-                val db = SQLiteDatabase.openDatabase(dbFile.absolutePath, null, SQLiteDatabase.OPEN_READWRITE)
+                val db = SQLiteDatabase.openDatabase(
+                    dbFile.absolutePath,
+                    null,
+                    SQLiteDatabase.OPEN_READWRITE or SQLiteDatabase.NO_LOCALIZED_COLLATORS
+                )
                 try {
                     db.execSQL("INSERT INTO RULES VALUES (1, 'Hold to Toggle Porch', 'Long Press', 0, '12201982', '12201982', '1', 0)")
                     db.execSQL("INSERT INTO RULEDEVICES (RuleID, DeviceID, GroupID, DayID, StartTime, RuleDuration, StartAction, EndAction, SensorDuration, Type, Value, Level, OnModeOffset, OffModeOffset, CountdownTime, EndTime) VALUES (1, '$ownerUdn', 0, -1, 60, 86340, 2.0, -1.0, -1, -1, -1, -1, 0, 0, -1, 86400)")
@@ -311,10 +342,12 @@ class FakeHardwareRulesServer(
                     db.execSQL("INSERT INTO LOCATIONINFO (cityName, countryName, latitude, longitude, countryCode, region) VALUES ('Mountain View', 'United States', '37.3861', '-122.0839', 'US', 'CA')")
                 } finally {
                     db.close()
+                    org.suppressingfire.wemi.network.HardwareRulesDbMutator.cleanupSqliteSidecars(dbFile)
                 }
                 HardwareRulesDbCodec.packFileToZipBytes(dbFile, zipEntryName)
             } finally {
                 runCatching { dbFile.delete() }
+                org.suppressingfire.wemi.network.HardwareRulesDbMutator.cleanupSqliteSidecars(dbFile)
             }
         }
     }

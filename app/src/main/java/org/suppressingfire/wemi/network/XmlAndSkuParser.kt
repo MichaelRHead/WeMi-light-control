@@ -30,6 +30,7 @@ object XmlAndSkuParser {
     private val MAC_ADDRESS_REGEX = Regex("<macAddress>([^<]+)</macAddress>", RegexOption.IGNORE_CASE)
     private val UDN_REGEX = Regex("<UDN>([^<]+)</UDN>", RegexOption.IGNORE_CASE)
     private val RTOS_REGEX = Regex("<rtos>\\s*1\\s*</rtos>", RegexOption.IGNORE_CASE)
+    private val EXPLICIT_RTOS_FW_REGEX = Regex("-rtos(?:-|$)", RegexOption.IGNORE_CASE)
     private val SERVICE_BLOCK_REGEX = Regex("<service>([\\s\\S]*?)</service>", RegexOption.IGNORE_CASE)
     private val CONTROL_URL_REGEX = Regex("<controlURL>([^<]+)</controlURL>", RegexOption.IGNORE_CASE)
     private val SCPD_URL_REGEX = Regex("<SCPDURL>([^<]+)</SCPDURL>", RegexOption.IGNORE_CASE)
@@ -325,7 +326,7 @@ object XmlAndSkuParser {
         }
         val fwLower = firmwareVersion.lowercase(Locale.US)
         val isExplicitOpenWrt = fwLower.contains("owrt")
-        val isExplicitRtos = fwLower.contains("-rtos-") ||
+        val isExplicitRtos = EXPLICIT_RTOS_FW_REGEX.containsMatchIn(firmwareVersion) ||
             udn.contains("Dimmer-2_0", ignoreCase = true) ||
             udn.contains("OutdoorPlug", ignoreCase = true) ||
             (isRtosTag && !isExplicitOpenWrt)

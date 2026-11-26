@@ -27,16 +27,17 @@ internal class DemoHardwareRulesStore(
     private val nowFormatted: () -> String
 ) {
     private val snapshotsByDeviceId = ConcurrentHashMap<Int, DeviceHardwareRulesSnapshot>()
-    private val backupHistoryByDeviceId = ConcurrentHashMap<Int, MutableList<Pair<HardwareRulesBackupEntry, DeviceHardwareRulesSnapshot>>>()
+    private val backupLock = Any()
+    private val backupHistoryByDeviceId = HashMap<Int, MutableList<Pair<HardwareRulesBackupEntry, DeviceHardwareRulesSnapshot>>>()
 
     fun clear() {
         snapshotsByDeviceId.clear()
-        backupHistoryByDeviceId.clear()
+        synchronized(backupLock) { backupHistoryByDeviceId.clear() }
     }
 
     fun evictDevice(deviceId: Int) {
         snapshotsByDeviceId.remove(deviceId)
-        backupHistoryByDeviceId.remove(deviceId)
+        synchronized(backupLock) { backupHistoryByDeviceId.remove(deviceId) }
     }
 
     fun getOrCreateSnapshot(device: DeviceEntity, allDevices: List<DeviceEntity>): DeviceHardwareRulesSnapshot =
@@ -54,9 +55,10 @@ internal class DemoHardwareRulesStore(
         pushDemoBackup(device.id, current)
         val nextId = draft.existingRuleId?.takeIf { it > 0 }
             ?: ((current.rules.maxOfOrNull { it.ruleId } ?: (device.id * 10)) + 1)
+        val existingRule = current.rules.firstOrNull { it.ruleId == nextId }
         val cleanName = HardwareRulesDbMutator.sanitizeSqlText(draft.name)
             .ifBlank { HardwareRulesDbMutator.defaultRuleName(draft) }
-        val newRule = draftToHardwareRule(nextId, cleanName, current.deviceUdn, draft)
+        val newRule = draftToHardwareRule(nextId, cleanName, current.deviceUdn, draft, existingRule)
         val updatedRules = current.rules.filterNot { it.ruleId == nextId } + newRule
         val nextSnap = current.copy(
             dbVersion = current.dbVersion + 1,
@@ -84,15 +86,17 @@ internal class DemoHardwareRulesStore(
         val current = getOrCreateSnapshot(device, allDevices)
         pushDemoBackup(device.id, current)
         val updated = current.rules.map { if (it.ruleId == ruleId) it.copy(isEnabled = enabled) else it }
+        val synced = enabled && current.deviceTimeInfo?.needsTimeSync == true
         val nextSnap = current.copy(
             dbVersion = current.dbVersion + 1,
             rules = updated,
+            deviceTimeInfo = if (synced) current.deviceTimeInfo?.copy(driftSeconds = 0, needsTimeSync = false) else current.deviceTimeInfo,
             availableBackups = listDemoBackups(device.id),
             diagnosticMessage = if (enabled) "Enabled rule (Demo DB v${current.dbVersion + 1})" else "Paused rule (Demo DB v${current.dbVersion + 1})",
             inspectedAt = nowFormatted()
         )
         snapshotsByDeviceId[device.id] = nextSnap
-        return HardwareRulesWriteResult(true, nextSnap, nextSnap.diagnosticMessage)
+        return HardwareRulesWriteResult(true, nextSnap, nextSnap.diagnosticMessage, clockSynced = synced)
     }
 
     fun deleteRule(
@@ -132,12 +136,25 @@ internal class DemoHardwareRulesStore(
         location: HardwareLocationInfo
     ): HardwareRulesWriteResult {
         val current = getOrCreateSnapshot(device, allDevices)
+        val latNum = location.latitude.trim().toDoubleOrNull()
+        val lonNum = location.longitude.trim().toDoubleOrNull()
+        if (latNum == null || latNum !in -90.0..90.0 || lonNum == null || lonNum !in -180.0..180.0) {
+            return HardwareRulesWriteResult(false, current, "Latitude must be between -90 and 90 and longitude between -180 and 180")
+        }
+        val normalizedLoc = location.copy(
+            cityName = HardwareRulesDbMutator.sanitizeSqlText(location.cityName),
+            region = HardwareRulesDbMutator.sanitizeSqlText(location.region),
+            countryName = HardwareRulesDbMutator.sanitizeSqlText(location.countryName),
+            latitude = String.format(Locale.US, "%.4f", latNum),
+            longitude = String.format(Locale.US, "%.4f", lonNum),
+            countryCode = HardwareRulesDbMutator.resolveCountryCode(location)
+        )
         pushDemoBackup(device.id, current)
         val nextSnap = current.copy(
             dbVersion = current.dbVersion + 1,
-            locationInfo = location,
+            locationInfo = normalizedLoc,
             availableBackups = listDemoBackups(device.id),
-            diagnosticMessage = "Updated solar location to ${location.formatSummary()} (Demo DB v${current.dbVersion + 1})",
+            diagnosticMessage = "Updated solar location to ${normalizedLoc.formatSummary()} (Demo DB v${current.dbVersion + 1})",
             inspectedAt = nowFormatted()
         )
         snapshotsByDeviceId[device.id] = nextSnap
@@ -150,9 +167,9 @@ internal class DemoHardwareRulesStore(
         backupFilePath: String
     ): HardwareRulesWriteResult {
         val current = getOrCreateSnapshot(device, allDevices)
-        val history = backupHistoryByDeviceId[device.id].orEmpty()
-        val match = history.firstOrNull { it.first.filePath == backupFilePath }
-            ?: return HardwareRulesWriteResult(false, current, "Backup not found")
+        val match = synchronized(backupLock) {
+            backupHistoryByDeviceId[device.id]?.firstOrNull { it.first.filePath == backupFilePath }
+        } ?: return HardwareRulesWriteResult(false, current, "Backup not found")
         pushDemoBackup(device.id, current)
         val restored = match.second.copy(
             dbVersion = current.dbVersion + 1,
@@ -165,7 +182,6 @@ internal class DemoHardwareRulesStore(
     }
 
     private fun pushDemoBackup(deviceId: Int, snapshot: DeviceHardwareRulesSnapshot) {
-        val list = backupHistoryByDeviceId.getOrPut(deviceId) { mutableListOf() }
         val stamp = SimpleDateFormat("MMM d, h:mm a", Locale.US).format(Date())
         val entry = HardwareRulesBackupEntry(
             filePath = "demo://backup/${deviceId}/v${snapshot.dbVersion}_${System.nanoTime()}",
@@ -173,18 +189,22 @@ internal class DemoHardwareRulesStore(
             createdAtLabel = stamp,
             sizeBytes = 4096L
         )
-        list.add(0, entry to snapshot)
-        while (list.size > 5) list.removeAt(list.lastIndex)
+        synchronized(backupLock) {
+            val list = backupHistoryByDeviceId.getOrPut(deviceId) { mutableListOf() }
+            list.add(0, entry to snapshot)
+            while (list.size > 5) list.removeAt(list.lastIndex)
+        }
     }
 
     private fun listDemoBackups(deviceId: Int): List<HardwareRulesBackupEntry> =
-        backupHistoryByDeviceId[deviceId]?.map { it.first }.orEmpty()
+        synchronized(backupLock) { backupHistoryByDeviceId[deviceId]?.map { it.first }.orEmpty() }
 
     private fun draftToHardwareRule(
         ruleId: Int,
         name: String,
         ownerUdn: String,
-        draft: HardwareRuleDraft
+        draft: HardwareRuleDraft,
+        existingRule: HardwareRule? = null
     ): HardwareRule {
         fun makePoint(anchor: HardwareTimeAnchor, h: Int, m: Int, offMin: Int): HardwareRuleTimePoint = when (anchor) {
             HardwareTimeAnchor.SUNRISE -> HardwareRuleTimePoint(21601, offMin * 60)
@@ -219,9 +239,9 @@ internal class DemoHardwareRulesStore(
                 ruleOrder = ruleId,
                 ownerDeviceUdn = ownerUdn,
                 daysOfWeek = draft.daysOfWeek,
-                startTime = HardwareRuleTimePoint(0),
-                endTime = HardwareRuleTimePoint(86400),
-                ruleDurationSeconds = 86400,
+                startTime = existingRule?.takeIf { it.type == HardwareRuleType.COUNTDOWN_TIMER }?.startTime ?: HardwareRuleTimePoint(0),
+                endTime = existingRule?.takeIf { it.type == HardwareRuleType.COUNTDOWN_TIMER }?.endTime ?: HardwareRuleTimePoint(86400),
+                ruleDurationSeconds = existingRule?.takeIf { it.type == HardwareRuleType.COUNTDOWN_TIMER }?.ruleDurationSeconds ?: 86400,
                 startAction = 1.0,
                 endAction = 0.0,
                 countdownSeconds = draft.countdownMinutes.coerceIn(1, 1440) * 60,
@@ -361,7 +381,7 @@ internal class DemoHardwareRulesStore(
             longPressCapable = true,
             dbVersion = 4,
             rules = rules,
-            locationInfo = HardwareLocationInfo("Mountain View", "CA", "United States", "37.3861", "-122.0839"),
+            locationInfo = HardwareLocationInfo("Mountain View", "CA", "United States", "37.3861", "-122.0839", "US"),
             existingTables = setOf("RULES", "RULEDEVICES", "TARGETDEVICES", "LOCATIONINFO"),
             integrityOk = true,
             diagnosticMessage = "Demo showcase snapshot (${rules.size} on-device rule(s))",

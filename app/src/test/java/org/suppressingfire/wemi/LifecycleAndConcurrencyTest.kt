@@ -321,6 +321,66 @@ class LifecycleAndConcurrencyTest {
         }
         assertPropagatesCancellation("probeSetupDevice") { prober.probeSetupDevice("127.0.0.1", 49152) }
         assertPropagatesCancellation("fetchAvailableApList") { prober.fetchAvailableApList("127.0.0.1", 49152) }
+
+        val cancellingRulesClient = org.suppressingfire.wemi.network.HardwareRulesClient(
+            appContext = ApplicationProvider.getApplicationContext(),
+            socketFactoryOverride = cancellingSocketFactory
+        )
+        val probeDev = DeviceEntity(id = 9, name = "Cancel Switch", ipAddress = "127.0.0.1", port = 49153, udn = "uuid:Lightswitch-3_0-CAN01")
+        assertPropagatesCancellation("probeRulesCapability") { cancellingRulesClient.probeRulesCapability(probeDev) }
+        assertPropagatesCancellation("fetchDeviceRulesSnapshot") { cancellingRulesClient.fetchDeviceRulesSnapshot(probeDev) }
+        assertPropagatesCancellation("syncDeviceTime") { cancellingRulesClient.syncDeviceTime(probeDev) }
+        assertPropagatesCancellation("mutateAndStoreRulesDb") { cancellingRulesClient.mutateAndStoreRulesDb(probeDev) {} }
+    }
+
+    @Test
+    fun `verify LanHttpClient throws EOFException on truncated Content-Length and Coordinator blocks unowned rules and blank real-LAN UDN`() = runBlocking {
+        // 1. Truncated Content-Length must throw EOFException instead of silently returning partial bytes
+        ServerSocket(0, 4, InetAddress.getByName("127.0.0.1")).use { ss ->
+            val t = kotlin.concurrent.thread(isDaemon = true) {
+                ss.accept().use { s ->
+                    s.getInputStream().read(ByteArray(512))
+                    s.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: 500\r\nConnection: close\r\n\r\nPARTIAL".toByteArray())
+                    s.getOutputStream().flush()
+                }
+            }
+            var threwEof = false
+            try {
+                LanHttpClient(connectTimeoutMs = 400, readTimeoutMs = 400).getBytes("http://127.0.0.1:${ss.localPort}/rules.db")
+            } catch (_: java.io.EOFException) {
+                threwEof = true
+            }
+            assertTrue("Truncated Content-Length must throw EOFException", threwEof)
+            t.join(1000)
+        }
+
+        // 2. Coordinator refuses mutating unowned/shared rules and refuses blank UDN when /setup.xml lacks UDN
+        val app = ApplicationProvider.getApplicationContext<Context>()
+        val repo = SwitchRepository(dao = database.switchDao(), context = app, initialDemoModeOverride = false)
+        try {
+            val blankUdnId = database.switchDao().insertDevice(
+                DeviceEntity(name = "No UDN Switch", ipAddress = "127.0.0.1", port = 1, serialNumber = "UNKNOWN", udn = "")
+            ).toInt()
+            val blankDev = database.switchDao().getDeviceById(blankUdnId)!!
+            val blankSave = repo.saveHardwareRule(
+                blankDev,
+                org.suppressingfire.wemi.network.HardwareRuleDraft(name = "Should Refuse", type = org.suppressingfire.wemi.network.HardwareRuleType.COUNTDOWN_TIMER, countdownMinutes = 10)
+            )
+            assertFalse("Real-LAN save must refuse blank UDN rather than fabricating one", blankSave.success)
+
+            val sharedRule = org.suppressingfire.wemi.network.HardwareRule(
+                ruleId = 42, name = "Shared", type = org.suppressingfire.wemi.network.HardwareRuleType.SCHEDULE_INTERVAL,
+                rawFirmwareType = "Time Interval", isEnabled = true, ruleOrder = 0, ownerDeviceUdn = "uuid:Lightswitch-3_0-A",
+                daysOfWeek = listOf(1), startTime = null, endTime = null, ruleDurationSeconds = 3600,
+                startAction = 1.0, endAction = 0.0, countdownSeconds = 0, sensorDurationSeconds = 0,
+                isOwnedByInspectedSwitch = true, isSharedMultiSwitch = true
+            )
+            assertFalse(repo.toggleHardwareRule(blankDev, sharedRule, false).success)
+            assertFalse(repo.deleteHardwareRule(blankDev, sharedRule).success)
+            assertFalse(repo.toggleHardwareRule(blankDev, sharedRule.copy(isOwnedByInspectedSwitch = false, isSharedMultiSwitch = false), false).success)
+        } finally {
+            repo.close()
+        }
     }
 
     @Test

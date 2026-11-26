@@ -186,13 +186,13 @@ class SwitchRepository(
         }
     }
 
-    suspend fun resetLanHomesSwitchesAndRooms(
-        onActiveKeyResolved: ((String) -> Unit)? = null
-    ): String = setDemoShowroomMode(false, onActiveKeyResolved)
-
-    suspend fun resetToClassicScreenshotPreset() = seedAndModeMutex.withLock {
-        resetToClassicScreenshotPresetLocked()
+    suspend fun resetLanHomesSwitchesAndRooms(onActiveKeyResolved: ((String) -> Unit)? = null): String {
+        val key = setDemoShowroomMode(false, onActiveKeyResolved)
+        hardwareRulesClient.clearAllBackups()
+        return key
     }
+
+    suspend fun resetToClassicScreenshotPreset() = seedAndModeMutex.withLock { resetToClassicScreenshotPresetLocked() }
 
     private suspend fun resetToClassicScreenshotPresetLocked(
         onActiveKeyResolved: ((String) -> Unit)? = null
@@ -429,20 +429,15 @@ class SwitchRepository(
         hardwareRulesCoordinator.evictDevice(id)
         if (existing != null) {
             deviceMutexes.remove(existing.concurrencyKey())
+            hardwareRulesClient.clearDeviceBackups(existing)
             if (!_isDemoShowroomMode.value) genaManager.unsubscribeDevice(existing)
         }
     }
 
-    suspend fun inspectDeviceHardwareRules(
-        device: DeviceEntity,
-        forceRecheck: Boolean = false
-    ): DeviceHardwareRulesSnapshot =
+    suspend fun inspectDeviceHardwareRules(device: DeviceEntity, forceRecheck: Boolean = false): DeviceHardwareRulesSnapshot =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.inspectDeviceHardwareRules(device, forceRecheck) }
 
-    suspend fun inspectAllHomeHardwareRules(
-        networkKey: String,
-        forceRecheck: Boolean = false
-    ): List<DeviceHardwareRulesSnapshot> =
+    suspend fun inspectAllHomeHardwareRules(networkKey: String, forceRecheck: Boolean = false): List<DeviceHardwareRulesSnapshot> =
         awaitDemoSeedIfPending().let { hardwareRulesCoordinator.inspectAllHomeHardwareRules(networkKey, forceRecheck) }
 
     suspend fun saveHardwareRule(device: DeviceEntity, draft: HardwareRuleDraft): HardwareRulesWriteResult =

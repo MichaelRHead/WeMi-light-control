@@ -140,10 +140,16 @@ data class HardwareLocationInfo(
     val region: String,
     val countryName: String,
     val latitude: String,
-    val longitude: String
+    val longitude: String,
+    val countryCode: String = ""
 ) {
-    fun formatSummary(): String =
-        listOf(cityName, region, countryName).filter { it.isNotBlank() }.joinToString(", ")
+    fun formatSummary(): String {
+        val named = listOf(cityName, region, countryName).filter { it.isNotBlank() }.joinToString(", ")
+        if (named.isNotBlank()) return named
+        val lat = latitude.trim()
+        val lon = longitude.trim()
+        return if (lat.isNotBlank() && lon.isNotBlank()) "$lat, $lon" else ""
+    }
 }
 
 data class HardwareDeviceTimeInfo(
@@ -173,7 +179,9 @@ data class HardwareRule(
     val sensorDurationSeconds: Int,
     val targetDeviceUdns: List<String> = emptyList(),
     val sensorDeviceUdns: List<String> = emptyList(),
-    val appliesToInspectedSwitch: Boolean = true
+    val appliesToInspectedSwitch: Boolean = true,
+    val isOwnedByInspectedSwitch: Boolean = true,
+    val isSharedMultiSwitch: Boolean = false
 ) {
     fun formatDaysSummary(): String {
         val validDays = daysOfWeek.filter { it in 1..7 }.distinct().sorted()
@@ -261,10 +269,14 @@ data class HardwareRule(
     }
 
     val isEditableInApp: Boolean
-        get() = type == HardwareRuleType.LONG_PRESS ||
-            type == HardwareRuleType.COUNTDOWN_TIMER ||
-            type == HardwareRuleType.SCHEDULE_INTERVAL ||
-            type == HardwareRuleType.SIMPLE_TIMER
+        get() = isOwnedByInspectedSwitch &&
+            !isSharedMultiSwitch &&
+            (
+                type == HardwareRuleType.LONG_PRESS ||
+                    type == HardwareRuleType.COUNTDOWN_TIMER ||
+                    type == HardwareRuleType.SCHEDULE_INTERVAL ||
+                    type == HardwareRuleType.SIMPLE_TIMER
+                )
 
     private fun formatBinaryAction(value: Double?): String? = when (value?.toInt()) {
         0 -> "Turn OFF"
@@ -361,7 +373,9 @@ data class HardwareRuleDraft(
                     offsetMinutes = (point.offsetSeconds / 60).coerceIn(-120, 120)
                 )
                 else -> {
-                    val totalMin = (point.rawSeconds.coerceIn(0, 86399) / 60)
+                    val clampedSec = point.rawSeconds.coerceIn(0, 86400)
+                    val normalizedSec = if (clampedSec == 86400) 0 else clampedSec
+                    val totalMin = normalizedSec / 60
                     DecodedTime(
                         anchor = HardwareTimeAnchor.FIXED_TIME,
                         hour24 = (totalMin / 60) % 24,
@@ -423,7 +437,8 @@ data class DeviceHardwareRulesSnapshot(
     val backupFilePath: String? = null,
     val availableBackups: List<HardwareRulesBackupEntry> = emptyList(),
     val diagnosticMessage: String = "",
-    val inspectedAt: String = ""
+    val inspectedAt: String = "",
+    val hasInspectionError: Boolean = false
 ) {
     val activeRuleCount: Int
         get() = rules.count { it.isEnabled }

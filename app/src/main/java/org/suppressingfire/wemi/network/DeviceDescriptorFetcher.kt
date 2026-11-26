@@ -119,15 +119,29 @@ internal class DeviceDescriptorFetcher(
                 base.hardwareSku
             }
 
+            val enrichedFirmware = meta?.firmwareVersion?.takeIf { it.isNotBlank() } ?: base.firmwareVersion
+            val refreshedRulesHint = if (enrichedFirmware != base.firmwareVersion) {
+                XmlAndSkuParser.inferRulesCapabilityFromSetupXml(
+                    xml = xml,
+                    locationUrl = locationUrl,
+                    udn = base.usn,
+                    firmwareVersion = enrichedFirmware
+                )
+            } else {
+                null
+            }
+
             base.copy(
                 isOn = stateProbe.binaryStateOn ?: base.isOn,
                 brightness = stateProbe.brightness ?: base.brightness,
                 serialNumber = meta?.serialNumber?.takeIf { !LanRuntimeUtils.isPlaceholderSerial(it) } ?: base.serialNumber,
-                firmwareVersion = meta?.firmwareVersion?.takeIf { it.isNotBlank() } ?: base.firmwareVersion,
+                firmwareVersion = enrichedFirmware,
                 hardwareSku = enrichedSku,
                 macAddress = meta?.macAddress?.takeIf { it.isNotBlank() } ?: base.macAddress,
                 wifiSsid = meta?.accessPointSsid.orEmpty(),
-                signalStrengthPercent = rssi ?: 85
+                signalStrengthPercent = rssi ?: 85,
+                rulesCapabilityHint = refreshedRulesHint?.capability ?: base.rulesCapabilityHint,
+                longPressCapableHint = refreshedRulesHint?.longPressCapable ?: base.longPressCapableHint
             )
         } catch (e: CancellationException) {
             throw e

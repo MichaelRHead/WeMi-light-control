@@ -296,7 +296,7 @@ fun normalizeDeviceNameForInference(deviceName: String): String {
         .replace(RoomAndCategoryRules.ACRONYM_CAMEL_BOUNDARY_REGEX, "$1 $2")
         .replace(RoomAndCategoryRules.CAMEL_CASE_BOUNDARY_REGEX, "$1 $2")
         .replace(RoomAndCategoryRules.DELIMITER_NORMALIZE_REGEX, " ")
-        .lowercase()
+        .lowercase(Locale.US)
         .replace(RoomAndCategoryRules.MULTI_SPACE_REGEX, " ")
         .trim()
 }
