@@ -3,6 +3,7 @@ package org.suppressingfire.wemi
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -396,6 +397,8 @@ class HardwareRulesE2ETest {
                 }
                 awaitRulesListNode("Shared Entry Schedule", isTag = false)
                 composeTestRule.onAllNodes(hasText("Shared Entry Schedule")).onFirst().assertIsDisplayed()
+                composeTestRule.onAllNodes(hasTestTag("delete_hardware_rule_${sharedId}_10")).onFirst().assertIsNotEnabled()
+                composeTestRule.onAllNodes(hasTestTag("toggle_hardware_rule_${sharedId}_10")).onFirst().assertIsNotEnabled()
 
                 // Expand Corrupt Rules Switch in Devices tab: drawer surfaces diagnostic error instead of '0 rule(s) stored'
                 composeTestRule.onNodeWithTag("nav_tab_devices").performClick()

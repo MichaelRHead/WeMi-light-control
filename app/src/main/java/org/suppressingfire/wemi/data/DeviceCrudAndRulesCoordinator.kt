@@ -13,9 +13,9 @@ import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.network.NetworkClient
 
 /**
- * Coordinates Room v5 CRUD operations, manual-IP 9-port hardware enrichment (`saveDevice`),
- * NVRAM friendly-name synchronization (`ChangeFriendlyName`), room-wide batch power/brightness
- * fan-out, and local schedule/motion rule execution on behalf of [SwitchRepository].
+ * Coordinates Room v7 CRUD operations, manual-IP 9-port hardware enrichment (`saveDevice`),
+ * NVRAM friendly-name synchronization (`ChangeFriendlyName`), and room-wide batch power/brightness
+ * fan-out on behalf of [SwitchRepository].
  */
 internal class DeviceCrudAndRulesCoordinator(
     private val dao: SwitchDao,

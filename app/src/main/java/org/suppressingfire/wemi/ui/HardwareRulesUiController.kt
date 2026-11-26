@@ -120,7 +120,7 @@ internal class HardwareRulesUiController(
     fun openEditHardwareRuleDialog(device: DeviceEntity, rule: HardwareRule) {
         if (!rule.isEditableInApp) {
             val reason = when {
-                rule.isSharedMultiSwitch -> "'${rule.name}' is shared across multiple switches; toggle or delete it directly"
+                rule.isSharedMultiSwitch -> "'${rule.name}' is shared across multiple switches and is read-only here"
                 !rule.isOwnedByInspectedSwitch -> "'${rule.name}' is controlled by another switch; edit it on its owner switch"
                 else -> "Toggle or delete '${rule.name}' directly; only Long Press, Auto-Off & Schedules can be edited"
             }

@@ -236,7 +236,7 @@ internal class HardwareRulesCoordinator(
         return runArmoredDeviceMutation(device, opEpoch) { fresh, _, onPortResolved ->
             val ownerUdn = cachedOwnerUdn(fresh)
             hardwareRulesClient.mutateAndStoreRulesDb(fresh, autoSyncClockIfNeeded = enabled, onPortResolved = onPortResolved) { dbFile ->
-                if (ownerUdn.isNotBlank()) HardwareRulesDbMutator.verifyRuleOwnedExclusivelyBy(dbFile, rule.ruleId, ownerUdn)
+                HardwareRulesDbMutator.verifyRuleOwnedExclusivelyBy(dbFile, rule.ruleId, ownerUdn)
                 check(HardwareRulesDbMutator.toggleRuleEnabled(dbFile, rule.ruleId, enabled)) {
                     "Rule #${rule.ruleId} was no longer present on ${fresh.name}"
                 }
@@ -253,7 +253,7 @@ internal class HardwareRulesCoordinator(
         return runArmoredDeviceMutation(device, opEpoch) { fresh, _, onPortResolved ->
             val ownerUdn = cachedOwnerUdn(fresh)
             hardwareRulesClient.mutateAndStoreRulesDb(fresh, autoSyncClockIfNeeded = false, onPortResolved = onPortResolved) { dbFile ->
-                if (ownerUdn.isNotBlank()) HardwareRulesDbMutator.verifyRuleOwnedExclusivelyBy(dbFile, rule.ruleId, ownerUdn)
+                HardwareRulesDbMutator.verifyRuleOwnedExclusivelyBy(dbFile, rule.ruleId, ownerUdn)
                 check(HardwareRulesDbMutator.deleteRule(dbFile, rule.ruleId)) {
                     "Rule #${rule.ruleId} was no longer present on ${fresh.name}"
                 }

@@ -162,6 +162,7 @@ internal fun HardwareRuleSummaryRow(
                 }
                 Spacer(modifier = Modifier.width(6.dp))
 
+                val canMutateRule = controlsEnabled && rule.isOwnedByInspectedSwitch && !rule.isSharedMultiSwitch
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (rule.isEditableInApp) {
                         IconButton(
@@ -179,20 +180,20 @@ internal fun HardwareRuleSummaryRow(
                     }
                     IconButton(
                         onClick = onDeleteClick,
-                        enabled = controlsEnabled,
+                        enabled = canMutateRule,
                         modifier = Modifier.testTag("delete_hardware_rule_${deviceId}_${rule.ruleId}")
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = "Delete ${rule.name}",
-                            tint = if (controlsEnabled) WemoTextSecondary else WemoTextSecondary.copy(alpha = 0.38f),
+                            tint = if (canMutateRule) WemoTextSecondary else WemoTextSecondary.copy(alpha = 0.38f),
                             modifier = Modifier.size(19.dp)
                         )
                     }
                     Switch(
                         checked = rule.isEnabled,
                         onCheckedChange = onToggleEnabled,
-                        enabled = controlsEnabled,
+                        enabled = canMutateRule,
                         colors = SwitchDefaults.colors(checkedTrackColor = WemoGreenPrimary),
                         modifier = Modifier
                             .semantics {
