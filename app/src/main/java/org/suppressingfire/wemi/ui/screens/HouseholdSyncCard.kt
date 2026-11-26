@@ -110,7 +110,7 @@ internal fun HouseholdSyncCard(
             }
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Share your $homeCount home(s) and $deviceCount switch(es) (custom names, rooms, and order) via JSON or local Wi-Fi pairing — no cloud account or Wi-Fi passwords included.",
+                text = "Share your $homeCount home(s) and $deviceCount switch(es) (custom names, rooms, order, Wi-Fi names, local LAN IPs, and switch IDs) via JSON or PIN-authenticated local Wi-Fi pairing — no cloud account or Wi-Fi passwords included.",
                 fontFamily = FontFamily.SansSerif,
                 fontSize = 13.sp,
                 color = WemoTextSecondary

@@ -287,7 +287,7 @@ internal class HouseholdSyncUiController(
                         deviceLabel = deviceDisplayLabel(isTv),
                         isTv = isTv,
                         onPayloadReceived = { received ->
-                            if (receiveSessionEpoch.get() != myEpoch) return@startSession
+                            if (!receiveSessionEpoch.compareAndSet(myEpoch, myEpoch + 1)) return@startSession
                             _uiState.update {
                                 it.copy(
                                     activeReceiveSession = null,
@@ -300,7 +300,7 @@ internal class HouseholdSyncUiController(
                             }
                         },
                         onSessionExpired = {
-                            if (receiveSessionEpoch.get() != myEpoch) return@startSession
+                            if (!receiveSessionEpoch.compareAndSet(myEpoch, myEpoch + 1)) return@startSession
                             _uiState.update {
                                 it.copy(
                                     activeReceiveSession = null,
@@ -309,7 +309,7 @@ internal class HouseholdSyncUiController(
                             }
                         },
                         onSessionLockedOut = {
-                            if (receiveSessionEpoch.get() != myEpoch) return@startSession
+                            if (!receiveSessionEpoch.compareAndSet(myEpoch, myEpoch + 1)) return@startSession
                             _uiState.update {
                                 it.copy(
                                     activeReceiveSession = null,
@@ -352,6 +352,27 @@ internal class HouseholdSyncUiController(
                         receiveStatusMessage = "Ready on ${session.ipAddress}:${session.port}"
                     )
                 }
+            }
+        }
+    }
+
+    /**
+     * Stops any live local-LAN pairing listener when the Activity moves to the background (`ON_STOP`),
+     * preserving an already-received [HouseholdSyncUiState.pendingImport] awaiting user confirmation.
+     */
+    fun pauseReceiveSessionForBackground() {
+        val current = _uiState.value
+        if (!current.showReceiveDialog || current.pendingImport != null) return
+        if (current.activeReceiveSession == null && lanServer == null && receiveJob == null) return
+        stopLanServer()
+        _uiState.update {
+            if (!it.showReceiveDialog || it.pendingImport != null) {
+                it
+            } else {
+                it.copy(
+                    activeReceiveSession = null,
+                    receiveStatusMessage = "Pairing paused in background — tap New Code to resume"
+                )
             }
         }
     }

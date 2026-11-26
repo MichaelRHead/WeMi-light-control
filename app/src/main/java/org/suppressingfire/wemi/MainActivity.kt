@@ -275,6 +275,7 @@ fun WeMiSwitchApp(
                         state = householdSyncState,
                         onStartNewSession = { viewModel.householdSync.openReceiveDialog(isTv = true) },
                         onConfirmImport = { mode -> viewModel.householdSync.confirmPendingImport(mode) },
+                        onPauseSession = { viewModel.householdSync.pauseReceiveSessionForBackground() },
                         onDismiss = { viewModel.householdSync.closeReceiveDialog() }
                     )
                 }

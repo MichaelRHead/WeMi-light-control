@@ -21,10 +21,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,6 +39,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import org.suppressingfire.wemi.network.HouseholdImportMode
 import org.suppressingfire.wemi.network.HouseholdSyncCrypto
@@ -58,8 +63,24 @@ internal fun HouseholdSyncReceiveDialog(
     session: HouseholdSyncServerSession?,
     statusMessage: String?,
     onStartNewSession: () -> Unit,
+    onPauseSession: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentPauseSession by rememberUpdatedState(onPauseSession)
+
+    ScopedWindowFlagSecure(enabled = session != null)
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                currentPauseSession()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     var remainingSeconds by remember(session?.expiresAtEpochMs) {
         mutableIntStateOf(
             session?.let { ((it.expiresAtEpochMs - System.currentTimeMillis()) / 1000L).toInt().coerceAtLeast(0) } ?: 0

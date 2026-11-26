@@ -8,6 +8,8 @@ package org.suppressingfire.wemi.network
  */
 internal object StrictJsonCodec {
     const val MAX_JSON_DEPTH = 12
+    const val MAX_JSON_INPUT_CHARS = 512 * 1024
+    const val MAX_TOTAL_NODES = 16_384
     private const val MAX_JSON_STRING_CHARS = 512 * 1024
 
     fun quoteJson(value: String): String = buildString(value.length + 2) {
@@ -33,6 +35,9 @@ internal object StrictJsonCodec {
     }
 
     fun parseJsonObject(input: String): Map<String, Any?> {
+        if (input.length > MAX_JSON_INPUT_CHARS) {
+            throw IllegalArgumentException("JSON payload exceeds maximum size of $MAX_JSON_INPUT_CHARS chars")
+        }
         val parser = Parser(input)
         val parsed = parser.parseRootObject()
         parser.expectEnd()
@@ -41,6 +46,14 @@ internal object StrictJsonCodec {
 
     private class Parser(private val src: String) {
         private var pos = 0
+        private var totalNodes = 0
+
+        private fun bumpNodeCount() {
+            totalNodes++
+            if (totalNodes > MAX_TOTAL_NODES) {
+                throw IllegalArgumentException("JSON node count exceeds safety bound $MAX_TOTAL_NODES")
+            }
+        }
 
         fun parseRootObject(): Map<String, Any?> {
             skipWhitespace()
@@ -58,6 +71,7 @@ internal object StrictJsonCodec {
             if (depth > MAX_JSON_DEPTH) {
                 throw IllegalArgumentException("JSON nesting exceeds maximum depth $MAX_JSON_DEPTH")
             }
+            bumpNodeCount()
             skipWhitespace()
             if (pos >= src.length) throw IllegalArgumentException("Unexpected end of JSON")
             return when (src[pos]) {
@@ -201,7 +215,10 @@ internal object StrictJsonCodec {
         }
 
         private fun skipWhitespace() {
-            while (pos < src.length && src[pos] in charArrayOf(' ', '\t', '\r', '\n')) pos++
+            while (pos < src.length) {
+                val ch = src[pos]
+                if (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') pos++ else break
+            }
         }
 
         private fun peek(expected: Char): Boolean = pos < src.length && src[pos] == expected

@@ -155,8 +155,11 @@ class HouseholdSyncTest {
             runCatching { HouseholdSyncCrypto.decryptEnvelope(envelope, wrongPin) }.exceptionOrNull() is SecurityException
         )
 
-        val tampered = envelope.replace("Pixel Phone", "Spoofed")
-        assertEquals("Spoofed", HouseholdSyncCrypto.decryptEnvelope(tampered, pin).first)
+        val tamperedSender = envelope.replace("Pixel Phone", "Spoofed")
+        assertTrue(
+            "Tampered sender header must fail AAD authentication",
+            runCatching { HouseholdSyncCrypto.decryptEnvelope(tamperedSender, pin) }.exceptionOrNull() is SecurityException
+        )
         val tamperedCt = envelope.replace("\"ct\":\"", "\"ct\":\"AA")
         assertTrue(
             "Tampered ciphertext must fail GCM authentication",

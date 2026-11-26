@@ -206,6 +206,7 @@ internal fun WeMiModalDialogs(
             session = householdSyncState.activeReceiveSession,
             statusMessage = householdSyncState.receiveStatusMessage,
             onStartNewSession = { viewModel.householdSync.openReceiveDialog(isTv = false) },
+            onPauseSession = { viewModel.householdSync.pauseReceiveSessionForBackground() },
             onDismiss = { viewModel.householdSync.closeReceiveDialog() }
         )
     }

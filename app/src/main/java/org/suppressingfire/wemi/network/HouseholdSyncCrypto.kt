@@ -28,7 +28,8 @@ object HouseholdSyncCrypto {
     private const val IV_BYTES = 12
     private const val GCM_TAG_BITS = 128
     private const val PIN_LENGTH = 6
-    private val AAD_BYTES = "WeMi-HouseholdSync-v1".toByteArray(Charsets.US_ASCII)
+    private const val MAX_ENVELOPE_CHARS = 384 * 1024
+    private const val AAD_DOMAIN = "WeMi-HouseholdSync-v1"
     private val secureRandom = SecureRandom()
 
     /** Generates a cryptographically random 6-digit numeric pairing code (`000000`..`999999`). */
@@ -50,7 +51,7 @@ object HouseholdSyncCrypto {
 
     /**
      * Encrypts [plaintextJson] using [pairingCode] and wraps it in a compact JSON wire envelope
-     * carrying only version, sender label, random salt, random IV, and authenticated ciphertext.
+     * carrying version, AAD-authenticated sender label, random salt, random IV, and ciphertext.
      */
     fun encryptEnvelope(
         plaintextJson: String,
@@ -64,6 +65,7 @@ object HouseholdSyncCrypto {
             "Household payload exceeds ${HouseholdSyncCodec.MAX_JSON_BYTES / 1024} KiB limit"
         }
 
+        val safeSender = HouseholdSyncCodec.sanitizeLabel(senderLabel, maxLen = 64).ifEmpty { "WeMi Device" }
         val salt = ByteArray(SALT_BYTES).also { secureRandom.nextBytes(it) }
         val iv = ByteArray(IV_BYTES).also { secureRandom.nextBytes(it) }
         val pinChars = normalizedPin.toCharArray()
@@ -72,9 +74,8 @@ object HouseholdSyncCrypto {
             keyBytes = deriveAesKey(pinChars, salt)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(GCM_TAG_BITS, iv))
-            cipher.updateAAD(AAD_BYTES)
+            cipher.updateAAD(buildV1Aad(ENVELOPE_VERSION, safeSender, salt, iv))
             val ciphertext = cipher.doFinal(plainBytes)
-            val safeSender = HouseholdSyncCodec.sanitizeLabel(senderLabel, maxLen = 64).ifEmpty { "WeMi Device" }
             buildString(ciphertext.size * 2) {
                 append("{\"v\":").append(ENVELOPE_VERSION)
                 append(",\"sender\":").append(HouseholdSyncCodec.quoteJson(safeSender))
@@ -93,8 +94,8 @@ object HouseholdSyncCrypto {
     /**
      * Authenticates and decrypts an encrypted wire envelope produced by [encryptEnvelope].
      *
-     * Throws [SecurityException] if the pairing code is wrong or the ciphertext/AAD was tampered with,
-     * and [IllegalArgumentException] if the envelope structure is malformed.
+     * Throws [SecurityException] if the pairing code is wrong or the ciphertext/sender/AAD was
+     * tampered with, and [IllegalArgumentException] if the envelope structure is malformed.
      */
     fun decryptEnvelope(
         envelopeJson: String,
@@ -102,6 +103,7 @@ object HouseholdSyncCrypto {
     ): Pair<String, String> {
         val normalizedPin = normalizePairingCode(pairingCode)
         require(normalizedPin.length == PIN_LENGTH) { "Pairing code must be 6 digits" }
+        require(envelopeJson.length <= MAX_ENVELOPE_CHARS) { "Sync envelope exceeds safety limit" }
 
         val obj = HouseholdSyncCodec.parseJsonObject(envelopeJson)
         val version = (obj["v"] as? Number)?.toInt()
@@ -112,10 +114,14 @@ object HouseholdSyncCrypto {
             .ifEmpty { "WeMi Device" }
         val salt = base64Decode(obj["salt"] as? String ?: "")
         val iv = base64Decode(obj["iv"] as? String ?: "")
-        val ciphertext = base64Decode(obj["ct"] as? String ?: "")
+        val ctRaw = (obj["ct"] as? String)?.trim().orEmpty()
+        require(ctRaw.length <= ((HouseholdSyncCodec.MAX_JSON_BYTES + 16) * 4) / 3 + 16) {
+            "Ciphertext exceeds safety limit"
+        }
+        val ciphertext = base64Decode(ctRaw)
         require(salt.size == SALT_BYTES) { "Invalid salt length" }
         require(iv.size == IV_BYTES) { "Invalid IV length" }
-        require(ciphertext.size >= 16) { "Truncated ciphertext" }
+        require(ciphertext.size in 16..(HouseholdSyncCodec.MAX_JSON_BYTES + 16)) { "Invalid ciphertext length" }
 
         val pinChars = normalizedPin.toCharArray()
         var keyBytes: ByteArray? = null
@@ -124,7 +130,7 @@ object HouseholdSyncCrypto {
             keyBytes = deriveAesKey(pinChars, salt)
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(keyBytes, "AES"), GCMParameterSpec(GCM_TAG_BITS, iv))
-            cipher.updateAAD(AAD_BYTES)
+            cipher.updateAAD(buildV1Aad(version, sender, salt, iv))
             plainBytes = cipher.doFinal(ciphertext)
             require(plainBytes.size <= HouseholdSyncCodec.MAX_JSON_BYTES) {
                 "Decrypted household payload exceeds safety limit"
@@ -137,6 +143,19 @@ object HouseholdSyncCrypto {
             keyBytes?.let { Arrays.fill(it, 0.toByte()) }
             plainBytes?.let { Arrays.fill(it, 0.toByte()) }
         }
+    }
+
+    private fun buildV1Aad(version: Int, sender: String, salt: ByteArray, iv: ByteArray): ByteArray {
+        val out = java.io.ByteArrayOutputStream(160)
+        fun writeField(bytes: ByteArray) {
+            out.write(java.nio.ByteBuffer.allocate(4).putInt(bytes.size).array())
+            out.write(bytes)
+        }
+        writeField("$AAD_DOMAIN:$version".toByteArray(Charsets.US_ASCII))
+        writeField(sender.toByteArray(Charsets.UTF_8))
+        writeField(salt)
+        writeField(iv)
+        return out.toByteArray()
     }
 
     private fun deriveAesKey(pinChars: CharArray, salt: ByteArray): ByteArray {

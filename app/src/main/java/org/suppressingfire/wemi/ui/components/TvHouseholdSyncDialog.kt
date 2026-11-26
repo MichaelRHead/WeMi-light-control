@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,6 +47,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import org.suppressingfire.wemi.network.HouseholdImportMode
 import org.suppressingfire.wemi.network.HouseholdSyncCrypto
@@ -62,10 +66,25 @@ internal fun TvHouseholdSyncOverlay(
     state: HouseholdSyncUiState,
     onStartNewSession: () -> Unit,
     onConfirmImport: (HouseholdImportMode) -> Unit,
+    onPauseSession: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val session = state.activeReceiveSession
     val pending = state.pendingImport
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentPauseSession by rememberUpdatedState(onPauseSession)
+
+    ScopedWindowFlagSecure(enabled = session != null)
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_STOP) {
+                currentPauseSession()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     BackHandler(enabled = true) {
         onDismiss()

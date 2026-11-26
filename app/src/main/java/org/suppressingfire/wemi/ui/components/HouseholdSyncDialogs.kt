@@ -1,5 +1,9 @@
 package org.suppressingfire.wemi.ui.components
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.WindowManager
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -25,12 +29,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
@@ -50,9 +55,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import org.suppressingfire.wemi.network.HouseholdSyncCrypto
 import org.suppressingfire.wemi.network.HouseholdSyncLanServer
 import org.suppressingfire.wemi.network.HouseholdSyncPeer
+import org.suppressingfire.wemi.network.LanEndpointPolicy
+import org.suppressingfire.wemi.network.LanRuntimeUtils
 import org.suppressingfire.wemi.ui.HouseholdSyncUiState
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
@@ -62,6 +73,39 @@ import org.suppressingfire.wemi.ui.theme.WemoTextSecondary
 private val SyncErrorSurface = Color(0xFFFEE2E2)
 private val SyncErrorText = Color(0xFFB91C1C)
 private val SyncInfoSurface = Color(0xFFE0F2FE)
+
+private tailrec fun Context.findSyncActivityOrNull(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findSyncActivityOrNull()
+    else -> null
+}
+
+/**
+ * Applies `WindowManager.LayoutParams.FLAG_SECURE` to both the dialog window and parent Activity
+ * window strictly while [enabled] is true, restoring prior flags cleanly on disposal.
+ */
+@Composable
+internal fun ScopedWindowFlagSecure(enabled: Boolean) {
+    val view = LocalView.current
+    DisposableEffect(view, enabled) {
+        val dialogWindow = (view.parent as? DialogWindowProvider)?.window
+        val activityWindow = view.context.findSyncActivityOrNull()?.window
+        val targetWindows = listOfNotNull(dialogWindow, activityWindow).distinct()
+        val previouslySecure = targetWindows.associateWith { w ->
+            (w.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) != 0
+        }
+        if (enabled) {
+            targetWindows.forEach { it.addFlags(WindowManager.LayoutParams.FLAG_SECURE) }
+        }
+        onDispose {
+            if (enabled) {
+                previouslySecure.forEach { (w, wasSecure) ->
+                    if (!wasSecure) w.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
+        }
+    }
+}
 
 /**
  * Mobile / Tablet / Chromebook dialog for sending the current household configuration over local
@@ -78,6 +122,22 @@ internal fun HouseholdSyncSendDialog(
     var targetPortText by remember { mutableStateOf(HouseholdSyncLanServer.DEFAULT_LISTEN_PORT.toString()) }
     // Keep one-time pairing code in volatile memory only (never rememberSaveable)
     var pairingCode by remember { mutableStateOf("") }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    ScopedWindowFlagSecure(enabled = pairingCode.isNotEmpty())
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                pairingCode = ""
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            pairingCode = ""
+        }
+    }
 
     LaunchedEffect(state.discoveredPeers) {
         if (targetIp.isBlank() && state.discoveredPeers.size == 1) {
@@ -87,8 +147,19 @@ internal fun HouseholdSyncSendDialog(
         }
     }
 
+    val allowLoopback = remember { LanRuntimeUtils.isRunningInRobolectric() }
+    val ipValid = targetIp.isBlank() || LanEndpointPolicy.isAllowedLanHost(targetIp, allowLoopback = allowLoopback)
+    val parsedPortCandidate = targetPortText.toIntOrNull()
+    val portValid = targetPortText.isBlank() || (parsedPortCandidate != null && parsedPortCandidate in 1..65535)
+    val resolvedPort = parsedPortCandidate ?: HouseholdSyncLanServer.DEFAULT_LISTEN_PORT
+
     AlertDialog(
-        onDismissRequest = { if (!state.isPushingToPeer) onDismiss() },
+        onDismissRequest = {
+            if (!state.isPushingToPeer) {
+                pairingCode = ""
+                onDismiss()
+            }
+        },
         modifier = Modifier.testTag("household_sync_send_dialog"),
         title = {
             Text(
@@ -186,9 +257,6 @@ internal fun HouseholdSyncSendDialog(
                     )
                 }
 
-                val parsedPortCandidate = targetPortText.toIntOrNull()
-                val portValid = targetPortText.isBlank() || (parsedPortCandidate != null && parsedPortCandidate in 1..65535)
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -198,6 +266,7 @@ internal fun HouseholdSyncSendDialog(
                         onValueChange = { targetIp = it.trim() },
                         label = { Text("Receiver IP") },
                         placeholder = { Text("192.168.1.42") },
+                        isError = !ipValid,
                         singleLine = true,
                         modifier = Modifier
                             .weight(1.7f)
@@ -209,19 +278,36 @@ internal fun HouseholdSyncSendDialog(
                         label = { Text("Port") },
                         isError = !portValid,
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            autoCorrectEnabled = false
+                        ),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("household_sync_target_port_input")
                     )
                 }
 
-                if (!portValid) {
+                if (!ipValid) {
+                    Text(
+                        text = "Enter a private local Wi-Fi IPv4 address (for example 192.168.1.42).",
+                        color = SyncErrorText,
+                        fontSize = 12.sp,
+                        modifier = Modifier.testTag("household_sync_ip_validation_error")
+                    )
+                } else if (!portValid) {
                     Text(
                         text = "Enter a valid TCP port between 1 and 65535 (default ${HouseholdSyncLanServer.DEFAULT_LISTEN_PORT}).",
                         color = SyncErrorText,
                         fontSize = 12.sp,
                         modifier = Modifier.testTag("household_sync_port_validation_error")
+                    )
+                } else if (targetIp.isNotBlank()) {
+                    Text(
+                        text = "Sending to $targetIp:$resolvedPort — verify this matches the screen showing the code.",
+                        color = WemoGreenDark,
+                        fontSize = 12.sp,
+                        modifier = Modifier.testTag("household_sync_target_verification")
                     )
                 }
 
@@ -233,7 +319,10 @@ internal fun HouseholdSyncSendDialog(
                     label = { Text("6-Digit Pairing Code") },
                     placeholder = { Text("123-456") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        autoCorrectEnabled = false
+                    ),
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("household_sync_pin_input")
@@ -241,15 +330,14 @@ internal fun HouseholdSyncSendDialog(
             }
         },
         confirmButton = {
-            val resolvedPort = targetPortText.toIntOrNull() ?: HouseholdSyncLanServer.DEFAULT_LISTEN_PORT
-            val portAllowed = targetPortText.isBlank() || resolvedPort in 1..65535
             Button(
                 onClick = {
                     onPushToPeer(targetIp, resolvedPort, pairingCode)
                 },
                 enabled = !state.isPushingToPeer &&
                     targetIp.isNotBlank() &&
-                    portAllowed &&
+                    ipValid &&
+                    portValid &&
                     HouseholdSyncCrypto.isValidPairingCode(pairingCode),
                 colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
                 modifier = Modifier
@@ -261,7 +349,10 @@ internal fun HouseholdSyncSendDialog(
         },
         dismissButton = {
             TextButton(
-                onClick = onDismiss,
+                onClick = {
+                    pairingCode = ""
+                    onDismiss()
+                },
                 enabled = !state.isPushingToPeer,
                 modifier = Modifier.heightIn(min = 48.dp)
             ) {

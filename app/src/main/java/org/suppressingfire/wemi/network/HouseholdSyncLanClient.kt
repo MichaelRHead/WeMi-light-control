@@ -31,6 +31,8 @@ class HouseholdSyncLanClient(
     private val allowLoopbackForTests: Boolean = LanRuntimeUtils.isRunningInRobolectric()
 ) {
     companion object {
+        internal const val MAX_DISCOVERED_PEERS = 16
+        internal const val MAX_DISCOVERY_PACKETS = 128
         private val PORT_REGEX = Regex("""\bport=(\d{1,5})\b""")
         private val ROLE_REGEX = Regex("""\brole=(TV|DEVICE)\b""")
     }
@@ -94,18 +96,27 @@ class HouseholdSyncLanClient(
 
                 val deadlineMs = System.currentTimeMillis() + timeoutMs.coerceIn(150L, 3_000L)
                 val buf = ByteArray(512)
-                while (System.currentTimeMillis() < deadlineMs) {
+                var packetsSeen = 0
+                while (System.currentTimeMillis() < deadlineMs && packetsSeen < MAX_DISCOVERY_PACKETS) {
                     ensureActive()
                     try {
                         val packet = DatagramPacket(buf, buf.size)
                         socket.receive(packet)
+                        packetsSeen++
                         val senderIp = packet.address?.hostAddress.orEmpty()
                         if (!LanEndpointPolicy.isAllowedLanHost(senderIp, allowLoopback = allowLoopbackForTests)) {
                             continue
                         }
                         val line = String(packet.data, packet.offset, packet.length, Charsets.UTF_8).trim()
                         parseDiscoveryReply(senderIp, line)?.let { peer ->
-                            found["${peer.ipAddress}:${peer.port}"] = peer
+                            val peerKey = if (allowLoopbackForTests && senderIp == "127.0.0.1") {
+                                "${peer.ipAddress}:${peer.port}"
+                            } else {
+                                peer.ipAddress
+                            }
+                            if (peerKey in found || found.size < MAX_DISCOVERED_PEERS) {
+                                found[peerKey] = peer
+                            }
                         }
                     } catch (_: SocketTimeoutException) {
                         // Continue until overall scan deadline expires
@@ -125,8 +136,8 @@ class HouseholdSyncLanClient(
     }
 
     /**
-     * Encrypts [bundle] with the receiver's one-time 6-digit [pairingCode] and pushes it directly
-     * to `http://<targetIp>:<targetPort>/wemi-sync/v1/push` over the local LAN.
+     * Completes a 2-step SPAKE2 (`v = 2`) key exchange (`/wemi-sync/v1/hello` -> `/wemi-sync/v1/push`)
+     * bound to the receiver's one-time 6-digit [pairingCode] and sends [bundle] over the local LAN.
      */
     suspend fun pushHouseholdBundle(
         targetIp: String,
@@ -167,60 +178,49 @@ class HouseholdSyncLanClient(
             )
         }
 
-        val encryptedEnvelope = try {
-            HouseholdSyncCrypto.encryptEnvelope(
-                plaintextJson = plaintextJson,
-                pairingCode = normalizedPin,
-                senderLabel = senderLabel
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            return@withContext HouseholdSyncPushResult(
-                success = false,
-                statusMessage = e.message ?: "Failed to encrypt household configuration"
-            )
-        }
-
-        val url = "http://$cleanIp:$targetPort${HouseholdSyncLanServer.PUSH_PATH}"
+        val helloUrl = "http://$cleanIp:$targetPort${HouseholdSyncLanServer.HELLO_PATH}"
+        val pushUrl = "http://$cleanIp:$targetPort${HouseholdSyncLanServer.PUSH_PATH}"
         try {
+            val helloResponse = httpClient.execute(
+                method = "POST",
+                url = helloUrl,
+                headers = mapOf("Content-Type" to "application/json; charset=utf-8"),
+                body = ""
+            )
+            if (helloResponse.code != 200) {
+                return@withContext mapHttpErrorResult(helloResponse.code)
+            }
+
+            val encryptedEnvelope = try {
+                HouseholdSyncPake.encryptPushV2(
+                    plaintextJson = plaintextJson,
+                    pairingCode = normalizedPin,
+                    senderLabel = senderLabel,
+                    helloResponseJson = helloResponse.body
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                return@withContext HouseholdSyncPushResult(
+                    success = false,
+                    statusMessage = e.message ?: "Failed to establish encrypted pairing session"
+                )
+            }
+
             val response = httpClient.execute(
                 method = "POST",
-                url = url,
+                url = pushUrl,
                 headers = mapOf("Content-Type" to "application/json; charset=utf-8"),
                 body = encryptedEnvelope
             )
-            when (response.code) {
-                200 -> HouseholdSyncPushResult(
+            if (response.code == 200) {
+                HouseholdSyncPushResult(
                     success = true,
                     httpCode = 200,
                     statusMessage = "Sent ${bundle.homes.size} home(s) & ${bundle.devices.size} switch(es) — confirm on the receiving device"
                 )
-                401 -> HouseholdSyncPushResult(
-                    success = false,
-                    httpCode = 401,
-                    statusMessage = "Wrong pairing code — check the 6-digit code shown on the receiver"
-                )
-                409 -> HouseholdSyncPushResult(
-                    success = false,
-                    httpCode = 409,
-                    statusMessage = "Receiver already has a pending transfer waiting for confirmation"
-                )
-                410 -> HouseholdSyncPushResult(
-                    success = false,
-                    httpCode = 410,
-                    statusMessage = "Pairing code expired — reopen Sync on the receiver for a new code"
-                )
-                429 -> HouseholdSyncPushResult(
-                    success = false,
-                    httpCode = 429,
-                    statusMessage = "Receiver closed pairing after too many wrong codes — reopen Sync for a new code"
-                )
-                else -> HouseholdSyncPushResult(
-                    success = false,
-                    httpCode = response.code,
-                    statusMessage = "Receiver rejected transfer (HTTP ${response.code})"
-                )
+            } else {
+                mapHttpErrorResult(response.code)
             }
         } catch (e: CancellationException) {
             throw e
@@ -230,6 +230,34 @@ class HouseholdSyncLanClient(
                 statusMessage = "Could not reach $cleanIp:$targetPort (${e.message ?: "connection failed"}) — check both devices are on the same Wi-Fi"
             )
         }
+    }
+
+    private fun mapHttpErrorResult(code: Int): HouseholdSyncPushResult = when (code) {
+        401 -> HouseholdSyncPushResult(
+            success = false,
+            httpCode = 401,
+            statusMessage = "Wrong pairing code — check the 6-digit code shown on the receiver"
+        )
+        409 -> HouseholdSyncPushResult(
+            success = false,
+            httpCode = 409,
+            statusMessage = "Receiver already has a pending transfer waiting for confirmation"
+        )
+        410 -> HouseholdSyncPushResult(
+            success = false,
+            httpCode = 410,
+            statusMessage = "Pairing code expired — reopen Sync on the receiver for a new code"
+        )
+        429 -> HouseholdSyncPushResult(
+            success = false,
+            httpCode = 429,
+            statusMessage = "Receiver closed pairing after too many wrong codes — reopen Sync for a new code"
+        )
+        else -> HouseholdSyncPushResult(
+            success = false,
+            httpCode = code,
+            statusMessage = "Receiver rejected transfer (HTTP $code)"
+        )
     }
 
     private fun buildProbeTargets(): List<String> = buildList {

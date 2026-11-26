@@ -1,20 +1,9 @@
 package org.suppressingfire.wemi.network
 
 import android.content.Context
-import android.net.wifi.WifiManager
-import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
-import java.io.OutputStreamWriter
-import java.net.DatagramPacket
-import java.net.DatagramSocket
 import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.MulticastSocket
-import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.SocketTimeoutException
-import java.util.Locale
 import java.util.concurrent.Semaphore
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -50,18 +39,18 @@ data class ReceivedHouseholdSync(
 )
 
 /**
- * Ephemeral, PIN-authenticated local-LAN HTTP receiver for one-tap Phone-to-TV and Phone-to-Device
- * household configuration transfers.
+ * Ephemeral, SPAKE2-authenticated local-LAN HTTP receiver for one-tap Phone-to-TV and
+ * Phone-to-Device household configuration transfers.
  *
  * Security & lifecycle invariants:
  * - Lives only while the user keeps the Receive/Pair dialog open (auto-expires after 120s).
- * - Binds directly to the active local LAN IPv4 address (rejecting unroutable CGNAT / loopback in production).
+ * - Binds directly to the active local LAN IPv4 address (rejecting CGNAT / loopback in production).
  * - Enforces RFC 1918 source-IP validation (`127.0.0.1` test-only), `Semaphore(4)` connection cap,
- *   bounded headers (`<= 24`), bounded body (`<= 384 KiB`), and `2.5s` socket read deadlines.
- * - Requires AES-256-GCM authentication with the one-time 6-digit pairing code and locks/closes the
- *   session after `5` failed authentication attempts.
- * - Accepts at most one valid push per session before closing the listener for user confirmation.
- * - Answers best-effort UDP peer discovery beacons (`UDP 49190`) with IP/port/name only (never PIN).
+ *   hardened HTTP framing ([HouseholdSyncHttpFraming]), and `2.5s` wall-clock request deadlines.
+ * - Requires a 2-step RFC 9382 SPAKE2 handshake (`POST /wemi-sync/v1/hello` -> `POST /wemi-sync/v1/push`,
+ *   `v = 2` only, zero v1 downgrade) serialized under [authLock] with single-use nonces, 5-attempt
+ *   lockout, and single-payload acceptance.
+ * - Rate-limits best-effort UDP peer discovery beacons (`UDP 49190`) to non-privileged ports only.
  */
 class HouseholdSyncLanServer(
     private val localIpProvider: () -> String,
@@ -72,6 +61,7 @@ class HouseholdSyncLanServer(
     private val allowLoopbackForTests: Boolean = LanRuntimeUtils.isRunningInRobolectric()
 ) {
     companion object {
+        const val HELLO_PATH = "/wemi-sync/v1/hello"
         const val PUSH_PATH = "/wemi-sync/v1/push"
         const val DEFAULT_LISTEN_PORT = 8990
         const val DEFAULT_DISCOVERY_UDP_PORT = 49190
@@ -80,11 +70,15 @@ class HouseholdSyncLanServer(
         const val DISCOVERY_REPLY_PREFIX = "WEMI-SYNC-PEER v1"
         const val DEFAULT_SESSION_TTL_MS = 120_000L
         const val MAX_FAILED_AUTH_ATTEMPTS = 5
+        private const val MAX_HELLO_CHALLENGES_PER_SESSION = 16
+        private const val MAX_ACTIVE_CHALLENGES = 4
         private const val MAX_CONCURRENT_CONNECTIONS = 4
         private const val MAX_HEADERS = 24
         private const val MAX_HEADER_LINE_BYTES = 4096
         private const val MAX_WIRE_BODY_BYTES = 384 * 1024
         private const val REQUEST_DEADLINE_MS = 2_500L
+        private val ALLOWED_PATHS = setOf(HELLO_PATH, PUSH_PATH)
+        private val BODY_OPTIONAL_PATHS = setOf(HELLO_PATH)
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -92,17 +86,17 @@ class HouseholdSyncLanServer(
     private val payloadAccepted = AtomicBoolean(false)
     private val failedAuthAttempts = AtomicInteger(0)
     private val connectionPermits = Semaphore(MAX_CONCURRENT_CONNECTIONS)
+    private val authLock = Any()
+    private val pendingChallenges = LinkedHashMap<String, HouseholdSyncPake.ServerChallenge>()
+    private var helloChallengesIssued = 0
 
     @Volatile private var activePairingCode: String = ""
-    @Volatile private var activeDeviceLabel: String = "WeMi Device"
-    @Volatile private var activeIsTv: Boolean = false
+    @Volatile private var activeExpiresAtMs: Long = 0L
     @Volatile private var activeSession: HouseholdSyncServerSession? = null
 
     private var serverSocket: ServerSocket? = null
-    private var udpSocket: DatagramSocket? = null
-    private var multicastLock: WifiManager.MulticastLock? = null
+    private var udpBeaconHandle: HouseholdSyncHttpFraming.UdpBeaconHandle? = null
     private var tcpAcceptJob: Job? = null
-    private var udpBeaconJob: Job? = null
     private var expiryJob: Job? = null
 
     val currentSession: HouseholdSyncServerSession?
@@ -152,21 +146,34 @@ class HouseholdSyncLanServer(
         }
 
         serverSocket = tcpSocket
-        activePairingCode = pin
-        activeDeviceLabel = cleanLabel
-        activeIsTv = isTv
-        payloadAccepted.set(false)
-        failedAuthAttempts.set(0)
-        isRunning.set(true)
+        synchronized(authLock) {
+            pendingChallenges.clear()
+            helloChallengesIssued = 0
+            activePairingCode = pin
+            activeExpiresAtMs = expiresAt
+            payloadAccepted.set(false)
+            failedAuthAttempts.set(0)
+            isRunning.set(true)
+        }
 
-        val actualUdpPort = startUdpDiscoveryResponder(tcpSocket.localPort, cleanLabel, isTv, resolvedIp)
+        udpBeaconHandle = HouseholdSyncHttpFraming.startUdpDiscoveryBeacon(
+            scope = scope,
+            appContext = appContext,
+            discoveryUdpPort = discoveryUdpPort,
+            tcpPort = tcpSocket.localPort,
+            label = cleanLabel,
+            isTv = isTv,
+            localIp = resolvedIp,
+            allowLoopbackForTests = allowLoopbackForTests,
+            isStillAccepting = { isRunning.get() && !payloadAccepted.get() }
+        )
         val displayIp = if (boundToPreferred) preferredAddr.hostAddress.orEmpty() else "127.0.0.1"
         val session = HouseholdSyncServerSession(
             ipAddress = displayIp,
             port = tcpSocket.localPort,
             pairingCode = pin,
             expiresAtEpochMs = expiresAt,
-            discoveryUdpPort = actualUdpPort
+            discoveryUdpPort = udpBeaconHandle?.localPort ?: -1
         )
         activeSession = session
 
@@ -201,7 +208,10 @@ class HouseholdSyncLanServer(
 
         expiryJob = scope.launch {
             delay(sessionTtlMs)
-            if (isRunning.get() && !payloadAccepted.get()) {
+            val shouldExpire = synchronized(authLock) {
+                isRunning.get() && !payloadAccepted.get()
+            }
+            if (shouldExpire) {
                 stopSession()
                 onSessionExpired()
             }
@@ -212,23 +222,22 @@ class HouseholdSyncLanServer(
 
     @Synchronized
     fun stopSession() {
-        isRunning.set(false)
-        activePairingCode = ""
+        synchronized(authLock) {
+            isRunning.set(false)
+            activePairingCode = ""
+            activeExpiresAtMs = 0L
+            pendingChallenges.clear()
+            helloChallengesIssued = 0
+        }
         activeSession = null
         expiryJob?.cancel()
         expiryJob = null
         tcpAcceptJob?.cancel()
         tcpAcceptJob = null
-        udpBeaconJob?.cancel()
-        udpBeaconJob = null
+        udpBeaconHandle?.close()
+        udpBeaconHandle = null
         runCatching { serverSocket?.close() }
         serverSocket = null
-        runCatching { udpSocket?.close() }
-        udpSocket = null
-        runCatching {
-            if (multicastLock?.isHeld == true) multicastLock?.release()
-        }
-        multicastLock = null
     }
 
     @Synchronized
@@ -246,89 +255,6 @@ class HouseholdSyncLanServer(
         }
     }
 
-    private fun startUdpDiscoveryResponder(
-        tcpPort: Int,
-        label: String,
-        isTv: Boolean,
-        localIp: String
-    ): Int {
-        if (discoveryUdpPort < 0) return -1
-        var createdSocket: DatagramSocket? = null
-        return try {
-            val socket: DatagramSocket = if (discoveryUdpPort == 0) {
-                DatagramSocket(0)
-            } else {
-                val ms = MulticastSocket(null)
-                createdSocket = ms
-                ms.reuseAddress = true
-                ms.bind(InetSocketAddress(discoveryUdpPort))
-                val activeBinding = if (allowLoopbackForTests) null else NetworkMonitor.resolveActiveLanBinding(appContext)
-                if (!allowLoopbackForTests) {
-                    activeBinding?.network?.let { net -> runCatching { net.bindSocket(ms) } }
-                }
-                runCatching {
-                    val wifiMgr = appContext?.applicationContext?.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-                    multicastLock = wifiMgr?.createMulticastLock("WeMiHouseholdSyncLock")?.apply {
-                        setReferenceCounted(false)
-                        acquire()
-                    }
-                }
-                val targetIf = activeBinding?.interfaceName
-                    ?.let { name -> runCatching { NetworkInterface.getByName(name) }.getOrNull() }
-                    ?: runCatching {
-                        if (LanRuntimeUtils.isPrivateRfc1918Ipv4(localIp)) {
-                            NetworkInterface.getByInetAddress(InetAddress.getByName(localIp))
-                        } else {
-                            null
-                        }
-                    }.getOrNull()
-                val groupAddr = InetSocketAddress(InetAddress.getByName(DISCOVERY_MULTICAST_GROUP), discoveryUdpPort)
-                runCatching { ms.joinGroup(groupAddr, targetIf) }
-                ms
-            }
-            createdSocket = socket
-            socket.soTimeout = 600
-            udpSocket = socket
-            val replyPayload = buildString {
-                append(DISCOVERY_REPLY_PREFIX)
-                append(" port=").append(tcpPort)
-                append(" role=").append(if (isTv) "TV" else "DEVICE")
-                append(" name=").append(label)
-            }.toByteArray(Charsets.UTF_8)
-
-            udpBeaconJob = scope.launch {
-                val buf = ByteArray(512)
-                while (isActive && isRunning.get() && !payloadAccepted.get() && !socket.isClosed) {
-                    try {
-                        val packet = DatagramPacket(buf, buf.size)
-                        socket.receive(packet)
-                        val senderIp = packet.address?.hostAddress.orEmpty()
-                        if (!LanEndpointPolicy.isAllowedLanHost(senderIp, allowLoopback = allowLoopbackForTests)) {
-                            continue
-                        }
-                        val msg = String(packet.data, packet.offset, packet.length, Charsets.UTF_8).trim()
-                        if (msg.startsWith(DISCOVERY_PROBE_PREFIX)) {
-                            val reply = DatagramPacket(replyPayload, replyPayload.size, packet.address, packet.port)
-                            runCatching { socket.send(reply) }
-                        }
-                    } catch (_: SocketTimeoutException) {
-                        // Poll loop tick so cancellation stops promptly
-                    } catch (e: CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        if (!isRunning.get()) break
-                    }
-                }
-            }
-            socket.localPort
-        } catch (_: Exception) {
-            runCatching { createdSocket?.close() }
-            runCatching { if (multicastLock?.isHeld == true) multicastLock?.release() }
-            multicastLock = null
-            -1
-        }
-    }
-
     private fun handleClient(
         clientSocket: Socket,
         onPayloadReceived: (ReceivedHouseholdSync) -> Unit,
@@ -336,152 +262,149 @@ class HouseholdSyncLanServer(
     ) {
         clientSocket.use { sock ->
             try {
-                sock.soTimeout = 2_000
                 val deadlineNs = System.nanoTime() + REQUEST_DEADLINE_MS * 1_000_000L
                 val sourceIp = sock.inetAddress?.hostAddress.orEmpty()
                 if (!LanEndpointPolicy.isAllowedLanHost(sourceIp, allowLoopback = allowLoopbackForTests)) {
-                    sendJsonResponse(sock, "403 Forbidden", """{"ok":false,"error":"non_lan_source"}""")
-                    return
-                }
-                val input = BufferedInputStream(sock.getInputStream())
-                val requestLine = readHeaderLine(input, deadlineNs) ?: return
-                val parts = requestLine.split(' ')
-                val method = parts.getOrNull(0).orEmpty()
-                val rawTarget = parts.getOrNull(1).orEmpty().substringBefore('?')
-                if (!method.equals("POST", ignoreCase = true)) {
-                    sendJsonResponse(sock, "405 Method Not Allowed", """{"ok":false,"error":"method_not_allowed"}""")
-                    return
-                }
-                if (rawTarget != PUSH_PATH) {
-                    sendJsonResponse(sock, "404 Not Found", """{"ok":false,"error":"not_found"}""")
-                    return
-                }
-
-                var contentLength = -1
-                var headerCount = 0
-                while (true) {
-                    if (System.nanoTime() > deadlineNs) {
-                        sendJsonResponse(sock, "408 Request Timeout", """{"ok":false,"error":"timeout"}""")
-                        return
-                    }
-                    val line = readHeaderLine(input, deadlineNs) ?: break
-                    if (line.isEmpty()) break
-                    headerCount++
-                    if (headerCount > MAX_HEADERS) {
-                        sendJsonResponse(sock, "431 Request Header Fields Too Large", """{"ok":false,"error":"too_many_headers"}""")
-                        return
-                    }
-                    val colon = line.indexOf(':')
-                    if (colon > 0) {
-                        val key = line.substring(0, colon).trim().uppercase(Locale.US)
-                        val value = line.substring(colon + 1).trim()
-                        if (key == "CONTENT-LENGTH") contentLength = value.toIntOrNull() ?: -1
-                    }
-                }
-
-                if (contentLength <= 0 || contentLength > MAX_WIRE_BODY_BYTES) {
-                    sendJsonResponse(sock, "413 Payload Too Large", """{"ok":false,"error":"invalid_length"}""")
-                    return
-                }
-                if (payloadAccepted.get()) {
-                    sendJsonResponse(sock, "409 Conflict", """{"ok":false,"error":"already_received"}""")
-                    return
-                }
-                val pinSnapshot = activePairingCode
-                if (!isRunning.get() || pinSnapshot.length != 6) {
-                    sendJsonResponse(sock, "410 Gone", """{"ok":false,"error":"session_closed"}""")
-                    return
-                }
-
-                val bodyBytes = readExactBody(input, contentLength, deadlineNs) ?: run {
-                    sendJsonResponse(sock, "408 Request Timeout", """{"ok":false,"error":"incomplete_body"}""")
-                    return
-                }
-                val envelopeText = String(bodyBytes, Charsets.UTF_8)
-                val (senderLabel, plaintextJson) = try {
-                    HouseholdSyncCrypto.decryptEnvelope(envelopeText, pinSnapshot)
-                } catch (_: SecurityException) {
-                    val failures = failedAuthAttempts.incrementAndGet()
-                    if (failures >= MAX_FAILED_AUTH_ATTEMPTS) {
-                        sendJsonResponse(sock, "429 Too Many Requests", """{"ok":false,"error":"locked_out"}""")
-                        stopSession()
-                        onSessionLockedOut()
-                    } else {
-                        sendJsonResponse(sock, "401 Unauthorized", """{"ok":false,"error":"invalid_code"}""")
-                    }
-                    return
-                } catch (_: IllegalArgumentException) {
-                    sendJsonResponse(sock, "400 Bad Request", """{"ok":false,"error":"malformed_envelope"}""")
-                    return
-                }
-
-                val bundle = try {
-                    HouseholdSyncCodec.decodeFromJson(plaintextJson, allowLoopback = allowLoopbackForTests)
-                } catch (_: IllegalArgumentException) {
-                    sendJsonResponse(sock, "400 Bad Request", """{"ok":false,"error":"invalid_household_json"}""")
-                    return
-                }
-
-                if (!payloadAccepted.compareAndSet(false, true)) {
-                    sendJsonResponse(sock, "409 Conflict", """{"ok":false,"error":"already_received"}""")
-                    return
-                }
-
-                sendJsonResponse(
-                    sock,
-                    "200 OK",
-                    """{"ok":true,"homes":${bundle.homes.size},"devices":${bundle.devices.size}}"""
-                )
-                stopSession()
-                onPayloadReceived(
-                    ReceivedHouseholdSync(
-                        sourceIp = sourceIp,
-                        senderLabel = senderLabel.ifBlank { bundle.sourceDeviceLabel },
-                        bundle = bundle
+                    HouseholdSyncHttpFraming.sendJsonResponse(
+                        sock,
+                        "403 Forbidden",
+                        """{"ok":false,"error":"non_lan_source"}"""
                     )
-                )
+                    return
+                }
+                val request = when (
+                    val res = HouseholdSyncHttpFraming.readRequest(
+                        sock = sock,
+                        deadlineNs = deadlineNs,
+                        maxHeaders = MAX_HEADERS,
+                        maxHeaderLineBytes = MAX_HEADER_LINE_BYTES,
+                        maxBodyBytes = MAX_WIRE_BODY_BYTES,
+                        allowedPaths = ALLOWED_PATHS,
+                        bodyOptionalPaths = BODY_OPTIONAL_PATHS
+                    )
+                ) {
+                    is HouseholdSyncHttpFraming.ReadResult.Ok -> res
+                    is HouseholdSyncHttpFraming.ReadResult.Error -> {
+                        HouseholdSyncHttpFraming.sendJsonResponse(
+                            sock,
+                            res.httpStatus,
+                            """{"ok":false,"error":"${res.errorCode}"}"""
+                        )
+                        return
+                    }
+                }
+
+                when (request.path) {
+                    HELLO_PATH -> handleHelloRequest(sock)
+                    PUSH_PATH -> handlePushRequest(sock, sourceIp, request.bodyBytes, onPayloadReceived, onSessionLockedOut)
+                }
             } catch (_: Exception) {
                 // Close malformed/aborted client quietly
             }
         }
     }
 
-    private fun readHeaderLine(input: BufferedInputStream, deadlineNs: Long): String? {
-        val baos = ByteArrayOutputStream()
-        while (true) {
-            if (System.nanoTime() > deadlineNs) return null
-            val b = input.read()
-            if (b == -1) return if (baos.size() == 0) null else baos.toString("ISO-8859-1")
-            if (b == '\n'.code) break
-            if (b != '\r'.code) {
-                if (baos.size() >= MAX_HEADER_LINE_BYTES) return null
-                baos.write(b)
+    private fun handleHelloRequest(sock: Socket) {
+        val (status, body) = synchronized(authLock) {
+            when {
+                payloadAccepted.get() -> "409 Conflict" to """{"ok":false,"error":"already_received"}"""
+                !isRunning.get() || activePairingCode.length != 6 || System.currentTimeMillis() >= activeExpiresAtMs ->
+                    "410 Gone" to """{"ok":false,"error":"session_closed"}"""
+                failedAuthAttempts.get() >= MAX_FAILED_AUTH_ATTEMPTS ||
+                    helloChallengesIssued >= MAX_HELLO_CHALLENGES_PER_SESSION ->
+                    "429 Too Many Requests" to """{"ok":false,"error":"locked_out"}"""
+                else -> {
+                    helloChallengesIssued++
+                    val challenge = HouseholdSyncPake.createServerChallenge(activePairingCode)
+                    if (pendingChallenges.size >= MAX_ACTIVE_CHALLENGES) {
+                        pendingChallenges.keys.firstOrNull()?.let { pendingChallenges.remove(it) }
+                    }
+                    pendingChallenges[challenge.nonceB64] = challenge
+                    "200 OK" to challenge.responseJson
+                }
             }
         }
-        return baos.toString("ISO-8859-1")
+        HouseholdSyncHttpFraming.sendJsonResponse(sock, status, body)
     }
 
-    private fun readExactBody(input: BufferedInputStream, length: Int, deadlineNs: Long): ByteArray? {
-        val out = ByteArray(length)
-        var offset = 0
-        while (offset < length) {
-            if (System.nanoTime() > deadlineNs) return null
-            val n = input.read(out, offset, length - offset)
-            if (n <= 0) return null
-            offset += n
+    private fun handlePushRequest(
+        sock: Socket,
+        sourceIp: String,
+        bodyBytes: ByteArray,
+        onPayloadReceived: (ReceivedHouseholdSync) -> Unit,
+        onSessionLockedOut: () -> Unit
+    ) {
+        val parsedPush = try {
+            HouseholdSyncPake.parsePushEnvelopeV2(String(bodyBytes, Charsets.UTF_8))
+        } catch (_: IllegalArgumentException) {
+            HouseholdSyncHttpFraming.sendJsonResponse(
+                sock,
+                "400 Bad Request",
+                """{"ok":false,"error":"malformed_envelope"}"""
+            )
+            return
         }
-        return out
-    }
 
-    private fun sendJsonResponse(sock: Socket, status: String, body: String) {
-        val bytes = body.toByteArray(Charsets.UTF_8)
-        val writer = OutputStreamWriter(sock.getOutputStream(), Charsets.US_ASCII)
-        writer.write("HTTP/1.1 $status\r\n")
-        writer.write("Content-Type: application/json; charset=utf-8\r\n")
-        writer.write("Content-Length: ${bytes.size}\r\n")
-        writer.write("Connection: close\r\n\r\n")
-        writer.flush()
-        sock.getOutputStream().write(bytes)
-        sock.getOutputStream().flush()
+        var acceptedPayload: ReceivedHouseholdSync? = null
+        var shouldLockOut = false
+        val (status, body) = synchronized(authLock) {
+            when {
+                payloadAccepted.get() -> "409 Conflict" to """{"ok":false,"error":"already_received"}"""
+                !isRunning.get() || activePairingCode.length != 6 || System.currentTimeMillis() >= activeExpiresAtMs ->
+                    "410 Gone" to """{"ok":false,"error":"session_closed"}"""
+                failedAuthAttempts.get() >= MAX_FAILED_AUTH_ATTEMPTS ->
+                    "429 Too Many Requests" to """{"ok":false,"error":"locked_out"}"""
+                else -> {
+                    // Single-use nonce: burn immediately before verifying to prevent replays.
+                    val challenge = pendingChallenges.remove(parsedPush.nonceB64)
+                    if (challenge == null) {
+                        val failures = failedAuthAttempts.incrementAndGet()
+                        if (failures >= MAX_FAILED_AUTH_ATTEMPTS) {
+                            isRunning.set(false)
+                            shouldLockOut = true
+                            "429 Too Many Requests" to """{"ok":false,"error":"locked_out"}"""
+                        } else {
+                            "401 Unauthorized" to """{"ok":false,"error":"invalid_handshake"}"""
+                        }
+                    } else {
+                        try {
+                            val (senderLabel, plaintextJson) = HouseholdSyncPake.decryptPushV2(parsedPush, challenge)
+                            val bundle = HouseholdSyncCodec.decodeFromJson(
+                                plaintextJson,
+                                allowLoopback = allowLoopbackForTests
+                            )
+                            payloadAccepted.set(true)
+                            isRunning.set(false)
+                            acceptedPayload = ReceivedHouseholdSync(
+                                sourceIp = sourceIp,
+                                senderLabel = bundle.sourceDeviceLabel.ifBlank { senderLabel },
+                                bundle = bundle
+                            )
+                            "200 OK" to """{"ok":true,"homes":${bundle.homes.size},"devices":${bundle.devices.size}}"""
+                        } catch (_: SecurityException) {
+                            val failures = failedAuthAttempts.incrementAndGet()
+                            if (failures >= MAX_FAILED_AUTH_ATTEMPTS) {
+                                isRunning.set(false)
+                                shouldLockOut = true
+                                "429 Too Many Requests" to """{"ok":false,"error":"locked_out"}"""
+                            } else {
+                                "401 Unauthorized" to """{"ok":false,"error":"invalid_code"}"""
+                            }
+                        } catch (_: IllegalArgumentException) {
+                            "400 Bad Request" to """{"ok":false,"error":"invalid_household_json"}"""
+                        }
+                    }
+                }
+            }
+        }
+
+        HouseholdSyncHttpFraming.sendJsonResponse(sock, status, body)
+        if (shouldLockOut) {
+            stopSession()
+            onSessionLockedOut()
+        } else if (acceptedPayload != null) {
+            stopSession()
+            onPayloadReceived(acceptedPayload!!)
+        }
     }
 }
