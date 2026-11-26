@@ -9,6 +9,12 @@ data class ReleaseHistoryEntry(
 
 val WEMI_RELEASE_HISTORY: List<ReleaseHistoryEntry> = listOf(
     ReleaseHistoryEntry(
+        version = "v37.0",
+        releaseDate = "Nov 26, 2026",
+        headline = "Zero-Cloud Household Sync, Security Hardening & Drawer Polish",
+        summary = "Share your Wi-Fi Homes, custom switch names, rooms, and ordering across phones, tablets, Chromebooks, and Android TV via compact JSON export/import or 6-digit PIN-encrypted local Wi-Fi pairing (no cloud account or Wi-Fi passwords), plus comprehensive security & privacy hardening (redacted-by-default diagnostics, ephemeral masked setup passwords, RFC 1918 LAN validation, non-exported widget actions, cloud Auto-Backup exclusions) and a cleaner full-width expanded switch drawer."
+    ),
+    ReleaseHistoryEntry(
         version = "v36.0",
         releaseDate = "Nov 25, 2026",
         headline = "Live On-Device Switch Rules, Clock Sync & Backup Restore",

@@ -45,6 +45,11 @@ description: "EXCLUSIVE TO THE GOOGLE AI STUDIO AGENT (Read-Only for All Other A
    - Filter rule creation to reachable compatible switches (and guard TopHeader `+` on the `Rules` tab with a helpful toast when none exist), preserve draft state across rotation (`rememberSaveable`), surface a pinned `LiveRegionMode.Polite` validation banner, use wrapping compact-safe time steppers (`-1h/+1h/-15m/+15m/-5m/+5m/-1m/+1m`), validate distinct fixed and solar start/end triggers, allow signed ASCII coordinate input (`-90..90` / `-180..180`) in `HardwareLocationDialog`, ellipsize `HardwareRuleBadgePill` so Edit/Delete/Switch never clip on `320dp` phones, keep multi-switch `Shared rule` and non-owner `Target` rows read-only (`Edit` hidden, `Delete`/`Switch` disabled) alongside `View only` badges for non-editable firmware types, confirm deletion via `DeleteHardwareRuleConfirmDialog`, and offer a `Go to Devices` button in `hardware_rules_empty_state`.
    - Inside `DeviceDiagnosticsDrawer.kt`, keep `ExpandedDrawerHardwareRulesSection` below Brightness and Telemetry (Invariant 4), display `trigger → action` + Paused indicators, warn on clock drift with `Sync Clock`, provide `Add Rule`, and link to full management via `Manage Rules` (`drawer_open_rules_tab_<id>`) and clickable `"+N more rule(s) in Rules tab"`.
 
+7. **Zero-Cloud Household Config Sync & Security/Privacy UX — CUJ 10**:
+   - `HouseholdSyncCard.kt` on the `More` tab exposes `>= 48.dp` compact-padding single-line buttons (`Send to TV`, `Receive`, `Export JSON`, `Import JSON`) using zero-permission SAF and PIN-encrypted local Wi-Fi pairing (`HouseholdSyncDialogs.kt`, `HouseholdSyncReceiveDialogs.kt`) with volatile `remember`-only 6-digit PINs, `>= 48.dp` peer rows with merged TalkBack semantics, inline TCP port `1..65535` validation, vertical-scroll safety, and wrapping `FlowRow` `Merge` / `Replace All` / `Cancel` import confirmation.
+   - On Android TV (`wemi TV`), `TvHeadersAndScenes.kt` appends a compact **`Sync`** (`tv_sync_button`) top-bar chip opening `TvHouseholdSyncOverlay` (`TvHouseholdSyncDialog.kt`) with `BackHandler` dismissal, polite live-region status updates, and `>= 48.dp` D-Pad remote buttons.
+   - Keep `ProvisionApDialog` Wi-Fi passwords strictly ephemeral (`remember` only, `ON_PAUSE` re-masking, reveal-scoped `FLAG_SECURE`), validate RFC 1918 LAN endpoints inline (`DeviceEditDialog`, `ProvisionApDialog`), and default exported/copied diagnostics to redacted identifiers with explicit opt-in Full Diagnostics toggles (`MoreControlAndLogCards`, `ProvisionDebugPanel`).
+
 ---
 
 ## 2. Five Mandatory Layout & Interaction Invariants
@@ -82,9 +87,9 @@ Before initiating any release review (`Stage 1: ai_studio_ux_cuj` in [`RELEASE_P
 
 ---
 
-## 4. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `HeaderAndReleaseHistoryE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt`, `TvNavigationAndScenesE2ETest.kt`, `HomeScreenWidgetTest.kt`, `HomeScreenWidgetUiE2ETest.kt`, `AppFlowsAndManagementE2ETest.kt`, `TelemetryDiagnosticsTest.kt`, `ChromeOsArcVmE2ETest.kt`, `HardwareRulesMutationTest.kt` & `HardwareRulesE2ETest.kt` — `134/134` Tests Across `26` Suites)
+## 4. Automated E2E CUJ Verification (`ExampleRobolectricTest.kt`, `EndToEndUiTest.kt`, `HardwareCujEndToEndTest.kt`, `ProvisioningAndGenaCujE2ETest.kt`, `HeaderAndReleaseHistoryE2ETest.kt`, `TvAndHeaderLayoutE2ETest.kt`, `TvNavigationAndScenesE2ETest.kt`, `HomeScreenWidgetTest.kt`, `HomeScreenWidgetUiE2ETest.kt`, `AppFlowsAndManagementE2ETest.kt`, `TelemetryDiagnosticsTest.kt`, `ChromeOsArcVmE2ETest.kt`, `HardwareRulesMutationTest.kt`, `HardwareRulesE2ETest.kt`, `SecurityAndPrivacyHardeningTest.kt`, `HouseholdSyncTest.kt` & `HouseholdSyncE2ETest.kt` — `145/145` Tests Across `29` Suites)
 
-Whenever UI components, widgets, ViewModel flows, or repository methods are touched, verify all 9 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
+Whenever UI components, widgets, ViewModel flows, or repository methods are touched, verify all 10 Critical User Journeys documented in [`UX_DESIGN.md`](../../../UX_DESIGN.md) and [`UX_DESIGN_AND_EXPERIENCE.md`](../../../UX_DESIGN_AND_EXPERIENCE.md) by running:
 
 ```bash
 sh gradlew testDebugUnitTest --rerun-tasks

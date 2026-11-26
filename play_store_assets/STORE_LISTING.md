@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v36.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v37.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `36.0` (`versionCode = 36`)
+- **Version:** `37.0` (`versionCode = 37`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Chromebooks (ChromeOS)**, **Android Home Screen Widgets**, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,20 +17,21 @@ WeMi Switch Control brings fast, reliable local-network control back to Belkin's
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery, local SOAP HTTP commands, and `<100ms` UPnP GENA push updates—with no cloud account, external server, or subscription required.
 
-### What's New in Version 36.0
-- **Live On-Device Switch Rules (`On-Switch`):** Create, edit, enable/disable, and delete native **Schedules** (fixed time or **Sunrise/Sunset** with custom offsets), **Auto-Off Delay** timers, **Timed Actions**, and **Long Press** targets directly inside compatible switch memory—so your automations keep running even when your phone is turned off.
-- **Automatic Clock Sync, Offline Solar Location & Pre-Write Backups:** Automatically syncs drifted switch clocks before saving rules, lets you pick a city preset or enter signed coordinates offline with zero location permissions, and automatically saves up to 5 local pre-write backups with one-tap restore.
-- **Privacy, Reliability & UX Polish:** Masked Wi-Fi passwords with a show/hide toggle in `10.22.22.1` setup, backup archives excluded from cloud Auto-Backup, fine-grained `±1m`/`±5m`/`±15m`/`±1h` time steppers, and a one-tap **Manage Rules** shortcut from every switch's expanded drawer.
-- **Chromebook (ChromeOS) LAN Support, Widgets & Android TV:** Network-bound multicast discovery with physical-subnet fallback on Chromebooks, one-tap Home Screen Widgets, 3-column Android TV controls, zero-cloud `10.22.22.1` setup, and pure Kotlin/DEX packaging (`minSdk 24+`).
+### What's New in Version 37.0
+- **Zero-Cloud Household Configuration Sync:** Share your remembered Wi-Fi Homes, custom switch names, room assignments, and ordering across Android phones, tablets, Chromebooks, and Android TV—either as a portable JSON file (zero storage permissions) or directly over your home Wi-Fi using a temporary 6-digit PIN-encrypted transfer (no cloud account or Wi-Fi passwords ever exported).
+- **Comprehensive Security & Privacy Hardening:** Diagnostic exports now redact SSIDs, MAC addresses, serials, UDNs, and DNS IPs by default (with an opt-in Full Diagnostics toggle), `10.22.22.1` setup Wi-Fi passwords stay ephemeral in memory and auto-remask when switching apps, LAN endpoints validate private IPv4 ranges, Home Screen widget actions are isolated to non-exported receivers, and saved device lists stay excluded from cloud Auto-Backup.
+- **Expanded Switch Drawer & TV Sync Polish:** Unified the expanded switch drawer so `UPnP Endpoint`, `Serial Number`, and `Firmware` sit cleanly across the full card width above wrapping action chips (`Add Widget`, `Configure IP`, `Reconnect`), and added a one-tap **`Sync`** chip and D-Pad **`Pair from Phone`** overlay on Android TV (`wemi TV`).
+- **Live On-Device Switch Rules, Chromebook LAN Support & Widgets:** Create, edit, toggle, and back up native Schedules (including Sunrise/Sunset), Auto-Off delays, Timed Actions, and Long Press targets directly in compatible switch memory—alongside ChromeOS LAN discovery, Home Screen Light & Room Widgets, and pure Kotlin/DEX packaging (`minSdk 24+`).
 
 ### Key Features
+- **Zero-Cloud Household Sync:** Export/import portable JSON or pair phone-to-TV and phone-to-phone setups over local Wi-Fi with a 6-digit encrypted PIN and identity-safe Merge or Replace.
 - **Home Screen Light & Room Widgets:** One-tap local Wi-Fi toggles for individual lights or whole rooms straight from your Android launcher without opening the app.
 - **Instant One-Tap Cyan Power Rings:** Toggle individual switches or entire room groups ON or OFF over your local LAN with tactile 3-state hardware illustrations (On, Standby, Offline).
-- **Native Android TV (`wemi TV`) 10-Foot Dashboard:** Automatic Leanback launcher UI with a 3-column room-grouped switch grid, glowing cyan `"FOCUSED • OK"` focus rings, TV Quick Scenes (`Movie 20%`, `Holiday ON`, `All OFF`), and inline D-Pad dimming.
+- **Native Android TV (`wemi TV`) 10-Foot Dashboard:** Automatic Leanback launcher UI with a 3-column room-grouped switch grid, glowing cyan `"FOCUSED • OK"` focus rings, TV Quick Scenes (`Movie 20%`, `Holiday ON`, `All OFF`), inline D-Pad dimming, and **`Sync`** pairing from your phone.
 - **Inline Dimmer & Night Mode Controls:** Smoothly dim smart dimmers and bulbs from 1% to 100%, jump to quick presets (21%, 50%, 75%, 100%), or toggle hardware Night Mode.
 - **Interactive SSDP & Unicast Local Scanner:** Discover switches over `239.255.255.250:1900` with automatic `/24` unicast fallback when routers block multicast.
 - **Live On-Device Switch Rules & Backups:** Create, edit, toggle, and back up native Schedules, Sunrise/Sunset timers, Auto-Off delays, Timed Actions, and Long Press targets directly inside compatible switches over local Wi-Fi—with clear RTOS capability disclosures.
-- **Multi-Home Wi-Fi Profiles & Built-In SOAP Inspector:** Organize switches across multiple Wi-Fi networks and inspect real-time local UPnP/SOAP packets and RTT health metrics.
+- **Multi-Home Wi-Fi Profiles & Privacy-First SOAP Inspector:** Organize switches across multiple Wi-Fi networks and inspect real-time local UPnP/SOAP packets and RTT health metrics with redacted-by-default diagnostics.
 
 ## Complete Google Play Console Asset Inventory (`/play_store_assets/`)
 1. **High-Res App Icon (`play_store_icon_512x512.png`):** 512 × 512 px, 32-bit PNG.
@@ -39,9 +40,9 @@ WeMi Switch Control communicates directly with your switches over your home Wi-F
    - `tv/tv_banner_1280x720.png`: 1280 × 720 px, 24-bit PNG (Google Play Console Android TV Banner upload).
    - `tv/tv_banner_320x180.png`: 320 × 180 px, 24-bit PNG (also bundled in APK at `res/drawable-xhdpi/tv_banner.png`).
 4. **Android TV 16:9 Screenshots (`screenshots/android_tv/` — 1920 × 1080 px, 16:9 PNG):**
-   - `tv_1_room_groups_and_remote_focus.png` (3-Column Room-Grouped TV Grid, Room Header `-10%`/`+10%` Dimming & Glowing Cyan `"FOCUSED • OK"` Focus Ring)
+   - `tv_1_room_groups_and_remote_focus.png` (3-Column Room-Grouped TV Grid, Room Header `-10%`/`+10%` Dimming, Top-Bar `Sync` Chip & Glowing Cyan `"FOCUSED • OK"` Focus Ring)
    - `tv_2_dimmer_and_ssdp_discovery.png` (Inline `"DIM -/+"` Dimmer Mode with `"Done Dimming"` Header Bar & Left/Right D-Pad Controls)
-   - `tv_3_living_room_scenes_and_rules.png` (TV Remote Quick Scenes — Movie Mode 20%, Conditional Holiday ON, All OFF & Room Master Toggle)
+   - `tv_3_living_room_scenes_and_rules.png` (TV Remote Quick Scenes — Movie Mode 20%, Conditional Holiday ON, All OFF, `Sync` & Room Master Toggle)
 5. **Phone Screenshots (`screenshots/phone/` — 1080 × 1920 px, 9:16 PNG):**
    - `phone_1_devices_and_power_rings.png` (Single-Row Top Bar with Subtle Version Badge, Room Grouping & 3-State Power Rings)
    - `phone_2_ssdp_network_scanner.png` (Pull-to-Refresh & SSDP Network Discovery Scanner with Port-Healed Switch Adoption)

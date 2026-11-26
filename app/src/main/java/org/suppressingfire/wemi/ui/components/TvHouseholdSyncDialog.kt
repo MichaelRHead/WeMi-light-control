@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +39,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -218,7 +222,9 @@ internal fun TvHouseholdSyncOverlay(
                             text = state.receiveStatusMessage,
                             color = TvCyanFocusBorder,
                             fontSize = 14.sp,
-                            modifier = Modifier.testTag("tv_sync_status_message")
+                            modifier = Modifier
+                                .semantics { liveRegion = LiveRegionMode.Polite }
+                                .testTag("tv_sync_status_message")
                         )
                     }
                     Spacer(modifier = Modifier.height(4.dp))
@@ -279,6 +285,7 @@ private fun TvSyncActionButton(
             color = if (isFocused) TvCyanFocusBorder else TvCyanFocusBorder.copy(alpha = 0.4f)
         ),
         modifier = Modifier
+            .heightIn(min = 48.dp)
             .focusRequester(focusRequester)
             .onFocusChanged { isFocused = it.isFocused }
             .onKeyEvent { event ->
@@ -297,13 +304,17 @@ private fun TvSyncActionButton(
             .clickable(onClick = onClick)
             .testTag(testTag)
     ) {
-        Text(
-            text = label,
-            color = Color.White,
-            fontFamily = FontFamily.SansSerif,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
+        Box(
+            contentAlignment = Alignment.Center,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
-        )
+        ) {
+            Text(
+                text = label,
+                color = Color.White,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp
+            )
+        }
     }
 }

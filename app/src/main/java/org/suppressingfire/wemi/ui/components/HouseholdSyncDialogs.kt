@@ -41,7 +41,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -156,7 +158,9 @@ internal fun HouseholdSyncSendDialog(
                     TextButton(
                         onClick = onRescanPeers,
                         enabled = !state.isDiscoveringPeers && !state.isPushingToPeer,
-                        modifier = Modifier.testTag("household_sync_rescan_peers_button")
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("household_sync_rescan_peers_button")
                     ) {
                         if (state.isDiscoveringPeers) {
                             CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp)
@@ -182,6 +186,9 @@ internal fun HouseholdSyncSendDialog(
                     )
                 }
 
+                val parsedPortCandidate = targetPortText.toIntOrNull()
+                val portValid = targetPortText.isBlank() || (parsedPortCandidate != null && parsedPortCandidate in 1..65535)
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -200,11 +207,21 @@ internal fun HouseholdSyncSendDialog(
                         value = targetPortText,
                         onValueChange = { raw -> targetPortText = raw.filter { it.isDigit() }.take(5) },
                         label = { Text("Port") },
+                        isError = !portValid,
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
                             .weight(1f)
                             .testTag("household_sync_target_port_input")
+                    )
+                }
+
+                if (!portValid) {
+                    Text(
+                        text = "Enter a valid TCP port between 1 and 65535 (default ${HouseholdSyncLanServer.DEFAULT_LISTEN_PORT}).",
+                        color = SyncErrorText,
+                        fontSize = 12.sp,
+                        modifier = Modifier.testTag("household_sync_port_validation_error")
                     )
                 }
 
@@ -224,13 +241,15 @@ internal fun HouseholdSyncSendDialog(
             }
         },
         confirmButton = {
+            val resolvedPort = targetPortText.toIntOrNull() ?: HouseholdSyncLanServer.DEFAULT_LISTEN_PORT
+            val portAllowed = targetPortText.isBlank() || resolvedPort in 1..65535
             Button(
                 onClick = {
-                    val port = targetPortText.toIntOrNull() ?: HouseholdSyncLanServer.DEFAULT_LISTEN_PORT
-                    onPushToPeer(targetIp, port, pairingCode)
+                    onPushToPeer(targetIp, resolvedPort, pairingCode)
                 },
                 enabled = !state.isPushingToPeer &&
                     targetIp.isNotBlank() &&
+                    portAllowed &&
                     HouseholdSyncCrypto.isValidPairingCode(pairingCode),
                 colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
                 modifier = Modifier
@@ -267,6 +286,11 @@ private fun SyncPeerRow(
         ),
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
+            .semantics(mergeDescendants = true) {
+                selected = isSelected
+                contentDescription = "${peer.deviceName} at ${peer.ipAddress} port ${peer.port}, ${if (isSelected) "selected" else "not selected"}"
+            }
             .clickable(onClick = onSelect)
             .testTag("household_sync_peer_${peer.ipAddress}_${peer.port}")
     ) {

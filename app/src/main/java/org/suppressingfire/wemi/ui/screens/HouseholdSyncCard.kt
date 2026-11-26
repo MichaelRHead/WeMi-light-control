@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.network.HouseholdSyncCodec
@@ -58,6 +60,7 @@ internal fun HouseholdSyncCard(
     onOpenReceiveLanSync: () -> Unit
 ) {
     val context = LocalContext.current
+    val compactButtonPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)
 
     val exportJsonLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -121,6 +124,7 @@ internal fun HouseholdSyncCard(
             ) {
                 Button(
                     onClick = onOpenSendLanSync,
+                    contentPadding = compactButtonPadding,
                     colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
                     modifier = Modifier
                         .weight(1f)
@@ -133,10 +137,17 @@ internal fun HouseholdSyncCard(
                         modifier = Modifier.size(16.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Send to TV", maxLines = 1)
+                    Text(
+                        text = "Send to TV",
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 OutlinedButton(
                     onClick = onOpenReceiveLanSync,
+                    contentPadding = compactButtonPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
@@ -149,7 +160,14 @@ internal fun HouseholdSyncCard(
                         tint = WemoGreenDark
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Receive", color = WemoGreenDark, maxLines = 1)
+                    Text(
+                        text = "Receive",
+                        color = WemoGreenDark,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
 
@@ -161,6 +179,7 @@ internal fun HouseholdSyncCard(
             ) {
                 OutlinedButton(
                     onClick = { exportJsonLauncher.launch(HouseholdSyncCodec.DEFAULT_EXPORT_FILENAME) },
+                    contentPadding = compactButtonPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
@@ -173,12 +192,20 @@ internal fun HouseholdSyncCard(
                         tint = WemoTextPrimary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Export JSON", color = WemoTextPrimary, maxLines = 1)
+                    Text(
+                        text = "Export JSON",
+                        color = WemoTextPrimary,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 OutlinedButton(
                     onClick = {
                         importJsonLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                     },
+                    contentPadding = compactButtonPadding,
                     modifier = Modifier
                         .weight(1f)
                         .heightIn(min = 48.dp)
@@ -191,7 +218,14 @@ internal fun HouseholdSyncCard(
                         tint = WemoTextPrimary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Import JSON", color = WemoTextPrimary, maxLines = 1)
+                    Text(
+                        text = "Import JSON",
+                        color = WemoTextPrimary,
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
         }

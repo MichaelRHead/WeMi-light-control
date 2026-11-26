@@ -1294,9 +1294,9 @@ public class GeneratePlayStoreAssets {
         Color focusPillBorder = isDimmerMode ? new Color(0xFB, 0xBF, 0x24) : new Color(0x22, 0xD3, 0xEE, 175);
         Color focusPillFg = isDimmerMode ? C_TV_BG_TOP : C_WHITE;
         g.setFont(fUi(11.5 * s, Font.BOLD));
-        int fpW = Math.min((int) (205 * s), g.getFontMetrics().stringWidth(focusPillTxt) + (int) (22 * s));
+        int fpW = Math.min((int) (175 * s), g.getFontMetrics().stringWidth(focusPillTxt) + (int) (20 * s));
         fillRoundRect(g, cx, y, fpW, barH, 9 * s, focusPillBg, focusPillBorder, 1.2 * s);
-        drawFittedString(g, focusPillTxt, cx + 11 * s, y + 24 * s, fpW - 18 * s, 11.5 * s, Font.BOLD, focusPillFg);
+        drawFittedString(g, focusPillTxt, cx + 10 * s, y + 24 * s, fpW - 16 * s, 11.5 * s, Font.BOLD, focusPillFg);
         cx += fpW + 8 * s;
 
         if (isDimmerMode) {
@@ -1308,19 +1308,20 @@ public class GeneratePlayStoreAssets {
             g.drawString(doneTxt, (int) (cx + 9 * s), (int) (y + 23 * s));
         }
 
-        // Right-aligned Scene Chips + Rescan Button
+        // Right-aligned Scene Chips + Rescan + Sync Button (TvHeadersAndScenes.kt v37.0)
         String[][] scenes = {
             {"Movie 20%", isScenesMode ? "1" : "0"},
             {"Holiday ON", "0"},
             {"All OFF", "0"},
-            {"Rescan", "0"}
+            {"Rescan", "0"},
+            {"Sync", "0"}
         };
         double rx = w - padX;
         for (int i = scenes.length - 1; i >= 0; i--) {
             String[] sc = scenes[i];
             boolean scFocus = "1".equals(sc[1]);
             g.setFont(fUi(12 * s, Font.BOLD));
-            int sw = g.getFontMetrics().stringWidth(sc[0]) + (int) (24 * s);
+            int sw = g.getFontMetrics().stringWidth(sc[0]) + (int) (22 * s);
             rx -= sw;
             fillRoundRect(
                 g, rx, y, sw, barH, 10 * s,
@@ -1329,8 +1330,8 @@ public class GeneratePlayStoreAssets {
                 (scFocus ? 2.4 : 1.0) * s
             );
             g.setColor(C_WHITE);
-            g.drawString(sc[0], (int) (rx + 12 * s), (int) (y + 24 * s));
-            rx -= 8 * s;
+            g.drawString(sc[0], (int) (rx + 11 * s), (int) (y + 24 * s));
+            rx -= 7 * s;
         }
         y += (int) (barH + 12 * s);
 

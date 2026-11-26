@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, Chromebooks (ChromeOS), and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v36.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v37.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v36.0`)
+## Quick Release Summary (`v1.0` → `v37.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v37.0`](#version-370-versioncode--37--november-26-2026)** | `37` | Nov 26, 2026 | **Zero-Cloud Household Configuration Sync (JSON Export/Import & 6-Digit PIN Phone-to-TV Local Pairing), Comprehensive Security & Privacy Hardening & Expanded Switch Drawer Layout Fix**: Sync Wi-Fi Homes, custom switch names, rooms, and ordering across phones, tablets, Chromebooks, and Android TV with zero cloud accounts or Wi-Fi passwords; redact diagnostic exports by default with opt-in Full Diagnostics toggles, ephemeral auto-remasking Wi-Fi setup passwords, RFC 1918 LAN validation, non-exported widget receivers, and cloud Auto-Backup exclusions; plus a cleaner full-width expanded switch drawer |
 | **[`v36.0`](#version-360-versioncode--36--november-25-2026)** | `36` | Nov 25, 2026 | **Live On-Device Switch Rules Management (`On-Switch`), Automatic Clock Sync, Offline Solar Location, Pre-Write Backup Restore & Security/UX Hardening**: Create, edit, toggle, and delete native **Long Press**, **Auto-Off Delay**, **Schedule** (with **Sunrise/Sunset** offsets), and **Timed Action** rules directly in compatible switch memory (retiring phone-only app rules cleanly in Room v7), with automatic clock sync, offline city/signed-coordinate solar setup, automatic pre-write backups with one-tap restore, masked Wi-Fi setup passwords, and a unified **Rules** tab + expanded drawer **Manage Rules** bridge |
 | **[`v35.0`](#version-350-versioncode--35--november-22-2026)** | `35` | Nov 22, 2026 | **On-Device Switch Rules Inspector (Read-Only), Two-Tier Rules UX & Refreshed User Guides**: Zero-delay capability detection + firmware-cached verification, read-only inspection of stored switch rules (`Long Press`, `Auto-Off Delay`, `Schedule` / `Sunrise`-`Sunset`, `Away Mode`, clock-sync alerts) in the collapsible **Rules** tab and expanded switch drawer, plus refreshed User Guides & new Home Screen Widgets guide |
 | **[`v34.0`](#version-340-versioncode--34--november-21-2026)** | `34` | Nov 21, 2026 | **Chromebook (ChromeOS ARCVM) Local-LAN Discovery & Control + Refreshed Play Store Visuals**: Network-bound multicast SSDP & automatic physical-subnet fallback on Chromebooks, guided manual `/24` subnet scanner fallback when routers block multicast, clean CGNAT home profile hygiene, 15s Chromebook foreground sync, and refreshed Store/TV graphics |
@@ -51,6 +52,17 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 37.0 (`versionCode = 37`) — November 26, 2026
+- **Zero-Cloud Household Configuration Sync (JSON & PIN-Encrypted Local Wi-Fi Pairing)**: Set up your switches, custom names, rooms, and ordering once on your phone and share them effortlessly to Android TV, another phone, a tablet, or a Chromebook—with zero cloud accounts, zero storage permissions, and zero Wi-Fi passwords ever leaving your device.
+  - **One-Tap Phone-to-TV & Device Pairing**: Open **`Sync`** in the top bar of **Android TV (`wemi TV`)** (or **More → Household Config Sync → Receive** on another device) to display a temporary 2-minute **6-digit pairing code**, then tap **Send to TV** on your phone to push your household setup over your home Wi-Fi using authenticated `AES-GCM` encryption (`PBKDF2-SHA256`) and choose identity-safe **Merge** or **Replace All**.
+  - **Portable JSON Export & Import**: Export or import a compact `.json` household snapshot anytime via Android's built-in file picker (Storage Access Framework), preserving live local IP addresses, power states, and on-device rules caches on the receiving device.
+- **Comprehensive Security & Privacy Hardening**:
+  - **Privacy-First Diagnostics**: Exported and copied troubleshooting logs now redact Wi-Fi SSIDs, MAC addresses, serial numbers, UDNs, and DNS IP addresses by default, with an explicit opt-in **Full Diagnostics** toggle whenever you choose to share unredacted identifiers for support, plus Android `EXTRA_IS_SENSITIVE` clipboard flagging.
+  - **Hardened Setup, LAN, Rules & Widget Boundaries**: `10.22.22.1` setup Wi-Fi passwords now stay strictly in volatile memory, auto-remask when switching apps, and activate reveal-scoped screenshot protection (`FLAG_SECURE`) while revealed; manual IP dialogs validate private RFC 1918 LAN endpoints inline; local switch rules archives undergo strict read-only SQLite schema checks; live wall-switch GENA callbacks authenticate per-subscription tokens and LAN source IPs; Home Screen widget actions run through non-exported receivers; Room databases and preferences are excluded from cloud Auto-Backup while keeping direct cable transfer; and **Reset Homes, Switches & Rooms** also wipes saved diagnostic logs and widget bindings.
+- **Expanded Switch Drawer & Household Sync UX Polish**: Unified the expanded switch drawer into a single clean **Connection & Hardware Details** card so `UPnP Endpoint`, `Serial Number`, and `Firmware` span the full card width above wrapping action chips (`Add Widget`, `Configure IP`, `Reconnect`) with zero cramped vertical text wrapping, and ensured `48dp+` touch targets, TalkBack announcements, and compact-screen wrapping across all new Household Sync cards and TV overlays.
+
+---
 
 ### Version 36.0 (`versionCode = 36`) — November 25, 2026
 - **Live On-Device Switch Rules Management (`On-Switch`)**: The **Rules** tab is now dedicated exclusively to native on-device switch rules stored directly inside compatible wall switches, dimmers, and plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`)—so your schedules and timers keep running even when your phone is turned off or away from home. Create, edit, enable/disable, and delete **Long Press** (controlling one or more target switches), **Auto-Off Delay**, **Schedules** (fixed times or **Sunrise/Sunset** with `-60m` to `+60m` offsets), and **Timed Actions** directly over your local Wi-Fi network, retiring legacy phone-only app rules cleanly via Room v7.

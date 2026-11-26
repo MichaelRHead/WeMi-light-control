@@ -1,4 +1,4 @@
-WeMi Switch Control v36.0:
-• Live On-Device Switch Rules: Create, edit, toggle & delete schedules (with Sunrise/Sunset offsets), Auto-Off delays, Timed Actions, and Long Press targets in compatible switch memory—running even with your phone off.
-• Clock Sync, Solar & Backups: Auto clock sync before writes, offline solar location presets/coordinates, and pre-write backups with one-tap restore.
-• Security & UX Polish: Masked Wi-Fi setup passwords, cleaner On-Switch Rules tab & faster sync.
+WeMi Switch Control v37.0:
+• Zero-Cloud Household Sync: Share Wi-Fi Homes, switch names, rooms & order across phones, tablets, Chromebooks & Android TV via JSON export/import or 6-digit PIN-encrypted local Wi-Fi pairing (no cloud or Wi-Fi passwords).
+• Security & Privacy Hardening: Redacted-by-default diagnostics, ephemeral setup passwords, RFC 1918 LAN validation, non-exported widget actions & cloud Auto-Backup exclusions.
+• UX Polish: Cleaner full-width expanded switch drawers.

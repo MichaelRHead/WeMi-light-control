@@ -3,13 +3,16 @@ package org.suppressingfire.wemi.ui.components
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -84,7 +87,9 @@ internal fun HouseholdSyncReceiveDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
@@ -148,7 +153,9 @@ internal fun HouseholdSyncReceiveDialog(
                 Button(
                     onClick = onStartNewSession,
                     colors = ButtonDefaults.buttonColors(containerColor = WemoGreenPrimary),
-                    modifier = Modifier.heightIn(min = 48.dp)
+                    modifier = Modifier
+                        .heightIn(min = 48.dp)
+                        .testTag("household_sync_receive_new_code_button")
                 ) {
                     Text("New Code")
                 }
@@ -171,6 +178,7 @@ internal fun HouseholdSyncReceiveDialog(
  * Confirmation modal shown after decoding an imported JSON file or receiving a verified local-LAN
  * push, letting the user choose between identity-safe Merge or full Replace.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun HouseholdImportConfirmDialog(
     pending: PendingHouseholdImport,
@@ -194,7 +202,12 @@ internal fun HouseholdImportConfirmDialog(
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Text(
                     text = "Source: ${pending.sourceDescription}",
                     fontWeight = FontWeight.SemiBold,
@@ -232,7 +245,10 @@ internal fun HouseholdImportConfirmDialog(
             }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
                 OutlinedButton(
                     onClick = { onConfirm(HouseholdImportMode.REPLACE) },
                     modifier = Modifier
