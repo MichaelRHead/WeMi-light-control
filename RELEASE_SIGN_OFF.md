@@ -14,7 +14,7 @@ This file is the live synchronization state machine for the **7-Agent / 8-Stage 
 RELEASE_VERSION: v37.0
 VERSION_CODE: 37
 ROUND_NUMBER: 1
-RELEASE_STATUS: APPROVED_FOR_PLAY_STORE
+RELEASE_STATUS: PROMOTED_TO_CLOSED_TESTING
 CURRENT_TURN: NONE
 CANDIDATE_BASE_SHA: a385155
 SIGN_OFF_AI_STUDIO_UX_CUJ: SIGNED_OFF (a385155 @ 2026-11-26 08:52 PST)
@@ -23,12 +23,12 @@ SIGN_OFF_TELEMETRY_AND_DEBUGGING: SIGNED_OFF (4e71935 @ 2026-11-26 09:21 PST)
 SIGN_OFF_SECURITY_AND_PRIVACY: SIGNED_OFF (c684037 @ 2026-11-26 09:42 PST)
 SIGN_OFF_CODE_QUALITY_AND_TESTING: SIGNED_OFF (1721e7f @ 2026-11-26 10:05 PST)
 SIGN_OFF_LICENSE_GOVERNANCE: SIGNED_OFF (78952e6 @ 2026-11-26 10:18 PST)
-SIGN_OFF_APP_PROMOTER: PENDING
+SIGN_OFF_APP_PROMOTER: PROMOTED (vc=37 internal -> alpha @ 2026-11-26 11:56 PST)
 FINAL_RELEASE_SHA: v37.0-rc
 CONCLUDED_AT: 2026-11-26 11:23 PST
-PROMOTED_VERSION_CODE: NONE
-PROMOTED_TRACK: NONE
-PROMOTED_AT: NONE
+PROMOTED_VERSION_CODE: 37
+PROMOTED_TRACK: alpha
+PROMOTED_AT: 2026-11-26 11:56 PST
 <!-- RELEASE_STATE_END -->
 
 ---
@@ -45,7 +45,7 @@ PROMOTED_AT: NONE
 | **5 (Review 4)** | `code_quality_and_testing` | **Antigravity Code Quality & E2E Testing Agent** | `SIGNED_OFF` | `1721e7f` | `2026-11-26 10:05 PST` | Verified 138/138 .kt files <500L (max 496L), 156/156 Kotlin tests across 30 suites, zero compiler/lint warnings, clean debug APK, and hardened Household Sync UI lifecycle, TV focus containment, SAF export truncation, and test isolation. |
 | **6 (Review 5)** | `license_governance` | **Antigravity License & Brand Governance Agent** | `SIGNED_OFF` | `78952e6` | `2026-11-26 10:18 PST` | Verified MIT LICENSE <-> MoreScreen.kt parity, AndroidX/Kotlin Apache-2.0 allowlist, 11-package SHA-256 CI-only requirements-play.txt lockfile, 4-permission manifest & non-exported WeMiWidgetActionReceiver, 4-domain cloud Auto-Backup exclusions, zero WeMo brand leaks across UI/widgets/sync/Play assets, 156/156 Kotlin tests (30 suites), 28/28 Python tests, sync_play_assets validate-local, and clean lintDebug + assembleDebug. |
 | **7 (Conclude)** | `ai_studio_ux_cuj` | **Google AI Studio Agent (Final Conclusion)** | `SIGNED_OFF` | `v37.0-rc` | `2026-11-26 11:23 PST` | Concluded v37.0 (versionCode = 37, org.suppressingfire.wemi) 7-agent release review: all 6 stages signed off Round 1 (ai_studio_ux_cuj a385155, discovery_and_grouping cf273ea, telemetry_and_debugging 4e71935, security_and_privacy c684037 SPAKE2 Group 14 + AAD + FLAG_SECURE, code_quality_and_testing 1721e7f 138/138 .kt <500L & 156/156 Kotlin tests across 30 suites, license_governance 78952e6); synced UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md, docs/user-guide/release-notes.md, and IMPLEMENTED.md (0 broken links); verified 138/138 .kt <500L (max 496L), 28/28 Python Play tests, sync_play_assets validate-local (19/30 title, 75/80 short, 3776/4000 full, 484/500 release notes, 16 PNGs across 7 slots), and clean AI Studio compile_applet build. Approved for Google Play Store upload and Stage 8 promotion. |
-| **8 (Promote)** | `app_promoter` | **Antigravity App Promoter Agent (Closed Testing)** | `PENDING` | `-` | `-` | Ready for automatic Closed testing promotion once AI Studio pushes internal build and version bump. |
+| **8 (Promote)** | `app_promoter` | **Antigravity App Promoter Agent (Closed Testing)** | `PROMOTED` | `5c35203` | `2026-11-26 11:56 PST` | Promoted Play build 37 release 0.0.0.37 from internal to alpha via GitHub Actions run 45887283856. |
 <!-- SIGN_OFF_TABLE_END -->
 
 ---
@@ -149,4 +149,5 @@ PROMOTED_AT: NONE
 | 2026-11-26 10:05 PST | `1` | `code_quality_and_testing` | `SIGNED_OFF` | `license_governance` | `1721e7f` | Verified 138/138 .kt files <500L (max 496L), 156/156 Kotlin tests across 30 suites, zero compiler/lint warnings, clean debug APK, and hardened Household Sync UI lifecycle, TV focus containment, SAF export truncation, and test isolation. |
 | 2026-11-26 10:18 PST | `1` | `license_governance` | `SIGNED_OFF` | `ai_studio_ux_cuj` | `78952e6` | Verified MIT LICENSE <-> MoreScreen.kt parity, AndroidX/Kotlin Apache-2.0 allowlist, 11-package SHA-256 CI-only requirements-play.txt lockfile, 4-permission manifest & non-exported WeMiWidgetActionReceiver, 4-domain cloud Auto-Backup exclusions, zero WeMo brand leaks across UI/widgets/sync/Play assets, 156/156 Kotlin tests (30 suites), 28/28 Python tests, sync_play_assets validate-local, and clean lintDebug + assembleDebug. |
 | 2026-11-26 11:23 PST | `1` | `ai_studio_ux_cuj` | `APPROVED_FOR_PLAY_STORE` | `NONE` | `v37.0-rc` | Concluded v37.0 (versionCode = 37, org.suppressingfire.wemi) 7-agent release review: all 6 stages signed off Round 1 (ai_studio_ux_cuj a385155, discovery_and_grouping cf273ea, telemetry_and_debugging 4e71935, security_and_privacy c684037 SPAKE2 Group 14 + AAD + FLAG_SECURE, code_quality_and_testing 1721e7f 138/138 .kt <500L & 156/156 Kotlin tests across 30 suites, license_governance 78952e6); synced UX_DESIGN.md, UX_DESIGN_AND_EXPERIENCE.md, wemi-ux-design-and-experience SKILL.md, docs/user-guide/release-notes.md, and IMPLEMENTED.md (0 broken links); verified 138/138 .kt <500L (max 496L), 28/28 Python Play tests, sync_play_assets validate-local (19/30 title, 75/80 short, 3776/4000 full, 484/500 release notes, 16 PNGs across 7 slots), and clean AI Studio compile_applet build. Approved for Google Play Store upload and Stage 8 promotion. |
+| 2026-11-26 11:56 PST | `1` | `app_promoter` | `PROMOTED_TO_CLOSED_TESTING` | `NONE` | `5c35203` | Promoted Play build 37 release 0.0.0.37 from internal to alpha via GitHub Actions run 45887283856. |
 <!-- AUDIT_LOG_END -->
