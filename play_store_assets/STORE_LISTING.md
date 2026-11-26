@@ -1,9 +1,9 @@
-# Google Play Store Listing — WeMi Switch Control (v35.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
+# Google Play Store Listing — WeMi Switch Control (v36.0 — Phone, Tablet, Chromebook, Widgets & Android TV)
 
 ## App Identity & Metadata (Play Policy Compliant)
 - **App Title (19 / 30 chars max):** `WeMi Switch Control`
 - **Application ID:** `com.aistudio.wemiswitch.kxpqzr`
-- **Version:** `35.0` (`versionCode = 35`)
+- **Version:** `36.0` (`versionCode = 36`)
 - **Supported Form Factors:** Phone, 7-Inch Tablet, 10-Inch Tablet, **Chromebooks (ChromeOS)**, **Android Home Screen Widgets**, and **Android TV (Leanback)**
 - **Category:** House & Home / Tools
 - **Brand Color Palette:** Ocean Teal (`#0891B2`), Electric Cyan (`#06B6D4`), Deep Sapphire (`#0F4C81`), Cool Slate (`#EEF2F6`)
@@ -17,10 +17,10 @@ WeMi Switch Control brings fast, reliable local-network control back to Belkin's
 
 WeMi Switch Control communicates directly with your switches over your home Wi-Fi network using standard UPnP / SSDP multicast discovery, local SOAP HTTP commands, and `<100ms` UPnP GENA push updates—with no cloud account, external server, or subscription required.
 
-### What's New in Version 35.0
-- **On-Device Switch Rules Inspector (Read-Only):** Inspect schedules, Sunrise/Sunset timers, Auto-Off delays, Away Mode, and Long Press targets already stored inside compatible switches directly from the Rules tab or any switch's expanded drawer—resolving target switch names automatically and flagging drifted switch clocks.
-- **Zero-Delay Capability Detection & Clear Two-Tier Rules UX:** Instantly detects on-device rules support during normal scans with firmware-cached verification, clear RTOS disclosures (noting Dimmer Night Mode stays on-device), and a collapsible **`Read-Only`** vs. **`App-Run`** layout that keeps local rule creation one tap away.
-- **Refreshed User Guides & Home Screen Widgets Guide:** Expanded plain-English documentation covering Home Screen Light & Room Widgets, On-Device Switch Rules, and ChromeOS discovery.
+### What's New in Version 36.0
+- **Live On-Device Switch Rules (`On-Switch`):** Create, edit, enable/disable, and delete native **Schedules** (fixed time or **Sunrise/Sunset** with custom offsets), **Auto-Off Delay** timers, **Timed Actions**, and **Long Press** targets directly inside compatible switch memory—so your automations keep running even when your phone is turned off.
+- **Automatic Clock Sync, Offline Solar Location & Pre-Write Backups:** Automatically syncs drifted switch clocks before saving rules, lets you pick a city preset or enter signed coordinates offline with zero location permissions, and automatically saves up to 5 local pre-write backups with one-tap restore.
+- **Privacy, Reliability & UX Polish:** Masked Wi-Fi passwords with a show/hide toggle in `10.22.22.1` setup, backup archives excluded from cloud Auto-Backup, fine-grained `±1m`/`±5m`/`±15m`/`±1h` time steppers, and a one-tap **Manage Rules** shortcut from every switch's expanded drawer.
 - **Chromebook (ChromeOS) LAN Support, Widgets & Android TV:** Network-bound multicast discovery with physical-subnet fallback on Chromebooks, one-tap Home Screen Widgets, 3-column Android TV controls, zero-cloud `10.22.22.1` setup, and pure Kotlin/DEX packaging (`minSdk 24+`).
 
 ### Key Features
@@ -29,7 +29,7 @@ WeMi Switch Control communicates directly with your switches over your home Wi-F
 - **Native Android TV (`wemi TV`) 10-Foot Dashboard:** Automatic Leanback launcher UI with a 3-column room-grouped switch grid, glowing cyan `"FOCUSED • OK"` focus rings, TV Quick Scenes (`Movie 20%`, `Holiday ON`, `All OFF`), and inline D-Pad dimming.
 - **Inline Dimmer & Night Mode Controls:** Smoothly dim smart dimmers and bulbs from 1% to 100%, jump to quick presets (21%, 50%, 75%, 100%), or toggle hardware Night Mode.
 - **Interactive SSDP & Unicast Local Scanner:** Discover switches over `239.255.255.250:1900` with automatic `/24` unicast fallback when routers block multicast.
-- **On-Device & Local Switch Rules:** Inspect schedules, Auto-Off delays, and Long Press targets stored directly inside compatible switches alongside app-run schedules, sunset/sunrise timers, and motion triggers over local Wi-Fi.
+- **Live On-Device Switch Rules & Backups:** Create, edit, toggle, and back up native Schedules, Sunrise/Sunset timers, Auto-Off delays, Timed Actions, and Long Press targets directly inside compatible switches over local Wi-Fi—with clear RTOS capability disclosures.
 - **Multi-Home Wi-Fi Profiles & Built-In SOAP Inspector:** Organize switches across multiple Wi-Fi networks and inspect real-time local UPnP/SOAP packets and RTT health metrics.
 
 ## Complete Google Play Console Asset Inventory (`/play_store_assets/`)
@@ -45,14 +45,14 @@ WeMi Switch Control communicates directly with your switches over your home Wi-F
 5. **Phone Screenshots (`screenshots/phone/` — 1080 × 1920 px, 9:16 PNG):**
    - `phone_1_devices_and_power_rings.png` (Single-Row Top Bar with Subtle Version Badge, Room Grouping & 3-State Power Rings)
    - `phone_2_ssdp_network_scanner.png` (Pull-to-Refresh & SSDP Network Discovery Scanner with Port-Healed Switch Adoption)
-   - `phone_3_inline_dimmer_control.png` (Master Room Dimmer, Inline Brightness Presets, `Pin Widget` & Compact On-Device Rules Drawer Readout)
-   - `phone_4_local_rules_and_upnp_log.png` (On-Device Switch Rules Read-Only Inspector with Decoded Long Press/Sunset/Auto-Off Rules & App-Run Local Rules)
+   - `phone_3_inline_dimmer_control.png` (Master Room Dimmer, Inline Brightness Presets, `Pin Widget` & On-Device Rules Drawer with `Manage Rules`)
+   - `phone_4_local_rules_and_upnp_log.png` (Live `On-Switch` On-Device Switch Rules with `+ New Rule`, Solar Location, Backups, Live Toggles & Armored Safety Engine)
 6. **7-Inch Tablet Screenshots (`screenshots/tablet_7_inch/` — 1200 × 1920 px PNG):**
    - `tablet7_1_devices_dashboard.png` (Two-Column Room Dashboard, Expanded Dimmer, `Pin Widget` & On-Device Rules Drawer)
-   - `tablet7_2_ssdp_and_rules.png` (Zero-Cloud `10.22.22.1` Switch AP Provisioning, Collapsible `SETUP DIAGNOSTICS`, On-Device Switch Rules & SOAP/MIT Log)
+   - `tablet7_2_ssdp_and_rules.png` (Zero-Cloud `10.22.22.1` Switch AP Provisioning, Collapsible `SETUP DIAGNOSTICS`, Live `On-Switch` Rules & SOAP/MIT Log)
 7. **10-Inch Tablet & Large-Screen Screenshots (`screenshots/tablet_10_inch/` — 1600 × 2560 px & 1920 × 1080 px PNG):**
    - `tablet10_1_devices_dashboard.png` (Two-Column Room Dashboard, Expanded Dimmer, `Pin Widget` & On-Device Rules Drawer)
-   - `tablet10_2_ssdp_and_rules.png` (Zero-Cloud `10.22.22.1` Switch AP Provisioning, Collapsible `SETUP DIAGNOSTICS`, On-Device Switch Rules & SOAP/MIT Log)
+   - `tablet10_2_ssdp_and_rules.png` (Zero-Cloud `10.22.22.1` Switch AP Provisioning, Collapsible `SETUP DIAGNOSTICS`, Live `On-Switch` Rules & SOAP/MIT Log)
    - `tablet10_3_chromebook_desktop.png` (Chromebook 16:9 Widescreen Desktop 3-Column Multi-Room Dashboard & `15s` LAN Sync)
    - `tablet10_4_chromebook_ssdp_scanner.png` (Chromebook Split-Subnet SSDP Discovery, Guided `/24` Subnet Fallback & ChromeOS LAN Diagnostics)
 8. **Chromebook (ChromeOS) 16:9 Desktop Screenshots (`screenshots/chromebook/` — 1920 × 1080 px, 16:9 PNG):**

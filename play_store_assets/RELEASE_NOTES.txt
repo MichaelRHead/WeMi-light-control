@@ -1,4 +1,4 @@
-WeMi Switch Control v35.0:
-• On-Device Switch Rules Inspector: Read schedules, Sunrise/Sunset timers, Auto-Off delays, Away Mode & Long Press targets stored inside compatible switches right from the Rules tab or any expanded switch drawer.
-• Smart Capability & Clock Alerts: Zero-delay capability hints, firmware-cached verification, clear RTOS disclosures, and switch clock-sync warnings.
-• Two-Tier Rules UX & Guides: Collapsible Read-Only vs. App-Run rules layout plus refreshed User Guides.
+WeMi Switch Control v36.0:
+• Live On-Device Switch Rules: Create, edit, toggle & delete schedules (with Sunrise/Sunset offsets), Auto-Off delays, Timed Actions, and Long Press targets in compatible switch memory—running even with your phone off.
+• Clock Sync, Solar & Backups: Auto clock sync before writes, offline solar location presets/coordinates, and pre-write backups with one-tap restore.
+• Security & UX Polish: Masked Wi-Fi setup passwords, cleaner On-Switch Rules tab & faster sync.

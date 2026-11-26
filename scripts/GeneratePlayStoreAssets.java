@@ -773,14 +773,18 @@ public class GeneratePlayStoreAssets {
             double hwY0 = byMeta + 20 * s;
             double hwH = 52 * s;
             fillRoundRect(g, sx0, hwY0, sx1 - sx0, hwH, 8 * s, C_WHITE, C_DIVIDER, 1.0 * s);
-            double refW = 66 * s;
+            double manageW = 74 * s;
+            double refW = 54 * s;
             double refH = 20 * s;
             double refX0 = sx1 - 8 * s - refW;
-            double maxHwW = refX0 - (sx0 + 9 * s) - 6 * s;
+            double manageX0 = refX0 - 5 * s - manageW;
+            double maxHwW = manageX0 - (sx0 + 9 * s) - 6 * s;
             drawFittedString(g, "On-Device Rules: On-Device Ready • Long Press", sx0 + 9 * s, hwY0 + 14 * s, maxHwW, 9.4 * s, Font.BOLD, C_TEAL_DARK);
-            drawFittedString(g, "2 rule(s) stored on switch (DB v3)", sx0 + 9 * s, hwY0 + 25.5 * s, maxHwW, 8.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+            drawFittedString(g, "3 rule(s) stored on switch (DB v4)", sx0 + 9 * s, hwY0 + 25.5 * s, maxHwW, 8.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+            fillRoundRect(g, manageX0, hwY0 + 6 * s, manageW, refH, 6 * s, C_TEAL_PRIMARY, null, 0);
+            drawFittedString(g, "Manage Rules", manageX0 + 7 * s, hwY0 + 19.2 * s, manageW - 12 * s, 8.6 * s, Font.BOLD, C_WHITE);
             fillRoundRect(g, refX0, hwY0 + 6 * s, refW, refH, 6 * s, C_CYAN_SOFT, C_TEAL_PRIMARY, 0.9 * s);
-            drawFittedString(g, "Refresh", refX0 + 14 * s, hwY0 + 19.2 * s, refW - 18 * s, 9.0 * s, Font.BOLD, C_TEAL_DARK);
+            drawFittedString(g, "Refresh", refX0 + 9 * s, hwY0 + 19.2 * s, refW - 14 * s, 8.6 * s, Font.BOLD, C_TEAL_DARK);
             fillRoundRect(g, sx0 + 8 * s, hwY0 + 30.5 * s, (sx1 - sx0) - 16 * s, 16.5 * s, 5 * s, new Color(0xF8, 0xFA, 0xFC), C_DIVIDER, 0.8 * s);
             drawFittedString(g, "Goodnight Long Press  •  Hold paddle 2s → Toggle: Porch Entry Switch", sx0 + 13 * s, hwY0 + 41.5 * s, (sx1 - sx0) - 26 * s, 8.4 * s, Font.PLAIN, C_TEXT_PRIMARY);
         }
@@ -940,45 +944,37 @@ public class GeneratePlayStoreAssets {
         int y = drawTopHeader(g, w, s, false);
         int pad = (int) (10 * s);
 
-        // 1. On-Device Switch Rules Header Card (Read-Only)
-        int hdrH = (int) (66 * s);
+        // 1. On-Device Switch Rules Header Card (Live On-Switch Management)
+        int hdrH = (int) (96 * s);
         fillRoundRect(g, 0, y, w, hdrH, 0, C_WHITE, null, 0);
-        double readBtnW = 82 * s;
-        double readBtnX = w - 12 * s - readBtnW;
-        double maxHdrW = readBtnX - 14 * s - 8 * s;
+        double maxHdrW = w - 28 * s;
 
-        g.setFont(fUi(13.6 * s, Font.BOLD));
+        g.setFont(fUi(14.5 * s, Font.BOLD));
         String hwTitle = "On-Device Switch Rules";
         g.setColor(C_TEXT_PRIMARY);
         g.drawString(hwTitle, (int) (14 * s), (int) (y + 22 * s));
         int hwTitleW = g.getFontMetrics().stringWidth(hwTitle);
-        double roX = 14 * s + hwTitleW + 6 * s;
-        double roW = 54 * s;
-        if (roX + roW < readBtnX - 4 * s) {
-            fillRoundRect(g, roX, y + 10.5 * s, roW, 14.5 * s, 7.2 * s, new Color(0xE0, 0xF2, 0xFE), null, 0);
-            drawFittedString(g, "Read-Only", roX + 5.5 * s, y + 20.5 * s, roW - 10 * s, 8.6 * s, Font.BOLD, new Color(0x03, 0x69, 0xA1));
-        }
-        drawFittedString(g, "Stored in switch memory • runs even when phone is off", 14 * s, y + 38 * s, maxHdrW, 10.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
-        drawFittedString(g, "3 rule(s) read • 2 ready • 1 unsupported", 14 * s, y + 54 * s, maxHdrW, 10.2 * s, Font.BOLD, C_TEAL_DARK);
+        double osX = 14 * s + hwTitleW + 7 * s;
+        double osW = 58 * s;
+        fillRoundRect(g, osX, y + 10.5 * s, osW, 15.5 * s, 7.8 * s, C_CYAN_SOFT, null, 0);
+        drawFittedString(g, "On-Switch", osX + 6 * s, y + 21.0 * s, osW - 10 * s, 8.8 * s, Font.BOLD, C_TEAL_DARK);
 
-        fillRoundRect(g, readBtnX, y + 17 * s, readBtnW, 32 * s, 16 * s, C_TEAL_PRIMARY, null, 0);
-        drawFittedString(g, "Read Rules", readBtnX + 11 * s, y + 36.5 * s, readBtnW - 18 * s, 10.6 * s, Font.BOLD, C_WHITE);
+        drawFittedString(g, "Stored in switch memory • runs even when your phone is off", 14 * s, y + 38 * s, maxHdrW, 10.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        drawFittedString(g, "3 rule(s) stored • 2 ready • 1 unsupported", 14 * s, y + 53 * s, maxHdrW, 10.2 * s, Font.BOLD, C_TEAL_DARK);
+
+        double newBtnW = 94 * s;
+        double readBtnW = 96 * s;
+        fillRoundRect(g, 14 * s, y + 61 * s, newBtnW, 27 * s, 13.5 * s, C_TEAL_PRIMARY, null, 0);
+        drawFittedString(g, "+ New Rule", 25 * s, y + 78.2 * s, newBtnW - 18 * s, 10.8 * s, Font.BOLD, C_WHITE);
+        fillRoundRect(g, 14 * s + newBtnW + 8 * s, y + 61 * s, readBtnW, 27 * s, 13.5 * s, C_WHITE, C_DIVIDER, 1.1 * s);
+        drawFittedString(g, "Refresh All", 14 * s + newBtnW + 22 * s, y + 78.2 * s, readBtnW - 22 * s, 10.6 * s, Font.BOLD, C_TEAL_DARK);
         y += hdrH;
         g.setColor(C_DIVIDER);
         g.drawLine(0, y, w, y);
+        y += (int) (7 * s);
 
-        // Collapsible Show/Hide Switches Toggle Bar
-        int togH = (int) (25 * s);
-        fillRoundRect(g, 0, y, w, togH, 0, C_WHITE, null, 0);
-        drawFittedString(g, "Sorted by stored rules & support • tap Refresh per switch", 14 * s, y + 16 * s, w - 115 * s, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
-        drawFittedString(g, "Hide Switches ▲", w - 98 * s, y + 16 * s, 86 * s, 9.8 * s, Font.BOLD, C_TEAL_DARK);
-        y += togH;
-        g.setColor(C_DIVIDER);
-        g.drawLine(0, y, w, y);
-        y += (int) (5 * s);
-
-        // 2. Expanded OpenWrt Switch Card (Porch Entry Switch — 3 decoded on-device rules)
-        int card1H = (int) (212 * s);
+        // 2. Expanded OpenWrt Switch Card (Porch Entry Switch — Live CRUD, Solar & Backups)
+        int card1H = (int) (242 * s);
         fillRoundRect(g, pad, y, w - pad * 2, card1H, 11 * s, C_WHITE, C_DIVIDER, 1.0 * s);
         double chipW = 60 * s;
         double chipX = w - pad - 10 * s - chipW;
@@ -987,44 +983,61 @@ public class GeneratePlayStoreAssets {
         fillRoundRect(g, chipX, y + 9 * s, chipW, 22 * s, 7 * s, C_WHITE, C_DIVIDER, 1.0 * s);
         drawFittedString(g, "Refresh", chipX + 10 * s, y + 23.5 * s, chipW - 16 * s, 9.8 * s, Font.BOLD, C_TEAL_DARK);
 
-        // Capability & DB badges
-        double bY = y + 39 * s;
+        // Capability, DB & Action Chips
+        double bY = y + 38 * s;
         fillRoundRect(g, pad + 12 * s, bY, 136 * s, 16.5 * s, 8.2 * s, C_CYAN_SOFT, null, 0);
         drawFittedString(g, "On-Device Ready • Long Press", pad + 19 * s, bY + 11.5 * s, 126 * s, 9.0 * s, Font.BOLD, C_TEAL_DARK);
         fillRoundRect(g, pad + 153 * s, bY, 76 * s, 16.5 * s, 8.2 * s, new Color(0xF1, 0xF5, 0xF9), null, 0);
-        drawFittedString(g, "DB v3 • 3 rule(s)", pad + 160 * s, bY + 11.5 * s, 66 * s, 9.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        drawFittedString(g, "DB v4 • 3 rule(s)", pad + 160 * s, bY + 11.5 * s, 66 * s, 9.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
 
-        // Decoded On-Device Rule Rows
+        double actY = y + 59 * s;
+        String[] actChips = {"+ Add Rule", "Solar Location", "Backups (3)"};
+        double actX = pad + 12 * s;
+        for (int ai = 0; ai < actChips.length; ai++) {
+            double cw = (ai == 0 ? 64 : (ai == 1 ? 80 : 70)) * s;
+            fillRoundRect(g, actX, actY, cw, 20 * s, 7 * s, ai == 0 ? C_CYAN_SOFT : C_WHITE, ai == 0 ? C_TEAL_PRIMARY : C_DIVIDER, 0.9 * s);
+            drawFittedString(g, actChips[ai], actX + 7 * s, actY + 13.5 * s, cw - 12 * s, 8.8 * s, Font.BOLD, ai == 0 ? C_TEAL_DARK : C_TEXT_PRIMARY);
+            actX += cw + 6 * s;
+        }
+
+        // Live Editable On-Device Rule Rows (with Toggle Switch)
         String[][] hwRules = {
             {"Goodnight Long Press", "Long Press", "Hold wall paddle for 2s", "Toggle: Master Dimmer V2"},
-            {"Evening Sunset Porch", "Schedule", "Sunset → 11:00 PM • Daily", "Turn ON Porch Entry Switch"},
+            {"Evening Sunset Porch", "Schedule", "Sunset -15m → 11:00 PM • Daily", "Turn ON Porch Entry Switch"},
             {"Porch Auto-Off Delay", "Auto-Off", "Auto-Off after 30 min ON", "Turn OFF automatically"}
         };
-        double hRy = y + 61 * s;
+        double hRy = y + 85 * s;
         for (String[] hr : hwRules) {
-            double hRh = 41 * s;
+            double hRh = 43 * s;
             fillRoundRect(g, pad + 10 * s, hRy, w - pad * 2 - 20 * s, hRh, 8.5 * s, new Color(0xF8, 0xFA, 0xFC), C_DIVIDER, 0.9 * s);
-            fillRoundRect(g, pad + 17 * s, hRy + 6.5 * s, 28 * s, 28 * s, 7 * s, C_CYAN_SOFT, null, 0);
+            fillRoundRect(g, pad + 17 * s, hRy + 7.5 * s, 28 * s, 28 * s, 7 * s, C_CYAN_SOFT, null, 0);
             g.setColor(C_TEAL_DARK);
             g.setStroke(new BasicStroke((float) (1.6 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            double icx = pad + 31 * s, icy = hRy + 20.5 * s;
+            double icx = pad + 31 * s, icy = hRy + 21.5 * s;
             g.draw(new Ellipse2D.Double(icx - 6.5 * s, icy - 6.5 * s, 13 * s, 13 * s));
             g.draw(new Line2D.Double(icx, icy - 3.5 * s, icx, icy));
             g.draw(new Line2D.Double(icx, icy, icx + 3 * s, icy + 1.5 * s));
 
-            double pillW = 54 * s;
-            double pillX = w - pad - 17 * s - pillW;
+            double swW = 32 * s;
+            double swX = w - pad - 17 * s - swW;
+            double pillW = 50 * s;
+            double pillX = swX - 6 * s - pillW;
             double rtx = pad + 52 * s;
             double rMaxW = pillX - rtx - 6 * s;
-            drawFittedString(g, hr[0], rtx, hRy + 14 * s, rMaxW, 11.2 * s, Font.BOLD, C_TEXT_PRIMARY);
-            fillRoundRect(g, pillX, hRy + 4.5 * s, pillW, 13.5 * s, 6.7 * s, C_CYAN_SOFT, null, 0);
-            drawFittedString(g, hr[1], pillX + 6 * s, hRy + 13.8 * s, pillW - 10 * s, 8.4 * s, Font.BOLD, C_TEAL_DARK);
-            drawFittedString(g, hr[2], rtx, hRy + 26 * s, w - pad - 18 * s - rtx, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
-            drawFittedString(g, hr[3], rtx, hRy + 37 * s, w - pad - 18 * s - rtx, 9.6 * s, Font.BOLD, C_TEAL_DARK);
+            drawFittedString(g, hr[0], rtx, hRy + 14.5 * s, rMaxW, 11.0 * s, Font.BOLD, C_TEXT_PRIMARY);
+            fillRoundRect(g, pillX, hRy + 5 * s, pillW, 13.5 * s, 6.7 * s, C_CYAN_SOFT, null, 0);
+            drawFittedString(g, hr[1], pillX + 5 * s, hRy + 14.3 * s, pillW - 8 * s, 8.2 * s, Font.BOLD, C_TEAL_DARK);
+            // Live ON toggle pill
+            fillRoundRect(g, swX, hRy + 12 * s, swW, 18 * s, 9 * s, C_TEAL_PRIMARY, null, 0);
+            g.setColor(C_WHITE);
+            g.fill(new Ellipse2D.Double(swX + swW - 15.5 * s, hRy + 14.5 * s, 13 * s, 13 * s));
+
+            drawFittedString(g, hr[2], rtx, hRy + 27 * s, swX - rtx - 6 * s, 9.4 * s, Font.PLAIN, C_TEXT_SECONDARY);
+            drawFittedString(g, hr[3], rtx, hRy + 38.5 * s, swX - rtx - 6 * s, 9.4 * s, Font.BOLD, C_TEAL_DARK);
             hRy += hRh + 4.5 * s;
         }
         drawFittedString(g, "Solar location on switch: Mountain View, CA, United States", pad + 12 * s, y + card1H - 7 * s, w - pad * 2 - 24 * s, 9.2 * s, Font.PLAIN, C_TEXT_SECONDARY);
-        y += card1H + (int) (6 * s);
+        y += card1H + (int) (7 * s);
 
         // 3. Expanded RTOS Switch Card (Honest No On-Device Rules + Dimmer Night Mode note)
         int card2H = (int) (78 * s);
@@ -1036,53 +1049,15 @@ public class GeneratePlayStoreAssets {
         fillRoundRect(g, pad + 12 * s, y + 38 * s, 96 * s, 16 * s, 8 * s, new Color(0xF3, 0xF4, 0xF6), null, 0);
         drawFittedString(g, "No On-Device Rules", pad + 19 * s, y + 49 * s, 86 * s, 9.0 * s, Font.BOLD, new Color(0x4B, 0x55, 0x63));
         drawFittedString(g, "Firmware does not expose on-device rules storage. Dimmer Night Mode is still stored on-device.", pad + 12 * s, y + 68 * s, w - pad * 2 - 24 * s, 9.2 * s, Font.PLAIN, C_TEXT_SECONDARY);
-        y += card2H + (int) (9 * s);
+        y += card2H + (int) (7 * s);
 
-        // 4. Local Switch Rules & Timers (App-Run Section)
-        g.setColor(C_DIVIDER);
-        g.drawLine(0, y, w, y);
-        int localH = (int) (106 * s);
-        fillRoundRect(g, 0, y, w, localH, 0, C_WHITE, null, 0);
-
-        double newRuleW = 82 * s;
-        double newRuleX = w - 12 * s - newRuleW;
-        double maxLocalW = newRuleX - 14 * s - 8 * s;
-
-        g.setFont(fUi(12.6 * s, Font.BOLD));
-        String appTitle = "Local Switch Rules & Timers";
-        g.setColor(C_TEXT_PRIMARY);
-        g.drawString(appTitle, (int) (14 * s), (int) (y + 21 * s));
-        int appTitleW = g.getFontMetrics().stringWidth(appTitle);
-        double arX = 14 * s + appTitleW + 6 * s;
-        double arW = 46 * s;
-        if (arX + arW < newRuleX - 4 * s) {
-            fillRoundRect(g, arX, y + 10 * s, arW, 14.5 * s, 7.2 * s, C_CYAN_SOFT, null, 0);
-            drawFittedString(g, "App-Run", arX + 5.5 * s, y + 20 * s, arW - 9 * s, 8.5 * s, Font.BOLD, C_TEAL_DARK);
-        }
-        drawFittedString(g, "Runs from this device over local Wi-Fi • create & edit here", 14 * s, y + 36 * s, maxLocalW, 10.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
-        fillRoundRect(g, newRuleX, y + 10 * s, newRuleW, 28 * s, 14 * s, C_TEAL_PRIMARY, null, 0);
-        drawFittedString(g, "+ New Rule", newRuleX + 11 * s, y + 27.5 * s, newRuleW - 16 * s, 10.8 * s, Font.BOLD, C_WHITE);
-
-        int ry = y + (int) (46 * s);
-        g.setColor(C_DIVIDER);
-        g.drawLine(0, ry, w, ry);
-        fillRoundRect(g, 14 * s, ry + 11 * s, 36 * s, 36 * s, 10 * s, C_CYAN_SOFT, null, 0);
-        g.setColor(C_TEAL_DARK);
-        g.setStroke(new BasicStroke((float) (1.8 * s), BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-        double ccx = 32 * s, ccy = ry + 29 * s, rClock = 9 * s;
-        g.draw(new Ellipse2D.Double(ccx - rClock, ccy - rClock, rClock * 2, rClock * 2));
-        g.draw(new Line2D.Double(ccx, ccy - 5 * s, ccx, ccy));
-        g.draw(new Line2D.Double(ccx, ccy, ccx + 4 * s, ccy + 2 * s));
-
-        double swX0 = w - 58 * s;
-        double tx = 58 * s;
-        double maxRuleW = swX0 - tx - 8 * s;
-        drawFittedString(g, "Bedroom Motion Nightlight", tx, ry + 21 * s, maxRuleW, 13.0 * s, Font.BOLD, C_TEXT_PRIMARY);
-        drawFittedString(g, "Motion Sensed • Hallway Sensor", tx, ry + 36 * s, maxRuleW, 10.4 * s, Font.PLAIN, C_TEXT_SECONDARY);
-        drawFittedString(g, "Set Lightbulb Landing to 21% (Night Mode)", tx, ry + 50 * s, maxRuleW, 10.2 * s, Font.BOLD, C_TEAL_DARK);
-        fillRoundRect(g, swX0, ry + 17 * s, 44 * s, 24 * s, 12 * s, C_TEAL_PRIMARY, null, 0);
-        g.setColor(C_WHITE);
-        g.fill(new Ellipse2D.Double(w - 35 * s, ry + 20 * s, 18 * s, 18 * s));
+        // 4. Built-In Anti-Brick Protection, Clock Sync & Backup Recovery Summary Card
+        int safeH = (int) (72 * s);
+        fillRoundRect(g, pad, y, w - pad * 2, safeH, 11 * s, C_WHITE, C_DIVIDER, 1.0 * s);
+        drawFittedString(g, "Armored Local Rules Engine", pad + 12 * s, y + 19 * s, w - pad * 2 - 24 * s, 12.2 * s, Font.BOLD, C_TEAL_DARK);
+        drawFittedString(g, "• Auto-syncs switch clock before saving schedules or timers", pad + 12 * s, y + 36 * s, w - pad * 2 - 24 * s, 9.6 * s, Font.PLAIN, C_TEXT_PRIMARY);
+        drawFittedString(g, "• Saves automatic pre-write backup with one-tap restore", pad + 12 * s, y + 50 * s, w - pad * 2 - 24 * s, 9.6 * s, Font.PLAIN, C_TEXT_PRIMARY);
+        drawFittedString(g, "• Zero cloud account, zero GPS permissions — 100% local LAN", pad + 12 * s, y + 64 * s, w - pad * 2 - 24 * s, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
 
         drawBottomNav(g, w, h, "Rules", s);
         g.dispose();
@@ -1203,38 +1178,43 @@ public class GeneratePlayStoreAssets {
         fillRoundRect(g, lx0 + 22 * s, dyDbg - 5 * s, innerW - 18 * s, 23 * s, 7 * s, new Color(0x1E, 0x29, 0x3B), new Color(0x33, 0x41, 0x55), 0.9 * s);
         drawFittedString(g, "Keep Dialog Open on Success: OFF (stays open on errors)", lx0 + 29 * s, dyDbg + 10 * s, innerW - 32 * s, 8.8 * s, Font.PLAIN, new Color(0xCB, 0xD5, 0xE1));
 
-        // Right Pane: On-Device Switch Rules (Read-Only) + Local App-Run Rules + SOAP/MIT Log
+        // Right Pane: Live On-Device Switch Rules (On-Switch) + UPnP/SOAP Log & MIT License
         int ry = y;
         fillRoundRect(g, rx0, ry, rx1 - rx0, 356 * s, 14 * s, C_WHITE, C_DIVIDER, 1.0 * s);
-        double readBtnTW = 72 * s;
-        double readBtnTX = rx1 - 12 * s - readBtnTW;
-        drawFittedString(g, "On-Device Switch Rules", rx0 + 14 * s, ry + 24 * s, readBtnTX - (rx0 + 14 * s) - 8 * s, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
-        drawFittedString(g, "Read-Only • Runs inside switch memory without phone", rx0 + 14 * s, ry + 40 * s, readBtnTX - (rx0 + 14 * s) - 8 * s, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
-        fillRoundRect(g, readBtnTX, ry + 13 * s, readBtnTW, 24 * s, 12 * s, C_TEAL_PRIMARY, null, 0);
-        drawFittedString(g, "Read Rules", readBtnTX + 10 * s, ry + 28 * s, readBtnTW - 14 * s, 9.8 * s, Font.BOLD, C_WHITE);
+        double newBtnTW = 74 * s;
+        double newBtnTX = rx1 - 12 * s - newBtnTW;
+        drawFittedString(g, "On-Device Switch Rules", rx0 + 14 * s, ry + 24 * s, newBtnTX - (rx0 + 14 * s) - 8 * s, 14.5 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "On-Switch • Create, edit & backup inside switch memory", rx0 + 14 * s, ry + 40 * s, newBtnTX - (rx0 + 14 * s) - 8 * s, 9.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        fillRoundRect(g, newBtnTX, ry + 13 * s, newBtnTW, 24 * s, 12 * s, C_TEAL_PRIMARY, null, 0);
+        drawFittedString(g, "+ New Rule", newBtnTX + 10 * s, ry + 28 * s, newBtnTW - 14 * s, 9.8 * s, Font.BOLD, C_WHITE);
 
-        // Decoded Switch Box
+        // Live Editable Switch Box
         int riy = ry + (int) (50 * s);
         fillRoundRect(g, rx0 + 12 * s, riy, rx1 - rx0 - 24 * s, 212 * s, 10 * s, new Color(0xF8, 0xFA, 0xFC), C_DIVIDER, 1.0 * s);
         drawFittedString(g, "Porch Entry Switch • WLS0403", rx0 + 20 * s, riy + 18 * s, innerW - 16 * s, 12.0 * s, Font.BOLD, C_TEXT_PRIMARY);
-        fillRoundRect(g, rx0 + 20 * s, riy + 24 * s, 130 * s, 16 * s, 8 * s, C_CYAN_SOFT, null, 0);
-        drawFittedString(g, "On-Device Ready • Long Press", rx0 + 26 * s, riy + 35 * s, 120 * s, 8.8 * s, Font.BOLD, C_TEAL_DARK);
-        fillRoundRect(g, rx0 + 154 * s, riy + 24 * s, 68 * s, 16 * s, 8 * s, new Color(0xE2, 0xE8, 0xF0), null, 0);
-        drawFittedString(g, "DB v3 • 3 rules", rx0 + 160 * s, riy + 35 * s, 60 * s, 8.6 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        fillRoundRect(g, rx0 + 20 * s, riy + 24 * s, 126 * s, 16 * s, 8 * s, C_CYAN_SOFT, null, 0);
+        drawFittedString(g, "On-Device Ready • Long Press", rx0 + 26 * s, riy + 35 * s, 116 * s, 8.6 * s, Font.BOLD, C_TEAL_DARK);
+        fillRoundRect(g, rx0 + 150 * s, riy + 24 * s, 72 * s, 16 * s, 8 * s, new Color(0xE2, 0xE8, 0xF0), null, 0);
+        drawFittedString(g, "DB v4 • Backups", rx0 + 156 * s, riy + 35 * s, 64 * s, 8.4 * s, Font.PLAIN, C_TEXT_SECONDARY);
 
         String[][] tHwRules = {
             {"Goodnight Long Press (Long Press)", "Hold paddle 2s → Toggle: Master Dimmer V2"},
-            {"Evening Sunset Porch (Schedule)", "Sunset → 11:00 PM • Daily • Turn ON"},
+            {"Evening Sunset Porch (Schedule)", "Sunset -15m → 11:00 PM • Daily • Turn ON"},
             {"Porch Auto-Off Delay (Auto-Off)", "Auto-Off after 30 min ON • Turn OFF"}
         };
         int tryY = riy + (int) (46 * s);
         for (String[] tri : tHwRules) {
             fillRoundRect(g, rx0 + 20 * s, tryY, rx1 - rx0 - 40 * s, 44 * s, 8 * s, C_WHITE, C_DIVIDER, 0.9 * s);
-            drawFittedString(g, tri[0], rx0 + 27 * s, tryY + 17 * s, innerW - 30 * s, 10.6 * s, Font.BOLD, C_TEXT_PRIMARY);
-            drawFittedString(g, tri[1], rx0 + 27 * s, tryY + 34 * s, innerW - 30 * s, 9.6 * s, Font.BOLD, C_TEAL_DARK);
+            double tSwW = 28 * s;
+            double tSwX = rx1 - 26 * s - tSwW;
+            drawFittedString(g, tri[0], rx0 + 27 * s, tryY + 17 * s, tSwX - (rx0 + 27 * s) - 6 * s, 10.6 * s, Font.BOLD, C_TEXT_PRIMARY);
+            drawFittedString(g, tri[1], rx0 + 27 * s, tryY + 34 * s, tSwX - (rx0 + 27 * s) - 6 * s, 9.6 * s, Font.BOLD, C_TEAL_DARK);
+            fillRoundRect(g, tSwX, tryY + 14 * s, tSwW, 16 * s, 8 * s, C_TEAL_PRIMARY, null, 0);
+            g.setColor(C_WHITE);
+            g.fill(new Ellipse2D.Double(tSwX + tSwW - 13.5 * s, tryY + 16 * s, 12 * s, 12 * s));
             tryY += (int) (49 * s);
         }
-        drawFittedString(g, "Solar location: Mountain View, CA, United States", rx0 + 20 * s, riy + 204 * s, innerW - 16 * s, 8.8 * s, Font.PLAIN, C_TEXT_SECONDARY);
+        drawFittedString(g, "Solar location: Mountain View, CA • Auto clock sync", rx0 + 20 * s, riy + 204 * s, innerW - 16 * s, 8.8 * s, Font.PLAIN, C_TEXT_SECONDARY);
 
         // RTOS Unsupported capability readout card
         int rtosY = riy + (int) (220 * s);
@@ -1244,14 +1224,14 @@ public class GeneratePlayStoreAssets {
         drawFittedString(g, "No On-Device Rules", rx0 + 27 * s, rtosY + 35 * s, 84 * s, 8.6 * s, Font.BOLD, new Color(0x4B, 0x55, 0x63));
         drawFittedString(g, "Firmware does not expose rules DB. Dimmer Night Mode stays on-device.", rx0 + 20 * s, rtosY + 57 * s, innerW - 18 * s, 9.0 * s, Font.PLAIN, C_TEXT_SECONDARY);
 
-        // Bottom Right Card: Local App-Run Rules + Live UPnP/SOAP Log & MIT License
+        // Bottom Right Card: Live UPnP / SOAP Packet Log & MIT Open Source Notices
         ry += (int) (368 * s);
         fillRoundRect(g, rx0, ry, rx1 - rx0, 312 * s, 14 * s, C_WHITE, C_DIVIDER, 1.0 * s);
-        drawFittedString(g, "App-Run Rules, SOAP Log & MIT License", rx0 + 14 * s, ry + 24 * s, innerW, 14.0 * s, Font.BOLD, C_TEXT_PRIMARY);
-        drawFittedString(g, "MIT License • Local Wi-Fi Rules & Headless Widgets", rx0 + 14 * s, ry + 41 * s, innerW, 10.0 * s, Font.BOLD, C_TEAL_DARK);
+        drawFittedString(g, "UPnP / SOAP Packet Log & MIT License", rx0 + 14 * s, ry + 24 * s, innerW, 14.0 * s, Font.BOLD, C_TEXT_PRIMARY);
+        drawFittedString(g, "MIT License • Armored Rules Sync & Headless Widgets", rx0 + 14 * s, ry + 41 * s, innerW, 10.0 * s, Font.BOLD, C_TEAL_DARK);
         String[][] lItems = {
-            {"Bedroom Motion Nightlight (App-Run Rule)", "Motion Sensed → Set Lightbulb Landing to 21%"},
-            {"FetchRules • Porch Entry Switch (rules.db)", "POST /upnp/control/rules1 -> DB v3 (3 rules read)"},
+            {"StoreRules • Porch Entry Switch (rules.db)", "POST /upnp/control/rules1 -> DB v4 verified (backup saved)"},
+            {"TimeSync • Porch Entry Switch (timesync1)", "Auto-synced local clock & DST before rule write"},
             {"Widget#Toggle(ROOM) • Living Room (ON)", "Home Screen Widget -> 3 switches synced (12ms)"},
             {"Open Source Notices: AndroidX, Compose, Room", "Kotlin & Coroutines (Apache-2.0) • MIT License"}
         };

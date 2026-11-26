@@ -9,6 +9,12 @@ data class ReleaseHistoryEntry(
 
 val WEMI_RELEASE_HISTORY: List<ReleaseHistoryEntry> = listOf(
     ReleaseHistoryEntry(
+        version = "v36.0",
+        releaseDate = "Nov 25, 2026",
+        headline = "Live On-Device Switch Rules, Clock Sync & Backup Restore",
+        summary = "Create, edit, toggle, and delete native schedules (with Sunrise/Sunset offsets), Auto-Off delays, Timed Actions, and Long Press targets directly in compatible switch memory—complete with automatic clock sync, offline solar city/coordinate setup, automatic pre-write backups with one-tap restore, masked Wi-Fi setup passwords, and a unified On-Switch Rules tab."
+    ),
+    ReleaseHistoryEntry(
         version = "v35.0",
         releaseDate = "Nov 22, 2026",
         headline = "On-Device Switch Rules Inspector & Refreshed Guides",

@@ -4,16 +4,17 @@
 
 Welcome to the official user-facing **Release Notes** for **WeMi Light Control** (`com.aistudio.wemiswitch.kxpqzr`) on Google Play for Android Phones, Tablets, Chromebooks (ChromeOS), and Android TV.
 
-Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v35.0`**) all the way back to **`v1.0`**.
+Unlike our developer engineering log ([`IMPLEMENTED.md`](../../IMPLEMENTED.md)), this guide provides a clear, high-level summary of the **major user-facing features, visual improvements, and reliability upgrades** introduced in each Google Play Store release—from our latest release (**`v36.0`**) all the way back to **`v1.0`**.
 
 For step-by-step instructions on using any feature mentioned below, visit the **[WeMi Light Control User Guide (`USER_GUIDE.md`)](../../USER_GUIDE.md)**.
 
 ---
 
-## Quick Release Summary (`v1.0` → `v35.0`)
+## Quick Release Summary (`v1.0` → `v36.0`)
 
 | Version | Play Store `versionCode` | Release Date | Headline User-Facing Additions |
 | :--- | :---: | :--- | :--- |
+| **[`v36.0`](#version-360-versioncode--36--november-25-2026)** | `36` | Nov 25, 2026 | **Live On-Device Switch Rules Management (`On-Switch`), Automatic Clock Sync, Offline Solar Location, Pre-Write Backup Restore & Security/UX Hardening**: Create, edit, toggle, and delete native **Long Press**, **Auto-Off Delay**, **Schedule** (with **Sunrise/Sunset** offsets), and **Timed Action** rules directly in compatible switch memory (retiring phone-only app rules cleanly in Room v7), with automatic clock sync, offline city/signed-coordinate solar setup, automatic pre-write backups with one-tap restore, masked Wi-Fi setup passwords, and a unified **Rules** tab + expanded drawer **Manage Rules** bridge |
 | **[`v35.0`](#version-350-versioncode--35--november-22-2026)** | `35` | Nov 22, 2026 | **On-Device Switch Rules Inspector (Read-Only), Two-Tier Rules UX & Refreshed User Guides**: Zero-delay capability detection + firmware-cached verification, read-only inspection of stored switch rules (`Long Press`, `Auto-Off Delay`, `Schedule` / `Sunrise`-`Sunset`, `Away Mode`, clock-sync alerts) in the collapsible **Rules** tab and expanded switch drawer, plus refreshed User Guides & new Home Screen Widgets guide |
 | **[`v34.0`](#version-340-versioncode--34--november-21-2026)** | `34` | Nov 21, 2026 | **Chromebook (ChromeOS ARCVM) Local-LAN Discovery & Control + Refreshed Play Store Visuals**: Network-bound multicast SSDP & automatic physical-subnet fallback on Chromebooks, guided manual `/24` subnet scanner fallback when routers block multicast, clean CGNAT home profile hygiene, 15s Chromebook foreground sync, and refreshed Store/TV graphics |
 | **[`v33.0`](#version-330-versioncode--33--november-21-2026)** | `33` | Nov 21, 2026 | **In-App Release History, UX Hygiene Cleanup, Conditional TV Holiday Scene & Discovery/Diagnostics Polish**: Subtle top-bar version pill + scrollable `Release History` dialog, streamlined top bar/More/dialogs with Demo-only preset gating and reset confirmation, conditional Android TV `Holiday ON` with D-Pad focus recovery, word-bounded icon/room classification, and collapsible `SETUP DIAGNOSTICS` auto-expansion |
@@ -50,6 +51,14 @@ For step-by-step instructions on using any feature mentioned below, visit the **
 ---
 
 ## Release-by-Release Highlights (Newest to Oldest)
+
+### Version 36.0 (`versionCode = 36`) — November 25, 2026
+- **Live On-Device Switch Rules Management (`On-Switch`)**: The **Rules** tab is now dedicated exclusively to native on-device switch rules stored directly inside compatible wall switches, dimmers, and plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`)—so your schedules and timers keep running even when your phone is turned off or away from home. Create, edit, enable/disable, and delete **Long Press** (controlling one or more target switches), **Auto-Off Delay**, **Schedules** (fixed times or **Sunrise/Sunset** with `-60m` to `+60m` offsets), and **Timed Actions** directly over your local Wi-Fi network, retiring legacy phone-only app rules cleanly via Room v7.
+- **Armored Safety, Automatic Clock Sync & One-Tap Backup Restore**: Every write automatically syncs drifted switch clocks first, validates the rules archive before upload (preserving existing firmware tables and rejecting malformed payloads), verifies the stored version back from the switch, and retains up to 5 rotating pre-write backups stored locally in `noBackupFilesDir` (excluded from Android cloud Auto-Backup) with one-tap restore—even bootstrapping a fresh `rules.db` on factory-reset switches.
+- **Offline Solar Location & Polished Rules UX**: Configure switch **Sunrise/Sunset** coordinates offline with zero GPS permissions using built-in city presets or signed latitude/longitude entry (supporting negative Western/Southern Hemisphere coordinates). Enjoy wrapping `±1h`/`±15m`/`±5m`/`±1m` time steppers, rotation-safe editor state, distinct start/end time validation, a **Go to Devices** bridge on empty homes, a guarded top-bar **`+`** button, and a clickable **Manage Rules** link in every switch's expanded drawer.
+- **Security, Privacy & Cross-Surface Hardening**: Wi-Fi passwords in the `10.22.22.1` setup wizard are now masked by default with an accessible show/hide toggle, rules payloads are scrubbed from SOAP diagnostic logs, Widget Picker previews show accurate 3-state offline rings, and Play Store screenshots are updated to match the live `v36.0` **On-Switch** Rules experience.
+
+---
 
 ### Version 35.0 (`versionCode = 35`) — November 22, 2026
 - **On-Device Switch Rules Inspector (Read-Only)**: View automation rules stored directly inside compatible wall switches, dimmers, and plugs (`F7C030`, `WLS040` / `WLS0403`, `F7C059`, `F7C063`)—including **Long Press** (resolving hardware target IDs into friendly switch names), **Auto-Off Delay** timers, **Schedules** with native **Sunrise/Sunset** offsets and stored solar location, **Away Mode**, and **Motion / Sensor** triggers—from both the **Rules** tab and each switch's expanded drawer on the **Devices** tab. *(Live on-device rule editing is intentionally planned for a future release; WeMi keeps a rotating local backup of each untouched archive it reads.)*
