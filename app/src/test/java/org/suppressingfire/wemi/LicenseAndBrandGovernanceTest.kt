@@ -32,14 +32,12 @@ class LicenseAndBrandGovernanceTest {
         return if (File(cwd, "LICENSE").exists()) cwd else (cwd.parentFile ?: cwd)
     }
 
-    private fun excludedFilePaths(parent: Element): Set<String> {
+    private fun excludedRules(parent: Element): Set<Pair<String, String>> {
         val nodes = parent.getElementsByTagName("exclude")
         return buildSet {
             for (i in 0 until nodes.length) {
                 val el = nodes.item(i) as? Element ?: continue
-                if (el.getAttribute("domain") == "file") {
-                    add(el.getAttribute("path").trim().trimEnd('/'))
-                }
+                add(el.getAttribute("domain").trim() to el.getAttribute("path").trim().trimEnd('/'))
             }
         }
     }
@@ -111,6 +109,44 @@ class LicenseAndBrandGovernanceTest {
             .findAll(File(repoRoot, "settings.gradle.kts").readText()).map { it.groupValues[1] }.toList()
         val unapprovedSettingsPlugins = settingsPluginIds.filterNot { it in approvedSettingsPluginIds }
         assertTrue("settings.gradle.kts contains unapproved Gradle plugin IDs: $unapprovedSettingsPlugins", unapprovedSettingsPlugins.isEmpty())
+
+        // Verify CI-only Play Store Python dependency lockfile allowlist & SHA-256 hash pinning (never packaged in APK/AAB)
+        val playReqsFile = File(repoRoot, "scripts/requirements-play.txt")
+        assertTrue("scripts/requirements-play.txt must exist", playReqsFile.isFile)
+        val playReqsText = playReqsFile.readText()
+        val playReqsLower = playReqsText.lowercase()
+        for (copyleftToken in listOf("gpl", "agpl", "lgpl")) {
+            assertFalse("scripts/requirements-play.txt must not reference '$copyleftToken'", playReqsLower.contains(copyleftToken))
+        }
+        val approvedCiPythonPackages = setOf(
+            "certifi", "cffi", "charset-normalizer", "cryptography", "google-auth",
+            "idna", "pyasn1", "pyasn1_modules", "pycparser", "requests", "urllib3"
+        )
+        val logicalReqLines = mutableListOf<String>()
+        val reqBuf = StringBuilder()
+        for (rawLine in playReqsText.lines()) {
+            val trimmed = rawLine.trim()
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
+            if (trimmed.endsWith("\\")) {
+                reqBuf.append(trimmed.dropLast(1).trim()).append(' ')
+            } else {
+                reqBuf.append(trimmed)
+                logicalReqLines += reqBuf.toString().trim()
+                reqBuf.setLength(0)
+            }
+        }
+        if (reqBuf.isNotEmpty()) logicalReqLines += reqBuf.toString().trim()
+        assertEquals("scripts/requirements-play.txt must pin exact 11 CI-only packages", approvedCiPythonPackages.size, logicalReqLines.size)
+        val parsedCiPackages = mutableSetOf<String>()
+        val sha256HashRegex = Regex("""--hash=sha256:[0-9a-f]{64}""")
+        for (entry in logicalReqLines) {
+            val pkgName = entry.substringBefore("==").trim().lowercase()
+            assertTrue("Unapproved package in scripts/requirements-play.txt: $pkgName", pkgName in approvedCiPythonPackages)
+            assertTrue("Package '$pkgName' in scripts/requirements-play.txt must use exact '==' pin", entry.contains("=="))
+            assertTrue("Package '$pkgName' in scripts/requirements-play.txt must carry --hash=sha256:", sha256HashRegex.containsMatchIn(entry))
+            parsedCiPackages += pkgName
+        }
+        assertEquals("scripts/requirements-play.txt package set mismatch", approvedCiPythonPackages, parsedCiPackages)
 
         val appBuildGradle = File(repoRoot, "app/build.gradle.kts")
         assertTrue("app/build.gradle.kts must exist", appBuildGradle.exists())
@@ -217,10 +253,11 @@ class LicenseAndBrandGovernanceTest {
             .toList()
         assertTrue("All app/src/main/res XML files must not contain case-insensitive 'wemo' references, found: $resXmlHits", resXmlHits.isEmpty())
 
-        // Verify Play Store Data Safety & Privacy Policy parity: exact 4 LAN permissions + structural XML Auto-Backup exclusions
+        // Verify Play Store Data Safety & Privacy Policy parity: exact 4 LAN permissions, non-exported widget receiver, & 4-domain cloud Auto-Backup exclusions
+        val manifestFile = File(repoRoot, "app/src/main/AndroidManifest.xml")
+        val manifestText = manifestFile.readText()
         val declaredPermissions = Regex("""<uses-permission\s+android:name="([^"]+)"""")
-            .findAll(File(repoRoot, "app/src/main/AndroidManifest.xml").readText())
-            .map { it.groupValues[1] }.toSet()
+            .findAll(manifestText).map { it.groupValues[1] }.toSet()
         assertEquals(
             "AndroidManifest.xml permissions must match Play Store Data Safety & Privacy Policy disclosures",
             setOf(
@@ -231,22 +268,45 @@ class LicenseAndBrandGovernanceTest {
             ),
             declaredPermissions
         )
-        val requiredBackupExclusions = setOf("wemi-telemetry-latest.txt", "hardware_rules_backups")
         val dbf = DocumentBuilderFactory.newInstance()
+        val manifestDoc = dbf.newDocumentBuilder().parse(manifestFile)
+        val receivers = manifestDoc.getElementsByTagName("receiver")
+        var foundPrivateActionReceiver = false
+        for (i in 0 until receivers.length) {
+            val el = receivers.item(i) as? Element ?: continue
+            val name = el.getAttribute("android:name").trim()
+            assertFalse("Manifest receiver must not reference legacy com.example: $name", name.contains("com.example"))
+            if (name == ".widget.WeMiWidgetActionReceiver" || name == "org.suppressingfire.wemi.widget.WeMiWidgetActionReceiver") {
+                assertEquals("WeMiWidgetActionReceiver must remain android:exported=\"false\"", "false", el.getAttribute("android:exported").trim())
+                foundPrivateActionReceiver = true
+            }
+        }
+        assertTrue("AndroidManifest.xml must declare non-exported .widget.WeMiWidgetActionReceiver", foundPrivateActionReceiver)
+
+        val requiredCloudBackupExclusions = setOf(
+            "database" to ".",
+            "sharedpref" to ".",
+            "file" to "wemi-telemetry-latest.txt",
+            "file" to "hardware_rules_backups"
+        )
+        val requiredDeviceTransferExclusions = setOf(
+            "file" to "wemi-telemetry-latest.txt",
+            "file" to "hardware_rules_backups"
+        )
         val backupDoc = dbf.newDocumentBuilder().parse(File(repoRoot, "app/src/main/res/xml/backup_rules.xml"))
         assertEquals("full-backup-content", backupDoc.documentElement.tagName)
-        val backupExcluded = excludedFilePaths(backupDoc.documentElement)
-        assertTrue("backup_rules.xml <full-backup-content> must exclude $requiredBackupExclusions, found: $backupExcluded", backupExcluded.containsAll(requiredBackupExclusions))
+        val backupExcluded = excludedRules(backupDoc.documentElement)
+        assertTrue("backup_rules.xml <full-backup-content> must exclude $requiredCloudBackupExclusions, found: $backupExcluded", backupExcluded.containsAll(requiredCloudBackupExclusions))
 
         val extractDoc = dbf.newDocumentBuilder().parse(File(repoRoot, "app/src/main/res/xml/data_extraction_rules.xml"))
-        for (sectionTag in listOf("cloud-backup", "device-transfer")) {
-            val sectionEl = extractDoc.getElementsByTagName(sectionTag).item(0) as? Element
-            assertNotNull("data_extraction_rules.xml must declare <$sectionTag>", sectionEl)
-            val excluded = excludedFilePaths(sectionEl!!)
-            assertTrue("data_extraction_rules.xml <$sectionTag> must exclude $requiredBackupExclusions, found: $excluded", excluded.containsAll(requiredBackupExclusions))
-        }
+        val cloudBackupEl = extractDoc.getElementsByTagName("cloud-backup").item(0) as? Element
+        assertNotNull("data_extraction_rules.xml must declare <cloud-backup>", cloudBackupEl)
+        assertTrue("data_extraction_rules.xml <cloud-backup> must exclude $requiredCloudBackupExclusions", excludedRules(cloudBackupEl!!).containsAll(requiredCloudBackupExclusions))
+        val transferEl = extractDoc.getElementsByTagName("device-transfer").item(0) as? Element
+        assertNotNull("data_extraction_rules.xml must declare <device-transfer>", transferEl)
+        assertTrue("data_extraction_rules.xml <device-transfer> must exclude $requiredDeviceTransferExclusions", excludedRules(transferEl!!).containsAll(requiredDeviceTransferExclusions))
 
-        // 4. Modular UI, widget & user-facing rules files must not expose user-visible "WeMo" literals (single-line or multi-line """...""")
+        // 4. Modular UI, widget, household sync & user-facing rules files must not expose user-visible "WeMo" literals (single-line or multi-line """...""")
         val allowedUiProtocolOrTagTokens = setOf(
             "WeMo_WW_2.00.11532.PVT",
             "wemo_setup_ap_detected_banner",
@@ -257,7 +317,10 @@ class LicenseAndBrandGovernanceTest {
             File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/MainActivity.kt"),
             File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/data/DemoHardwareRulesStore.kt"),
             File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/data/HardwareRulesCoordinator.kt"),
-            File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/network/HardwareRulesModels.kt")
+            File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/data/HouseholdSyncCoordinator.kt"),
+            File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/network/HardwareRulesModels.kt"),
+            File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/network/HouseholdSyncCodec.kt"),
+            File(repoRoot, "app/src/main/java/org/suppressingfire/wemi/network/HouseholdSyncLanClient.kt")
         ) + listOf("app/src/main/java/org/suppressingfire/wemi/ui", "app/src/main/java/org/suppressingfire/wemi/widget")
             .flatMap { dirRel -> File(repoRoot, dirRel).walkTopDown().filter { it.isFile && it.extension == "kt" }.toList() }
         val kotlinStringRegex = Regex("/\\*[\\s\\S]*?\\*/|//[^\\n]*|\"\"\"([\\s\\S]*?)\"\"\"|\"([^\"\\\\\\n]*(?:\\\\.[^\"\\\\\\n]*)*)\"")
@@ -272,7 +335,7 @@ class LicenseAndBrandGovernanceTest {
                 }
             }
         }
-        assertTrue("User-facing UI, widget & rules files must not expose 'WeMo' brand literals, found: $disallowedUiStrings", disallowedUiStrings.isEmpty())
+        assertTrue("User-facing UI, widget, sync & rules files must not expose 'WeMo' brand literals, found: $disallowedUiStrings", disallowedUiStrings.isEmpty())
 
         // 5. Google Play Console listing character limits & graphic asset inventory
         val releaseNotesText = File(repoRoot, "play_store_assets/RELEASE_NOTES.txt").readText().trim()
