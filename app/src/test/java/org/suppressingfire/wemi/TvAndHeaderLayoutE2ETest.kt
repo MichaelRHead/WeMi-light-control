@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -147,22 +148,35 @@ class TvAndHeaderLayoutE2ETest {
                     composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}").assertIsFocused()
 
                     // Pressing Up from leftmost switch widget selects the Living Room Bar above it
+                    // and updates the top OK hint chip to reflect the Room Master action instead of the previous switch
                     composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
                         .performKeyInput { pressKey(Key.DirectionUp) }
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_room_header_Living Room").assertIsFocused()
+                    composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+                        .assertIsDisplayed()
+                        .assertTextContains("Living Room", substring = true)
+                        .assertTextContains("OK Toggle Room • ◄/► Dim", substring = true)
+                    composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle").assertDoesNotExist()
 
                     // Pressing Down from Living Room Bar returns focus to the leftmost switch widget
                     composeTestRule.onNodeWithTag("tv_room_header_Living Room")
                         .performKeyInput { pressKey(Key.DirectionDown) }
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}").assertIsFocused()
+                    composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+                        .assertTextContains("Living Room Switch", substring = true)
+                        .assertTextContains("OK Toggle", substring = true)
 
                     // Pressing Down from leftmost switch widget selects the Unassigned Room Bar below it
+                    // (no dimmers in Unassigned -> OK Toggle Room without dimmer hint)
                     composeTestRule.onNodeWithTag("tv_device_card_${switchEntity.id}")
                         .performKeyInput { pressKey(Key.DirectionDown) }
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_room_header_Unassigned").assertIsFocused()
+                    composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+                        .assertTextContains("Unassigned", substring = true)
+                        .assertTextContains("OK Toggle Room", substring = true)
 
                     // Pressing Up from Unassigned Room Bar returns focus to the leftmost switch widget
                     composeTestRule.onNodeWithTag("tv_room_header_Unassigned")
@@ -276,11 +290,16 @@ class TvAndHeaderLayoutE2ETest {
                     assertEquals(50, dimmerServer.dimmerBrightness.get())
 
                     // Navigating Down from the Dimmer Slider moves to the widget below (Unassigned Room Bar)
+                    // and clears the dimmer chip while updating the top hint pill to Unassigned
                     composeTestRule.onNodeWithTag("tv_card_dim_mode_${dimmerEntity.id}")
                         .performKeyInput { pressKey(Key.DirectionDown) }
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_room_header_Unassigned").assertIsFocused()
                     composeTestRule.onNodeWithText("DIM -/+", useUnmergedTree = true).assertDoesNotExist()
+                    composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle").assertDoesNotExist()
+                    composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+                        .assertTextContains("Unassigned", substring = true)
+                        .assertTextContains("OK Toggle Room", substring = true)
 
                     // 5. Focus Living Room section header and press DirectionCenter to trigger Room Master OFF across both switches
                     composeTestRule.onNodeWithTag("tv_room_header_Living Room")
@@ -299,14 +318,21 @@ class TvAndHeaderLayoutE2ETest {
                     assertFalse(dimmerServer.relayStateOn.get())
 
                     // 6. Verify D-Pad navigation in TV top bar skips cleanly between Movie 20% and All OFF when Holiday ON is hidden
+                    //    and updates the top OK hint chip to explain the focused top-bar action
                     composeTestRule.onNodeWithTag("tv_room_header_Living Room")
                         .performKeyInput { pressKey(Key.DirectionUp) }
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_scene_movie").assertIsFocused()
+                    composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+                        .assertTextContains("Movie 20%", substring = true)
+                        .assertTextContains("OK Run Scene", substring = true)
                     composeTestRule.onNodeWithTag("tv_scene_movie")
                         .performKeyInput { pressKey(Key.DirectionRight) }
                     composeTestRule.waitForIdle()
                     composeTestRule.onNodeWithTag("tv_scene_bedtime").assertIsFocused()
+                    composeTestRule.onNodeWithTag("tv_remote_dpad_ok")
+                        .assertTextContains("All OFF", substring = true)
+                        .assertTextContains("OK Turn All Off", substring = true)
                     composeTestRule.onNodeWithTag("tv_scene_bedtime")
                         .performKeyInput { pressKey(Key.DirectionLeft) }
                     composeTestRule.waitForIdle()

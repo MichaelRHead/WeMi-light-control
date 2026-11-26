@@ -19,10 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.Park
-import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -48,14 +46,12 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.data.DeviceEntity
 import org.suppressingfire.wemi.data.DeviceType
 import org.suppressingfire.wemi.ui.theme.WemoGreenDark
 import org.suppressingfire.wemi.ui.theme.WemoGreenPrimary
-import org.suppressingfire.wemi.ui.theme.WemoGreenTop
 
 /**
  * Compact 42.dp single-row top bar for the 10-foot Android TV dashboard (`wemi TV`),
@@ -67,8 +63,7 @@ import org.suppressingfire.wemi.ui.theme.WemoGreenTop
 internal fun TvTopHeaderBar(
     activeSwitchCount: Int,
     totalSwitchCount: Int,
-    focusedDevice: DeviceEntity?,
-    dimmingDeviceId: Int?,
+    focusedBannerTarget: TvFocusedBannerTarget?,
     isRefreshing: Boolean,
     showHolidayScene: Boolean = false,
     topActionFocusRequesters: List<FocusRequester>,
@@ -76,16 +71,39 @@ internal fun TvTopHeaderBar(
     onNavigateDownFromTopBar: () -> Boolean,
     onNavigateTopActionHorizontal: (Int) -> Boolean,
     onPrimaryActionOnFocused: (DeviceEntity) -> Unit,
+    onToggleRoomPower: (String) -> Unit,
     onToggleDimmingFocused: (Int?) -> Unit,
     onApplyTvScene: (String) -> Unit,
     onScanSsdpClick: () -> Unit,
     onOpenHouseholdSync: () -> Unit = {}
 ) {
-    val isFocusedDimmer =
-        focusedDevice != null &&
-            focusedDevice.parsedType == DeviceType.LIGHTBULB_DIMMER &&
-            focusedDevice.isReachable
-    val isDimmingFocused = focusedDevice != null && dimmingDeviceId == focusedDevice.id && isFocusedDimmer
+    val focusedDeviceBanner = focusedBannerTarget as? TvFocusedBannerTarget.Device
+    val focusedDimmer = focusedDeviceBanner?.device?.takeIf {
+        it.parsedType == DeviceType.LIGHTBULB_DIMMER && it.isReachable
+    }
+    val isDimmingFocused = focusedDimmer != null && focusedDeviceBanner.isDimming
+
+    val triggerBannerClick: () -> Unit = {
+        when (focusedBannerTarget) {
+            is TvFocusedBannerTarget.Device -> {
+                if (isDimmingFocused) {
+                    onToggleDimmingFocused(null)
+                } else {
+                    onPrimaryActionOnFocused(focusedBannerTarget.device)
+                }
+            }
+            is TvFocusedBannerTarget.Room -> onToggleRoomPower(focusedBannerTarget.roomName)
+            is TvFocusedBannerTarget.TopAction -> when (focusedBannerTarget.index) {
+                0 -> onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.MOVIE_MODE.wireKey)
+                1 -> onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey)
+                2 -> onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.BEDTIME_OFF.wireKey)
+                3 -> onScanSsdpClick()
+                4 -> onOpenHouseholdSync()
+                else -> Unit
+            }
+            null -> Unit
+        }
+    }
 
     BoxWithConstraints(
         modifier = Modifier
@@ -107,17 +125,15 @@ internal fun TvTopHeaderBar(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TvBrandAndCountBadges(activeSwitchCount, totalSwitchCount)
-                    if (focusedDevice != null) {
+                    if (focusedBannerTarget != null) {
                         TvFocusedStatusPill(
-                            focusedDevice = focusedDevice,
-                            isDimmingFocused = isDimmingFocused,
-                            onPrimaryActionOnFocused = onPrimaryActionOnFocused,
-                            onToggleDimmingFocused = onToggleDimmingFocused,
+                            focusedTarget = focusedBannerTarget,
+                            onClick = triggerBannerClick,
                             modifier = Modifier.weight(1f, fill = false)
                         )
-                        if (isFocusedDimmer) {
+                        if (focusedDimmer != null) {
                             TvDimmerModeChip(
-                                focusedDevice = focusedDevice,
+                                focusedDevice = focusedDimmer,
                                 isDimmingFocused = isDimmingFocused,
                                 onToggleDimmingFocused = onToggleDimmingFocused
                             )
@@ -149,17 +165,15 @@ internal fun TvTopHeaderBar(
                 verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 TvBrandAndCountBadges(activeSwitchCount, totalSwitchCount)
-                if (focusedDevice != null) {
+                if (focusedBannerTarget != null) {
                     TvFocusedStatusPill(
-                        focusedDevice = focusedDevice,
-                        isDimmingFocused = isDimmingFocused,
-                        onPrimaryActionOnFocused = onPrimaryActionOnFocused,
-                        onToggleDimmingFocused = onToggleDimmingFocused,
+                        focusedTarget = focusedBannerTarget,
+                        onClick = triggerBannerClick,
                         modifier = Modifier.widthIn(max = availableWidth)
                     )
-                    if (isFocusedDimmer) {
+                    if (focusedDimmer != null) {
                         TvDimmerModeChip(
-                            focusedDevice = focusedDevice,
+                            focusedDevice = focusedDimmer,
                             isDimmingFocused = isDimmingFocused,
                             onToggleDimmingFocused = onToggleDimmingFocused
                         )
@@ -220,106 +234,6 @@ private fun TvBrandAndCountBadges(activeSwitchCount: Int, totalSwitchCount: Int)
             softWrap = false,
             modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
         )
-    }
-}
-
-@Composable
-private fun TvFocusedStatusPill(
-    focusedDevice: DeviceEntity,
-    isDimmingFocused: Boolean,
-    onPrimaryActionOnFocused: (DeviceEntity) -> Unit,
-    onToggleDimmingFocused: (Int?) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        shape = RoundedCornerShape(9.dp),
-        color = if (isDimmingFocused) TvDimmerGold else WemoGreenTop.copy(alpha = 0.20f),
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isDimmingFocused) TvDimmerGold else TvCyanFocusBorder.copy(alpha = 0.65f)
-        ),
-        modifier = modifier
-            .focusProperties { canFocus = false }
-            .clickable {
-                if (isDimmingFocused) {
-                    onToggleDimmingFocused(null)
-                } else {
-                    onPrimaryActionOnFocused(focusedDevice)
-                }
-            }
-            .testTag("tv_remote_dpad_ok")
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.PowerSettingsNew,
-                contentDescription = null,
-                tint = if (isDimmingFocused) TvDeepBackground else TvCyanFocusBorder,
-                modifier = Modifier.size(14.dp)
-            )
-            Text(
-                text = focusedDevice.name,
-                color = if (isDimmingFocused) TvDeepBackground else Color.White,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.5.sp,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f, fill = false)
-            )
-            Text(
-                text = if (isDimmingFocused) "• ◄/► ${focusedDevice.brightness}%" else "• OK Toggle",
-                color = if (isDimmingFocused) TvDeepBackground else Color.White,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.5.sp,
-                maxLines = 1,
-                softWrap = false
-            )
-        }
-    }
-}
-
-@Composable
-private fun TvDimmerModeChip(
-    focusedDevice: DeviceEntity,
-    isDimmingFocused: Boolean,
-    onToggleDimmingFocused: (Int?) -> Unit
-) {
-    Surface(
-        shape = RoundedCornerShape(9.dp),
-        color = if (isDimmingFocused) TvDimmerGold else Color(0xFF132D4E),
-        border = BorderStroke(1.dp, TvDimmerGold.copy(alpha = 0.8f)),
-        modifier = Modifier
-            .focusProperties { canFocus = false }
-            .clickable { onToggleDimmingFocused(if (isDimmingFocused) null else focusedDevice.id) }
-            .testTag("tv_dimmer_mode_toggle")
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp),
-            modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Tune,
-                contentDescription = "Toggle Dimmer Adjust Mode",
-                tint = if (isDimmingFocused) TvDeepBackground else TvDimmerGold,
-                modifier = Modifier.size(13.dp)
-            )
-            Text(
-                text = if (isDimmingFocused) "Done Dimming" else "Dimmer ${focusedDevice.brightness}%",
-                color = if (isDimmingFocused) TvDeepBackground else TvDimmerGold,
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.5.sp,
-                maxLines = 1,
-                softWrap = false
-            )
-        }
     }
 }
 

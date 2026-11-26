@@ -42,13 +42,6 @@ internal val TvCyanFocusBorder = Color(0xFF22D3EE)
 internal val TvTextPrimary = Color(0xFFF8FAFC)
 internal val TvTextSecondary = Color(0xFF94A3B8)
 
-internal sealed interface TvFocusTarget {
-    data class TopAction(val index: Int) : TvFocusTarget
-    data class RoomHeader(val roomName: String) : TvFocusTarget
-    data class DeviceToggle(val deviceId: Int) : TvFocusTarget
-    data class DeviceSlider(val deviceId: Int) : TvFocusTarget
-}
-
 /**
  * 10-foot Android TV & Large-Screen Landscape Dashboard (`wemi TV`).
  *
@@ -234,8 +227,13 @@ fun TvDashboardScreen(
         }
     }
 
-    val focusedDevice = orderedDevices.firstOrNull { it.id == lastFocusedDeviceId }
-        ?: orderedDevices.firstOrNull()
+    val focusedBannerTarget = resolveTvFocusedBannerTarget(
+        activeFocusTarget = activeFocusTarget,
+        groupedByRoom = groupedByRoom,
+        orderedDevices = orderedDevices,
+        lastFocusedDeviceId = lastFocusedDeviceId,
+        isRefreshing = isRefreshing
+    )
     val dimmingDeviceId: Int? = (activeFocusTarget as? TvFocusTarget.DeviceSlider)?.deviceId
 
     // Pressing Back on the TV remote while on the Dimmer Slider returns focus to the card's On/Off Toggle
@@ -272,8 +270,7 @@ fun TvDashboardScreen(
         TvTopHeaderBar(
             activeSwitchCount = activeSwitchCount,
             totalSwitchCount = totalSwitchCount,
-            focusedDevice = focusedDevice,
-            dimmingDeviceId = dimmingDeviceId,
+            focusedBannerTarget = focusedBannerTarget,
             isRefreshing = isRefreshing,
             showHolidayScene = hasHolidayDevices,
             topActionFocusRequesters = topActionFocusRequesters,
@@ -287,11 +284,16 @@ fun TvDashboardScreen(
                 navigateTo(TvFocusTarget.TopAction(resolvedIdx))
             },
             onPrimaryActionOnFocused = { triggerPrimaryAction(it) },
+            onToggleRoomPower = onToggleRoomPower,
             onToggleDimmingFocused = { targetDimId ->
                 if (targetDimId != null) {
                     navigateTo(TvFocusTarget.DeviceSlider(targetDimId))
-                } else if (focusedDevice != null) {
-                    navigateTo(TvFocusTarget.DeviceToggle(focusedDevice.id))
+                } else {
+                    val currentDeviceId = (focusedBannerTarget as? TvFocusedBannerTarget.Device)?.device?.id
+                        ?: lastFocusedDeviceId
+                    if (currentDeviceId != null) {
+                        navigateTo(TvFocusTarget.DeviceToggle(currentDeviceId))
+                    }
                 }
             },
             onApplyTvScene = onApplyTvScene,
