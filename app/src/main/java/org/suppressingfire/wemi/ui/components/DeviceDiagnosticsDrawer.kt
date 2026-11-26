@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.AddToHomeScreen
@@ -24,6 +25,7 @@ import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -44,6 +46,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.suppressingfire.wemi.R
@@ -137,7 +140,7 @@ internal fun ExpandedDrawer(
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 listOf(21, 50, 75, 100).forEach { preset ->
                     FilterChip(
@@ -170,148 +173,174 @@ internal fun ExpandedDrawer(
             Spacer(modifier = Modifier.height(6.dp))
         }
 
-        // Real-Time Connection & Latency Telemetry Banner inside Expanded Drawer
+        // Real-Time Connection, Hardware Metadata & Quick Actions Card inside Expanded Drawer
         Surface(
             color = Color.White,
             shape = RoundedCornerShape(10.dp),
             border = BorderStroke(1.dp, WemoDividerGray),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Row(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = if (device.isReachable) {
-                            "Connection: Active (${device.latencyMs}ms SOAP Round-Trip)"
-                        } else {
-                            "Connection: Offline (Unreachable on Port ${device.port})"
-                        },
-                        color = if (device.isReachable) WemoGreenDark else StatusOfflineRed,
-                        fontFamily = FontFamily.SansSerif,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp
-                    )
-                    Text(
-                        text = "Last Checked: ${device.lastCheckedTime} • Endpoint: ${device.ipAddress}:${device.port}",
-                        color = WemoTextSecondary,
-                        fontFamily = FontFamily.SansSerif,
-                        fontSize = 11.sp
-                    )
-                }
-
-                AssistChip(
-                    onClick = onPingLatency,
-                    label = { Text("Ping RTT", fontSize = 11.sp) },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.NetworkCheck,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (device.isReachable) {
+                                "Connection: Active (${device.latencyMs}ms SOAP Round-Trip)"
+                            } else {
+                                "Connection: Offline (Unreachable on Port ${device.port})"
+                            },
+                            color = if (device.isReachable) WemoGreenDark else StatusOfflineRed,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
                         )
-                    },
-                    colors = AssistChipDefaults.assistChipColors(
-                        leadingIconContentColor = WemoGreenDark,
-                        labelColor = WemoGreenDark
-                    ),
-                    modifier = Modifier.testTag("ping_device_${device.id}")
-                )
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "UPnP Endpoint: http://${device.ipAddress}:${device.port}",
-                    color = WemoTextSecondary,
-                    fontFamily = FontFamily.SansSerif,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "SN: ${device.serialNumber} • ${device.firmwareVersion}",
-                    color = WemoTextSecondary,
-                    fontFamily = FontFamily.SansSerif,
-                    fontSize = 11.sp
-                )
-            }
-
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (!device.isReachable) {
-                    AssistChip(
-                        onClick = onReconnect,
-                        label = { Text("Reconnect") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Refresh,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            leadingIconContentColor = WemoGreenDark,
-                            labelColor = WemoGreenDark
+                        Text(
+                            text = "Last Checked: ${device.lastCheckedTime}",
+                            color = WemoTextSecondary,
+                            fontFamily = FontFamily.SansSerif,
+                            fontSize = 11.sp
                         )
-                    )
-                } else if (type == DeviceType.MOTION_SENSOR) {
-                    AssistChip(
-                        onClick = onTriggerMotion,
-                        label = { Text(if (isDemoShowroomMode) "Simulate Motion" else "Refresh Motion") },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Sensors,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        modifier = Modifier.testTag("trigger_motion_${device.id}")
-                    )
-                }
+                    }
 
-                if (onPinDeviceWidget != null && type != DeviceType.MOTION_SENSOR) {
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     AssistChip(
-                        onClick = onPinDeviceWidget,
-                        label = { Text(stringResource(R.string.action_add_home_widget)) },
+                        onClick = onPingLatency,
+                        label = { Text("Ping RTT", fontSize = 11.sp, maxLines = 1, softWrap = false) },
                         leadingIcon = {
                             Icon(
-                                imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen,
+                                imageVector = Icons.Default.NetworkCheck,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(15.dp)
                             )
                         },
                         colors = AssistChipDefaults.assistChipColors(
                             leadingIconContentColor = WemoGreenDark,
                             labelColor = WemoGreenDark
                         ),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.testTag("pin_device_widget_${device.id}")
+                        modifier = Modifier.testTag("ping_device_${device.id}")
                     )
                 }
 
-                AssistChip(
-                    onClick = onEditDevice,
-                    label = { Text("Configure IP") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (device.isReachable) Icons.Default.Edit else Icons.Default.WifiOff,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
+                HorizontalDivider(color = WemoDividerGray.copy(alpha = 0.65f))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("device_diagnostics_metadata_${device.id}"),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "UPnP Endpoint: http://${device.ipAddress}:${device.port}",
+                        color = WemoTextSecondary,
+                        fontFamily = FontFamily.SansSerif,
+                        fontSize = 11.5.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "SN: ${device.serialNumber} • ${device.firmwareVersion}",
+                        color = WemoTextSecondary,
+                        fontFamily = FontFamily.SansSerif,
+                        fontSize = 11.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    if (!device.isReachable) {
+                        AssistChip(
+                            onClick = onReconnect,
+                            label = { Text("Reconnect", maxLines = 1, softWrap = false) },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                leadingIconContentColor = WemoGreenDark,
+                                labelColor = WemoGreenDark
+                            ),
+                            shape = RoundedCornerShape(8.dp)
                         )
-                    },
-                    shape = RoundedCornerShape(8.dp)
-                )
+                    } else if (type == DeviceType.MOTION_SENSOR) {
+                        AssistChip(
+                            onClick = onTriggerMotion,
+                            label = {
+                                Text(
+                                    text = if (isDemoShowroomMode) "Simulate Motion" else "Refresh Motion",
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.Sensors,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("trigger_motion_${device.id}")
+                        )
+                    }
+
+                    if (onPinDeviceWidget != null && type != DeviceType.MOTION_SENSOR) {
+                        AssistChip(
+                            onClick = onPinDeviceWidget,
+                            label = {
+                                Text(
+                                    text = stringResource(R.string.action_add_home_widget),
+                                    maxLines = 1,
+                                    softWrap = false
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.AddToHomeScreen,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            },
+                            colors = AssistChipDefaults.assistChipColors(
+                                leadingIconContentColor = WemoGreenDark,
+                                labelColor = WemoGreenDark
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.testTag("pin_device_widget_${device.id}")
+                        )
+                    }
+
+                    AssistChip(
+                        onClick = onEditDevice,
+                        label = { Text("Configure IP", maxLines = 1, softWrap = false) },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = if (device.isReachable) Icons.Default.Edit else Icons.Default.WifiOff,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("configure_ip_device_${device.id}")
+                    )
+                }
             }
         }
 

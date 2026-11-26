@@ -121,9 +121,23 @@ class EndToEndUiTest {
         composeTestRule.onNodeWithText("Christmas Tree Living").performClick()
         composeTestRule.waitForIdle()
 
-        // 2. Verify Ping RTT chip inside the expanded diagnostics drawer and trigger it
+        // 2. Verify Ping RTT chip, full-width hardware metadata above action chips, and trigger Ping RTT
         composeTestRule.onNodeWithTag("ping_device_1").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithTag("ping_device_1").performClick()
+        composeTestRule.onNodeWithTag("device_diagnostics_metadata_1").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithTag("configure_ip_device_1").performScrollTo().assertIsDisplayed()
+        val metaBounds = composeTestRule.onNodeWithTag("device_diagnostics_metadata_1", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val configureIpBounds = composeTestRule.onNodeWithTag("configure_ip_device_1", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        val widgetBtnBounds = composeTestRule.onNodeWithTag("pin_device_widget_1", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+        assertTrue(
+            "Expected UPnP/SN metadata to span full drawer width above action chips (meta=$metaBounds, widget=$widgetBtnBounds, config=$configureIpBounds)",
+            metaBounds.width >= 200f &&
+                metaBounds.bottom <= widgetBtnBounds.top + 4f &&
+                metaBounds.bottom <= configureIpBounds.top + 4f
+        )
+        composeTestRule.onNodeWithTag("ping_device_1").performScrollTo().performClick()
         composeTestRule.waitForIdle()
 
         // 3. Enter Edit Mode via edit_devices_button and open AddOrEditDeviceDialog for device 1
