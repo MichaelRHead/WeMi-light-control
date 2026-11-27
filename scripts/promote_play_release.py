@@ -132,6 +132,11 @@ def _format_api_error(status_code: int, body_text: str) -> str:
             "Re-run with changes_not_sent_for_review=true (or resolve pending review state "
             "in Play Console -> Publishing overview)."
         )
+    elif "wrong key" in lower or "upload key" in lower:
+        hints.append(
+            "Confirm the AAB is signed with the active Play Console upload key. If you recently "
+            "requested an upload key reset, wait until the activation timestamp in Google's email passes."
+        )
 
     msg = f"Google Play API error (HTTP {status_code}): {detail}"
     if hints:
@@ -332,6 +337,25 @@ class PlayPublisherClient:
         )
         return dict(data.get("image") or data)
 
+    def upload_bundle(
+        self,
+        edit_id: str,
+        bundle_path: Path,
+        *,
+        timeout_sec: int = 240,
+    ) -> dict[str, Any]:
+        """Upload a signed Android App Bundle (.aab) into an open Play edit."""
+        payload = bundle_path.read_bytes()
+        return self._request(
+            "POST",
+            f"/edits/{quote(edit_id, safe='')}/bundles",
+            params={"uploadType": "media"},
+            data=payload,
+            headers={"Content-Type": "application/octet-stream"},
+            upload=True,
+            timeout_sec=timeout_sec,
+        )
+
     def commit_edit(
         self,
         edit_id: str,
@@ -481,6 +505,12 @@ def parse_gradle_version_code(gradle_text: str) -> int | None:
     """Extract Android defaultConfig versionCode from app/build.gradle.kts."""
     match = re.search(r"\bversionCode\s*=\s*(\d+)", gradle_text)
     return int(match.group(1)) if match else None
+
+
+def parse_gradle_version_name(gradle_text: str) -> str | None:
+    """Extract Android defaultConfig versionName from app/build.gradle.kts."""
+    match = re.search(r'\bversionName\s*=\s*"([^"\r\n]+)"', gradle_text)
+    return match.group(1).strip() if match else None
 
 
 def read_release_sign_off_state(sign_off_path: Path) -> dict[str, str]:
