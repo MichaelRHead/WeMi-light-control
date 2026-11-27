@@ -1,6 +1,6 @@
 # WeMi Light Control — Security & Privacy Specification (`SECURITY_AND_PRIVACY.md`)
 
-**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v37.0` / `versionCode = 37`)  
+**Repository**: `MichaelRHead/WeMi-light-control` (`org.suppressingfire.wemi` / `com.aistudio.wemiswitch.kxpqzr`, `v38.0` / `versionCode = 38`)  
 **Document & Skill Owner**: **Antigravity Security & Privacy Agent (`security_and_privacy`) — EXCLUSIVE OWNER**  
 **Companion Stage 4 Skill**: [`.agents/skills/wemi-security-and-privacy/SKILL.md`](.agents/skills/wemi-security-and-privacy/SKILL.md)  
 **General Security & Privacy Methodology Skill**: [`.agents/skills/security-and-privacy/SKILL.md`](.agents/skills/security-and-privacy/SKILL.md)
@@ -46,7 +46,7 @@ Every release candidate reviewed at **Stage 4 (`security_and_privacy`)** is eval
 
 1. **Invariant 1 — Least-Privilege Android Manifest & IPC Boundaries ([`AndroidManifest.xml`](app/src/main/AndroidManifest.xml), [`widget/`](app/src/main/java/org/suppressingfire/wemi/widget))**:
    - Declare only the 4 normal install-time LAN permissions (`INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`); never add Location, Contacts, Storage, or background-tracking permissions without explicit user approval and policy updates.
-   - Exported components (`android:exported="true"`) must never act as a confused deputy for co-resident zero-permission apps: keep internal widget actions off exported receivers (`WeMiWidgetActionReceiver` `exported="false"`), validate active `AppWidgetManager` IDs/providers and single-use nonces on mutable pin `PendingIntent`s, and keep `FileProvider` `exported="false"` with `grantUriPermissions="true"` scoped strictly to explicit cache/telemetry paths.
+   - Exported components (`android:exported="true"`) must never act as a confused deputy for co-resident zero-permission apps: keep internal widget actions off exported receivers (`WeMiWidgetActionReceiver` `exported="false"`), validate active `AppWidgetManager` IDs/providers and single-use nonces on mutable pin `PendingIntent`s, and keep `FileProvider` absent (telemetry shares via `Intent.ACTION_SEND` `EXTRA_TEXT` and Household Config Sync uses Android SAF) — or, if ever added, `exported="false"` with `grantUriPermissions="true"` scoped strictly to explicit cache/telemetry paths.
 2. **Invariant 2 — Strict Local-LAN Networking, PAKE Pairing, Anti-SSRF, Anti-CRLF & DoS Bounds ([`LanEndpointPolicy.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanEndpointPolicy.kt), [`LanHttpClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/LanHttpClient.kt), [`SsdpDiscoveryEngine.kt`](app/src/main/java/org/suppressingfire/wemi/network/SsdpDiscoveryEngine.kt), [`GenaSubscriptionManager.kt`](app/src/main/java/org/suppressingfire/wemi/network/GenaSubscriptionManager.kt), [`HouseholdSyncPake.kt`](app/src/main/java/org/suppressingfire/wemi/network/HouseholdSyncPake.kt), [`HouseholdSyncLanServer.kt`](app/src/main/java/org/suppressingfire/wemi/network/HouseholdSyncLanServer.kt), [`HouseholdSyncHttpFraming.kt`](app/src/main/java/org/suppressingfire/wemi/network/HouseholdSyncHttpFraming.kt), [`HouseholdSyncLanClient.kt`](app/src/main/java/org/suppressingfire/wemi/network/HouseholdSyncLanClient.kt))**:
    - Pin all LAN fetches (`<ruleDbPath>`, SSDP `LOCATION`, manual switch IPs, Household Sync peer targets) to local private RFC 1918 IPv4 networks (loopback test-only).
    - Reject CR/LF/NUL (`\r`, `\n`, `\u0000`) in HTTP request targets, header keys/values, SSDP search targets, and parsed hardware identifiers (`serialNumber`, `udn`).
@@ -70,7 +70,7 @@ Every release candidate reviewed at **Stage 4 (`security_and_privacy`)** is eval
 
 ---
 
-## 3. Verified Baseline Controls & Remediated Hardening Backlog (`v36.0` → `v37.0`)
+## 3. Verified Baseline Controls & Remediated Hardening Backlog (`v36.0` → `v38.0`)
 
 ### 3.1 Strong Controls Verified Across the Codebase
 - Zero cloud backend, zero analytics/ad/crash SDKs, minimal pure-Kotlin/AndroidX runtime dependencies, zero bundled `.so`/`.ttf` binaries, `dependenciesInfo.includeInApk = false`, R8 minification enabled on release with `android.util.Log.v/d/i` stripping in [`app/proguard-rules.pro`](app/proguard-rules.pro).
@@ -112,6 +112,10 @@ All **8 `v37.0` Household Config Sync findings** (`0` Critical, `1` High, `5` Me
 | **SYNC-06** | **Low** | HTTP Framing & UDP Amplification (`HouseholdSyncHttpFraming`, `HouseholdSyncLanServer`) | `RESOLVED` | Extracted `HouseholdSyncHttpFraming` clamping per-read `soTimeout` to remaining deadline, returning `408`/`431` cleanly, rejecting duplicate `Content-Length` / `Transfer-Encoding` with `400`, streaming request bodies in 8 KiB chunks, and rate-limiting UDP `49190` replies (`<= 10/sec`, `<= 120/session`, `port >= 1024`). |
 | **SYNC-07** | **Low** | JSON & Envelope Resource Bounds (`StrictJsonCodec`, `HouseholdSyncCrypto`) | `RESOLVED` | Added `MAX_JSON_INPUT_CHARS = 512 KiB`, `MAX_TOTAL_NODES = 16,384`, zero-alloc `skipWhitespace()`, and pre-decode envelope/ciphertext byte limits. |
 
+### 3.4 `v38.0` Android TV Focus & Release Audit (`versionCode = 38`, `140` `.kt` files, `159` tests / `31` suites)
+
+- Audited all `v38.0` changes ([`TvFocusModel.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvFocusModel.kt), [`TvScreen.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvScreen.kt), [`TvHeadersAndScenes.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvHeadersAndScenes.kt), [`ReleaseHistoryCatalog.kt`](app/src/main/java/org/suppressingfire/wemi/ui/components/ReleaseHistoryCatalog.kt), and [`app/build.gradle.kts`](app/build.gradle.kts)): confirmed `0` new security or privacy findings, zero sensitive metadata exposed in the context-aware TV top-bar action pill, `ScopedWindowFlagSecure` and `ON_STOP` listener pause intact on [`TvHouseholdSyncOverlay`](app/src/main/java/org/suppressingfire/wemi/ui/components/TvHouseholdSyncDialog.kt), zero production `android.util.Log` / `println` calls, zero GitHub Actions deprecation annotations, and full compliance across all 7 invariants.
+
 ---
 
 ## 4. Stage 4 Release Review Gate (`security_and_privacy`)
@@ -125,7 +129,7 @@ In the **7-Agent / 8-Stage Autonomous Release Process** ([`RELEASE_PROCESS.md`](
    - Verify `PRIVACY_POLICY.md` and `DATA_SAFETY_GUIDE.md` remain truthful to live runtime behavior.
    - Check `.github/workflows/*.yml`, `scripts/requirements-play.txt`, `scripts/*.py`, `gradle-wrapper.properties`, and `app/proguard-rules.pro` for secret safety, expression injection, permissions, and supply-chain regressions.
 3. **Remediate or Gate Blocking Regressions**: Fix newly introduced security/privacy regressions (with targeted regression tests) or request re-review (`request_rereview`) if an upstream domain change introduced a cross-cutting vulnerability.
-4. **Run Focused Verification Suite** (full `150+`-test & APK gate follows immediately in Stage 5 `code_quality_and_testing`; run the full gate as well if pushing standalone fixes):
+4. **Run Focused Verification Suite** (full `159`-test across `31` suites & APK gate follows immediately in Stage 5 `code_quality_and_testing`; run the full gate as well if pushing standalone code fixes):
    ```bash
    sh gradlew testDebugUnitTest \
      --tests org.suppressingfire.wemi.SecurityAndPrivacyHardeningTest \
