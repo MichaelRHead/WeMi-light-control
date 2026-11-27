@@ -63,7 +63,8 @@ internal fun reconcileTvFocusState(
     hasHolidayDevices: Boolean,
     holidayChipVanishedWhileFocused: Boolean,
     focusedRoomVanishedWhileFocused: Boolean = false,
-    focusedDeviceVanishedWhileFocused: Boolean = false
+    focusedDeviceVanishedWhileFocused: Boolean = false,
+    focusedSliderDemotedDeviceId: Int? = null
 ): TvFocusReconciliation {
     if (orderedDevices.isEmpty()) {
         return TvFocusReconciliation(
@@ -100,13 +101,25 @@ internal fun reconcileTvFocusState(
         )
     }
 
+    if (focusedSliderDemotedDeviceId != null) {
+        val demotedId = orderedDevices.firstOrNull { it.id == focusedSliderDemotedDeviceId }?.id
+            ?: fallbackDeviceId
+        return TvFocusReconciliation(
+            nextActiveTarget = TvFocusTarget.DeviceToggle(demotedId),
+            nextLastFocusedDeviceId = demotedId,
+            nextDidRequestInitialGridFocus = true,
+            shouldRequestFocus = true,
+            awaitFrameBeforeFocus = true
+        )
+    }
+
     val currentSliderId = (activeFocusTarget as? TvFocusTarget.DeviceSlider)?.deviceId
     if (currentSliderId != null) {
         val sliderDevice = orderedDevices.firstOrNull { it.id == currentSliderId }
         if (sliderDevice == null) {
             return TvFocusReconciliation(
-                nextActiveTarget = TvFocusTarget.DeviceToggle(firstDeviceId),
-                nextLastFocusedDeviceId = firstDeviceId,
+                nextActiveTarget = TvFocusTarget.DeviceToggle(fallbackDeviceId),
+                nextLastFocusedDeviceId = fallbackDeviceId,
                 nextDidRequestInitialGridFocus = true,
                 shouldRequestFocus = true,
                 awaitFrameBeforeFocus = true
@@ -116,7 +129,8 @@ internal fun reconcileTvFocusState(
                 nextActiveTarget = TvFocusTarget.DeviceToggle(sliderDevice.id),
                 nextLastFocusedDeviceId = sliderDevice.id,
                 nextDidRequestInitialGridFocus = true,
-                shouldRequestFocus = true
+                shouldRequestFocus = true,
+                awaitFrameBeforeFocus = true
             )
         }
     }
@@ -212,7 +226,8 @@ internal fun resolveTvFocusedBannerTarget(
     groupedByRoom: List<Pair<String, List<DeviceEntity>>>,
     orderedDevices: List<DeviceEntity>,
     lastFocusedDeviceId: Int?,
-    isRefreshing: Boolean
+    isRefreshing: Boolean,
+    hasHolidayDevices: Boolean = true
 ): TvFocusedBannerTarget? {
     return when (activeFocusTarget) {
         is TvFocusTarget.RoomHeader -> {
@@ -251,7 +266,11 @@ internal fun resolveTvFocusedBannerTarget(
         is TvFocusTarget.TopAction -> {
             when (activeFocusTarget.index) {
                 0 -> TvFocusedBannerTarget.TopAction(0, "Movie 20%", "• OK Run Scene")
-                1 -> TvFocusedBannerTarget.TopAction(1, "Holiday ON", "• OK Run Scene")
+                1 -> if (hasHolidayDevices) {
+                    TvFocusedBannerTarget.TopAction(1, "Holiday ON", "• OK Run Scene")
+                } else {
+                    TvFocusedBannerTarget.TopAction(0, "Movie 20%", "• OK Run Scene")
+                }
                 2 -> TvFocusedBannerTarget.TopAction(2, "All OFF", "• OK Turn All Off")
                 3 -> TvFocusedBannerTarget.TopAction(
                     index = 3,

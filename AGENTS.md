@@ -11,7 +11,7 @@
 > **CRITICAL RULE**: **Only push to `origin/main` after verifying the full build, lint, and all automated tests pass with zero errors.**
 
 ```bash
-# Run all 159 unit, protocol, hardware-rules, household-sync, security, widget, telemetry, governance, ChromeOS & Compose E2E tests (31 suites) + Lint
+# Run all 161 unit, protocol, hardware-rules, household-sync, security, widget, telemetry, governance, ChromeOS & Compose E2E tests (31 suites) + Lint
 sh gradlew testDebugUnitTest --rerun-tasks lintDebug
 
 # Assemble debug APK

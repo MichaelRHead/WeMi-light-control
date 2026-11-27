@@ -144,6 +144,7 @@ internal fun TvDeviceCardDimmerStrip(
                     testTag = "tv_card_dim_minus_${device.id}",
                     onClick = {
                         onSelectSliderFocus()
+                        sliderFocusRequester?.let { runCatching { it.requestFocus() } }
                         onStepBrightness(-10)
                     }
                 )
@@ -173,6 +174,7 @@ internal fun TvDeviceCardDimmerStrip(
                     testTag = "tv_card_dim_plus_${device.id}",
                     onClick = {
                         onSelectSliderFocus()
+                        sliderFocusRequester?.let { runCatching { it.requestFocus() } }
                         onStepBrightness(10)
                     }
                 )

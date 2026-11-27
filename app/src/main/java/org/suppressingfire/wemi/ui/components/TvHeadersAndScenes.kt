@@ -95,7 +95,11 @@ internal fun TvTopHeaderBar(
             is TvFocusedBannerTarget.Room -> onToggleRoomPower(focusedBannerTarget.roomName)
             is TvFocusedBannerTarget.TopAction -> when (focusedBannerTarget.index) {
                 0 -> onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.MOVIE_MODE.wireKey)
-                1 -> onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey)
+                1 -> if (showHolidayScene) {
+                    onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.HOLIDAY_ON.wireKey)
+                } else {
+                    onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.MOVIE_MODE.wireKey)
+                }
                 2 -> onApplyTvScene(org.suppressingfire.wemi.ui.TvScene.BEDTIME_OFF.wireKey)
                 3 -> onScanSsdpClick()
                 4 -> onOpenHouseholdSync()
@@ -371,7 +375,11 @@ internal fun TvSceneChip(
             }
             .focusable()
             .focusProperties { canFocus = false }
-            .clickable(onClick = onClick)
+            .clickable {
+                onFocusGained()
+                focusRequester?.let { runCatching { it.requestFocus() } }
+                onClick()
+            }
             .testTag(testTag)
     ) {
         Row(

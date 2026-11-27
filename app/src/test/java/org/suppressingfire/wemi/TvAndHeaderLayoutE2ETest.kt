@@ -426,5 +426,70 @@ class TvAndHeaderLayoutE2ETest {
             }
         }
     }
-}
 
+    @OptIn(ExperimentalTestApi::class)
+    @Test
+    @Config(sdk = [36], qualifiers = "w960dp-h540dp-land-television-xhdpi")
+    fun `verify offline dimmer slider demotes focus to Reconnect, pointer clicks keep single focus, and top OK pill toggles focused room`() {
+        composeTestRule.waitForIdle()
+        val vm = ViewModelProvider(composeTestRule.activity)[SwitchViewModel::class.java]
+        val dao = org.suppressingfire.wemi.data.SwitchDatabase.getDatabase(composeTestRule.activity.application).switchDao()
+        composeTestRule.runOnUiThread { vm.resetLanHomesSwitchesAndRooms(rediscoverAfterReset = false) }
+        awaitLoopbackIo { !vm.isDemoShowroomMode.value && vm.devices.value.isEmpty() && !vm.isRefreshing.value }
+
+        FakeUpnpServer(
+            initialFriendlyName = "Kitchen Switch", deviceTypeUrn = "urn:Belkin:device:lightswitch:1",
+            modelName = "WLS0403", serialNumber = "WLS0403TVOFF02", udn = "uuid:Lightswitch-3_0-WLS0403TVOFF02",
+            isRtos = true, initialRelayOn = true, registerAsCandidatePort = true
+        ).use { kitchenServer ->
+            val key = vm.activeNetworkKey.value
+            val (dimmerId, kitchenId) = kotlinx.coroutines.runBlocking {
+                val dim = dao.insertDevice(org.suppressingfire.wemi.data.DeviceEntity(
+                    name = "Living Dimmer", roomName = "Living Room", networkKey = key,
+                    deviceType = org.suppressingfire.wemi.data.DeviceType.LIGHTBULB_DIMMER.name,
+                    ipAddress = "127.0.0.1", port = 49153, isOn = true, brightness = 50,
+                    isReachable = true, serialNumber = "WDS060TVOFF01", sortOrder = 0
+                )).toInt()
+                val kit = dao.insertDevice(org.suppressingfire.wemi.data.DeviceEntity(
+                    name = "Kitchen Switch", roomName = "Kitchen", networkKey = key,
+                    deviceType = org.suppressingfire.wemi.data.DeviceType.SWITCH_PLUG.name,
+                    ipAddress = "127.0.0.1", port = kitchenServer.port, isOn = true,
+                    isReachable = true, serialNumber = "WLS0403TVOFF02", sortOrder = 1
+                )).toInt()
+                dim to kit
+            }
+            awaitLoopbackIo { vm.devices.value.size == 2 }
+            composeTestRule.waitForIdle()
+
+            // Focus inline dimmer slider, then mark dimmer offline while slider holds focus -> must demote cleanly to card toggle (Reconnect)
+            composeTestRule.onNodeWithTag("tv_device_card_$dimmerId").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("tv_card_dim_mode_$dimmerId").assertIsFocused()
+            composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle").assertIsDisplayed()
+
+            kotlinx.coroutines.runBlocking { dao.updateDevice(dao.getDeviceById(dimmerId)!!.copy(isReachable = false)) }
+            awaitLoopbackIo { vm.devices.value.firstOrNull { it.id == dimmerId }?.isReachable == false }
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("tv_dimmer_mode_toggle").assertDoesNotExist()
+            val afterOfflineTags = composeTestRule.onAllNodes(androidx.compose.ui.test.isFocused()).fetchSemanticsNodes()
+                .mapNotNull { it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag) }
+            assertEquals(listOf("tv_device_card_$dimmerId"), afterOfflineTags)
+            composeTestRule.onNodeWithTag("tv_remote_dpad_ok").assertTextContains("Living Dimmer", substring = true).assertTextContains("OK Reconnect", substring = true)
+
+            // Pointer-clicking Kitchen Switch moves hardware focus cleanly so only one card is focused and toggles relay OFF
+            composeTestRule.onNodeWithTag("tv_device_card_$kitchenId").performClick()
+            awaitLoopbackIo { !kitchenServer.relayStateOn.get() && vm.togglingDeviceIds.value.isEmpty() }
+            composeTestRule.waitForIdle()
+            val afterClickTags = composeTestRule.onAllNodes(androidx.compose.ui.test.isFocused()).fetchSemanticsNodes()
+                .mapNotNull { it.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag) }
+            assertEquals(listOf("tv_device_card_$kitchenId"), afterClickTags)
+
+            // Focus Kitchen Room Header and click top-bar OK action pill -> toggles Kitchen room ON over loopback SOAP
+            composeTestRule.onNodeWithTag("tv_room_header_Kitchen").performSemanticsAction(SemanticsActions.RequestFocus)
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithTag("tv_remote_dpad_ok").assertTextContains("Kitchen", substring = true).performClick()
+            awaitLoopbackIo { kitchenServer.relayStateOn.get() && vm.togglingRooms.value.isEmpty() && vm.togglingDeviceIds.value.isEmpty() }
+            assertTrue(kitchenServer.relayStateOn.get())
+        }
+    }
+}

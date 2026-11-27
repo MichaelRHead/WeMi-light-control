@@ -188,4 +188,102 @@ class TvFocusModelTest {
         assertFalse(emptyHome.nextDidRequestInitialGridFocus)
         assertTrue(emptyHome.shouldRequestFocus)
     }
+
+    @Test
+    fun `demoted offline slider, missing slider fallback, and Holiday ON banner target guard behave deterministically`() {
+        val firstSwitch = DeviceEntity(
+            id = 10,
+            name = "Entry Switch",
+            roomName = "Entry",
+            deviceType = DeviceType.SWITCH_PLUG.name,
+            isReachable = true
+        )
+        val offlineDimmer = DeviceEntity(
+            id = 11,
+            name = "Dining Dimmer",
+            roomName = "Dining",
+            deviceType = DeviceType.LIGHTBULB_DIMMER.name,
+            isReachable = false
+        )
+        val grouped = groupDevicesByCanonicalRoom(listOf(firstSwitch, offlineDimmer)).toList()
+        val ordered = grouped.flatMap { it.second }
+
+        // Even if Compose's detach fallback already overwrote activeFocusTarget to TopAction(0),
+        // focusedSliderDemotedDeviceId restores focus to the offline dimmer's DeviceToggle so OK offers Reconnect
+        val detachedOfflineSlider = reconcileTvFocusState(
+            activeFocusTarget = TvFocusTarget.TopAction(0),
+            lastFocusedDeviceId = offlineDimmer.id,
+            didRequestInitialGridFocus = true,
+            groupedByRoom = grouped,
+            orderedDevices = ordered,
+            hasHolidayDevices = false,
+            holidayChipVanishedWhileFocused = false,
+            focusedSliderDemotedDeviceId = offlineDimmer.id
+        )
+        assertEquals(TvFocusTarget.DeviceToggle(offlineDimmer.id), detachedOfflineSlider.nextActiveTarget)
+        assertEquals(offlineDimmer.id, detachedOfflineSlider.nextLastFocusedDeviceId)
+        assertTrue(detachedOfflineSlider.shouldRequestFocus)
+        assertTrue(detachedOfflineSlider.awaitFrameBeforeFocus)
+
+        // Missing slider respects valid lastFocusedDeviceId consistently with RoomHeader/DeviceToggle
+        val missingSlider = reconcileTvFocusState(
+            activeFocusTarget = TvFocusTarget.DeviceSlider(999),
+            lastFocusedDeviceId = offlineDimmer.id,
+            didRequestInitialGridFocus = true,
+            groupedByRoom = grouped,
+            orderedDevices = ordered,
+            hasHolidayDevices = false,
+            holidayChipVanishedWhileFocused = false
+        )
+        assertEquals(TvFocusTarget.DeviceToggle(offlineDimmer.id), missingSlider.nextActiveTarget)
+        assertEquals(offlineDimmer.id, missingSlider.nextLastFocusedDeviceId)
+        assertTrue(missingSlider.shouldRequestFocus)
+        assertTrue(missingSlider.awaitFrameBeforeFocus)
+
+        // Holiday ON top-bar target falls back cleanly to Movie 20% when no holiday devices exist
+        assertEquals(
+            TvFocusedBannerTarget.TopAction(1, "Holiday ON", "• OK Run Scene"),
+            resolveTvFocusedBannerTarget(
+                activeFocusTarget = TvFocusTarget.TopAction(1),
+                groupedByRoom = grouped,
+                orderedDevices = ordered,
+                lastFocusedDeviceId = firstSwitch.id,
+                isRefreshing = false,
+                hasHolidayDevices = true
+            )
+        )
+        assertEquals(
+            TvFocusedBannerTarget.TopAction(0, "Movie 20%", "• OK Run Scene"),
+            resolveTvFocusedBannerTarget(
+                activeFocusTarget = TvFocusTarget.TopAction(1),
+                groupedByRoom = grouped,
+                orderedDevices = ordered,
+                lastFocusedDeviceId = firstSwitch.id,
+                isRefreshing = false,
+                hasHolidayDevices = false
+            )
+        )
+        assertEquals(
+            TvFocusedBannerTarget.TopAction(3, "Scanning...", "• OK Scan LAN"),
+            resolveTvFocusedBannerTarget(
+                activeFocusTarget = TvFocusTarget.TopAction(3),
+                groupedByRoom = grouped,
+                orderedDevices = ordered,
+                lastFocusedDeviceId = firstSwitch.id,
+                isRefreshing = true,
+                hasHolidayDevices = false
+            )
+        )
+        assertEquals(
+            TvFocusedBannerTarget.TopAction(4, "Sync", "• OK Pair Phone"),
+            resolveTvFocusedBannerTarget(
+                activeFocusTarget = TvFocusTarget.TopAction(4),
+                groupedByRoom = grouped,
+                orderedDevices = ordered,
+                lastFocusedDeviceId = firstSwitch.id,
+                isRefreshing = false,
+                hasHolidayDevices = false
+            )
+        )
+    }
 }

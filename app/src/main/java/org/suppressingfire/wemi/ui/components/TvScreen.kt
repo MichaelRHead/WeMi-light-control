@@ -147,6 +147,12 @@ fun TvDashboardScreen(
         is TvFocusTarget.DeviceSlider -> orderedDevices.none { it.id == target.deviceId }
         else -> false
     }
+    val focusedSliderDemotedDeviceId: Int? = (activeFocusTarget as? TvFocusTarget.DeviceSlider)
+        ?.deviceId
+        ?.takeIf { sliderId ->
+            val dev = orderedDevices.firstOrNull { it.id == sliderId }
+            dev != null && (!dev.isReachable || dev.parsedType != DeviceType.LIGHTBULB_DIMMER)
+        }
 
     val navigateTo: (TvFocusTarget?) -> Boolean = { target ->
         if (target != null) {
@@ -185,7 +191,8 @@ fun TvDashboardScreen(
             hasHolidayDevices = hasHolidayDevices,
             holidayChipVanishedWhileFocused = holidayChipVanishedWhileFocused,
             focusedRoomVanishedWhileFocused = focusedRoomVanishedWhileFocused,
-            focusedDeviceVanishedWhileFocused = focusedDeviceVanishedWhileFocused
+            focusedDeviceVanishedWhileFocused = focusedDeviceVanishedWhileFocused,
+            focusedSliderDemotedDeviceId = focusedSliderDemotedDeviceId
         )
         didRequestInitialGridFocus = reconciled.nextDidRequestInitialGridFocus
         lastFocusedDeviceId = reconciled.nextLastFocusedDeviceId
@@ -201,6 +208,11 @@ fun TvDashboardScreen(
             }
             runCatching { requesterFor(reconciled.nextActiveTarget).requestFocus() }
         }
+        focusRequesters.keys.retainAll { key ->
+            key is TvFocusTarget.TopAction ||
+                key == reconciled.nextActiveTarget ||
+                key in gridIndexByTarget
+        }
     }
 
     val focusedBannerTarget = resolveTvFocusedBannerTarget(
@@ -208,7 +220,8 @@ fun TvDashboardScreen(
         groupedByRoom = groupedByRoom,
         orderedDevices = orderedDevices,
         lastFocusedDeviceId = lastFocusedDeviceId,
-        isRefreshing = isRefreshing
+        isRefreshing = isRefreshing,
+        hasHolidayDevices = hasHolidayDevices
     )
     val dimmingDeviceId: Int? = (activeFocusTarget as? TvFocusTarget.DeviceSlider)?.deviceId
 

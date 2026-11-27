@@ -185,6 +185,7 @@ internal fun TvDeviceCard(
                     .combinedClickable(
                         onClick = {
                             onSelectToggleFocus()
+                            toggleFocusRequester?.let { runCatching { it.requestFocus() } }
                             onPrimaryAction()
                         },
                         onLongClick = {
@@ -192,6 +193,7 @@ internal fun TvDeviceCard(
                                 onNavigateDownFromToggle()
                             } else {
                                 onSelectToggleFocus()
+                                toggleFocusRequester?.let { runCatching { it.requestFocus() } }
                                 onPrimaryAction()
                             }
                         }

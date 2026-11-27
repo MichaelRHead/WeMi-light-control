@@ -119,6 +119,7 @@ internal fun TvRoomSectionHeader(
             .focusProperties { canFocus = false }
             .clickable {
                 onSelectRoomFocus()
+                focusRequester?.let { runCatching { it.requestFocus() } }
                 onToggleRoomPower()
             }
             .testTag("tv_room_header_$roomName")
@@ -186,7 +187,11 @@ internal fun TvRoomSectionHeader(
                         color = Color.White.copy(alpha = 0.10f),
                         modifier = Modifier
                             .focusProperties { canFocus = false }
-                            .clickable { onStepRoomBrightness(-10) }
+                            .clickable {
+                                onSelectRoomFocus()
+                                focusRequester?.let { runCatching { it.requestFocus() } }
+                                onStepRoomBrightness(-10)
+                            }
                             .testTag("tv_room_dim_minus_$roomName")
                     ) {
                         Text(
@@ -203,7 +208,11 @@ internal fun TvRoomSectionHeader(
                         color = Color.White.copy(alpha = 0.10f),
                         modifier = Modifier
                             .focusProperties { canFocus = false }
-                            .clickable { onStepRoomBrightness(10) }
+                            .clickable {
+                                onSelectRoomFocus()
+                                focusRequester?.let { runCatching { it.requestFocus() } }
+                                onStepRoomBrightness(10)
+                            }
                             .testTag("tv_room_dim_plus_$roomName")
                     ) {
                         Text(
