@@ -75,8 +75,12 @@ When installed on an **Android TV** or **Google TV** device, WeMi automatically 
 
 ### Navigating `wemi TV` with Your TV Remote (D-Pad)
 
-1. **Compact Single-Row Top Bar**:
-   - Shows the **`wemi TV`** badge, active count (`X/Y ON`), a status pill for whichever switch is currently highlighted, a **`Dimmer X%` / `Done Dimming`** indicator whenever a dimmer is focused, your **Quick Scenes**, **`Rescan`**, and **`Sync`**.
+1. **Compact Single-Row Top Bar & Context-Aware OK Action Pill**:
+   - Shows the **`wemi TV`** badge, active count (`X/Y ON`), a **context-aware OK action pill** that updates immediately as you move your TV remote selector across rooms, switches, or top-bar buttons, a **`Dimmer X%` / `Done Dimming`** chip (shown only while a reachable dimmer is highlighted and hidden whenever focus moves to a Room Bar, regular switch, offline switch, or top-bar action), your **Quick Scenes**, **`Rescan`**, and **`Sync`**.
+   - What the top-bar OK action pill shows (and runs directly if selected):
+     - **Switch or Dimmer Card**: **`<Switch Name> • OK Toggle`** (switches to **`• ◄/► X%`** while dimming, **`• OK Reconnect`** on an offline switch, or **`• OK Refresh`** on a motion sensor).
+     - **Room Bar**: **`<Room Name> • OK Toggle Room`**—or **`<Room Name> • OK Toggle Room • ◄/► Dim`** whenever that room includes reachable dimmers.
+     - **Top-Bar Scenes & Controls**: **`Movie 20% • OK Run Scene`**, **`Holiday ON • OK Run Scene`**, **`All OFF • OK Turn All Off`**, **`Rescan • OK Scan LAN`** (or **`Scanning... • OK Scan LAN`**), and **`Sync • OK Pair Phone`**.
    - Over 90% of the screen stays dedicated to your rooms and switch cards.
 2. **3-Column Room-Grouped Switch Grid & Room Bars**:
    - Switches are grouped under full-width **Room Bars** (`LIVING ROOM`, `BEDROOM`, `KITCHEN`, etc., with `UNASSIGNED` last) in a 3-column grid.
@@ -84,11 +88,12 @@ When installed on an **Android TV** or **Google TV** device, WeMi automatically 
    - While a **Room Bar** is focused (**`FOCUSED • OK TOGGLE ROOM`** or **`FOCUSED • OK TOGGLE • L/R DIM`**):
      - Press **`OK / Select`** to toggle every switch in that room ON or OFF at once.
      - Press **`Left`** / **`Right`** (on rooms with reachable dimmers) to dim or brighten every dimmer in that room by **`-10%` / `+10%`**.
+   - If room capitalization merges during a background scan (such as `"kitchen"` merging into `"Kitchen"`), your remote focus stays locked on that Room Bar; if a focused room or switch disappears after a filter or update, focus recovers smoothly to your last active switch (or **`Rescan`** if the home is empty).
 3. **Clear 10-Foot Cursor Focus (Including Empty-Home Start)**:
    - On launch, focus lands automatically on your first switch card—or directly on **`Rescan`** if your home has zero switches yet so a single **`OK`** press discovers your switches.
    - Focused switch cards stand out across the room with a bright **Electric Cyan** border, illuminated card surface, slight scale lift, and a **`FOCUSED • OK`** badge in the top-right corner.
 4. **Google TV Remote-Friendly Inline Dimmer Slider**:
-   - **Toggling Power**: On any switch or dimmer card, press **`OK / Select`** to toggle power ON or OFF (or reconnect if offline), and press **`Left` / `Right`** to move across the 3 columns.
+   - **Toggling Power**: On any switch or dimmer card, press **`OK / Select`** to toggle power ON or OFF (reconnect if offline, or refresh if a motion sensor), and press **`Left` / `Right`** to move across the 3 columns.
    - **Adjusting Brightness (No Special Remote Keys Needed)**: On a reachable dimmer card, press **`Down`** once from the On/Off Toggle to focus the **Inline Dimmer Slider** right underneath it *(you can also press **`Play/Pause`**, **`Menu`**, **`Info`**, or long-press **`OK`**)*.
    - The card highlights in **Gold** with a **`DIM -/+`** badge in the corner, **`Done Dimming`** in the top bar, and the inline guide **`Left: -10%  •  Right: +10%   (Up: Toggle • Down: Next)`**:
      - Press **`Left`** / **`Right`** to step brightness down or up by **`10%`** (`10%–100%`).

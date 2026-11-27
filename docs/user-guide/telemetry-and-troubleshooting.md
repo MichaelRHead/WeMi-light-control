@@ -51,14 +51,14 @@ Inside the **`SETUP DIAGNOSTICS`** header bar in the **Provision New Switch AP (
   1. Writes the diagnostic report (redacted by default, or full if **`Full IDs in Export`** is ON) to `files/wemi-telemetry-latest.txt` in the app's private storage without touching your system clipboard.
   2. Opens Android's **Share Sheet (`Save or Share WeMi Telemetry`)** so you can save `wemi-telemetry-latest.txt` to **Files / Google Drive**, email it, or send it directly to chat.
 - **Tap `Copy`**:
-  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v37.0 [37] • ... • IDs=REDACTED) ===` (or `IDs=FULL`) block to your clipboard (marked sensitive on Android 13+) and updates `files/wemi-telemetry-latest.txt`.
+  1. Copies the version-stamped `=== WeMi Setup AP Diagnostic Report (v38.0 [38] • ... • IDs=REDACTED) ===` (or `IDs=FULL`) block to your clipboard (marked sensitive on Android 13+) and updates `files/wemi-telemetry-latest.txt`.
   2. Paste the copied text directly into your chat message or issue report.
 
 ### B2. Exporting from the `More` Tab (`Save/Share Log`)
 In the **`UPnP / SOAP Packet Log`** card on the **`More`** tab:
 - Leave **`Full Diagnostics in Exported Logs`** **OFF** for default privacy-safe redaction (`Identifiers: REDACTED (default privacy-safe)`), or toggle it **ON** only when sharing full SSIDs/MACs/serials/UDNs/DNS IPs with support.
 - **Tap `Save/Share Log`**:
-  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v37.0 (versionCode=37, com.aistudio.wemiswitch.kxpqzr)`) containing:
+  1. Generates a comprehensive **5-section** report (`wemi-telemetry-latest.txt`, stamped with `App Version: v38.0 (versionCode=38, com.aistudio.wemiswitch.kxpqzr)`) containing:
      - **`--- [1. SETUP AP & PROVISIONING SNAPSHOT] ---`**: All hardware probe, encryption flag, AP scan, `[TARGET AP]` match/warning, and `[STEP 1..6]` provisioning traces from your most recent setup attempt (keeping `[NET]` subnet/Wi-Fi-binding/ChromeOS VM flags consistent with the captured session).
      - **`--- [2. REMEMBERED WI-FI HOMES] ---`**: All remembered Wi-Fi Home profiles (`networkKey`, `homeName`, redacted or full `ssid`, `/24` subnet — or `subnet=unset gw=none` on a fresh Chromebook before the first switch is discovered — and gateway IP).
      - **`--- [3. REGISTERED SWITCHES & DEVICES] ---`**: Every switch in your current inventory with its normalized room, Wi-Fi Home (`home=<networkKey>`), IP:port, state (`ON`, `OFF_STANDBY`, `OFFLINE`), dimmer brightness/Night Mode (`dim=<n>%`, `night=1`), latency (`ms`), hardware SKU, firmware, redacted or full serial/MAC/UDN, cached on-device rules capability (`rulesCap=...`, optional `lp=1` and `rulesFw=...`), and — when inspected — a privacy-safe `  rules:` summary (`dbV=...`, rule count, SQLite integrity, clock drift, `needsSync`, local backup count, and `solarLoc=set/unset` without exact coordinates).

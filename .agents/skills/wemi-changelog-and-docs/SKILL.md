@@ -32,7 +32,7 @@ Use this skill whenever you land a feature, bug fix, UI change, or architectural
 | :--- | :--- |
 | [`IMPLEMENTED.md`](../../../IMPLEMENTED.md) | **Reverse-Chronological Feature Change Log**: Records every completed feature, bug fix, and improvement from **newest at the top to oldest at the bottom**, including the PST timestamp, version/commit reference, summary table row, and detailed bullet points. |
 | [`RELEASE_PROCESS.md`](../../../RELEASE_PROCESS.md) & [`RELEASE_SIGN_OFF.md`](../../../RELEASE_SIGN_OFF.md) | **7-Agent / 8-Stage Autonomous Release Process & Sign-Off Ledger**: Coordinates autonomous release reviews (`ai_studio_ux_cuj` → `discovery_and_grouping` → `telemetry_and_debugging` → `security_and_privacy` → `code_quality_and_testing` → `license_governance` → `ai_studio_ux_cuj` → `app_promoter`). |
-| [`docs/user-guide/release-notes.md`](../../../docs/user-guide/release-notes.md) | **User-Facing Google Play Store Release Notes**: High-level, non-technical summary of major user-facing features and improvements introduced in each Play Store release version (`v1.0` → `v37.0+`). |
+| [`docs/user-guide/release-notes.md`](../../../docs/user-guide/release-notes.md) | **User-Facing Google Play Store Release Notes**: High-level, non-technical summary of major user-facing features and improvements introduced in each Play Store release version (`v1.0` → `v38.0+`). |
 | [`UPCOMING_FEATURES.md`](../../../UPCOMING_FEATURES.md) | **Upcoming Features Roadmap**: Lists planned/unimplemented features and engineering tracks. When an upcoming feature is implemented, remove it from `UPCOMING_FEATURES.md` and prepend it to `IMPLEMENTED.md`. |
 | [`USER_GUIDE.md`](../../../USER_GUIDE.md) | **User Guide Index**: Summarizes each user-facing feature in a table and links to detailed guides under [`docs/user-guide/`](../../../docs/user-guide/). |
 | [`docs/user-guide/*.md`](../../../docs/user-guide/) | **Detailed Human-Focused Feature Guides**: Individual user-facing guides (`main-screen.md`, `switch-discovery.md`, `fresh-device-setup.md`, `room-grouping.md`, `home-screen-widgets.md`, `editing-and-managing-devices.md`, `wifi-homes.md`, `rules-and-timers.md`, `more-and-tv-mode.md`, `telemetry-and-troubleshooting.md`, `release-notes.md`). |
@@ -73,5 +73,5 @@ bash .agents/skills/agent-commit-attribution/scripts/commit_as_agent.sh \
   <your_role_id> \
   "<type>(<scope>): <plain-English summary <= 72 chars>" \
   "- Explain what changed and why in plain English." \
-  --verified "<brief checks, e.g. 147+ tests passing, lint clean>"
+  --verified "<brief checks, e.g. 159/159 tests passing, lint clean>"
 ```

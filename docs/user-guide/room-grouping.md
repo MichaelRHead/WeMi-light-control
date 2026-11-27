@@ -40,7 +40,7 @@ In **Grouped by Room** view, each room card gives you instant overview and whole
 When a room contains dimmable switches (`F7C059` / `WDS060`), tapping the **Tune** sliders icon on the Room Group header expands the **Room Master Brightness** drawer:
 
 - **Continuous Master Brightness Slider (`1%–100%`)**: Drag and release the slider to set every reachable dimmer in that room to the same brightness level together, while leaving regular ON/OFF switches in the room untouched.
-- **Android TV (`wemi TV`) Room Bars**: On Android TV, each room renders a full-width **Room Bar** above its 3-column switch cards (with **`Unassigned`** placed last). Navigating **Up** or **Down** between rooms from any column focuses the Room Bar (**`FOCUSED • OK TOGGLE ROOM`** or **`FOCUSED • OK TOGGLE • L/R DIM`**), where pressing **`OK`** toggles the entire room ON or OFF and pressing **`Left`** / **`Right`** dims or brightens every reachable dimmer in that room in **`10%`** steps.
+- **Android TV (`wemi TV`) Room Bars**: On Android TV, each room renders a full-width **Room Bar** above its 3-column switch cards (with **`Unassigned`** placed last). Navigating **Up** or **Down** between rooms from any column focuses the Room Bar (**`FOCUSED • OK TOGGLE ROOM`** or **`FOCUSED • OK TOGGLE • L/R DIM`**) and immediately updates the top-bar OK hint (`<Room Name> • OK Toggle Room` or `• OK Toggle Room • ◄/► Dim`), where pressing **`OK`** toggles the entire room ON or OFF, pressing **`Left`** / **`Right`** dims or brightens every reachable dimmer in that room in **`10%`** steps, and case-insensitive room merges keep remote focus locked smoothly in place.
 
 ---
 
