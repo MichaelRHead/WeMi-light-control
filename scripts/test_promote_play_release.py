@@ -819,6 +819,127 @@ class PromotePlayReleaseTests(unittest.TestCase):
             self.assertEqual(rc, 1)
             self.assertIn("ERROR: Play API network timeout", stderr_buf.getvalue())
 
+    def test_client_retries_transient_503_on_idempotent_requests(self) -> None:
+        sleeps: list[float] = []
+        session = FakeSession(
+            [
+                ("POST", "/edits", FakeResponse(503, {"error": {"message": "The service is currently unavailable."}})),
+                ("POST", "/edits", FakeResponse(200, {"id": "edit-retry"})),
+                ("GET", "/edits/edit-retry/tracks", FakeResponse(502, text="Bad Gateway")),
+                ("GET", "/edits/edit-retry/tracks", FakeResponse(200, {"tracks": [{"track": "alpha", "releases": []}]})),
+                ("DELETE", "/edits/edit-retry", FakeResponse(204)),
+            ]
+        )
+        client = mod.PlayPublisherClient(
+            "com.aistudio.wemiswitch.kxpqzr",
+            session=session,
+            max_transient_retries=2,
+            retry_backoff_sec=1.5,
+            sleep_fn=sleeps.append,
+        )
+        tracks = mod.run_list_tracks(client)
+        self.assertEqual([t["track"] for t in tracks], ["alpha"])
+        self.assertEqual(sleeps, [1.5, 1.5])
+        self.assertEqual(len(session.calls), 5)
+
+    def test_client_does_not_retry_commit_or_403_errors(self) -> None:
+        sleeps: list[float] = []
+        commit_session = FakeSession(
+            [("POST", "/edits/edit-9:commit", FakeResponse(503, {"error": {"message": "Unavailable"}}))]
+        )
+        commit_client = mod.PlayPublisherClient(
+            "com.aistudio.wemiswitch.kxpqzr",
+            session=commit_session,
+            max_transient_retries=3,
+            retry_backoff_sec=1.0,
+            sleep_fn=sleeps.append,
+        )
+        with self.assertRaises(mod.PlayApiError) as commit_ctx:
+            commit_client.commit_edit("edit-9")
+        self.assertEqual(commit_ctx.exception.status_code, 503)
+        self.assertEqual(len(commit_session.calls), 1)
+        self.assertEqual(sleeps, [])
+
+        auth_session = FakeSession(
+            [("GET", "/tracks/alpha/releases", FakeResponse(403, {"error": {"message": "Permission denied"}}))]
+        )
+        auth_client = mod.PlayPublisherClient(
+            "com.aistudio.wemiswitch.kxpqzr",
+            session=auth_session,
+            max_transient_retries=3,
+            retry_backoff_sec=1.0,
+            sleep_fn=sleeps.append,
+        )
+        with self.assertRaises(mod.PlayApiError) as auth_ctx:
+            auth_client.list_track_releases("alpha")
+        self.assertEqual(auth_ctx.exception.status_code, 403)
+        self.assertEqual(len(auth_session.calls), 1)
+        self.assertEqual(sleeps, [])
+
+    def test_auto_promote_continues_polling_after_transient_503(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sign_off = self._write_sign_off(tmpdir, "APPROVED_FOR_PLAY_STORE", version_code=38)
+            poll_sleeps: list[float] = []
+            session = FakeSession(
+                [
+                    # Poll attempt 1 fails with transient 503 (per-request retries disabled to test poll loop)
+                    ("POST", "/edits", FakeResponse(503, {"error": {"message": "The service is currently unavailable."}})),
+                    # Poll attempt 2 succeeds and sees build 38 on internal
+                    ("POST", "/edits", FakeResponse(200, {"id": "poll-2"})),
+                    (
+                        "GET",
+                        "/edits/poll-2/tracks/internal",
+                        FakeResponse(200, {"track": "internal", "releases": [{"name": "0.0.0.38", "status": "completed", "versionCodes": ["38"]}]}),
+                    ),
+                    (
+                        "GET",
+                        "/edits/poll-2/tracks/alpha",
+                        FakeResponse(200, {"track": "alpha", "releases": [{"name": "0.0.0.37", "status": "completed", "versionCodes": ["37"]}]}),
+                    ),
+                    ("DELETE", "/edits/poll-2", FakeResponse(204)),
+                    # Promotion edit
+                    ("POST", "/edits", FakeResponse(200, {"id": "promo-38"})),
+                    ("GET", "/edits/promo-38/tracks", FakeResponse(200, {"tracks": [{"track": "internal"}, {"track": "alpha"}]})),
+                    (
+                        "GET",
+                        "/edits/promo-38/tracks/internal",
+                        FakeResponse(200, {"track": "internal", "releases": [{"name": "0.0.0.38", "status": "completed", "versionCodes": ["38"]}]}),
+                    ),
+                    (
+                        "GET",
+                        "/edits/promo-38/tracks/alpha",
+                        FakeResponse(200, {"track": "alpha", "releases": [{"name": "0.0.0.37", "status": "completed", "versionCodes": ["37"]}]}),
+                    ),
+                    ("PUT", "/edits/promo-38/tracks/alpha", FakeResponse(200, {"track": "alpha"})),
+                    ("POST", "/edits/promo-38:commit", FakeResponse(200, {"id": "promo-38"})),
+                ]
+            )
+            client = mod.PlayPublisherClient(
+                "com.aistudio.wemiswitch.kxpqzr",
+                session=session,
+                max_transient_retries=0,
+            )
+            result = mod.run_auto_promote(
+                client,
+                from_track="internal",
+                to_track="alpha",
+                current_version_code=38,
+                previous_version_code=37,
+                sign_off_path=sign_off,
+                require_approved=True,
+                poll_attempts=3,
+                poll_interval_sec=20.0,
+                status="completed",
+                notes_source="none",
+                notes_file=Path(tmpdir) / "RELEASE_NOTES.txt",
+                notes_language="en-US",
+                changes_not_sent_for_review=False,
+                sleep_fn=poll_sleeps.append,
+            )
+            self.assertTrue(result["promoted"])
+            self.assertEqual(result["version_code"], "38")
+            self.assertEqual(poll_sleeps, [20.0])
+
 
 if __name__ == "__main__":
     unittest.main()

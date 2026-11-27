@@ -37,6 +37,9 @@ TERMINAL_LIFECYCLE_STATES = (
     "RELEASE_LIFECYCLE_STATE_APPROVED_NOT_PUBLISHED",
     "RELEASE_LIFECYCLE_STATE_NOT_APPROVED",
 )
+TRANSIENT_HTTP_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+DEFAULT_TRANSIENT_RETRIES = 3
+DEFAULT_RETRY_BACKOFF_SEC = 2.0
 
 
 class PlayApiError(RuntimeError):
@@ -139,13 +142,34 @@ def _format_api_error(status_code: int, body_text: str) -> str:
 class PlayPublisherClient:
     """Minimal Google Play Android Publisher API v3 client for tracks, listings, and images."""
 
-    def __init__(self, package_name: str, session: Any, timeout_sec: int = 30) -> None:
+    def __init__(
+        self,
+        package_name: str,
+        session: Any,
+        timeout_sec: int = 30,
+        *,
+        max_transient_retries: int = DEFAULT_TRANSIENT_RETRIES,
+        retry_backoff_sec: float = DEFAULT_RETRY_BACKOFF_SEC,
+        sleep_fn: Callable[[float], None] = time.sleep,
+    ) -> None:
         self.package_name = package_name
         self.session = session
         self.timeout_sec = timeout_sec
+        self.max_transient_retries = max(0, int(max_transient_retries))
+        self.retry_backoff_sec = max(0.0, float(retry_backoff_sec))
+        self.sleep_fn = sleep_fn
         encoded_pkg = quote(package_name, safe="")
         self.base_url = f"{PLAY_API_BASE}/{encoded_pkg}"
         self.upload_base_url = f"{PLAY_UPLOAD_BASE}/{encoded_pkg}"
+
+    @staticmethod
+    def _is_retryable_request(method: str, path: str, upload: bool) -> bool:
+        if upload:
+            return False
+        upper = method.upper()
+        if upper in ("GET", "PUT", "DELETE"):
+            return True
+        return upper == "POST" and path == "/edits"
 
     def _request(
         self,
@@ -170,17 +194,35 @@ class PlayPublisherClient:
             req_kwargs["data"] = data
         if headers is not None:
             req_kwargs["headers"] = headers
-        response = self.session.request(method, url, **req_kwargs)
-        text = getattr(response, "text", "") or ""
-        if not (200 <= response.status_code < 300):
+
+        can_retry = self._is_retryable_request(method, path, upload)
+        max_attempts = (self.max_transient_retries + 1) if can_retry else 1
+        for attempt in range(1, max_attempts + 1):
+            response = self.session.request(method, url, **req_kwargs)
+            text = getattr(response, "text", "") or ""
+            if 200 <= response.status_code < 300:
+                if not text.strip():
+                    return {}
+                return response.json()
+            if (
+                can_retry
+                and response.status_code in TRANSIENT_HTTP_STATUS_CODES
+                and attempt < max_attempts
+            ):
+                delay = self.retry_backoff_sec * (2 ** (attempt - 1))
+                print(
+                    f"Transient Google Play HTTP {response.status_code} on {method} {path} "
+                    f"(retry {attempt}/{self.max_transient_retries} in {delay:g}s)..."
+                )
+                if delay > 0:
+                    self.sleep_fn(delay)
+                continue
             raise PlayApiError(
                 response.status_code,
                 _format_api_error(response.status_code, text),
                 raw_body=text,
             )
-        if not text.strip():
-            return {}
-        return response.json()
+        raise PlayApiError(500, f"Google Play request failed unexpectedly for {method} {path}.")
 
     def insert_edit(self) -> str:
         data = self._request("POST", "/edits", json_body={})
@@ -827,12 +869,23 @@ def run_auto_promote(
     candidate_vc: str | None = None
 
     for attempt in range(1, attempts + 1):
-        edit_id = client.insert_edit()
+        edit_id: str | None = None
         try:
+            edit_id = client.insert_edit()
             source_track_data = client.get_track(edit_id, from_track)
             target_track_data = client.get_track(edit_id, to_track)
+        except PlayApiError as exc:
+            if exc.status_code in TRANSIENT_HTTP_STATUS_CODES and attempt < attempts:
+                print(
+                    f"Attempt {attempt}/{attempts}: transient Google Play HTTP {exc.status_code} "
+                    f"while checking tracks; retrying in {poll_interval_sec:g}s..."
+                )
+                sleep_fn(poll_interval_sec)
+                continue
+            raise
         finally:
-            client.delete_edit(edit_id)
+            if edit_id is not None:
+                client.delete_edit(edit_id)
 
         source_vc = highest_track_version_code(source_track_data)
         target_vc = highest_track_version_code(target_track_data)
